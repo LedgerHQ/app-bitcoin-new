@@ -1,0 +1,49 @@
+{
+    "env": {
+        "BOLOS_SDK": "/opt/nanos-secure-sdk",
+        "BOLOS_ENV": "/opt/bolos-devenv"
+    },
+    "configurations": [
+        {
+            "name": "Nano S",
+            "includePath": [
+                "/usr/include",
+                "${workspaceFolder}/src",
+                "${env:BOLOS_SDK}/include/*",
+                "${env:BOLOS_SDK}/lib_ux/include/*"
+            ],
+            "defines": [
+                "TARGET_NANOS",
+                "OS_IO_SEPROXYHAL",
+                "HAVE_BAGL",
+                "HAVE_SPRINTF",
+                "HAVE_IO_USB",
+                "HAVE_L4_USBLIB",
+                "IO_USB_MAX_ENDPOINTS=6",
+                "IO_HID_EP_LENGTH=64",
+                "HAVE_USB_APDU",
+                "USB_SEGMENT_SIZE=64",
+                "UNUSED(x)=(void)x",
+                "APPVERSION=\"1.0.0\"",
+                "APPNAME=\"Boilerplate\"",
+                "MAJOR_VERSION=1",
+                "MINOR_VERSION=0",
+                "PATCH_VERSION=0",
+                "IO_SEPROXYHAL_BUFFER_SIZE_B=128",
+                "HAVE_UX_FLOW",
+                "DEBUG=1",
+                "HAVE_PRINTF",
+                "PRINTF=screen_printf"
+            ],
+            "compilerPath": "${env:BOLOS_ENV}/gcc-arm-none-eabi-5_3-2016q1/bin/arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        }
+    ],
+    "version": 4
+}

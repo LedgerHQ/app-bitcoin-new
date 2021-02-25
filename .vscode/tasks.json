@@ -1,0 +1,111 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "make clean && make",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "[debug] make",
+            "type": "shell",
+            "command": "make clean && make DEBUG=1",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "make clean",
+            "type": "shell",
+            "command": "make clean",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "make load",
+            "type": "shell",
+            "command": "make load",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "run unit tests",
+            "type": "shell",
+            "command": "cd unit-tests && rm -rf  build && cmake -Bbuild -H. && make -C build && CTEST_OUTPUT_ON_FAILURE=1 make -C build test",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        },
+        {
+            "label": "run Speculos",
+            "type": "shell",
+            "command": "python /path/to/speculos/speculos.py ${workspaceFolder}/bin/app.elf --ontop --sdk 1.6 --apdu-port 9999 --button-port 42000 --automation-port 43000",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "make debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "[debug] run Speculos",
+            "type": "shell",
+            "command": "python /path/to/speculos/speculos.py -d ${workspaceFolder}/bin/app.elf --ontop --sdk 1.6 --apdu-port 9999 --button-port 42000 --automation-port 43000",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": [
+                "make debug"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "run tests",
+            "type": "shell",
+            "command": "cd tests && pytest",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "kill Speculos",
+            "type": "shell",
+            "command": "pkill -f speculos.py",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

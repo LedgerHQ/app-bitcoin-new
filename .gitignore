@@ -1,0 +1,31 @@
+# Compilation of Ledger's app
+src/glyphs.c
+src/glyphs.h
+bin/
+debug/
+dep/
+obj/
+
+# Unit tests and code coverage
+unit-tests/build/
+unit-tests/coverage/
+unit-tests/coverage.info
+
+# Fuzzing
+fuzzing/build/
+
+
+# Editors
+.idea/
+
+# Python
+*.pyc[cod]
+*.egg
+__pycache__/
+*.egg-info/
+.eggs/
+.python-version
+
+# Doxygen
+doc/html
+doc/latex

@@ -1,0 +1,1 @@
+#define CCMD_GET_SQUARE 1
