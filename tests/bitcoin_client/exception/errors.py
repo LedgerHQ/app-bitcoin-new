@@ -56,3 +56,8 @@ class BadStateError(Exception):
 
 class SignatureFailError(Exception):
     pass
+
+
+# Not really an error
+class InterruptedExecution(Exception):
+    pass
