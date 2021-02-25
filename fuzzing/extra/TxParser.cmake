@@ -1,7 +1,7 @@
 # project information
 project(TxParser
         VERSION 1.0
-        DESCRIPTION "Transaction parser of Boilerplate app"
+        DESCRIPTION "Transaction parser of the Bitcoin app"
         LANGUAGES C)
 
 # specify C standard

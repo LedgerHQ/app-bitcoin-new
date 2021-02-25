@@ -1,4 +1,4 @@
-name: Compilation & tests
+name: Compilation & tests (TODO-untouched from the boilerplate)
 
 on: [push, pull_request]
 

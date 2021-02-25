@@ -1,6 +1,6 @@
 /*****************************************************************************
- *   Ledger App Boilerplate.
- *   (c) 2020 Ledger SAS.
+ *   Ledger App Bitcoin.
+ *   (c) 2021 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -25,10 +25,6 @@
 #include "../io.h"
 #include "../sw.h"
 #include "../common/buffer.h"
-#include "../handler/get_version.h"
-#include "../handler/get_app_name.h"
-#include "../handler/get_public_key.h"
-#include "../handler/sign_tx.h"
 #include "../handler/get_sum_of_squares.h"
 
 
@@ -70,44 +66,6 @@ int apdu_dispatcher(const command_t *cmd) {
 
     int ret;
     switch (ins) {
-        case GET_VERSION:
-            if (p1 != 0 || p2 != 0) {
-                return io_send_sw(SW_WRONG_P1P2);
-            }
-
-            ret = handler_get_version();
-            break;
-        case GET_APP_NAME:
-            if (p1 != 0 || p2 != 0) {
-                return io_send_sw(SW_WRONG_P1P2);
-            }
-
-            ret = handler_get_app_name();
-            break;
-        case GET_PUBLIC_KEY:
-            if (p1 > 1 || p2 > 0) {
-                return io_send_sw(SW_WRONG_P1P2);
-            }
-
-            if (!cmd->data) {
-                return io_send_sw(SW_WRONG_DATA_LENGTH);
-            }
-
-            ret = handler_get_public_key(&dispatcher_context.read_buffer, (bool) p1);
-            break;
-        case SIGN_TX:
-            if ((p1 == P1_START && p2 != P2_MORE) ||  //
-                p1 > P1_MAX ||                             //
-                (p2 != P2_LAST && p2 != P2_MORE)) {
-                return io_send_sw(SW_WRONG_P1P2);
-            }
-
-            if (!cmd->data) {
-                return io_send_sw(SW_WRONG_DATA_LENGTH);
-            }
-
-            ret = handler_sign_tx(&dispatcher_context.read_buffer, p1, (bool) (p2 & P2_MORE));
-            break;
         case GET_SUM_OF_SQUARES:
             if (p1 != 0 || p2 != 0) {
                 return io_send_sw(SW_WRONG_P1P2);

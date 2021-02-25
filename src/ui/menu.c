@@ -1,6 +1,6 @@
 /*****************************************************************************
- *   Ledger App Boilerplate.
- *   (c) 2020 Ledger SAS.
+ *   Ledger App Bitcoin.
+ *   (c) 2021 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 #include "../globals.h"
 #include "menu.h"
 
-UX_STEP_NOCB(ux_menu_ready_step, pnn, {&C_boilerplate_logo, "Boilerplate", "is ready"});
+UX_STEP_NOCB(ux_menu_ready_step, pnn, {&C_bitcoin_logo, "Bitcoin", "is ready"});
 UX_STEP_NOCB(ux_menu_version_step, bn, {"Version", APPVERSION});
 UX_STEP_CB(ux_menu_about_step, pb, ui_menu_about(), {&C_icon_certificate, "About"});
 UX_STEP_VALID(ux_menu_exit_step, pb, os_sched_exit(-1), {&C_icon_dashboard_x, "Quit"});
@@ -47,7 +47,7 @@ void ui_menu_main() {
     ux_flow_init(0, ux_menu_main_flow, NULL);
 }
 
-UX_STEP_NOCB(ux_menu_info_step, bn, {"Boilerplate App", "(c) 2020 Ledger"});
+UX_STEP_NOCB(ux_menu_info_step, bn, {"Bitcoin App", "(c) 2021 Ledger"});
 UX_STEP_CB(ux_menu_back_step, pb, ui_menu_main(), {&C_icon_back, "Back"});
 
 // FLOW for the about submenu:

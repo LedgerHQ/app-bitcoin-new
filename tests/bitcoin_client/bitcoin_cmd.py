@@ -3,10 +3,10 @@ from typing import Tuple
 
 from ledgercomm import Transport
 
-from boilerplate_client.boilerplate_cmd_builder import BoilerplateCommandBuilder, InsType, ClientCommandCode
-from boilerplate_client.button import Button
-from boilerplate_client.exception import DeviceException
-from boilerplate_client.transaction import Transaction
+from bitcoin_client.bitcoin_cmd_builder import BitcoinCommandBuilder, InsType, ClientCommandCode
+from bitcoin_client.button import Button
+from bitcoin_client.exception import DeviceException
+from bitcoin_client.transaction import Transaction
 
 class ClientCommand:
     def __init__(self, request: bytes):
@@ -44,12 +44,12 @@ class GetSquareCommand(ClientCommand):
     def execute(self):
         return (self.n * self.n).to_bytes(4, 'big')
 
-class BoilerplateCommand:
+class BitcoinCommand:
     def __init__(self,
                  transport: Transport,
                  debug: bool = False) -> None:
         self.transport = transport
-        self.builder = BoilerplateCommandBuilder(debug=debug)
+        self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
 
     def process_client_command(self, request: bytes) -> Tuple[int, bytes]:

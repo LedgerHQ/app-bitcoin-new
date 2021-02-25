@@ -1,6 +1,6 @@
-# Ledger Boilerplate Application
+# Ledger Bitcoin Application
 
-This is a boilerplate application which can be forked to start a new project for the Ledger Nano S/X.
+TODO
 
 ## Prerequisite
 
@@ -27,7 +27,7 @@ make load     # load the app on the Nano using ledgerblue
 
 ## Documentation
 
-High level documentation such as [APDU](doc/APDU.md), [commands](doc/COMMANDS.md) and [transaction serialization](doc/TRANSACTION.md) are included in developer documentation which can be generated with [doxygen](https://www.doxygen.nl)
+High level documentation such as [commands](doc/COMMANDS.md) are included in developer documentation which can be generated with [doxygen](https://www.doxygen.nl)
 
 ```
 doxygen .doxygen/Doxyfile
@@ -48,7 +48,6 @@ The flow processed in [GitHub Actions](https://github.com/features/actions) is t
 
 It outputs 4 artifacts:
 
-- `boilerplate-app-debug` within output files of the compilation process in debug mode
-- `speculos-log` within APDU command/response when executing end-to-end tests
+- `bitcoin-app-debug` within output files of the compilation process in debug mode
 - `code-coverage` within HTML details of code coverage
 - `documentation` within HTML auto-generated documentation

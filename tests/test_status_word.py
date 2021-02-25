@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 import re
 
-from boilerplate_client.exception import DeviceException
+from bitcoin_client.exception import DeviceException
 
 
 SW_RE = re.compile(r"""(?x)

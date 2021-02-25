@@ -1,6 +1,6 @@
 import pytest
 
-from boilerplate_client.exception import *
+from bitcoin_client.exception import *
 
 
 @pytest.mark.xfail(raises=ClaNotSupportedError)

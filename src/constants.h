@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * Instruction class of the Boilerplate application.
+ * Instruction class of the Bitcoin application.
  */
 #define CLA 0xE0
 
@@ -31,6 +31,6 @@
 #define MAX_DER_SIG_LEN 72
 
 /**
- * Exponent used to convert mBOL to BOL unit (N BOL = N * 10^3 mBOL).
+ * Exponent used to convert mBTC to BTC unit (N BTC = N * 10^3 mBTC).
  */
 #define EXPONENT_SMALLEST_UNIT 3

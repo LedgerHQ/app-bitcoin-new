@@ -12,7 +12,7 @@ pip install -r requirements.txt
 First start your application with Speculos
 
 ```
-./path/to/speculos.py /path/to/app-boilerplate/bin/app.elf --ontop --sdk 1.6
+./path/to/speculos.py /path/to/app-bitcoin-new/bin/app.elf --ontop --sdk 1.6
 ```
 
 then in the `tests` folder run
