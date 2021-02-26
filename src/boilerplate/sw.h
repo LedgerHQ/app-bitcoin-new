@@ -25,11 +25,11 @@
  */
 #define SW_CLA_NOT_SUPPORTED 0x6E00
 
-
 /**
  * Status word for interrupted excution.
  */
-#define SW_INTERRUPTED_EXECUTION 0xA000
+#define SW_INTERRUPTED_EXECUTION 0xE000
+
 
 /**
  * Status word for wrong reponse length (buffer too small or too big).

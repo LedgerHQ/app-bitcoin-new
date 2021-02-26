@@ -17,13 +17,12 @@
 
 #include <stdint.h>  // uint*_t
 
-#include "../constants.h"
-#include "../globals.h"
-#include "../io.h"
-#include "../sw.h"
-#include "../types.h"
+#include "boilerplate/io.h"
+#include "boilerplate/dispatcher.h"
+#include "boilerplate/sw.h"
 #include "common/buffer.h"
-#include "../apdu/dispatcher.h"
+#include "../constants.h"
+#include "../types.h"
 #include "client_commands.h"
 
 

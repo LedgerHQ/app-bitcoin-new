@@ -4,7 +4,7 @@
 
 #include "ux.h"
 
-#include "io.h"
+#include "boilerplate/io.h"
 #include "types.h"
 #include "constants.h"
 
@@ -36,15 +36,11 @@ extern io_state_e G_io_state;
 /**
  * Global context for user requests.
  */
-extern global_ctx_t G_context;
+extern global_context_t G_context;
 
 /**
  * State of the current APDU interaction, if any.
  */
 extern command_state_t G_command_state;
 
-/**
- * If non-zero, the code of the current interrupted APDU, whose state is saved in G_command_state.
- */
-extern interrupted_command_t G_interrupted_command;
 

@@ -19,23 +19,27 @@
 #include <stdbool.h>
 
 #include "dispatcher.h"
+#include "constants.h"
 #include "../constants.h"
-#include "../globals.h"
+#include "globals.h"
+#include "io.h"
+#include "sw.h"
+#include "types.h"
 #include "../types.h"
-#include "../io.h"
-#include "../sw.h"
 #include "../common/buffer.h"
 #include "../handler/get_sum_of_squares.h"
 
+/**
+ * Information about an interrupted command (if any).
+ */
+struct {
+    command_e ins;  /// Instruction code
+    uint8_t p1;     /// Instruction parameter 1
+    uint8_t p2;     /// Instruction parameter 2
+} G_interrupted_command;
 
 int apdu_dispatcher(const command_t *cmd) {
-    if (cmd->cla != CLA) {
-        return io_send_sw(SW_CLA_NOT_SUPPORTED);
-    }
-
     int ins = cmd->ins, p1 = cmd->p1, p2 = cmd->p2;
-
-
     dispatcher_context_t dispatcher_context = {
         .interrupt = false, // set to true if the execution is interrupted for a client command
         .is_continuation = false,
@@ -46,7 +50,7 @@ int apdu_dispatcher(const command_t *cmd) {
         }
     };
 
-    if (ins == CONTINUE) {
+    if (cmd->cla == CLA_FRAMEWORK && ins == INS_CONTINUE) {
         dispatcher_context.is_continuation = true;
         if (cmd->p1 != 0 || cmd->p2 != 0) {
             return io_send_sw(SW_WRONG_P1P2);
@@ -57,7 +61,10 @@ int apdu_dispatcher(const command_t *cmd) {
         ins = G_interrupted_command.ins;
         p1 = G_interrupted_command.p1;
         p2 = G_interrupted_command.p2;
+    } else if (cmd->cla != CLA_APP) {
+        return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
+
 
     // Reset info about the interrupted command (if any)
     G_interrupted_command.ins = 0;

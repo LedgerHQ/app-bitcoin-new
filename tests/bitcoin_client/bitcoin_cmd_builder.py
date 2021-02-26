@@ -28,9 +28,12 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
         yield True, data[offset:]
 
 
-class InsType(enum.IntEnum):
-    INS_GET_SUM_OF_SQUARES = 0x07
-    INS_CONTINUE = 0xFF
+class BitcoinInsType(enum.IntEnum):
+    GET_SUM_OF_SQUARES = 0x07
+
+class FrameworkInsType(enum.IntEnum):
+    CONTINUE_INTERRUPTED = 0x01
+
 
 class ClientCommandCode(enum.IntEnum):
     GET_SQUARE = 0x01
@@ -49,7 +52,8 @@ class BitcoinCommandBuilder:
         Whether you want to see logging or not.
 
     """
-    CLA: int = 0xE0
+    CLA_BITCOIN: int = 0xE0
+    CLA_FRAMEWORK: int = 0xFE
 
     def __init__(self, debug: bool = False):
         """Init constructor."""
@@ -107,8 +111,8 @@ class BitcoinCommandBuilder:
             APDU command for GET_SUM_OF_SQUARES.
 
         """
-        return self.serialize(cla=self.CLA,
-                              ins=InsType.INS_GET_SUM_OF_SQUARES,
+        return self.serialize(cla=self.CLA_BITCOIN,
+                              ins=BitcoinInsType.GET_SUM_OF_SQUARES,
                               cdata=n.to_bytes(1, byteorder="big"))
 
 
@@ -121,6 +125,6 @@ class BitcoinCommandBuilder:
             APDU command for CONTINUE.
 
         """
-        return self.serialize(cla=self.CLA,
-                        ins=InsType.INS_CONTINUE,
+        return self.serialize(cla=self.CLA_FRAMEWORK,
+                        ins=FrameworkInsType.CONTINUE_INTERRUPTED,
                         cdata=cdata)

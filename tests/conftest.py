@@ -24,8 +24,8 @@ def pytest_addoption(parser):
 def sw_h_path():
     # path with tests
     conftest_folder_path: Path = Path(__file__).parent
-    # sw.h should be in src/sw.h
-    sw_h_path = conftest_folder_path.parent / "src" / "sw.h"
+    # sw.h should be in src/boilerplate/sw.h
+    sw_h_path = conftest_folder_path.parent / "src" / "boilerplate" / "sw.h"
 
     if not sw_h_path.is_file():
         raise FileNotFoundError(f"Can't find sw.h: '{sw_h_path}'")
