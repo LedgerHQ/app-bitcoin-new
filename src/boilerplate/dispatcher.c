@@ -20,26 +20,26 @@
 
 #include "dispatcher.h"
 #include "constants.h"
-#include "../constants.h"
 #include "globals.h"
 #include "io.h"
 #include "sw.h"
 #include "types.h"
-#include "../types.h"
-#include "../common/buffer.h"
-#include "../handler/get_sum_of_squares.h"
+
+#include "common/buffer.h"
 
 /**
  * Information about an interrupted command (if any).
  */
 struct {
-    command_e ins;  /// Instruction code
-    uint8_t p1;     /// Instruction parameter 1
-    uint8_t p2;     /// Instruction parameter 2
+    bool has_interrupted_command;
+    uint8_t cla;                   // Instruction class
+    uint8_t ins;                   // Instruction code
+    uint8_t p1;                    // Instruction parameter 1
+    uint8_t p2;                    // Instruction parameter 2
 } G_interrupted_command;
 
-int apdu_dispatcher(const command_t *cmd) {
-    int ins = cmd->ins, p1 = cmd->p1, p2 = cmd->p2;
+int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descriptors, const command_t *cmd) {
+    uint8_t cla = cmd->cla, ins = cmd->ins, p1 = cmd->p1, p2 = cmd->p2;
     dispatcher_context_t dispatcher_context = {
         .interrupt = false, // set to true if the execution is interrupted for a client command
         .is_continuation = false,
@@ -56,41 +56,56 @@ int apdu_dispatcher(const command_t *cmd) {
             return io_send_sw(SW_WRONG_P1P2);
         }
 
-        // Set ins, p1 and p2 as previously set for the interrupted command.
+        if (!G_interrupted_command.has_interrupted_command) {
+            return io_send_sw(SW_BAD_STATE);
+        }
+
+        // Set cla, ins, p1 and p2 as previously set for the interrupted command.
         // Note that lc and data still refer to the continuation command instead.
+        cla = G_interrupted_command.cla;
         ins = G_interrupted_command.ins;
         p1 = G_interrupted_command.p1;
         p2 = G_interrupted_command.p2;
-    } else if (cmd->cla != CLA_APP) {
-        return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
 
 
-    // Reset info about the interrupted command (if any)
-    G_interrupted_command.ins = 0;
-    G_interrupted_command.p1 = 0;
-    G_interrupted_command.p2 = 0;
+    // Reset interrupted command (if any)
+    G_interrupted_command.has_interrupted_command = false;
 
-    int ret;
-    switch (ins) {
-        case GET_SUM_OF_SQUARES:
-            if (p1 != 0 || p2 != 0) {
-                return io_send_sw(SW_WRONG_P1P2);
+    int ret = 0;
+    bool cla_found = false, ins_found = false;
+    for (int i = 0; i < n_descriptors; i++) {
+        if (cmd_descriptors[i].cla != cla)
+            continue;
+        cla_found = true;
+        if (cmd_descriptors[i].ins != ins)
+            continue;
+        ins_found = true;
+
+        if (!dispatcher_context.is_continuation) {
+            command_handler_t handler = (command_handler_t)PIC(cmd_descriptors[i].handler);
+            ret = handler(p1, p2, cmd->lc, &dispatcher_context, &G_command_state);
+            if (ret < 0) {
+                break;
             }
-            if (cmd->lc != 1 && !dispatcher_context.is_continuation) { // ugly, find a better way to avoid these checks on CONTINUE
-                return io_send_sw(SW_WRONG_DATA_LENGTH);
-            }
-            if (!dispatcher_context.is_continuation) {
-                init_get_sum_of_squares_state(&G_command_state.get_sum_of_squares_state, &dispatcher_context);
-            }
-            ret = handler_get_sum_of_squares(&G_command_state.get_sum_of_squares_state, &dispatcher_context);
-            break;
-        default:
-            ret = io_send_sw(SW_INS_NOT_SUPPORTED);
+        }
+        if (cmd_descriptors[i].processor != NULL) {
+            command_processor_t processor = (command_processor_t)PIC(cmd_descriptors[i].processor);
+            ret = processor(&dispatcher_context, &G_command_state);
+        }
+        break;
+    }
+
+    if (!cla_found) {
+        return io_send_sw(SW_CLA_NOT_SUPPORTED);
+    } else if (!ins_found) {
+        return io_send_sw(SW_INS_NOT_SUPPORTED);
     }
 
     if (dispatcher_context.interrupt == true) {
         // store which command was interrupted
+        G_interrupted_command.has_interrupted_command = true;
+        G_interrupted_command.cla = cla;
         G_interrupted_command.ins = ins;
         G_interrupted_command.p1 = p1;
         G_interrupted_command.p2 = p2;

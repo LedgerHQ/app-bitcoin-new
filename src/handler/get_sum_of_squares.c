@@ -46,7 +46,7 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
 
         // read the result from the client
         if (!buffer_read_u32(&dispatcher_context->read_buffer, result, BE)) {
-            io_set_response(NULL, SW_WRONG_RESPONSE_LENGTH);
+            io_set_response(NULL, SW_WRONG_DATA_LENGTH);
             return 0;
         }
 
@@ -56,6 +56,9 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
         uint8_t req[] = { CCMD_GET_SQUARE, n };
 
         int res = io_set_response(&(const buffer_t){.ptr = req, .size = 2, .offset = 0}, SW_INTERRUPTED_EXECUTION);
+        if (res < 0) {
+            return 0;
+        }
 
         dispatcher_context->interrupt = true;
         return 0;
@@ -63,23 +66,35 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
 }
 
 
-
-bool init_get_sum_of_squares_state(get_sum_of_squares_state_t *state, dispatcher_context_t *dispatcher_context) {
+int handler_get_sum_of_squares(
+    uint8_t p1,
+    uint8_t p2,
+    uint8_t lc,
+    dispatcher_context_t *dispatcher_context,
+    get_sum_of_squares_state_t *state
+) {
     uint8_t n;
 
-    // TODO: check return value
+    if (p1 != 0 || p2 != 0) {
+        return io_send_sw(SW_WRONG_P1P2);
+    }
+    if (lc != 1) {
+        return io_send_sw(SW_WRONG_DATA_LENGTH);
+    }
+
     if (!buffer_read_u8(&dispatcher_context->read_buffer, &n)){
-        return false;
+        return -1;
     }
 
     state->n = n;
     state->i = 1;
     state->sum = 0;
+
     return true;
 }
 
 
-int handler_get_sum_of_squares(get_sum_of_squares_state_t *state, dispatcher_context_t *dispatcher_context) {
+int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context, get_sum_of_squares_state_t *state) {
     for ( ; state->i <= state->n; state->i++) {
         uint32_t result;
         if (!ext_get_square(dispatcher_context, &result, state->i)) {
@@ -89,9 +104,13 @@ int handler_get_sum_of_squares(get_sum_of_squares_state_t *state, dispatcher_con
     }
 
     return io_send_response(
-        &(const buffer_t){.ptr = (uint8_t *)&state->sum,
-                          .size = 4,
-                          .offset = 0},
+        &(const buffer_t){
+            .ptr = (uint8_t *)&state->sum,
+            .size = 4,
+            .offset = 0
+        },
         SW_OK);
 
 }
+
+

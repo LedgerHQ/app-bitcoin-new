@@ -29,12 +29,25 @@
 #include "boilerplate/parser.h"
 #include "boilerplate/dispatcher.h"
 
+#include "handler/get_sum_of_squares.h"
+
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 io_state_e G_io_state;
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 global_context_t G_context;
 command_state_t G_command_state;
+
+
+command_descriptor_t const COMMAND_DESCRIPTORS[] = {
+    {
+        .cla = CLA_APP,
+        .ins = GET_SUM_OF_SQUARES,
+        .handler = (command_handler_t)handler_get_sum_of_squares,
+        .processor = (command_processor_t)processor_get_sum_of_squares
+    }
+};
+
 
 /**
  * Handle APDU command received and send back APDU response using handlers.
@@ -80,7 +93,8 @@ void app_main() {
                        cmd.data);
 
                 // Dispatch structured APDU command to handler
-                if (apdu_dispatcher(&cmd) < 0) {
+                int n_command_descriptors = sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]);
+                if (apdu_dispatcher(COMMAND_DESCRIPTORS, n_command_descriptors, &cmd) < 0) {
                     return;
                 }
             }

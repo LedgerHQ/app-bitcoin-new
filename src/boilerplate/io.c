@@ -107,7 +107,7 @@ int io_recv_command() {
     return ret;
 }
 
-int io_set_response(const buffer_t *rdata, uint16_t sw) {
+void io_set_response(const buffer_t *rdata, uint16_t sw) {
     if (rdata != NULL) {
         if (rdata->size - rdata->offset > IO_APDU_BUFFER_SIZE - 2 ||  //
             !buffer_copy(rdata, G_io_apdu_buffer, sizeof(G_io_apdu_buffer))) {
