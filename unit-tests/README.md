@@ -11,6 +11,12 @@ and for code coverage generation:
 
 - lcov >= 1.14
 
+On Ubuntu, the following command will install the required dependencies:
+
+```
+sudo apt install cmake libcmocka-dev lcov
+```
+
 ## Overview
 
 In `unit-tests` folder, compile with

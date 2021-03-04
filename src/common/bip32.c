@@ -1,5 +1,5 @@
 /*****************************************************************************
- *   (c) 2021 Ledger SAS.
+ *   (c) 2020 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@
 #include "read.h"
 
 bool bip32_path_read(const uint8_t *in, size_t in_len, uint32_t *out, size_t out_len) {
-    if (out_len == 0 || out_len > MAX_BIP32_PATH) {
+    if (out_len > MAX_BIP32_PATH) {
         return false;
     }
 
@@ -45,8 +45,11 @@ bool bip32_path_format(const uint32_t *bip32_path,
                        size_t bip32_path_len,
                        char *out,
                        size_t out_len) {
-    if (bip32_path_len == 0 || bip32_path_len > MAX_BIP32_PATH) {
+    if (bip32_path_len > MAX_BIP32_PATH || out_len < 1) {
         return false;
+    }
+    if (bip32_path_len == 0) {
+        out[0] = '\0';
     }
 
     size_t offset = 0;

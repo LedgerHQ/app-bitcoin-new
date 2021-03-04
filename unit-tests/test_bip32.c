@@ -27,6 +27,11 @@ static void test_bip32_format(void **state) {
                           sizeof(output));
     assert_true(b);
     assert_string_equal(output, "44'/1'/0'/0/0");
+
+    // No BIP32 path (=0)
+    b = bip32_path_format(NULL, 0, output, sizeof(output));
+    assert_true(b);
+    assert_string_equal(output, "");
 }
 
 static void test_bad_bip32_format(void **state) {
@@ -41,10 +46,6 @@ static void test_bad_bip32_format(void **state) {
         11,
         output,
         sizeof(output));
-    assert_false(b);
-
-    // No BIP32 path (=0)
-    b = bip32_path_format(NULL, 0, output, sizeof(output));
     assert_false(b);
 }
 
@@ -66,6 +67,9 @@ static void test_bip32_read(void **state) {
     b = bip32_path_read(input, sizeof(input), output, 5);
     assert_true(b);
     assert_memory_equal(output, expected, 5);
+
+    // No BIP32 path
+    assert_true(bip32_path_read(input, sizeof(input), output, 0));
 }
 
 static void test_bad_bip32_read(void **state) {
@@ -83,9 +87,6 @@ static void test_bad_bip32_read(void **state) {
 
     // buffer too small (5 BIP32 paths instead of 10)
     assert_false(bip32_path_read(input, sizeof(input), output, 10));
-
-    // No BIP32 path
-    assert_false(bip32_path_read(input, sizeof(input), output, 0));
 
     // More than MAX_BIP32_PATH (=10)
     assert_false(bip32_path_read(input, sizeof(input), output, 20));
