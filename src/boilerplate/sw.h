@@ -4,10 +4,22 @@
  * Status word for success.
  */
 #define SW_OK 0x9000
+
+/**
+ * Status word for command not valid for security reasons (for example: device needs to be unlocked with PIN).
+ */
+#define SW_SECURITY_STATUS_NOT_SATISFIED 0x6982
+
 /**
  * Status word for denied by user.
  */
 #define SW_DENY 0x6985
+
+/**
+ * Status word for data.
+ */
+#define SW_INCORRECT_DATA 0x6A80
+
 /**
  * Status word for incorrect P1 or P2.
  */
@@ -24,12 +36,6 @@
  * Status word for instruction class is different than CLA.
  */
 #define SW_CLA_NOT_SUPPORTED 0x6E00
-
-/**
- * Status word for interrupted excution.
- */
-#define SW_INTERRUPTED_EXECUTION 0xE000
-
 
 /**
  * Status word for wrong reponse length (buffer too small or too big).
@@ -67,3 +73,9 @@
  * Status word for signature fail.
  */
 #define SW_SIGNATURE_FAIL 0xB008
+
+
+/**
+ * Status word for interrupted excution.
+ */
+#define SW_INTERRUPTED_EXECUTION 0xE000

@@ -29,7 +29,9 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
 
 
 class BitcoinInsType(enum.IntEnum):
-    GET_SUM_OF_SQUARES = 0x07
+    GET_PUBKEY = 0x00
+    GET_ADDRESS = 0x01
+    GET_SUM_OF_SQUARES = 0xF0
 
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
@@ -52,7 +54,7 @@ class BitcoinCommandBuilder:
         Whether you want to see logging or not.
 
     """
-    CLA_BITCOIN: int = 0xE0
+    CLA_BITCOIN: int = 0xE1
     CLA_FRAMEWORK: int = 0xFE
 
     def __init__(self, debug: bool = False):
@@ -101,6 +103,32 @@ class BitcoinCommandBuilder:
 
         return header + cdata
 
+
+    def get_pubkey(self, bip32_path: List[int], display: bool = False):
+        bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
+
+        cdata: bytes = b"".join([
+            len(bip32_paths).to_bytes(1, byteorder="big"),
+            *bip32_paths
+        ])
+
+        return self.serialize(cla=self.CLA_BITCOIN,
+                        ins=BitcoinInsType.GET_PUBKEY,
+                        p1=1 if display else 0,
+                        cdata=cdata)
+
+    def get_address(self, bip32_path: List[int], display: bool = False):
+        bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
+
+        cdata: bytes = b"".join([
+            len(bip32_paths).to_bytes(1, byteorder="big"),
+            *bip32_paths
+        ])
+
+        return self.serialize(cla=self.CLA_BITCOIN,
+                        p1=1 if display else 0,
+                        ins=BitcoinInsType.GET_ADDRESS,
+                        cdata=cdata)
 
     def get_sum_of_squares(self, n: int):
         """Command builder for GET_SUM_OF_SQUARES.

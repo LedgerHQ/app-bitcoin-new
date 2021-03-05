@@ -1,5 +1,5 @@
 import struct
-from typing import Tuple
+from typing import Tuple, List
 
 from ledgercomm import Transport
 
@@ -57,13 +57,23 @@ class BitcoinCommand:
         command_response = command.execute()
         return self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
 
-    def get_sum_of_squares(self, n: int):
+    def get_pubkey(self, bip32_path: str, display: bool = False) -> Tuple[bytes, bytes]:
+        sw, response = self.transport.exchange_raw(
+            self.builder.get_pubkey(bip32_path, display)
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
+
+        return response.decode()
+
+    def get_sum_of_squares(self, n: int) -> int:
         if n < 0 or n > 255:
             raise ValueError("n must be an integer between 0 and 255 (inclusive)")
 
         sw, response = self.transport.exchange_raw(
             self.builder.get_sum_of_squares(n)
-        )  # type: int, bytes
+        )
 
         while sw == 0xE000:
             sw, response = self.process_client_command(response)

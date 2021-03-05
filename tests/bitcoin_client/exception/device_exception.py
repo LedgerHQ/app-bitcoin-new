@@ -7,6 +7,8 @@ from .errors import *
 class DeviceException(Exception):  # pylint: disable=too-few-public-methods
     exc: Dict[int, Any] = {
         0x6985: DenyError,
+        0x6982: SecurityStatusNotSatisfiedError,
+        0x6A80: IncorrectDataError,
         0x6A86: WrongP1P2Error,
         0x6A87: WrongDataLengthError,
         0x6D00: InsNotSupportedError,

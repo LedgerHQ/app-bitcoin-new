@@ -30,7 +30,7 @@ uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len);
 int io_recv_command(void);
 
 /* TODO: docs */
-int io_set_response(const buffer_t *rdata, uint16_t sw);
+void io_set_response(const buffer_t *rdata, uint16_t sw);
 
 /* TODO: docs */
 int io_confirm_response(void);

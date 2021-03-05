@@ -29,6 +29,8 @@
 #include "boilerplate/parser.h"
 #include "boilerplate/dispatcher.h"
 
+#include "handler/get_pubkey.h"
+#include "handler/get_address.h"
 #include "handler/get_sum_of_squares.h"
 
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
@@ -40,6 +42,18 @@ command_state_t G_command_state;
 
 
 command_descriptor_t const COMMAND_DESCRIPTORS[] = {
+    {
+        .cla = CLA_APP,
+        .ins = GET_PUBKEY,
+        .handler = (command_handler_t)handler_get_pubkey,
+        .processor = NULL
+    },
+    {
+        .cla = CLA_APP,
+        .ins = GET_ADDRESS,
+        .handler = (command_handler_t)handler_get_address,
+        .processor = NULL
+    },
     {
         .cla = CLA_APP,
         .ins = GET_SUM_OF_SQUARES,

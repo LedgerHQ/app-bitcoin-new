@@ -3,7 +3,7 @@
 /**
  * Instruction class of the Bitcoin application.
  */
-#define CLA_APP 0xE0
+#define CLA_APP 0xE1
 
 /**
  * Length of APPNAME variable in the Makefile.

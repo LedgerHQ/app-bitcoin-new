@@ -68,7 +68,6 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
         p2 = G_interrupted_command.p2;
     }
 
-
     // Reset interrupted command (if any)
     G_interrupted_command.has_interrupted_command = false;
 

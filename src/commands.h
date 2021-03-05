@@ -8,7 +8,9 @@
  * Enumeration with expected INS of APDU commands.
  */
 typedef enum {
-    GET_SUM_OF_SQUARES = 0x07, /// compute the sum of the squares up to a number (I know, right?)
+    GET_PUBKEY = 0x00,
+    GET_ADDRESS = 0x01,
+    GET_SUM_OF_SQUARES = 0xF0, /// compute the sum of the squares up to a number (I know, right?)
 } command_e;
 
 /**

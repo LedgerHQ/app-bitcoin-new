@@ -2,7 +2,15 @@ class UnknownDeviceError(Exception):
     pass
 
 
+class SecurityStatusNotSatisfiedError(Exception):
+    pass
+
+
 class DenyError(Exception):
+    pass
+
+
+class IncorrectDataError(Exception):
     pass
 
 

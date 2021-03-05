@@ -55,10 +55,7 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
         // prepare the EXT_GET_SQUARE response for the user
         uint8_t req[] = { CCMD_GET_SQUARE, n };
 
-        int res = io_set_response(&(const buffer_t){.ptr = req, .size = 2, .offset = 0}, SW_INTERRUPTED_EXECUTION);
-        if (res < 0) {
-            return 0;
-        }
+        io_set_response(&(const buffer_t){.ptr = req, .size = 2, .offset = 0}, SW_INTERRUPTED_EXECUTION);
 
         dispatcher_context->interrupt = true;
         return 0;
