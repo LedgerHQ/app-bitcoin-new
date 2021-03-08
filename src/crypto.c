@@ -19,18 +19,23 @@
 #include <string.h>   // memset, explicit_bzero
 #include <stdbool.h>  // bool
 
+#include "os.h"
+
 #include "crypto.h"
 
-#include "globals.h"
-
+// TODO: missing unit tests
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t chain_code[static 32],
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len) {
     uint8_t raw_private_key[32] = {0};
 
-    BEGIN_TRY {
-        TRY {
+    // TODO: disabled exception handling, as it breaks with CMocha. Once the sdk is updated,
+    //       there will be versions of the cx.h functions that do not throw exceptions.
+    //       NOTE: the current version is insecure as it might not wipe the private key after usage!
+
+    // BEGIN_TRY {
+    //     TRY {
             // derive the seed with bip32_path
             os_perso_derive_node_bip32(CX_CURVE_256K1,
                                        bip32_path,
@@ -42,19 +47,21 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                                      raw_private_key,
                                      sizeof(raw_private_key),
                                      private_key);
-        }
-        CATCH_OTHER(e) {
-            THROW(e);
-        }
-        FINALLY {
+        // }
+        // CATCH_OTHER(e) {
+        //     THROW(e);
+        // }
+        // FINALLY {
             explicit_bzero(&raw_private_key, sizeof(raw_private_key));
-        }
-    }
-    END_TRY;
+    //     }
+    // }
+    // END_TRY;
 
     return 0;
 }
 
+
+// TODO: missing unit tests
 int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
                            cx_ecfp_public_key_t *public_key,
                            uint8_t raw_public_key[static 64]) {
@@ -67,6 +74,7 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 }
 
 
+// TODO: missing unit tests
 void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_ripemd160_t riprip;
     uint8_t buffer[32];
@@ -75,63 +83,21 @@ void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_hash(&riprip.header, CX_LAST, buffer, 32, out, 20);
 }
 
-// TODO: do we pass also inputs and output lengths for sanity check?
+
 int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t out[static 33]) {
     if (uncompressed_key[0] != 0x04) {
         return -1;
     }
     out[0] = (uncompressed_key[64] % 2 == 1) ? 0x03 : 0x02;
-    memmove(out+1, uncompressed_key + 1, 32);
+    memmove(out + 1, uncompressed_key + 1, 32);
     return 0;
 }
 
 
+// TODO: missing unit tests
 void crypto_get_checksum(uint8_t *in, uint16_t in_len, uint8_t out[static 4]) {
     uint8_t buffer[32];
     cx_hash_sha256(in, in_len, buffer, 32);
     cx_hash_sha256(buffer, 32, buffer, 32);
     os_memmove(out, buffer, 4);
 }
-
-// int crypto_sign_message() {
-//     cx_ecfp_private_key_t private_key = {0};
-//     uint8_t chain_code[32] = {0};
-//     uint32_t info = 0;
-//     int sig_len = 0;
-
-//     // derive private key according to BIP32 path
-//     crypto_derive_private_key(&private_key,
-//                               chain_code,
-//                               G_context.bip32_path,
-//                               G_context.bip32_path_len);
-
-//     BEGIN_TRY {
-//         TRY {
-//             sig_len = cx_ecdsa_sign(&private_key,
-//                                     CX_RND_RFC6979 | CX_LAST,
-//                                     CX_SHA256,
-//                                     G_context.tx_info.m_hash,
-//                                     sizeof(G_context.tx_info.m_hash),
-//                                     G_context.tx_info.signature,
-//                                     sizeof(G_context.tx_info.signature),
-//                                     &info);
-//             PRINTF("Signature: %.*H\n", sig_len, G_context.tx_info.signature);
-//         }
-//         CATCH_OTHER(e) {
-//             THROW(e);
-//         }
-//         FINALLY {
-//             explicit_bzero(&private_key, sizeof(private_key));
-//         }
-//     }
-//     END_TRY;
-
-//     if (sig_len < 0) {
-//         return -1;
-//     }
-
-//     G_context.tx_info.signature_len = sig_len;
-//     G_context.tx_info.v = (uint8_t)(info & CX_ECCINFO_PARITY_ODD);
-
-//     return 0;
-// }
