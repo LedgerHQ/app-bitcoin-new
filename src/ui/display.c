@@ -49,6 +49,27 @@ UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public k
 // Step with icon and text for address
 UX_STEP_NOCB(ux_display_confirm_address_step, pn, {&C_icon_eye, "Confirm receive address"});
 
+// Step with icon and text for a suspicious address
+UX_STEP_NOCB(
+    ux_display_unusual_derivation_path_step,
+    pnn,
+    {
+      &C_icon_warning,
+      "The derivation",
+      "path is unusual!",
+    });
+
+// Step with icon and text to caution the user to reject if unsure
+UX_STEP_CB(
+    ux_display_reject_if_not_sure_step,
+    pnn,
+    (*g_validate_callback)(false),
+    {
+      &C_icon_crossmark,
+      "Reject if you're",
+      "not sure",
+    });
+
 // Step with title/text for BIP32 path
 UX_STEP_NOCB(ux_display_path_step,
              bnnn_paging,
@@ -105,15 +126,31 @@ UX_FLOW(ux_display_pubkey_flow,
         &ux_display_reject_step);
 
 
-// FLOW to display BIP32 path and pubkey:
+// FLOW to display a receive address, for a standard path:
 // #1 screen: eye icon + "Confirm Address"
-// #2 screen: display BIP32 Path
-// #3 screen: display pubkey
+// #3 screen: display address
 // #4 screen: approve button
 // #5 screen: reject button
 UX_FLOW(ux_display_address_flow,
         &ux_display_confirm_address_step,
+        &ux_display_address_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+// FLOW to display a receive address, for a non-standard path:
+// #1 screen: warning icon + "The derivation path is unusual!"
+// #2 screen: display BIP32 Path
+// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #4 screen: eye icon + "Confirm Address"
+// #5 screen: display address
+// #6 screen: approve button
+// #7 screen: reject button
+UX_FLOW(ux_display_address_suspicious_flow,
+        &ux_display_unusual_derivation_path_step,
         &ux_display_path_step,
+        &ux_display_reject_if_not_sure_step,
+        &ux_display_confirm_address_step,
         &ux_display_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
@@ -132,13 +169,14 @@ int ui_display_pubkey(char *bip32_path, char *pubkey, action_validate_cb callbac
 }
 
 
-int ui_display_address(char *address, action_validate_cb callback) {
+int ui_display_address(char *address, bool is_path_suspicious, action_validate_cb callback) {
     strncpy(g_address, address, sizeof(g_address));
     g_validate_callback = callback;
 
-    // TODO: add flow for untrusted/weird address
-
-    ux_flow_init(0, ux_display_address_flow, NULL);
-
+    if (is_path_suspicious) {
+        ux_flow_init(0, ux_display_address_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
+    }
     return 0;
 }

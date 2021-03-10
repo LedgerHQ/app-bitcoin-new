@@ -36,6 +36,12 @@ class BitcoinInsType(enum.IntEnum):
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
 
+class AddrType(enum.IntEnum):
+    """Type of Bitcoin address."""
+
+    PKH = 0x00
+    SH_WPKH = 0x01
+    WPKH = 0x02
 
 class ClientCommandCode(enum.IntEnum):
     GET_SQUARE = 0x01
@@ -117,7 +123,7 @@ class BitcoinCommandBuilder:
                         p1=1 if display else 0,
                         cdata=cdata)
 
-    def get_address(self, bip32_path: List[int], display: bool = False):
+    def get_address(self, addr_type: AddrType, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
         cdata: bytes = b"".join([
@@ -127,6 +133,7 @@ class BitcoinCommandBuilder:
 
         return self.serialize(cla=self.CLA_BITCOIN,
                         p1=1 if display else 0,
+                        p2=addr_type,
                         ins=BitcoinInsType.GET_ADDRESS,
                         cdata=cdata)
 

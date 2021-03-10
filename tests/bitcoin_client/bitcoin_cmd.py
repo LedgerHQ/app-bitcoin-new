@@ -3,7 +3,13 @@ from typing import Tuple, List
 
 from ledgercomm import Transport
 
-from bitcoin_client.bitcoin_cmd_builder import BitcoinCommandBuilder, BitcoinInsType, FrameworkInsType, ClientCommandCode
+from bitcoin_client.bitcoin_cmd_builder import (
+    AddrType,
+    BitcoinCommandBuilder,
+    BitcoinInsType,
+    FrameworkInsType,
+    ClientCommandCode
+)
 from bitcoin_client.button import Button
 from bitcoin_client.exception import DeviceException
 from bitcoin_client.transaction import Transaction
@@ -57,9 +63,38 @@ class BitcoinCommand:
         command_response = command.execute()
         return self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
 
-    def get_pubkey(self, bip32_path: str, display: bool = False) -> Tuple[bytes, bytes]:
+    def get_pubkey(self, bip32_path: str, display: bool = False) -> str:
         sw, response = self.transport.exchange_raw(
             self.builder.get_pubkey(bip32_path, display)
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
+
+        return response.decode()
+
+    def get_address(self,
+                    addr_type: AddrType,
+                    bip32_path: str,
+                    display: bool = False) -> str:
+        """Get an address given address type and BIP32 path. Optionally, validate with the user.
+
+        Parameters
+        ----------
+        addr_type : AddrType
+            Type of address. Could be AddrType.PKH, AddrType.SH_WPKH,
+            AddrType.WPKH.
+        bip32_path : str
+            BIP32 path of the public key you want.
+        display : bool
+            Whether you want to display address and ask confirmation on the device.
+
+        Returns
+        -------
+
+        """
+        sw, response = self.transport.exchange_raw(
+            self.builder.get_address(addr_type, bip32_path, display)
         )
 
         if sw != 0x9000:

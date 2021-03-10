@@ -95,7 +95,7 @@ int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t ou
 
 
 // TODO: missing unit tests
-void crypto_get_checksum(uint8_t *in, uint16_t in_len, uint8_t out[static 4]) {
+void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 4]) {
     uint8_t buffer[32];
     cx_hash_sha256(in, in_len, buffer, 32);
     cx_hash_sha256(buffer, 32, buffer, 32);

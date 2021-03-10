@@ -23,6 +23,9 @@
 #include "bip32.h"
 #include "read.h"
 
+// bitmask for hardened derivation steps
+#define H 0x80000000u
+
 bool bip32_path_read(const uint8_t *in, size_t in_len, uint32_t *out, size_t out_len) {
     if (out_len > MAX_BIP32_PATH) {
         return false;
@@ -65,7 +68,7 @@ bool bip32_path_format(const uint32_t *bip32_path,
         }
         offset += written;
 
-        if ((bip32_path[i] & 0x80000000u) != 0) {
+        if ((bip32_path[i] & H) != 0) {
             snprintf(out + offset, out_len - offset, "'");
             written = strlen(out + offset);
             if (written == 0 || written >= out_len - offset) {
@@ -88,3 +91,57 @@ bool bip32_path_format(const uint32_t *bip32_path,
 
     return true;
 }
+
+
+bool is_path_standard(const uint32_t *bip32_path,
+                      size_t bip32_path_len,
+                      const uint32_t expected_coin_types[],
+                      size_t expected_coin_types_len,
+                      bool is_change
+){
+    if (bip32_path_len != 5) {
+        return false;
+    }
+
+    uint32_t purpose = bip32_path[BIP44_PURPOSE_OFFSET];
+    if ((purpose != (44 ^ H)) &&
+        (purpose != (49 ^ H)) &&
+        (purpose != (84 ^ H))) {
+            return false;
+    }
+
+    uint32_t coin_type = bip32_path[BIP44_COIN_TYPE_OFFSET];
+    if (coin_type < H) {
+        return false; // the coin_type should be hardened
+    }
+    if (expected_coin_types_len > 0) {
+        // make sure that the coin_type is in the given list
+        bool is_coin_type_valid = false;
+        for (unsigned int i = 0; i < expected_coin_types_len; i++) {
+            if (coin_type == (expected_coin_types[i] ^ H)) {
+                is_coin_type_valid = true;
+                break;
+            }
+        }
+        if (!is_coin_type_valid) {
+            return false;
+        }
+    }
+    uint32_t account_number = bip32_path[BIP44_ACCOUNT_OFFSET];
+    if ((account_number ^ H) > MAX_BIP44_ACCOUNT_RECOMMENDED) { // should be hardened, and not too large
+        return false;
+    }
+
+    uint32_t change = bip32_path[BIP44_CHANGE_OFFSET];
+    // incidentally, this also checks that it is _not_ hardened
+    if (change != (is_change ? 1 : 0)) {
+        return false;
+    }
+
+    uint32_t address_index = bip32_path[BIP44_ADDRESS_INDEX_OFFSET];
+    if (address_index > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) { // should not be hardened, and not too large
+        return false;
+    }
+    return true;
+}
+

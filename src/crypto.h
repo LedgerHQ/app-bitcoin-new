@@ -76,9 +76,17 @@ void crypto_hash160(uint8_t *in, uint16_t in_len, uint8_t *out);
 int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t out[static 33]);
 
 /**
- * TODO: docs
+ * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
+ * 
+ * @param[in] in
+ *   Pointer to the input data. 
+ * @param[in] in_len
+ *   Length of the input data. 
+ * @param[out] out
+ *   Pointer to the output buffer, which must contain at least 4 bytes.
+ *   
  */
-void crypto_get_checksum(uint8_t *in, uint16_t in_len, uint8_t out[static 4]);
+void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 4]);
 
 /**
  * Sign message hash in global context.

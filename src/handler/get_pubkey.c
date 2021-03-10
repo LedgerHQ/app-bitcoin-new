@@ -31,16 +31,6 @@
 #include "../ui/menu.h"
 #include "client_commands.h"
 
-static struct {
-    uint8_t version[4];
-    uint8_t depth;
-    uint8_t parent_fingerprint[4];
-    uint8_t child_number[4];
-    uint8_t chain_code[32];
-    uint8_t compressed_pubkey[33];  // SEC1 compressed public key
-    uint8_t checksum[4];
-} g_ext_pubkey;
-
 char g_serialized_pubkey_str[113];
 
 
@@ -112,10 +102,20 @@ int handler_get_pubkey(
         child_number = bip32_path[bip32_path_len - 1];
     }
 
-    write_u32_be(g_ext_pubkey.version, 0, 0x0488B21E); // TODO: generalize to all networks
-    g_ext_pubkey.depth = bip32_path_len;
-    write_u32_be(g_ext_pubkey.parent_fingerprint, 0, parent_fingerprint);
-    write_u32_be(g_ext_pubkey.child_number, 0, child_number);
+    static struct {
+        uint8_t version[4];
+        uint8_t depth;
+        uint8_t parent_fingerprint[4];
+        uint8_t child_number[4];
+        uint8_t chain_code[32];
+        uint8_t compressed_pubkey[33];  // SEC1 compressed public key
+        uint8_t checksum[4];
+    } ext_pubkey;
+
+    write_u32_be(ext_pubkey.version, 0, 0x0488B21E); // TODO: generalize to all networks
+    ext_pubkey.depth = bip32_path_len;
+    write_u32_be(ext_pubkey.parent_fingerprint, 0, parent_fingerprint);
+    write_u32_be(ext_pubkey.child_number, 0, child_number);
 
     // extkey = version + depth + fpr + child + chainCode + publicKey
 
@@ -129,13 +129,13 @@ int handler_get_pubkey(
     // compute compressed public key (in-place)
     crypto_get_compressed_pubkey((uint8_t *)&keydata, (uint8_t *)&keydata);
 
-    memmove(g_ext_pubkey.chain_code, keydata.chain_code, 32);
-    memmove(g_ext_pubkey.compressed_pubkey, (uint8_t *)&keydata, 33);
+    memmove(ext_pubkey.chain_code, keydata.chain_code, 32);
+    memmove(ext_pubkey.compressed_pubkey, (uint8_t *)&keydata, 33);
 
-    crypto_get_checksum((uint8_t *)&g_ext_pubkey, 78, g_ext_pubkey.checksum);
+    crypto_get_checksum((uint8_t *)&ext_pubkey, 78, ext_pubkey.checksum);
 
     char g_serialized_pubkey_str[113];
-    int serialized_pubkey_len = base58_encode((uint8_t *)&g_ext_pubkey, 78 + 4, g_serialized_pubkey_str, 112);
+    int serialized_pubkey_len = base58_encode((uint8_t *)&ext_pubkey, 78 + 4, g_serialized_pubkey_str, 112);
     g_serialized_pubkey_str[serialized_pubkey_len] = '\0';
 
     char path_str[60] = "Master key";
@@ -152,7 +152,7 @@ int handler_get_pubkey(
             .size = strlen(g_serialized_pubkey_str),
             .offset = 0
         };
-        io_send_response(&response_buf, SW_OK);
+        return io_send_response(&response_buf, SW_OK);
     }
 }
 

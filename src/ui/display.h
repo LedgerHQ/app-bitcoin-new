@@ -14,3 +14,6 @@ typedef void (*action_validate_cb)(bool);
  * TODO: document params
  */
 int ui_display_pubkey(char *path, char *xpub, action_validate_cb callback);
+
+// TODO: docs
+int ui_display_address(char *address, bool is_path_suspicious, action_validate_cb callback);
