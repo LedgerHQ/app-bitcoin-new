@@ -16,7 +16,7 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>  // uint*_t
+#include <stdint.h>
 
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
@@ -25,6 +25,7 @@
 #include "common/buffer.h"
 #include "common/segwit_addr.h"
 #include "common/write.h"
+#include "../commands.h"
 #include "../constants.h"
 #include "../types.h"
 #include "../crypto.h"
@@ -35,15 +36,8 @@
 #define P2_SH_WPKH 1
 #define P2_WPKH 2
 
-#define MAX_ADDRESS_LENGTH 74 // segwit addresses can reach 74 characters
-
-
 static void ui_action_validate_address(bool accepted);
 
-// TODO: merge global state for all commands using a union
-
-char g_address[MAX_ADDRESS_LENGTH + 1];
-size_t g_address_len;
 
 #define MAX_ADDR_HASH_LEN 100 // TODO
 
@@ -78,9 +72,10 @@ int handler_get_address(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context,
-    void *state
+    dispatcher_context_t *dispatcher_context
 ) {
+    get_address_state_t *state = (get_address_state_t *)&G_command_state;
+
     if (p1 > 1 || p2 > 2) {
         return io_send_sw(SW_WRONG_P1P2);
     }
@@ -140,7 +135,7 @@ int handler_get_address(
     switch(p2) {
         case P2_PKH:
             crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
-            g_address_len = base58_encode_address(pubkey_hash, 20, 0x00, g_address, sizeof(g_address));
+            state->address_len = base58_encode_address(pubkey_hash, 20, 0x00, state->address, sizeof(state->address));
             break;
         case P2_SH_WPKH: // wrapped segwit
         case P2_WPKH:    // native segwit
@@ -154,11 +149,11 @@ int handler_get_address(
                 crypto_hash160((uint8_t *)&script, 22, script_rip);
 
                 if (p2 == P2_SH_WPKH) {
-                    g_address_len = base58_encode_address(script_rip, 20, 0x05, g_address, sizeof(g_address)); // TODO: support for altcoins
+                    state->address_len = base58_encode_address(script_rip, 20, 0x05, state->address, sizeof(state->address)); // TODO: support for altcoins
                 } else { // P2_WPKH
 
                     int ret = segwit_addr_encode(
-                        (char *)g_address,
+                        (char *)state->address,
                         (char *)PIC("bc"),
                         0, script + 2, 20 // TODO: generalize for other networks
                     );
@@ -167,7 +162,7 @@ int handler_get_address(
                         return io_send_sw(SW_BAD_STATE); // should never happen
                     }
 
-                    g_address_len = strlen((char *)g_address);
+                    state->address_len = strlen((char *)state->address);
                 }
             }
             break;
@@ -175,10 +170,10 @@ int handler_get_address(
             return io_send_sw(SW_BAD_STATE); // this can never happen
     }
 
-    g_address[g_address_len] = '\0';
+    state->address[state->address_len] = '\0';
 
     if (p1 == 1 || is_path_suspicious) {
-        return ui_display_address(g_address, is_path_suspicious, ui_action_validate_address);
+        return ui_display_address(state->address, is_path_suspicious, ui_action_validate_address);
     } else {
         ui_action_validate_address(true);
         return 0;
@@ -186,10 +181,11 @@ int handler_get_address(
 }
 
 static void ui_action_validate_address(bool accepted) {
+    get_address_state_t *state = (get_address_state_t *)&G_command_state;
     if (accepted) {
         buffer_t response_buf = {
-            .ptr = (uint8_t *)&g_address,
-            .size = g_address_len,
+            .ptr = (uint8_t *)&state->address,
+            .size = state->address_len,
             .offset = 0
         };
         io_send_response(&response_buf, SW_OK);

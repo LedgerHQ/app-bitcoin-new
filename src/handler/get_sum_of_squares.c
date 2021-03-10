@@ -21,6 +21,7 @@
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
 #include "common/buffer.h"
+#include "../commands.h"
 #include "../constants.h"
 #include "../types.h"
 #include "client_commands.h"
@@ -67,9 +68,9 @@ int handler_get_sum_of_squares(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context,
-    get_sum_of_squares_state_t *state
+    dispatcher_context_t *dispatcher_context
 ) {
+    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state;
     uint8_t n;
 
     if (p1 != 0 || p2 != 0) {
@@ -91,7 +92,8 @@ int handler_get_sum_of_squares(
 }
 
 
-int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context, get_sum_of_squares_state_t *state) {
+int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
+    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state; 
     for ( ; state->i <= state->n; state->i++) {
         uint32_t result;
         if (!ext_get_square(dispatcher_context, &result, state->i)) {

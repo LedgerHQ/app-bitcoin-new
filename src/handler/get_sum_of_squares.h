@@ -14,8 +14,7 @@ int handler_get_sum_of_squares(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context,
-    get_sum_of_squares_state_t *state
+    dispatcher_context_t *dispatcher_context
 );
 
-int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context, get_sum_of_squares_state_t *state);
+int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);

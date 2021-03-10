@@ -24,14 +24,13 @@
 #include "common/buffer.h"
 #include "common/read.h"
 #include "common/write.h"
+#include "../commands.h"
 #include "../constants.h"
 #include "../types.h"
 #include "../crypto.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 #include "client_commands.h"
-
-char g_serialized_pubkey_str[113];
 
 
 static void ui_action_validate_pubkey(bool choice);
@@ -41,9 +40,10 @@ int handler_get_pubkey(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context,
-    void *state
+    dispatcher_context_t *dispatcher_context
 ) {
+    get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
+
     if (p1 > 1 || p2 != 0) {
         return io_send_sw(SW_WRONG_P1P2);
     }
@@ -134,9 +134,8 @@ int handler_get_pubkey(
 
     crypto_get_checksum((uint8_t *)&ext_pubkey, 78, ext_pubkey.checksum);
 
-    char g_serialized_pubkey_str[113];
-    int serialized_pubkey_len = base58_encode((uint8_t *)&ext_pubkey, 78 + 4, g_serialized_pubkey_str, 112);
-    g_serialized_pubkey_str[serialized_pubkey_len] = '\0';
+    size_t serialized_pubkey_len = base58_encode((uint8_t *)&ext_pubkey, 78 + 4, state->serialized_pubkey_str, 112);
+    state->serialized_pubkey_str[serialized_pubkey_len] = '\0';
 
     char path_str[60] = "Master key";
     if (bip32_path_len > 0) {
@@ -145,11 +144,11 @@ int handler_get_pubkey(
     // TODO: handle if the path is too long to fit in path_str
 
     if (p1 == 1) {
-        return ui_display_pubkey(path_str, g_serialized_pubkey_str, ui_action_validate_pubkey);
+        return ui_display_pubkey(path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
         buffer_t response_buf = {
-            .ptr = (uint8_t *)&g_serialized_pubkey_str,
-            .size = strlen(g_serialized_pubkey_str),
+            .ptr = (uint8_t *)&state->serialized_pubkey_str,
+            .size = strlen(state->serialized_pubkey_str),
             .offset = 0
         };
         return io_send_response(&response_buf, SW_OK);
@@ -157,10 +156,11 @@ int handler_get_pubkey(
 }
 
 static void ui_action_validate_pubkey(bool choice) {
+    get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
     if (choice) {
         buffer_t response_buf = {
-            .ptr = (uint8_t *)&g_serialized_pubkey_str,
-            .size = strlen(g_serialized_pubkey_str),
+            .ptr = (uint8_t *)&state->serialized_pubkey_str,
+            .size = strlen(state->serialized_pubkey_str),
             .offset = 0
         };
         io_send_response(&response_buf, SW_OK);

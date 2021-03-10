@@ -158,9 +158,8 @@ UX_FLOW(ux_display_address_suspicious_flow,
 
 int ui_display_pubkey(char *bip32_path, char *pubkey, action_validate_cb callback) {
     strncpy(g_bip32_path, bip32_path, sizeof(g_bip32_path));
-    strncpy(g_pubkey
-, pubkey, sizeof(g_pubkey
-));
+    strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
+
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_pubkey_flow, NULL);

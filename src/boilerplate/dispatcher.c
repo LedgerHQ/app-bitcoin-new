@@ -83,14 +83,14 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
 
         if (!dispatcher_context.is_continuation) {
             command_handler_t handler = (command_handler_t)PIC(cmd_descriptors[i].handler);
-            ret = handler(p1, p2, cmd->lc, &dispatcher_context, &G_command_state);
+            ret = handler(p1, p2, cmd->lc, &dispatcher_context);
             if (ret < 0) {
                 break;
             }
         }
         if (cmd_descriptors[i].processor != NULL) {
             command_processor_t processor = (command_processor_t)PIC(cmd_descriptors[i].processor);
-            ret = processor(&dispatcher_context, &G_command_state);
+            ret = processor(&dispatcher_context);
         }
         break;
     }

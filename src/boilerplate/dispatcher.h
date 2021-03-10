@@ -24,10 +24,10 @@ typedef struct {
 // implements the state machines, and must respect specific constraints in the way it's written.
 // TODO: document this.
 
-// Args: p1, p2, Lc, pointer to read_buffer, pointer to global state
-typedef int (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *, void *);
-// Args: pointer to global state
-typedef int (*command_processor_t)(dispatcher_context_t *, void *);
+// Args: p1, p2, Lc, pointer to dispatcher context
+typedef int (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *);
+// Args: pointer to dispatcher context
+typedef int (*command_processor_t)(dispatcher_context_t *);
 
 /**
  * Describes a command that can be processed by the dispatcher.
