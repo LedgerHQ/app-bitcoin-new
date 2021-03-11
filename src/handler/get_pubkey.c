@@ -146,24 +146,14 @@ int handler_get_pubkey(
     if (p1 == 1) {
         return ui_display_pubkey(path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
-        buffer_t response_buf = {
-            .ptr = (uint8_t *)&state->serialized_pubkey_str,
-            .size = strlen(state->serialized_pubkey_str),
-            .offset = 0
-        };
-        return io_send_response(&response_buf, SW_OK);
+        return io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
     }
 }
 
 static void ui_action_validate_pubkey(bool choice) {
     get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
     if (choice) {
-        buffer_t response_buf = {
-            .ptr = (uint8_t *)&state->serialized_pubkey_str,
-            .size = strlen(state->serialized_pubkey_str),
-            .offset = 0
-        };
-        io_send_response(&response_buf, SW_OK);
+        io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
     } else {
         io_send_sw(SW_DENY);
     }

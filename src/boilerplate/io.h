@@ -30,7 +30,7 @@ uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len);
 int io_recv_command(void);
 
 /* TODO: docs */
-void io_set_response(const buffer_t *rdata, uint16_t sw);
+void io_set_response(void *rdata, size_t rdata_len, uint16_t sw);
 
 /* TODO: docs */
 int io_confirm_response(void);
@@ -40,14 +40,16 @@ int io_confirm_response(void);
  * G_io_apdu_buffer.
  *
  * @param[in] rdata
- *   Buffer with APDU response data.
+ *   Pointer to the response.
+ * @param[in] rdata_len
+ *   Length of response.
  * @param[in] sw
  *   Status word of APDU response.
  *
  * @return zero or positive integer if success, -1 otherwise.
  *
  */
-int io_send_response(const buffer_t *rdata, uint16_t sw);
+int io_send_response(void *rdata, size_t rdata_len, uint16_t sw);
 
 /**
  * Send APDU response (only status word) by filling

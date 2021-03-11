@@ -182,13 +182,9 @@ int handler_get_address(
 
 static void ui_action_validate_address(bool accepted) {
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
+
     if (accepted) {
-        buffer_t response_buf = {
-            .ptr = (uint8_t *)&state->address,
-            .size = state->address_len,
-            .offset = 0
-        };
-        io_send_response(&response_buf, SW_OK);
+        io_send_response(state->address, state->address_len, SW_OK);
     } else {
         io_send_sw(SW_DENY);
     }

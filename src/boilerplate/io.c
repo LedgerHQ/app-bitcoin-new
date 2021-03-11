@@ -16,6 +16,7 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <string.h>
 
 #include "os.h"
 #include "ux.h"
@@ -107,23 +108,24 @@ int io_recv_command() {
     return ret;
 }
 
-void io_set_response(const buffer_t *rdata, uint16_t sw) {
-    if (rdata != NULL) {
-        if (rdata->size - rdata->offset > IO_APDU_BUFFER_SIZE - 2 ||  //
-            !buffer_copy(rdata, G_io_apdu_buffer, sizeof(G_io_apdu_buffer))) {
-
-            write_u16_be(G_io_apdu_buffer, G_output_len, SW_WRONG_RESPONSE_LENGTH);
-        }
-        G_output_len = rdata->size - rdata->offset;
-        // PRINTF("<= SW=%04X | RData=%.*H\n", sw, rdata->size, rdata->ptr);
-    } else {
-        G_output_len = 0;
-        // PRINTF("<= SW=%04X | RData=\n", sw);
+void io_set_response(void *rdata, size_t rdata_len, uint16_t sw) {
+    if (rdata == NULL) {
+        rdata_len = 0;
     }
 
-    write_u16_be(G_io_apdu_buffer, G_output_len, sw);
-    G_output_len += 2;
+    if (rdata_len > IO_APDU_BUFFER_SIZE - 2) {
+        rdata_len = IO_APDU_BUFFER_SIZE - 2;
+        sw = SW_WRONG_RESPONSE_LENGTH;
+    }
+
+    if (rdata_len > 0) {
+        memmove(G_io_apdu_buffer, rdata, rdata_len);
+    }
+
+    write_u16_be(G_io_apdu_buffer, rdata_len, sw);
+    G_output_len = rdata_len + 2;
 }
+
 
 int io_confirm_response() {
     int ret;
@@ -146,11 +148,11 @@ int io_confirm_response() {
     return ret;
 }
 
-int io_send_response(const buffer_t *rdata, uint16_t sw) {
-    io_set_response(rdata, sw);
+int io_send_response(void *rdata, size_t rdata_len, uint16_t sw) {
+    io_set_response(rdata, rdata_len, sw);
     return io_confirm_response();
 }
 
 int io_send_sw(uint16_t sw) {
-    return io_send_response(NULL, sw);
+    return io_send_response(NULL, 0, sw);
 }

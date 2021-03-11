@@ -47,7 +47,7 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
 
         // read the result from the client
         if (!buffer_read_u32(&dispatcher_context->read_buffer, result, BE)) {
-            io_set_response(NULL, SW_WRONG_DATA_LENGTH);
+            io_set_response(NULL, 0, SW_WRONG_DATA_LENGTH);
             return 0;
         }
 
@@ -56,7 +56,7 @@ int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, u
         // prepare the EXT_GET_SQUARE response for the user
         uint8_t req[] = { CCMD_GET_SQUARE, n };
 
-        io_set_response(&(const buffer_t){.ptr = req, .size = 2, .offset = 0}, SW_INTERRUPTED_EXECUTION);
+        io_set_response(req, 2, SW_INTERRUPTED_EXECUTION);
 
         dispatcher_context->interrupt = true;
         return 0;
@@ -102,14 +102,7 @@ int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
         state->sum += result;
     }
 
-    return io_send_response(
-        &(const buffer_t){
-            .ptr = (uint8_t *)&state->sum,
-            .size = 4,
-            .offset = 0
-        },
-        SW_OK);
-
+    return io_send_response(&state->sum, 4, SW_OK);
 }
 
 
