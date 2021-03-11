@@ -1,4 +1,4 @@
-# End-to-end tests using Bitcoin Testnet
+# End-to-end tests
 
 These tests are implemented in Python and can be executed either using the [Speculos](https://github.com/LedgerHQ/speculos) emulator or a Ledger Nano S/X.
 
@@ -12,22 +12,16 @@ pip install -r requirements.txt
 
 ## Launch with Speculos
 
-In order to create the necessary binaries for the Bitcoin Testnet application, you can use the convenience script `prepare_tests.sh`:
+Build the app as normal from the root folder. For convenience, you probably want to enable DEBUG:
 
 ```
-bash ./prepare_tests.sh
+DEBUG=1 make
 ```
 
-Then run all the tests using:
+Then run all the tests from this folder with:
 
 ```
 pytest
-```
-
-You can delete the test binaries with
-
-```
-bash ./clean_tests.sh
 ```
 
 ## Launch with your Nano S/X
