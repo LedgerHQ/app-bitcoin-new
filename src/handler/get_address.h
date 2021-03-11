@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../commands.h"
-
-#define MAX_ADDRESS_LENGTH_STR 74 // segwit addresses can reach 74 characters
+#include "../constants.h"
+#include "../boilerplate/dispatcher.h"
 
 typedef struct {
     char address[MAX_ADDRESS_LENGTH_STR + 1];

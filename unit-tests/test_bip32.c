@@ -42,7 +42,7 @@ static void test_bad_bip32_format(void **state) {
     char output[30];
     bool b = true;
 
-    // More than MAX_BIP32_PATH (=10)
+    // More than MAX_BIP32_PATH_STEPS (=10)
     b = bip32_path_format(
         (const uint32_t[11]){0x8000002C, 0x80000000, 0x80000000, 0, 0, 0, 0, 0, 0, 0, 0},
         11,
@@ -91,7 +91,7 @@ static void test_bad_bip32_read(void **state) {
     // buffer too small (5 BIP32 paths instead of 10)
     assert_false(bip32_path_read(input, sizeof(input), output, 10));
 
-    // More than MAX_BIP32_PATH (=10)
+    // More than MAX_BIP32_PATH_STEPS (=10)
     assert_false(bip32_path_read(input, sizeof(input), output, 20));
 }
 

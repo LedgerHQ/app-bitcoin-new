@@ -21,6 +21,11 @@
 #define MAX_APPNAME_LEN 64
 
 /**
+ * Maximum length of a serialized address (in characters).
+ */
+#define MAX_ADDRESS_LENGTH_STR 74 // segwit addresses can reach 74 characters
+
+/**
  * Maximum transaction length (bytes).
  */
 #define MAX_TRANSACTION_LEN 510
@@ -34,3 +39,4 @@
  * Exponent used to convert mBTC to BTC unit (N BTC = N * 10^3 mBTC).
  */
 #define EXPONENT_SMALLEST_UNIT 3
+

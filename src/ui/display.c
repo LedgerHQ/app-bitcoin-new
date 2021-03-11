@@ -32,16 +32,15 @@
 #include "../boilerplate/sw.h"
 #include "../common/bip32.h"
 #include "../common/format.h"
+#include "../constants.h"
 
-
-#define MAX_BIP32_PATH_LENGTH 60 // TODO: could likely be longer; check
 #define MAX_BASE58_PUBKEY_LENGTH 112
 #define MAX_ADDRESS_LENGTH 35
 
 static action_validate_cb g_validate_callback;
-static char g_bip32_path[MAX_BIP32_PATH_LENGTH + 1];
-static char g_pubkey[MAX_BASE58_PUBKEY_LENGTH + 1];
-static char g_address[MAX_ADDRESS_LENGTH + 1];
+static char g_bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+static char g_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+static char g_address[MAX_ADDRESS_LENGTH_STR + 1];
 
 // Step with icon and text for pubkey
 UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public key"});

@@ -7,8 +7,17 @@
 
 /**
  * Maximum length of BIP32 path allowed.
+ * Note: BIP32 allows up to 256 derivation steps - but generally only 5 are used.
  */
-#define MAX_BIP32_PATH 10
+#define MAX_BIP32_PATH_STEPS 10
+
+
+/**
+ * Maximum length of a string representing a BIP32 derivation path.
+ * Each step is up to 11 characters (10 decimal digits, plus the "hardened" symbol),
+ * and there is 1 separator before each step.
+ */
+#define MAX_SERIALIZED_BIP32_PATH_LENGTH (12 * MAX_BIP32_PATH_STEPS)
 
 
 #define BIP44_PURPOSE_OFFSET 0

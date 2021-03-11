@@ -6,6 +6,17 @@
 
 #include "os.h"
 #include "cx.h"
+#include "constants.h"
+
+#define ADDRESS_TYPE_PKH 0
+#define ADDRESS_TYPE_SH_WPKH 1
+#define ADDRESS_TYPE_WPKH 2
+
+/**
+ * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
+ */
+#define MAX_SERIALIZED_PUBKEY_LENGTH 113
+
 
 /**
  * Derive private key given BIP32 path.
@@ -24,10 +35,13 @@
  * @throw INVALID_PARAMETER
  *
  */
-int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t chain_code[static 32],
-                              const uint32_t *bip32_path,
-                              uint8_t bip32_path_len);
+int crypto_derive_private_key(
+    cx_ecfp_private_key_t *private_key,
+    uint8_t chain_code[static 32],
+    const uint32_t *bip32_path,
+    uint8_t bip32_path_len
+);
+
 
 /**
  * Initialize public key given private key.
@@ -44,9 +58,11 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
  * @throw INVALID_PARAMETER
  *
  */
-int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
-                           cx_ecfp_public_key_t *public_key,
-                           uint8_t raw_public_key[static 64]);
+int crypto_init_public_key(
+    cx_ecfp_private_key_t *private_key,
+    cx_ecfp_public_key_t *public_key,
+    uint8_t raw_public_key[static 64]
+);
 
 
 /**
@@ -62,7 +78,6 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 void crypto_hash160(uint8_t *in, uint16_t in_len, uint8_t *out);
 
 
-
 /**
  * Computes the 33-bytes compressed public key from the uncompressed 65-bytes extended public key.
  *
@@ -74,6 +89,7 @@ void crypto_hash160(uint8_t *in, uint16_t in_len, uint8_t *out);
  *   Otherwise, the input and output arrays MUST be non-overlapping.
  */
 int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t out[static 33]);
+
 
 /**
  * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
@@ -88,15 +104,62 @@ int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t ou
  */
 void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 4]);
 
+
 /**
- * Sign message hash in global context.
- *
- * @see G_context.bip32_path, G_context.tx_info.m_hash,
- * G_context.tx_info.signature.
- *
- * @return 0 if success, -1 otherwise.
- *
- * @throw INVALID_PARAMETER
- *
+ * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
+ * 
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit integer input buffer.
+ * @param[in]  bip32_path_len
+ *   Maximum number of BIP32 paths in the input buffer.
+ * @param[out] out
+ *   Pointer to the output buffer, which must be long enough to contain the result.
  */
-// int crypto_sign_message(void);
+size_t get_serialized_extended_pubkey(
+    const uint32_t bip32_path[],
+    uint8_t bip32_path_len,
+    char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]
+);
+
+
+/**
+ * Encodes a 20-bytes hash in base58 with checksum, after prepending a version prefix.
+ * If version < 256, it is prepended as 1 byte.
+ * If 256 <= version < 65536, it is prepended in big-endian as 2 bytes.
+ * Otherwise, it is prepended in big-endian as 4 bytes.
+ *
+ * @param[in]  in
+ *   Pointer to the 20-bytes hash to encode.
+ * @param[in]  version
+ *   The 1-byte, 2-byte or 4-byte version prefix.
+ * @param[out]  out
+ *   The pointer to the output array.
+ * @param[in]  out_len
+ *   The 1-byte, 2-byte or 4-byte version prefix.
+ * 
+ * @return the length of the encoded output on success, -1 on failure (that is, if the output
+ *   would be longer than out_len).
+ */
+int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
+
+
+/**
+ * Computes an address for one of the supported types at a given BIP32 derivation path.
+ *
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit integer input buffer.
+ * @param[in]  bip32_path_len
+ *   Maximum number of BIP32 paths in the input buffer.
+ * @param[in]  address_type
+ *   One of ADDRESS_TYPE_PKH, ADDRESS_TYPE_SH_WPKH, ADDRESS_TYPE_WPKH.
+ * @param[out]  out
+ *   Pointer to the output array, that must be long enough to contain the result.
+ * 
+ * @return the length of the computed address on success, -1 on failure.
+ */
+int get_address_at_path(
+    const uint32_t bip32_path[],
+    uint8_t bip32_path_len,
+    uint8_t address_type,
+    char out[static MAX_ADDRESS_LENGTH_STR + 1]
+);

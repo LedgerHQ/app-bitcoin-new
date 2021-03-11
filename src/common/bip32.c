@@ -21,13 +21,20 @@
 #include <stdbool.h>  // bool
 
 #include "bip32.h"
+#include "base58.h"
 #include "read.h"
+#include "write.h"
+#include "../crypto.h"
+
+#include "os.h"
+#include "cx.h"
+
 
 // bitmask for hardened derivation steps
 #define H 0x80000000u
 
 bool bip32_path_read(const uint8_t *in, size_t in_len, uint32_t *out, size_t out_len) {
-    if (out_len > MAX_BIP32_PATH) {
+    if (out_len > MAX_BIP32_PATH_STEPS) {
         return false;
     }
 
@@ -48,7 +55,7 @@ bool bip32_path_format(const uint32_t *bip32_path,
                        size_t bip32_path_len,
                        char *out,
                        size_t out_len) {
-    if (bip32_path_len > MAX_BIP32_PATH || out_len < 1) {
+    if (bip32_path_len > MAX_BIP32_PATH_STEPS || out_len < 1) {
         return false;
     }
     if (bip32_path_len == 0) {
@@ -144,4 +151,3 @@ bool is_path_standard(const uint32_t *bip32_path,
     }
     return true;
 }
-
