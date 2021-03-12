@@ -43,6 +43,22 @@ int handler_get_address(
     if (p2 != ADDRESS_TYPE_PKH && p2 != ADDRESS_TYPE_SH_WPKH && p2 != ADDRESS_TYPE_WPKH) {
         return io_send_sw(SW_WRONG_P1P2);
     }
+
+    uint32_t purpose; // the valid purpose depends on the requested address type
+    switch(p2) {
+        case ADDRESS_TYPE_PKH:     //legacy
+            purpose = 44;
+            break;
+        case ADDRESS_TYPE_SH_WPKH: // wrapped segwit
+            purpose = 49;
+            break;
+        case ADDRESS_TYPE_WPKH:    // native segwit
+            purpose = 84;
+            break;
+        default:
+            return io_send_sw(SW_WRONG_P1P2);
+    }
+
     if (lc < 1) {
         return io_send_sw(SW_WRONG_DATA_LENGTH);
     }
@@ -69,9 +85,13 @@ int handler_get_address(
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-
     uint32_t supported_coin_types[] = {0};
-    bool is_path_suspicious = !is_path_standard(bip32_path, bip32_path_len, supported_coin_types, 1, false);
+    bool is_path_suspicious = !is_address_path_standard(bip32_path,
+                                                        bip32_path_len, 
+                                                        purpose,
+                                                        supported_coin_types,
+                                                        1,
+                                                        false);
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
     if (ret < 0) {

@@ -99,14 +99,14 @@ bool bip32_path_format(const uint32_t *bip32_path,
     return true;
 }
 
-
-bool is_path_standard(const uint32_t *bip32_path,
+bool is_pubkey_path_standard(const uint32_t *bip32_path,
                       size_t bip32_path_len,
                       const uint32_t expected_coin_types[],
-                      size_t expected_coin_types_len,
-                      bool is_change
+                      size_t expected_coin_types_len
 ){
-    if (bip32_path_len != 5) {
+    // if exporting the pubkey, should specify _at least_ until the coin type,
+    // and not deeper than the account (therefore 2 or 3 steps)
+    if (bip32_path_len < 2 || bip32_path_len > 3) {
         return false;
     }
 
@@ -121,6 +121,7 @@ bool is_path_standard(const uint32_t *bip32_path,
     if (coin_type < H) {
         return false; // the coin_type should be hardened
     }
+
     if (expected_coin_types_len > 0) {
         // make sure that the coin_type is in the given list
         bool is_coin_type_valid = false;
@@ -134,8 +135,36 @@ bool is_path_standard(const uint32_t *bip32_path,
             return false;
         }
     }
+
+    if (bip32_path_len == 2) {
+        return true; // nothing else to check
+    }
+
     uint32_t account_number = bip32_path[BIP44_ACCOUNT_OFFSET];
     if ((account_number ^ H) > MAX_BIP44_ACCOUNT_RECOMMENDED) { // should be hardened, and not too large
+        return false;
+    }
+
+    return true;
+}
+
+bool is_address_path_standard(const uint32_t *bip32_path,
+                      size_t bip32_path_len,
+                      uint32_t expected_purpose,
+                      const uint32_t expected_coin_types[],
+                      size_t expected_coin_types_len,
+                      bool is_change
+){
+    if (bip32_path_len != 5) {
+        return false;
+    }
+
+    if (!is_pubkey_path_standard(bip32_path, 3, expected_coin_types, expected_coin_types_len)) {
+        return false;
+    }
+
+    uint32_t purpose = bip32_path[BIP44_PURPOSE_OFFSET];
+    if (purpose != (expected_purpose ^ H)) {
         return false;
     }
 

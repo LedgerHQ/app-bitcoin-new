@@ -61,7 +61,8 @@ int handler_get_pubkey(
         return io_send_sw(SW_WRONG_DATA_LENGTH);
     }
 
-    // TODO: should we allow arbitrary paths? Should we alert the user for non-standard paths?
+    // TODO: check if path is ok to export, adapt UI to ask for confirmation if suspicious.
+
 
     get_serialized_extended_pubkey(bip32_path, bip32_path_len, state->serialized_pubkey_str);
 

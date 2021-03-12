@@ -96,7 +96,7 @@ static void test_bad_bip32_read(void **state) {
 }
 
 
-static void test_is_path_standard_true(void **state) {
+static void test_is_pubkey_path_standard_true(void **state) {
     (void) state;
 
     const uint32_t valid_purposes[] = {44, 49, 84};
@@ -106,61 +106,114 @@ static void test_is_path_standard_true(void **state) {
         uint32_t purpose = valid_purposes[i_p];
 
         // any coin type will do, if coin_types is not given
-        assert_true(is_path_standard((const uint32_t[]){purpose^H, 12345^H, 0^H, 0, 0}, 5, NULL, 0, false));
+        assert_true(is_pubkey_path_standard((const uint32_t[]){purpose^H, 12345^H}, 2, NULL, 0));
+        assert_true(is_pubkey_path_standard((const uint32_t[]){purpose^H, 12345^H, 0^H}, 3, NULL, 0));
 
         for (int i_c = 0; i_c < sizeof(coin_types)/sizeof(coin_types[0]); i_c++) {
             uint32_t coin_type = coin_types[i_c];
 
-            assert_true(is_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 0, 0}, 5, coin_types, 2, false));
-
-            // Change address
-            assert_true(is_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 1, 0}, 5, coin_types, 2, true));
-
-            // Largest valid account
-            assert_true(is_path_standard((const uint32_t[]){purpose^H, coin_type^H, MAX_BIP44_ACCOUNT_RECOMMENDED^H, 0, 0}, 5, coin_types, 2, false));
-
-            // Largest valid address index
-            assert_true(is_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 0, MAX_BIP44_ADDRESS_INDEX_RECOMMENDED}, 5, coin_types, 2, false));
+            assert_true(is_pubkey_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H}, 3, coin_types, 2));
         }
     }
 }
 
-static void test_is_path_standard_false(void **state) {
+static void test_is_pubkey_path_standard_false(void **state) {
+    (void) state;
+
+    const uint32_t coin_types[] = {0, 8};
+
+    // path too short
+    assert_false(is_pubkey_path_standard(NULL, 0, coin_types, 2));
+    assert_false(is_pubkey_path_standard(NULL, 0, NULL, 0));
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H}, 1, coin_types, 2));
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H}, 1, NULL, 0));
+
+    // invalid purpose
+    assert_false(is_pubkey_path_standard((const uint32_t[]){45^H, 0^H}, 2, coin_types, 2));
+    // non-hardened purpose
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44, 0^H}, 2, coin_types, 2));
+
+    // invalid coin type
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H, 100^H, 0^H}, 3, coin_types, 2));
+    // non-hardened coin type (but otherwise in coin_types)
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H, 8, 0^H}, 3, coin_types, 2));
+    // should still check that coin type is hardened, even if coin_types is not given
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H, 0, 0^H}, 3, NULL, 0));
+
+    // account too big
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H, 0^H, (1 + MAX_BIP44_ACCOUNT_RECOMMENDED)^H}, 3, coin_types, 2));
+    // account not hardened
+    assert_false(is_pubkey_path_standard((const uint32_t[]){44^H, 0^H, 0}, 3, coin_types, 2));
+}
+
+
+static void test_is_address_path_standard_true(void **state) {
+    (void) state;
+
+    const uint32_t valid_purposes[] = {44, 49, 84};
+    const uint32_t coin_types[] = {0, 8};
+
+    for (int i_p = 0; i_p < sizeof(valid_purposes)/sizeof(valid_purposes[0]); i_p++) {
+        uint32_t purpose = valid_purposes[i_p];
+
+        // any coin type will do, if coin_types is not given
+        assert_true(is_address_path_standard((const uint32_t[]){purpose^H, 12345^H, 42^H, 0, 0}, 5, purpose, NULL, 0, false));
+
+        for (int i_c = 0; i_c < sizeof(coin_types)/sizeof(coin_types[0]); i_c++) {
+            uint32_t coin_type = coin_types[i_c];
+
+            assert_true(is_address_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 0, 0}, 5, purpose, coin_types, 2, false));
+
+            // Change address
+            assert_true(is_address_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 1, 0}, 5, purpose, coin_types, 2, true));
+
+            // Largest valid account
+            assert_true(is_address_path_standard((const uint32_t[]){purpose^H, coin_type^H, MAX_BIP44_ACCOUNT_RECOMMENDED^H, 0, 0}, 5, purpose, coin_types, 2, false));
+
+            // Largest valid address index
+            assert_true(is_address_path_standard((const uint32_t[]){purpose^H, coin_type^H, 0^H, 0, MAX_BIP44_ADDRESS_INDEX_RECOMMENDED}, 5, purpose, coin_types, 2, false));
+        }
+    }
+}
+
+static void test_is_address_path_standard_false(void **state) {
     (void) state;
 
     const uint32_t coin_types[] = {0, 8};
 
     // invalid purpose
-    assert_false(is_path_standard((const uint32_t[]){45^H, 0^H, 0^H, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){999^H, 0^H, 0^H, 0, 0}, 5, 999, coin_types, 2, false));
+    // purpose not matching expected one
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 0, 0}, 5, 84, coin_types, 2, false));
     // non-hardened purpose
-    assert_false(is_path_standard((const uint32_t[]){44, 0^H, 0^H, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44, 0^H, 0^H, 0, 0}, 5, 44, coin_types, 2, false));
 
     // invalid coin type
-    assert_false(is_path_standard((const uint32_t[]){44^H, 100^H, 0^H, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 100^H, 0^H, 0, 0}, 44, 5, coin_types, 2, false));
     // non-hardened coin type (but otherwise in coin_types)
-    assert_false(is_path_standard((const uint32_t[]){44^H, 8, 0^H, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 8, 0^H, 0, 0}, 44, 5, coin_types, 2, false));
     // should still check that coin type is hardened, even if coin_types is not given
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0, 0^H, 0, 0}, 5, NULL, 0, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0, 0^H, 0, 0}, 44, 5, NULL, 0, false));
 
     // account too big
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, (1 + MAX_BIP44_ACCOUNT_RECOMMENDED)^H, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, (1 + MAX_BIP44_ACCOUNT_RECOMMENDED)^H, 0, 0}, 44, 5, coin_types, 2, false));
     // account not hardened
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 0}, 44, 5, coin_types, 2, false));
 
     // got change when is_change = false
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 1, 0}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 1, 0}, 44, 5, coin_types, 2, false));
     // didn't get change despite is_change = true
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 0, 0}, 5, coin_types, 2, true));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 0, 0}, 44, 5, coin_types, 2, true));
     // invalid change value
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 2, 0}, 5, coin_types, 2, true));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 2, 0}, 44, 5, coin_types, 2, true));
     // change is hardened, but it shouldn't be
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 0^H, 0}, 5, coin_types, 2, false));
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 1^H, 0}, 5, coin_types, 2, true));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 0^H, 0}, 44, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0^H, 1^H, 0}, 44, 5, coin_types, 2, true));
 
     // account too big
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 1 + MAX_BIP44_ADDRESS_INDEX_RECOMMENDED}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 1 + MAX_BIP44_ADDRESS_INDEX_RECOMMENDED}, 44, 5, coin_types, 2, false));
     // account is hardened
-    assert_false(is_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 0^H}, 5, coin_types, 2, false));
+    assert_false(is_address_path_standard((const uint32_t[]){44^H, 0^H, 0, 0, 0^H}, 44, 5, coin_types, 2, false));
 }
 
 
@@ -170,8 +223,10 @@ int main() {
         cmocka_unit_test(test_bad_bip32_format),
         cmocka_unit_test(test_bip32_read),
         cmocka_unit_test(test_bad_bip32_read),
-        cmocka_unit_test(test_is_path_standard_true),
-        cmocka_unit_test(test_is_path_standard_false)
+        cmocka_unit_test(test_is_pubkey_path_standard_true),
+        cmocka_unit_test(test_is_pubkey_path_standard_false),
+        cmocka_unit_test(test_is_address_path_standard_true),
+        cmocka_unit_test(test_is_address_path_standard_false)
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

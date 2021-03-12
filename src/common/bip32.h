@@ -69,14 +69,46 @@ bool bip32_path_format(const uint32_t *bip32_path,
 
 
 /**
- * Verifies if a given path is standard according to the BIP44, BIP39 or BIP84.
+ * Verifies if a given path is standard according to BIP44 or derived standards, and it is reasonable to export
+ * its pubkey. Should not export paths that are too short to specify the coin type (it would expose other
+ * coins' keys), but also not deeper than the standard account number (third level of derivation), since no
+ * standard currently defines deeper hardened derivations.
  *
- * Return false if any of the following conditions is not satisfied by the given bip32_path:
+ * Returns false if any of the following conditions is not satisfied by the given bip32_path:
+ * - the bip32_path has 2 or 3 steps;
+ * - purpose, coin_type and account_number (if given) are hardened;
+ * - purpose is not hardened, or it does not match expected_purpose;
+ * - coin_type is in the expected_coin_types array (if given);
+ * - account_number (if given) at most MAX_BIP44_ACCOUNT_RECOMMENDED.
+ *
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit integer input buffer.
+ * @param[in]  bip32_path_len
+ *   Maximum number of BIP32 paths in the input buffer.
+ * @param[in]  expected_coin_types
+ *   Pointer to an array with the coin types that are considered acceptable. The
+ *   elements of the array should be given as simple numbers (not their hardened version);
+ *   for example, the coin type for Bitcoin is 0.
+ *   Ignored if expected_coin_types_len is 0; in that case, it is only checked
+ *   that the coin_type is hardened, as expected in the standard.
+ * @param[in]  expected_coin_types_len
+ *   The length of expected_coin_types.
+ *
+ * @return true if the given address is standard, false otherwise.
+ *
+ */
+bool is_pubkey_path_standard(const uint32_t *bip32_path,
+                      size_t bip32_path_len,
+                      const uint32_t expected_coin_types[],
+                      size_t expected_coin_types_len);
+
+/**
+ * Verifies if a given path is standard according to the BIP44 or derived standards for the derivation path for an address.
+ *
+ * Returns false if any of the following conditions is not satisfied by the given bip32_path:
  * - the bip32_path has exactly 5 elements;
- * - purpose, coin_type and account_number are hardened; change and address_index are not;
- * - purpose is one of 44, 49 or 84;
- * - coin_type is in expected_coin_types (if given);
- * - account_number is at most MAX_BIP44_ACCOUNT_RECOMMENDED;
+ * - the first 3 steps of the derivation are standard according to is_pubkey_path_standard;
+ * - change and address_index are not hardened;
  * - change is 0 and is_change = false, or change is 1 and is_change = true;
  * - address_index is at most MAX_BIP44_ADDRESS_INDEX_RECOMMENDED.
  *
@@ -84,6 +116,8 @@ bool bip32_path_format(const uint32_t *bip32_path,
  *   Pointer to 32-bit integer input buffer.
  * @param[in]  bip32_path_len
  *   Maximum number of BIP32 paths in the input buffer.
+ * @param[in]  expected_purpose
+ *   The purpose that should be in the derivation (e.g. 44 for BIP44).
  * @param[in]  expected_coin_types
  *   Pointer to an array with the coin types that are considered acceptable. The
  *   elements of the array should be given as simple numbers (not their hardened version);
@@ -98,8 +132,9 @@ bool bip32_path_format(const uint32_t *bip32_path,
  * @return true if the given address is standard, false otherwise.
  *
  */
-bool is_path_standard(const uint32_t *bip32_path,
+bool is_address_path_standard(const uint32_t *bip32_path,
                       size_t bip32_path_len,
+                      uint32_t expected_purpose,
                       const uint32_t expected_coin_types[],
                       size_t expected_coin_types_len,
                       bool is_change);
