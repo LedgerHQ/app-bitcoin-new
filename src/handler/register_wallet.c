@@ -29,7 +29,7 @@
 
 #include "cx.h"
 
-static void ui_action_validate_cosigner(bool accept);
+static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
 
 int handler_register_wallet(
     uint8_t p1,
@@ -89,10 +89,14 @@ int handler_register_wallet(
     cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->n_keys, 1, wallet_hash, 32);
 
     state->next_pubkey_index = 0;
-    return ui_display_multisig_header((char *)state->wallet_name, state->threshold, state->n_keys, ui_action_validate_cosigner);
+    return ui_display_multisig_header(dispatcher_context,
+                                      (char *)state->wallet_name,
+                                      state->threshold,
+                                      state->n_keys,
+                                      ui_action_validate_cosigner);
 }
 
-static void ui_action_validate_cosigner(bool accept) {
+static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     if (!accept) {
@@ -102,7 +106,7 @@ static void ui_action_validate_cosigner(bool accept) {
             // TODO
             char pubkey[] = "xpubetcetcjlkjgslkfdjlksjdf;lkdsf;lsdk;lfdsk;lf";
             ++state->next_pubkey_index;
-            ui_display_multisig_cosigner_pubkey(pubkey, state->next_pubkey_index, state->n_keys, ui_action_validate_cosigner);
+            ui_display_multisig_cosigner_pubkey(dc, pubkey, state->next_pubkey_index, state->n_keys, ui_action_validate_cosigner);
             return;
         } else {
             //TODO: all good, send signature back

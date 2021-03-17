@@ -27,7 +27,7 @@
 #include "../ui/menu.h"
 
 
-static void ui_action_validate_pubkey(bool choice);
+static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice);
 
 int handler_get_pubkey(
     uint8_t p1,
@@ -72,13 +72,13 @@ int handler_get_pubkey(
     }
 
     if (p1 == 1) {
-        return ui_display_pubkey(path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
+        return ui_display_pubkey(dispatcher_context, path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
         return io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
     }
 }
 
-static void ui_action_validate_pubkey(bool choice) {
+static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice) {
     get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
     if (choice) {
         io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);

@@ -38,10 +38,14 @@
 #define MAX_BASE58_PUBKEY_LENGTH 112
 #define MAX_ADDRESS_LENGTH 35
 
+// These globals are a workaround for a limitation of the UX library that
+// does not allow to pass proper callbacks and context.
+static action_validate_cb g_validate_callback;
+static dispatcher_context_t *g_dispatcher_context;
+
 // TODO: optimize (or avoid?) globals for UX screens.
 //       different screens could share the same memory using a union.
 
-static action_validate_cb g_validate_callback;
 static char g_bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
 static char g_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 static char g_address[MAX_ADDRESS_LENGTH_STR + 1];
@@ -69,7 +73,7 @@ UX_STEP_NOCB(
 UX_STEP_CB(
     ux_display_reject_if_not_sure_step,
     pnn,
-    (*g_validate_callback)(false),
+    (*g_validate_callback)(g_dispatcher_context, false),
     {
       &C_icon_crossmark,
       "Reject if you're",
@@ -103,7 +107,7 @@ UX_STEP_NOCB(ux_display_address_step,
 // Step with approve button
 UX_STEP_CB(ux_display_approve_step,
            pb,
-           (*g_validate_callback)(true),
+           (*g_validate_callback)(g_dispatcher_context, true),
            {
                &C_icon_validate_14,
                "Approve",
@@ -112,7 +116,7 @@ UX_STEP_CB(ux_display_approve_step,
 // Step with reject button
 UX_STEP_CB(ux_display_reject_step,
            pb,
-           (*g_validate_callback)(false),
+           (*g_validate_callback)(g_dispatcher_context, false),
            {
                &C_icon_crossmark,
                "Reject",
@@ -218,10 +222,11 @@ UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
 
 
 
-int ui_display_pubkey(char *bip32_path, char *pubkey, action_validate_cb callback) {
+int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
     strncpy(g_bip32_path, bip32_path, sizeof(g_bip32_path));
     strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
 
+    g_dispatcher_context = context;
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_pubkey_flow, NULL);
@@ -230,8 +235,10 @@ int ui_display_pubkey(char *bip32_path, char *pubkey, action_validate_cb callbac
 }
 
 
-int ui_display_address(char *address, bool is_path_suspicious, action_validate_cb callback) {
+int ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, action_validate_cb callback) {
     strncpy(g_address, address, sizeof(g_address));
+
+    g_dispatcher_context = context;
     g_validate_callback = callback;
 
     if (is_path_suspicious) {
@@ -243,10 +250,11 @@ int ui_display_address(char *address, bool is_path_suspicious, action_validate_c
 }
 
 
-int ui_display_multisig_header(char *name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
+int ui_display_multisig_header(dispatcher_context_t *context, char *name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
     strncpy(g_wallet_name, name, sizeof(g_wallet_name));
     snprintf(g_multisig_type, sizeof(g_multisig_type), "%u of %u", threshold, n_keys);
 
+    g_dispatcher_context = context;
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_multisig_header_flow, NULL);
@@ -254,10 +262,11 @@ int ui_display_multisig_header(char *name, uint8_t threshold, uint8_t n_keys, ac
 }
 
 
-int ui_display_multisig_cosigner_pubkey(char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
+int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
     strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
     snprintf(g_multisig_signer_index, sizeof(g_multisig_type), "Signer %u of %u", cosigner_index, n_keys);
 
+    g_dispatcher_context = context;
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_multisig_cosigner_pubkey_flow, NULL);

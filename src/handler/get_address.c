@@ -27,7 +27,7 @@
 #include "../ui/menu.h"
 
 
-static void ui_action_validate_address(bool accepted);
+static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
 int handler_get_address(
     uint8_t p1,
@@ -100,14 +100,14 @@ int handler_get_address(
     state->address_len = (size_t)ret;
 
     if (p1 == 1 || is_path_suspicious) {
-        return ui_display_address(state->address, is_path_suspicious, ui_action_validate_address);
+        return ui_display_address(dispatcher_context, state->address, is_path_suspicious, ui_action_validate_address);
     } else {
-        ui_action_validate_address(true);
+        ui_action_validate_address(dispatcher_context, true);
         return 0;
     }
 }
 
-static void ui_action_validate_address(bool accepted) {
+static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (accepted) {
