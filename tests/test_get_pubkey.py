@@ -1,5 +1,7 @@
 # default speculos seed: glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin
 
+# TODO: add tests with display=True and non-standard path
+
 def test_get_pubkey(cmd):
     pub_key = cmd.get_pubkey(
         bip32_path="m",  # root pubkey

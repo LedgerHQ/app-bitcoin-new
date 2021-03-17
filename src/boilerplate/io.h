@@ -36,8 +36,7 @@ void io_set_response(void *rdata, size_t rdata_len, uint16_t sw);
 int io_confirm_response(void);
 
 /**
- * Send APDU response (response data + status word) by filling
- * G_io_apdu_buffer.
+ * Send APDU response (response data + status word) by filling G_io_apdu_buffer.
  *
  * @param[in] rdata
  *   Pointer to the response.
@@ -52,8 +51,7 @@ int io_confirm_response(void);
 int io_send_response(void *rdata, size_t rdata_len, uint16_t sw);
 
 /**
- * Send APDU response (only status word) by filling
- * G_io_apdu_buffer.
+ * Send APDU response (only status word) by filling G_io_apdu_buffer.
  *
  * @param[in] sw
  *   Status word of APDU response.

@@ -64,6 +64,7 @@ class BitcoinCommand:
         return self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
 
     def get_pubkey(self, bip32_path: str, display: bool = False) -> str:
+        # TODO: add docs
         sw, response = self.transport.exchange_raw(
             self.builder.get_pubkey(bip32_path, display)
         )
@@ -101,6 +102,27 @@ class BitcoinCommand:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
 
         return response.decode()
+
+
+    def register_wallet(self, wallet_type: int, name: str, threshold: int, n_keys:int, pubkeys: List[str]) -> bytes:
+        if wallet_type != 0:
+            raise ValueError("wallet_type must be 0")
+
+        if len(name.encode("latin-1")) > 16:
+            raise ValueError("The length of name must be at most 16 bytes")
+
+        if (threshold < 0 or n_keys < 0 or threshold > 15 or n_keys > 15 or threshold > n_keys):
+            raise ValueError("Invalid threshold or n_keys")
+
+        sw, response = self.transport.exchange_raw(
+            self.builder.register_wallet(wallet_type, name, threshold, n_keys, pubkeys)
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
+
+        return response
+
 
     def get_sum_of_squares(self, n: int) -> int:
         if n < 0 or n > 255:

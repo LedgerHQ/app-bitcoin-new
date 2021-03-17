@@ -40,3 +40,8 @@
  */
 #define EXPONENT_SMALLEST_UNIT 3
 
+
+/**
+ * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
+ */
+#define MAX_WALLET_NAME_LENGTH 16

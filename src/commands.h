@@ -12,6 +12,7 @@
 typedef enum {
     GET_PUBKEY = 0x00,
     GET_ADDRESS = 0x01,
+    REGISTER_WALLET = 0x2,
     GET_SUM_OF_SQUARES = 0xF0, /// compute the sum of the squares up to a number (I know, right?)
 } command_e;
 

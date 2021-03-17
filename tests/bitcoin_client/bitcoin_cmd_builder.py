@@ -31,6 +31,7 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
 class BitcoinInsType(enum.IntEnum):
     GET_PUBKEY = 0x00
     GET_ADDRESS = 0x01
+    REGISTER_WALLET = 0x02
     GET_SUM_OF_SQUARES = 0xF0
 
 class FrameworkInsType(enum.IntEnum):
@@ -135,6 +136,21 @@ class BitcoinCommandBuilder:
                         p1=1 if display else 0,
                         p2=addr_type,
                         ins=BitcoinInsType.GET_ADDRESS,
+                        cdata=cdata)
+
+    def register_wallet(self, wallet_type: int, name: str, threshold: int, n_keys:int, pubkeys: List[str]):
+        cdata: bytes = b"".join([
+            wallet_type.to_bytes(1, byteorder="big"),
+            len(name).to_bytes(1, byteorder="big"),
+            name.encode("latin-1"), # TODO: check appropriate encoding
+            threshold.to_bytes(1, byteorder="big"),
+            n_keys.to_bytes(1, byteorder="big"),
+        ])
+
+        return self.serialize(cla=self.CLA_BITCOIN,
+                        p1=0,
+                        p2=0,
+                        ins=BitcoinInsType.REGISTER_WALLET,
                         cdata=cdata)
 
     def get_sum_of_squares(self, n: int):

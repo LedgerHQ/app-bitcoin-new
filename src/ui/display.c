@@ -19,6 +19,7 @@
 #pragma GCC diagnostic ignored "-Wformat-extra-args"         // snprintf
 
 #include <stdbool.h>  // bool
+#include <stdio.h>    // snprintf
 #include <string.h>   // memset
 
 #include "os.h"
@@ -37,10 +38,16 @@
 #define MAX_BASE58_PUBKEY_LENGTH 112
 #define MAX_ADDRESS_LENGTH 35
 
+// TODO: optimize (or avoid?) globals for UX screens.
+//       different screens could share the same memory using a union.
+
 static action_validate_cb g_validate_callback;
 static char g_bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
 static char g_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 static char g_address[MAX_ADDRESS_LENGTH_STR + 1];
+static char g_wallet_name[MAX_WALLET_NAME_LENGTH + 1];
+static char g_multisig_type[sizeof("15 of 15")];
+static char g_multisig_signer_index[sizeof("Signer 15 of 15")];
 
 // Step with icon and text for pubkey
 UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public key"});
@@ -111,6 +118,37 @@ UX_STEP_CB(ux_display_reject_step,
                "Reject",
            });
 
+
+// Step with icon and text with name of a wallet being registered
+UX_STEP_NOCB(
+    ux_display_wallet_header_name_step,
+    pnn,
+    {
+      &C_icon_eye,
+      "Register wallet",
+      g_wallet_name,
+    });
+
+// Step with description of a m-of-n multisig wallet
+UX_STEP_NOCB(
+    ux_display_wallet_multisig_type_step,
+    nn,
+    {
+      "Multisig wallet",
+      g_multisig_type,
+    });
+
+
+// Step with index and xpub of a cosigner of a multisig wallet
+UX_STEP_NOCB(
+    ux_display_wallet_multisig_cosigner_pubkey_step,
+    bnnn_paging,
+    {
+        .title = g_multisig_signer_index,
+        .text = g_pubkey,
+    });
+
+
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
 // #2 screen: display BIP32 Path
@@ -155,6 +193,31 @@ UX_FLOW(ux_display_address_suspicious_flow,
         &ux_display_reject_step);
 
 
+// FLOW to display the header of a multisig wallet:
+// #1 screen: eye icon + "Register multisig" and the wallet name
+// #2 screen: display multisig threshold and number of keys
+// #3 screen: approve button
+// #4 screen: reject button
+UX_FLOW(ux_display_multisig_header_flow,
+        &ux_display_wallet_header_name_step,
+        &ux_display_wallet_multisig_type_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step
+        );
+
+
+// FLOW to display the header of a multisig wallet:
+// #1 screen: Cosigner index and pubkey (paginated)
+// #2 screen: approve button
+// #3 screen: reject button
+UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
+        &ux_display_wallet_multisig_cosigner_pubkey_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step
+        );
+
+
+
 int ui_display_pubkey(char *bip32_path, char *pubkey, action_validate_cb callback) {
     strncpy(g_bip32_path, bip32_path, sizeof(g_bip32_path));
     strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
@@ -176,5 +239,27 @@ int ui_display_address(char *address, bool is_path_suspicious, action_validate_c
     } else {
         ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
     }
+    return 0;
+}
+
+
+int ui_display_multisig_header(char *name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
+    strncpy(g_wallet_name, name, sizeof(g_wallet_name));
+    snprintf(g_multisig_type, sizeof(g_multisig_type), "%u of %u", threshold, n_keys);
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_display_multisig_header_flow, NULL);
+    return 0;
+}
+
+
+int ui_display_multisig_cosigner_pubkey(char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
+    strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
+    snprintf(g_multisig_signer_index, sizeof(g_multisig_type), "Signer %u of %u", cosigner_index, n_keys);
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_display_multisig_cosigner_pubkey_flow, NULL);
     return 0;
 }

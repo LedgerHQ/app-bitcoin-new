@@ -32,6 +32,7 @@
 #include "handler/get_pubkey.h"
 #include "handler/get_address.h"
 #include "handler/get_sum_of_squares.h"
+#include "handler/register_wallet.h"
 
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 io_state_e G_io_state;
@@ -52,6 +53,12 @@ command_descriptor_t const COMMAND_DESCRIPTORS[] = {
         .cla = CLA_APP,
         .ins = GET_ADDRESS,
         .handler = (command_handler_t)handler_get_address,
+        .processor = NULL
+    },
+    {
+        .cla = CLA_APP,
+        .ins = REGISTER_WALLET,
+        .handler = (command_handler_t)handler_register_wallet,
         .processor = NULL
     },
     {
