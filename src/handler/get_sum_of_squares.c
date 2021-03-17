@@ -26,42 +26,7 @@
 #include "../types.h"
 #include "client_commands.h"
 
-
-
-// TODO: this API is very clumsy, find a better interface.
-//       The boilerplate part of ext_get_square could be reduced. The only non-boilerplate code is:
-//         - reading the result from the client
-//         - serializing the command for SW_INTERRUPTED_EXECUTION
-
-/**
- * If this is a continuation, fetches the response, writes into `result`, then returns 1.
- * If this is an interruption, alerts the dispatcher and prepares the response, then returns 0.
- * If any error occurs, it returs 0.
- **/
-int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, uint8_t n) {
-    if (dispatcher_context->is_continuation) {
-        dispatcher_context->is_continuation = false;
-
-        // TODO: should only reach here if the interrupted command is GET_SUM_OF_SQUARES
-        //       It would make sense to have an integrity check here.
-
-        // read the result from the client
-        if (!buffer_read_u32(&dispatcher_context->read_buffer, result, BE)) {
-            io_set_response(NULL, 0, SW_WRONG_DATA_LENGTH);
-            return 0;
-        }
-
-        return 1;
-    } else {
-        // prepare the EXT_GET_SQUARE response for the user
-        uint8_t req[] = { CCMD_GET_SQUARE, n };
-
-        io_set_response(req, 2, SW_INTERRUPTED_EXECUTION);
-
-        dispatcher_context->interrupt = true;
-        return 0;
-    }
-}
+static int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);
 
 
 int handler_get_sum_of_squares(
@@ -88,9 +53,44 @@ int handler_get_sum_of_squares(
     state->i = 1;
     state->sum = 0;
 
-    return true;
+    return processor_get_sum_of_squares(dispatcher_context);
 }
 
+// TODO: this API is very clumsy, find a better interface.
+//       The boilerplate part of ext_get_square could be reduced. The only non-boilerplate code is:
+//         - reading the result from the client
+//         - serializing the command for SW_INTERRUPTED_EXECUTION
+
+/**
+ * If this is a continuation, fetches the response, writes into `result`, then returns 1.
+ * If this is an interruption, alerts the dispatcher and prepares the response, then returns 0.
+ * If any error occurs, it returs 0.
+ **/
+static int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, uint8_t n) {
+    if (dispatcher_context->is_continuation) {
+        dispatcher_context->is_continuation = false;
+
+        // TODO: should only reach here if the interrupted command is GET_SUM_OF_SQUARES
+        //       It would make sense to have an integrity check here.
+
+        // read the result from the client
+        if (!buffer_read_u32(&dispatcher_context->read_buffer, result, BE)) {
+            io_set_response(NULL, 0, SW_WRONG_DATA_LENGTH);
+            return 0;
+        }
+
+        return 1;
+    } else {
+        dispatcher_context->continuation = processor_get_sum_of_squares;
+
+        // prepare the EXT_GET_SQUARE response for the user
+        uint8_t req[] = { CCMD_GET_SQUARE, n };
+
+        io_set_response(req, 2, SW_INTERRUPTED_EXECUTION);
+
+        return 0;
+    }
+}
 
 int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
     get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state; 

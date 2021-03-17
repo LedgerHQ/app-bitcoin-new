@@ -3,15 +3,6 @@
 #include "types.h"
 #include "common/buffer.h"
 
-/**
- * TODO: docs
- */
-typedef struct {
-    buffer_t read_buffer;
-    bool is_continuation;
-    bool interrupt;
-} dispatcher_context_t;
-
 
 // TODO: continue brainstorming on a nice interface.
 // A command descriptor should contain:
@@ -24,17 +15,35 @@ typedef struct {
 // implements the state machines, and must respect specific constraints in the way it's written.
 // TODO: document this.
 
+
+// Forward declaration
+struct dispatcher_context_s;
+typedef struct dispatcher_context_s dispatcher_context_t;
+
 // Args: p1, p2, Lc, pointer to dispatcher context
 typedef int (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *);
 // Args: pointer to dispatcher context
 typedef int (*command_processor_t)(dispatcher_context_t *);
+
+
+/**
+ * TODO: docs
+ */
+struct dispatcher_context_s {
+    buffer_t read_buffer;
+    bool is_continuation; // Set to true before a command processor is called in case of continuation. false otherwise.
+                          // A command handler might set it to false once the continuation is processed to signal the
+                          // return to normal execution; the dispatcher ignores its value after calling a command
+                          // handler or processor. 
+    command_processor_t continuation; // will be set by a command handler or processor that interrupts the execution
+};
+
 
 /**
  * Describes a command that can be processed by the dispatcher.
  */
 typedef struct {
     command_handler_t handler;
-    command_processor_t processor; // it can be NULL
     uint8_t cla;
     uint8_t ins;
 } command_descriptor_t;

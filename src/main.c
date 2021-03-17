@@ -40,32 +40,28 @@ ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 global_context_t G_context;
 command_state_t G_command_state;
-
+command_processor_t G_command_continuation;
 
 command_descriptor_t const COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
         .ins = GET_PUBKEY,
-        .handler = (command_handler_t)handler_get_pubkey,
-        .processor = NULL
+        .handler = (command_handler_t)handler_get_pubkey
     },
     {
         .cla = CLA_APP,
         .ins = GET_ADDRESS,
-        .handler = (command_handler_t)handler_get_address,
-        .processor = NULL
+        .handler = (command_handler_t)handler_get_address
     },
     {
         .cla = CLA_APP,
         .ins = REGISTER_WALLET,
-        .handler = (command_handler_t)handler_register_wallet,
-        .processor = NULL
+        .handler = (command_handler_t)handler_register_wallet
     },
     {
         .cla = CLA_APP,
         .ins = GET_SUM_OF_SQUARES,
-        .handler = (command_handler_t)handler_get_sum_of_squares,
-        .processor = (command_processor_t)processor_get_sum_of_squares
+        .handler = (command_handler_t)handler_get_sum_of_squares
     }
 };
 
@@ -85,6 +81,8 @@ void app_main() {
 
     // Reset context
     explicit_bzero(&G_context, sizeof(G_context));
+
+    G_command_continuation = NULL;
 
     for (;;) {
         BEGIN_TRY {

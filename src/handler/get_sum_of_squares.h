@@ -16,5 +16,3 @@ int handler_get_sum_of_squares(
     uint8_t lc,
     dispatcher_context_t *dispatcher_context
 );
-
-int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);

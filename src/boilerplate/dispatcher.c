@@ -28,21 +28,15 @@
 #include "common/buffer.h"
 
 /**
- * Information about an interrupted command (if any).
+ * If there was an interrupted command, a CONTINUE will restart from the command processor stored here.
+ * Otherwise, this must be set to NULL.
  */
-struct {
-    bool has_interrupted_command;
-    uint8_t cla;                   // Instruction class
-    uint8_t ins;                   // Instruction code
-    uint8_t p1;                    // Instruction parameter 1
-    uint8_t p2;                    // Instruction parameter 2
-} G_interrupted_command;
+extern command_processor_t G_command_continuation;
 
 int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descriptors, const command_t *cmd) {
-    uint8_t cla = cmd->cla, ins = cmd->ins, p1 = cmd->p1, p2 = cmd->p2;
     dispatcher_context_t dispatcher_context = {
-        .interrupt = false, // set to true if the execution is interrupted for a client command
         .is_continuation = false,
+        .continuation = NULL,
         .read_buffer = {
             .ptr = cmd->data,
             .size = cmd->lc,
@@ -50,64 +44,55 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
         }
     };
 
-    if (cmd->cla == CLA_FRAMEWORK && ins == INS_CONTINUE) {
-        dispatcher_context.is_continuation = true;
+    int ret;
+
+    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (cmd->p1 != 0 || cmd->p2 != 0) {
             return io_send_sw(SW_WRONG_P1P2);
         }
 
-        if (!G_interrupted_command.has_interrupted_command) {
-            return io_send_sw(SW_BAD_STATE);
+        if (G_command_continuation == NULL) {
+            return io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
         }
 
-        // Set cla, ins, p1 and p2 as previously set for the interrupted command.
-        // Note that lc and data still refer to the continuation command instead.
-        cla = G_interrupted_command.cla;
-        ins = G_interrupted_command.ins;
-        p1 = G_interrupted_command.p1;
-        p2 = G_interrupted_command.p2;
-    }
+        dispatcher_context.is_continuation = true;
+        command_processor_t continuation = (command_processor_t)PIC(G_command_continuation);
 
-    // Reset interrupted command (if any)
-    G_interrupted_command.has_interrupted_command = false;
+        // Reset interrupted command
+        G_command_continuation = NULL;
 
-    int ret = 0;
-    bool cla_found = false, ins_found = false;
-    for (int i = 0; i < n_descriptors; i++) {
-        if (cmd_descriptors[i].cla != cla)
-            continue;
-        cla_found = true;
-        if (cmd_descriptors[i].ins != ins)
-            continue;
-        ins_found = true;
+        ret = continuation(&dispatcher_context);
+    } else {
+        // Reset interrupted command. If a previous command was interrupted but any command other than
+        // INS_CONTINUE is received, the interrupted command is therefore discarded.
+        G_command_continuation = NULL;
 
-        if (!dispatcher_context.is_continuation) {
-            command_handler_t handler = (command_handler_t)PIC(cmd_descriptors[i].handler);
-            ret = handler(p1, p2, cmd->lc, &dispatcher_context);
-            if (ret < 0) {
-                break;
-            }
+        bool cla_found = false, ins_found = false;
+        command_handler_t handler;
+        for (int i = 0; i < n_descriptors; i++) {
+            if (cmd_descriptors[i].cla != cmd->cla)
+                continue;
+            cla_found = true;
+            if (cmd_descriptors[i].ins != cmd->ins)
+                continue;
+            ins_found = true;
+
+            handler = (command_handler_t)PIC(cmd_descriptors[i].handler);
+            break;
         }
-        if (cmd_descriptors[i].processor != NULL) {
-            command_processor_t processor = (command_processor_t)PIC(cmd_descriptors[i].processor);
-            ret = processor(&dispatcher_context);
+
+        if (!cla_found) {
+            return io_send_sw(SW_CLA_NOT_SUPPORTED);
+        } else if (!ins_found) {
+            return io_send_sw(SW_INS_NOT_SUPPORTED);
         }
-        break;
+
+        ret = handler(cmd->p1, cmd->p2, cmd->lc, &dispatcher_context);
     }
 
-    if (!cla_found) {
-        return io_send_sw(SW_CLA_NOT_SUPPORTED);
-    } else if (!ins_found) {
-        return io_send_sw(SW_INS_NOT_SUPPORTED);
-    }
-
-    if (dispatcher_context.interrupt == true) {
-        // store which command was interrupted
-        G_interrupted_command.has_interrupted_command = true;
-        G_interrupted_command.cla = cla;
-        G_interrupted_command.ins = ins;
-        G_interrupted_command.p1 = p1;
-        G_interrupted_command.p2 = p2;
+    if (dispatcher_context.continuation != NULL) {
+        // store where execution should restart when INS_CONTINUE is called
+        G_command_continuation = dispatcher_context.continuation;
     }
 
     return ret;
