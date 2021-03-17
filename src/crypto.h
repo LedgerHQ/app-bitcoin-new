@@ -66,6 +66,22 @@ int crypto_init_public_key(
 
 
 /**
+ * Computes the signature of a previously computed sha256 hash as input.
+ * The key used to sign is the master key, and the nonce is chosen deterministically as per RFC6979.
+ *
+ * @param[in] in
+ *   Pointer to input data.
+ * @param[out] out
+ *   Pointer to the output array, which must be at least 72 bytes long.
+ *
+ * @return the length of the resulting signature on success; returns -1 on failure.
+ */
+int crypto_sign_sha256_hash(
+    const uint8_t in[static 32],
+    uint8_t out[static MAX_DER_SIG_LEN]
+);
+
+/**
  * Computes RIPEMD160(SHA256(in).
  *
  * @param[in] in

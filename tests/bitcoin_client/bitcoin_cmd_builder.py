@@ -45,7 +45,8 @@ class AddrType(enum.IntEnum):
     WPKH = 0x02
 
 class ClientCommandCode(enum.IntEnum):
-    GET_SQUARE = 0x01
+    GET_COSIGNER_PUBKEY = 0x01
+    GET_SQUARE = 0xFF
 
 class BitcoinCommandBuilder:
     """APDU command builder for the Bitcoin application.

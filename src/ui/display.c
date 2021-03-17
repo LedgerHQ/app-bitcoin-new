@@ -206,8 +206,7 @@ UX_FLOW(ux_display_multisig_header_flow,
         &ux_display_wallet_header_name_step,
         &ux_display_wallet_multisig_type_step,
         &ux_display_approve_step,
-        &ux_display_reject_step
-        );
+        &ux_display_reject_step);
 
 
 // FLOW to display the header of a multisig wallet:
@@ -217,8 +216,7 @@ UX_FLOW(ux_display_multisig_header_flow,
 UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
         &ux_display_wallet_multisig_cosigner_pubkey_step,
         &ux_display_approve_step,
-        &ux_display_reject_step
-        );
+        &ux_display_reject_step);
 
 
 

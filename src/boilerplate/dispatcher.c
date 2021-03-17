@@ -32,19 +32,16 @@
  * Otherwise, this must be set to NULL.
  */
 extern command_processor_t G_command_continuation;
+extern dispatcher_context_t G_dispatcher_context;
 
 int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descriptors, const command_t *cmd) {
-    dispatcher_context_t dispatcher_context = {
-        .is_continuation = false,
-        .continuation = NULL,
-        .read_buffer = {
-            .ptr = cmd->data,
-            .size = cmd->lc,
-            .offset = 0
-        }
-    };
+    // TODO: decide what to do if a command is sent while something was still running
 
-    int ret;
+    G_dispatcher_context.is_continuation = false;
+    G_dispatcher_context.continuation = NULL;
+    G_dispatcher_context.read_buffer.ptr = cmd->data;
+    G_dispatcher_context.read_buffer.size = cmd->lc;
+    G_dispatcher_context.read_buffer.offset = 0;
 
     if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (cmd->p1 != 0 || cmd->p2 != 0) {
@@ -55,13 +52,13 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
             return io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
         }
 
-        dispatcher_context.is_continuation = true;
+        G_dispatcher_context.is_continuation = true;
         command_processor_t continuation = (command_processor_t)PIC(G_command_continuation);
 
         // Reset interrupted command
         G_command_continuation = NULL;
 
-        ret = continuation(&dispatcher_context);
+        continuation(&G_dispatcher_context);
     } else {
         // Reset interrupted command. If a previous command was interrupted but any command other than
         // INS_CONTINUE is received, the interrupted command is therefore discarded.
@@ -87,13 +84,8 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
             return io_send_sw(SW_INS_NOT_SUPPORTED);
         }
 
-        ret = handler(cmd->p1, cmd->p2, cmd->lc, &dispatcher_context);
+        handler(cmd->p1, cmd->p2, cmd->lc, &G_dispatcher_context);
     }
 
-    if (dispatcher_context.continuation != NULL) {
-        // store where execution should restart when INS_CONTINUE is called
-        G_command_continuation = dispatcher_context.continuation;
-    }
-
-    return ret;
+    return 0;
 }

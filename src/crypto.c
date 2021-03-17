@@ -81,6 +81,41 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 }
 
 
+int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]) {
+    cx_ecfp_private_key_t private_key = {0};
+    uint8_t chain_code[32] = {0};
+    uint32_t info = 0; // TODO: wat?
+
+    // derive private key according to BIP32 path
+    // TODO: should we sign with a specific path? e.g. reserve m/0xLED'/... for all internal keys.
+    const uint32_t root_path[] = {};
+    crypto_derive_private_key(&private_key, chain_code, root_path, 0);
+
+    int sig_len = 0;
+    BEGIN_TRY {
+        TRY {
+            sig_len = cx_ecdsa_sign(&private_key,
+                                    CX_RND_RFC6979,
+                                    CX_SHA256,
+                                    in,
+                                    32,
+                                    out,
+                                    MAX_DER_SIG_LEN,
+                                    &info);
+        }
+        CATCH_OTHER(e) {
+            return -1;
+        }
+        FINALLY {
+            explicit_bzero(&private_key, sizeof(private_key));
+        }
+    }
+    END_TRY;
+
+    return sig_len;
+}
+
+
 // TODO: missing unit tests
 void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_ripemd160_t riprip;

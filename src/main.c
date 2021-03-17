@@ -40,9 +40,11 @@ ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 global_context_t G_context;
 command_state_t G_command_state;
-command_processor_t G_command_continuation;
 
-command_descriptor_t const COMMAND_DESCRIPTORS[] = {
+command_processor_t G_command_continuation;
+dispatcher_context_t G_dispatcher_context;
+
+const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
         .ins = GET_PUBKEY,
@@ -82,6 +84,8 @@ void app_main() {
     // Reset context
     explicit_bzero(&G_context, sizeof(G_context));
 
+    // Reset dispatcher state
+    explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));
     G_command_continuation = NULL;
 
     for (;;) {

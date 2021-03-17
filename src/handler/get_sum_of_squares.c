@@ -26,10 +26,10 @@
 #include "../types.h"
 #include "client_commands.h"
 
-static int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);
+static void processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);
 
 
-int handler_get_sum_of_squares(
+void handler_get_sum_of_squares(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
@@ -39,21 +39,21 @@ int handler_get_sum_of_squares(
     uint8_t n;
 
     if (p1 != 0 || p2 != 0) {
-        return io_send_sw(SW_WRONG_P1P2);
+        io_send_sw(SW_WRONG_P1P2);
+        return;
     }
     if (lc != 1) {
-        return io_send_sw(SW_WRONG_DATA_LENGTH);
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
     }
 
-    if (!buffer_read_u8(&dispatcher_context->read_buffer, &n)){
-        return -1;
-    }
+    buffer_read_u8(&dispatcher_context->read_buffer, &n);
 
     state->n = n;
     state->i = 1;
     state->sum = 0;
 
-    return processor_get_sum_of_squares(dispatcher_context);
+    processor_get_sum_of_squares(dispatcher_context);
 }
 
 // TODO: this API is very clumsy, find a better interface.
@@ -92,17 +92,18 @@ static int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *re
     }
 }
 
-int processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
+void processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
     get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state; 
     for ( ; state->i <= state->n; state->i++) {
         uint32_t result;
         if (!ext_get_square(dispatcher_context, &result, state->i)) {
-            return io_confirm_response();
+            io_confirm_response();
+            return;
         }
         state->sum += result;
     }
 
-    return io_send_response(&state->sum, 4, SW_OK);
+    io_send_response(&state->sum, 4, SW_OK);
 }
 
 

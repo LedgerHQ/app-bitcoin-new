@@ -21,9 +21,9 @@ struct dispatcher_context_s;
 typedef struct dispatcher_context_s dispatcher_context_t;
 
 // Args: p1, p2, Lc, pointer to dispatcher context
-typedef int (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *);
+typedef void (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *);
 // Args: pointer to dispatcher context
-typedef int (*command_processor_t)(dispatcher_context_t *);
+typedef void (*command_processor_t)(dispatcher_context_t *);
 
 
 /**
@@ -31,6 +31,7 @@ typedef int (*command_processor_t)(dispatcher_context_t *);
  */
 struct dispatcher_context_s {
     buffer_t read_buffer;
+    bool is_running; // Set to true once a command is started, false once a response is sent back. 
     bool is_continuation; // Set to true before a command processor is called in case of continuation. false otherwise.
                           // A command handler might set it to false once the continuation is processed to signal the
                           // return to normal execution; the dispatcher ignores its value after calling a command

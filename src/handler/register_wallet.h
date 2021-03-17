@@ -16,7 +16,7 @@ typedef struct {
     cx_sha256_t wallet_hash_context;
 } register_wallet_state_t;
 
-int handler_register_wallet(
+void handler_register_wallet(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,

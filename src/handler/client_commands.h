@@ -1,1 +1,4 @@
-#define CCMD_GET_SQUARE 1
+
+#define CCMD_GET_SQUARE 0xFF
+
+#define CCMD_GET_COSIGNER_PUBKEY 0x01

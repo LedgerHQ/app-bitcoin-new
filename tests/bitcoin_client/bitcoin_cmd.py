@@ -35,6 +35,8 @@ class ClientCommand:
         command_code = request[0]
         if command_code == ClientCommandCode.GET_SQUARE:
             return GetSquareCommand(request)
+        if command_code == ClientCommandCode.GET_COSIGNER_PUBKEY:
+            return GetCosignerPubkeyCommand(request)
         else:
             raise ValueError("Unknown command code: {:02X}".format(command_code))
 
@@ -47,8 +49,22 @@ class GetSquareCommand(ClientCommand):
 
         self.n = request[1]
 
-    def execute(self):
+    def execute(self) -> bytes:
         return (self.n * self.n).to_bytes(4, 'big')
+
+class GetCosignerPubkeyCommand(ClientCommand):
+    def __init__(self, request: bytes):
+        super().__init__(request)
+
+        if len(request) != 2:
+            raise ValueError("Wrong request length.")
+
+        self.n = request[1]
+
+    def execute(self) -> bytes:
+        result = "xpub" + str(1 + self.n)
+        return len(result).to_bytes(1, byteorder="big") + result.encode("latin-1")
+
 
 class BitcoinCommand:
     def __init__(self,
@@ -104,7 +120,7 @@ class BitcoinCommand:
         return response.decode()
 
 
-    def register_wallet(self, wallet_type: int, name: str, threshold: int, n_keys:int, pubkeys: List[str]) -> bytes:
+    def register_wallet(self, wallet_type: int, name: str, threshold: int, n_keys:int, pubkeys: List[str]) -> Tuple[str, str]:
         if wallet_type != 0:
             raise ValueError("wallet_type must be 0")
 
@@ -118,10 +134,20 @@ class BitcoinCommand:
             self.builder.register_wallet(wallet_type, name, threshold, n_keys, pubkeys)
         )
 
+        while sw == 0xE000:
+            sw, response = self.process_client_command(response)
+
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
 
-        return response
+        wallet_id = response[0:32]
+        sig_len = response[32]
+        sig = response[33:]
+
+        if len(sig) != sig_len:
+            raise RuntimeError("Invalid response")
+
+        return wallet_id.hex(), sig.hex()
 
 
     def get_sum_of_squares(self, n: int) -> int:

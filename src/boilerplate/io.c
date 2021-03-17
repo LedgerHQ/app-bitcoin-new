@@ -27,6 +27,11 @@
 #include "common/buffer.h"
 #include "common/write.h"
 
+#include "dispatcher.h"
+
+extern dispatcher_context_t G_dispatcher_context;
+extern command_processor_t G_command_continuation;
+
 uint32_t G_output_len = 0;
 
 void io_seproxyhal_display(const bagl_element_t *element) {
@@ -143,6 +148,11 @@ int io_confirm_response() {
             G_output_len = 0;
             G_io_state = READY;
             break;
+    }
+
+    if (G_dispatcher_context.continuation != NULL) {
+        // store where execution should restart when INS_CONTINUE is called
+        G_command_continuation = G_dispatcher_context.continuation;
     }
 
     return ret;

@@ -29,7 +29,7 @@
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
-int handler_get_address(
+void handler_get_address(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
@@ -38,10 +38,12 @@ int handler_get_address(
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (p1 > 1) {
-        return io_send_sw(SW_WRONG_P1P2);
+        io_send_sw(SW_WRONG_P1P2);
+        return;
     }
     if (p2 != ADDRESS_TYPE_PKH && p2 != ADDRESS_TYPE_SH_WPKH && p2 != ADDRESS_TYPE_WPKH) {
-        return io_send_sw(SW_WRONG_P1P2);
+        io_send_sw(SW_WRONG_P1P2);
+        return;
     }
 
     uint32_t purpose; // the valid purpose depends on the requested address type
@@ -56,28 +58,33 @@ int handler_get_address(
             purpose = 84;
             break;
         default:
-            return io_send_sw(SW_WRONG_P1P2);
+            io_send_sw(SW_WRONG_P1P2);
+            return;
     }
 
     if (lc < 1) {
-        return io_send_sw(SW_WRONG_DATA_LENGTH);
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        return io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        return;
     }
 
     uint8_t bip32_path_len;
     buffer_read_u8(&dispatcher_context->read_buffer, &bip32_path_len);
 
     if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
-        return io_send_sw(SW_INCORRECT_DATA);
+        io_send_sw(SW_INCORRECT_DATA);
+        return;
     }
 
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
     if (!buffer_read_bip32_path(&dispatcher_context->read_buffer, bip32_path, bip32_path_len)) {
-        return io_send_sw(SW_WRONG_DATA_LENGTH);
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
     }
 
     char path_str[60] = "(root)";
@@ -95,15 +102,15 @@ int handler_get_address(
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
     if (ret < 0) {
-        return io_send_sw(SW_BAD_STATE);
+        io_send_sw(SW_BAD_STATE);
+        return;
     }
     state->address_len = (size_t)ret;
 
     if (p1 == 1 || is_path_suspicious) {
-        return ui_display_address(dispatcher_context, state->address, is_path_suspicious, ui_action_validate_address);
+        ui_display_address(dispatcher_context, state->address, is_path_suspicious, ui_action_validate_address);
     } else {
         ui_action_validate_address(dispatcher_context, true);
-        return 0;
     }
 }
 

@@ -15,7 +15,10 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>  // uint*_t
+#include <stdint.h>
+
+#include "os.h"
+#include "cx.h"
 
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
@@ -25,13 +28,20 @@
 #include "../crypto.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
+
+#include "client_commands.h"
 #include "register_wallet.h"
 
-#include "cx.h"
-
+static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
+static void request_next_cosigner(dispatcher_context_t *dc);
+static void read_next_cosigner(dispatcher_context_t *dc);
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
 
-int handler_register_wallet(
+
+/**
+ * Validates the input, initializes the hash context and starts accumulating the wallet header in it.
+ */
+void handler_register_wallet(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
@@ -40,33 +50,39 @@ int handler_register_wallet(
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     if (p1 != 0 || p2 != 0) {
-        return io_send_sw(SW_WRONG_P1P2);
+        io_send_sw(SW_WRONG_P1P2);
+        return;
     }
     if (lc < 3) {
-        return io_send_sw(SW_WRONG_DATA_LENGTH);
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        return io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        return;
     }
 
     uint8_t wallet_type;
     buffer_read_u8(&dispatcher_context->read_buffer, &wallet_type);
 
     if (wallet_type != WALLET_TYPE_MULTISIG) {
-        return io_send_sw(SW_INCORRECT_DATA); // TODO: should add a field for "unsopported"? It might mean the app is outdated.
+        io_send_sw(SW_INCORRECT_DATA); // TODO: should add a field for "unsupported"? It might mean the app is outdated.
+        return;
     }
 
     uint8_t wallet_name_len;
     buffer_read_u8(&dispatcher_context->read_buffer, &wallet_name_len);
 
     if (wallet_name_len > MAX_WALLET_NAME_LENGTH) {
-        return io_send_sw(SW_INCORRECT_DATA);
+        io_send_sw(SW_INCORRECT_DATA);
+        return;
     }
 
     if (lc != 1 + 1 + wallet_name_len + 1 + 1) {
-        return io_send_sw(SW_WRONG_DATA_LENGTH);
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
     }
 
     for (int i = 0; i < wallet_name_len; i++) {
@@ -77,41 +93,123 @@ int handler_register_wallet(
     buffer_read_u8(&dispatcher_context->read_buffer, &state->threshold);
     buffer_read_u8(&dispatcher_context->read_buffer, &state->n_keys);
 
+    if (state->threshold == 0 || state->n_keys == 0 || state->n_keys > 15 || state->threshold > state->n_keys) {
+        io_send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
     cx_sha256_init(&state->wallet_hash_context);
 
-    // TODO: read pubkeys
-
-    uint8_t wallet_hash[32];
     cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&wallet_type, 1, NULL, 0);
     cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&wallet_name_len, 1, NULL, 0);
     cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->wallet_name, wallet_name_len, NULL, 0);
     cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->threshold, 1, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->n_keys, 1, wallet_hash, 32);
+    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->n_keys, 1, NULL, 0);
 
     state->next_pubkey_index = 0;
-    return ui_display_multisig_header(dispatcher_context,
-                                      (char *)state->wallet_name,
-                                      state->threshold,
-                                      state->n_keys,
-                                      ui_action_validate_cosigner);
+    ui_display_multisig_header(dispatcher_context,
+                               (char *)state->wallet_name,
+                               state->threshold,
+                               state->n_keys,
+                               ui_action_validate_header);
 }
 
+/**
+ * Abort if the user rejected the wallet header, otherwise start processing the pubkeys.
+ */
+static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
+    if (!accept) {
+        io_send_sw(SW_DENY);
+        ui_menu_main();
+    } else {
+        request_next_cosigner(dc);
+    }
+}
+
+/**
+ * Interrupts the command, asking the host for the next pubkey.
+ */
+static void request_next_cosigner(dispatcher_context_t *dc) {
+    register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
+
+    dc->continuation = read_next_cosigner;
+
+    uint8_t req[] = { CCMD_GET_COSIGNER_PUBKEY, state->next_pubkey_index};
+
+    io_send_response(req, 2, SW_INTERRUPTED_EXECUTION);
+}
+
+/**
+ * Receives the next xpub, accumulates it in the hash context, then asks the user to validate it.
+ */
+static void read_next_cosigner(dispatcher_context_t *dc) {
+    register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
+
+    uint8_t pubkey_len;
+    uint8_t pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+
+    if (!buffer_read_u8(&dc->read_buffer, &pubkey_len)) {
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (pubkey_len > MAX_SERIALIZED_PUBKEY_LENGTH) {
+        io_send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (!buffer_move(&dc->read_buffer, pubkey, pubkey_len)) {
+        io_send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    pubkey[pubkey_len] = '\0';
+
+    // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
+    //       Currently we are showing to the user whichever string is passed by the host.
+
+    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&pubkey_len, 1, NULL, 0);
+    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&pubkey, pubkey_len, NULL, 0);
+
+    ui_display_multisig_cosigner_pubkey(dc,
+                                        (char *)pubkey,
+                                        1 + state->next_pubkey_index, // 1-indexed for the UI
+                                        state->n_keys,
+                                        ui_action_validate_cosigner);
+}
+
+/**
+ * Aborts if the user rejected the pubkey; if more xpubs are to be read, goes back to request_next_cosigner.
+ * Otherwise, finalizes the hash, and returns the sha256 digest and the signature as the final response.
+ */
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     if (!accept) {
         io_send_sw(SW_DENY);
+        ui_menu_main();
     } else {
+        ++state->next_pubkey_index;
         if (state->next_pubkey_index < state->n_keys) {
-            // TODO
-            char pubkey[] = "xpubetcetcjlkjgslkfdjlksjdf;lkdsf;lsdk;lfdsk;lf";
-            ++state->next_pubkey_index;
-            ui_display_multisig_cosigner_pubkey(dc, pubkey, state->next_pubkey_index, state->n_keys, ui_action_validate_cosigner);
-            return;
+            request_next_cosigner(dc);
         } else {
-            //TODO: all good, send signature back
+
+            // TODO: validate wallet.
+            // - is one of the xpubs ours? (exactly one? How to check?)
+
+            struct {
+                uint8_t wallet_hash[32];
+                uint8_t signature_len;
+                uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
+            } response;
+
+            cx_hash(&state->wallet_hash_context.header, CX_LAST, NULL, 0, response.wallet_hash, 32);
+
+            // sign hash and produce response
+            int signature_len = crypto_sign_sha256_hash(response.wallet_hash, response.signature);
+            response.signature_len = (uint8_t)signature_len;
+
+            io_send_response(&response, 32 + 1 + signature_len, SW_OK);
+
+            ui_menu_main();
         }
     }
-
-    ui_menu_main();
 }
