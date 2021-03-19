@@ -43,15 +43,38 @@
 static action_validate_cb g_validate_callback;
 static dispatcher_context_t *g_dispatcher_context;
 
-// TODO: optimize (or avoid?) globals for UX screens.
-//       different screens could share the same memory using a union.
 
-static char g_bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-static char g_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-static char g_address[MAX_ADDRESS_LENGTH_STR + 1];
-static char g_wallet_name[MAX_WALLET_NAME_LENGTH + 1];
-static char g_multisig_type[sizeof("15 of 15")];
-static char g_multisig_signer_index[sizeof("Signer 15 of 15")];
+typedef struct {
+    char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+    char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+} ui_display_pubkey_state_t;
+
+typedef struct {
+    char address[MAX_ADDRESS_LENGTH_STR + 1];
+} ui_display_address_state_t;
+
+typedef struct {
+    char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
+    char multisig_type[sizeof("15 of 15")];
+} ui_display_multisig_header_state_t;
+
+typedef struct {
+    char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    char multisig_signer_index[sizeof("Signer 15 of 15")];
+} ui_display_multisig_cosigner_pubkey_state_t;
+
+
+/**
+ * Union of all the states for each of the UI screens, in order to save memory.
+ */
+typedef union {
+    ui_display_pubkey_state_t display_pubkey;
+    ui_display_address_state_t display_address;
+    ui_display_multisig_header_state_t display_multisig_header;
+    ui_display_multisig_cosigner_pubkey_state_t display_multisig_cosigner_pubkey;
+} ui_state_t;
+
+static ui_state_t g_ui_state;
 
 // Step with icon and text for pubkey
 UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public key"});
@@ -85,7 +108,7 @@ UX_STEP_NOCB(ux_display_path_step,
              bnnn_paging,
              {
                  .title = "Path",
-                 .text = g_bip32_path,
+                 .text = g_ui_state.display_pubkey.bip32_path,
              });
 
 // Step with title/text for pubkey
@@ -93,7 +116,7 @@ UX_STEP_NOCB(ux_display_pubkey_step,
              bnnn_paging,
              {
                  .title = "Public key",
-                 .text = g_pubkey,
+                 .text = g_ui_state.display_pubkey.pubkey,
              });
 
 // Step with title/text for address
@@ -101,7 +124,7 @@ UX_STEP_NOCB(ux_display_address_step,
              bnnn_paging,
              {
                  .title = "Address",
-                 .text = g_address,
+                 .text = g_ui_state.display_address.address,
              });
 
 // Step with approve button
@@ -130,7 +153,7 @@ UX_STEP_NOCB(
     {
       &C_icon_eye,
       "Register wallet",
-      g_wallet_name,
+      g_ui_state.display_multisig_header.wallet_name,
     });
 
 // Step with description of a m-of-n multisig wallet
@@ -139,7 +162,7 @@ UX_STEP_NOCB(
     nn,
     {
       "Multisig wallet",
-      g_multisig_type,
+      g_ui_state.display_multisig_header.multisig_type,
     });
 
 
@@ -148,8 +171,8 @@ UX_STEP_NOCB(
     ux_display_wallet_multisig_cosigner_pubkey_step,
     bnnn_paging,
     {
-        .title = g_multisig_signer_index,
-        .text = g_pubkey,
+        .title = g_ui_state.display_multisig_cosigner_pubkey.multisig_signer_index,
+        .text = g_ui_state.display_multisig_cosigner_pubkey.pubkey,
     });
 
 
@@ -221,8 +244,10 @@ UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
 
 
 int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
-    strncpy(g_bip32_path, bip32_path, sizeof(g_bip32_path));
-    strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
+    ui_display_pubkey_state_t *state = (ui_display_pubkey_state_t *)&g_ui_state;
+
+    strncpy(state->bip32_path, bip32_path, sizeof(state->bip32_path));
+    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
 
     g_dispatcher_context = context;
     g_validate_callback = callback;
@@ -234,7 +259,9 @@ int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pub
 
 
 int ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, action_validate_cb callback) {
-    strncpy(g_address, address, sizeof(g_address));
+    ui_display_address_state_t *state = (ui_display_address_state_t *)&g_ui_state;
+
+    strncpy(state->address, address, sizeof(state->address));
 
     g_dispatcher_context = context;
     g_validate_callback = callback;
@@ -249,8 +276,10 @@ int ui_display_address(dispatcher_context_t *context, char *address, bool is_pat
 
 
 int ui_display_multisig_header(dispatcher_context_t *context, char *name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
-    strncpy(g_wallet_name, name, sizeof(g_wallet_name));
-    snprintf(g_multisig_type, sizeof(g_multisig_type), "%u of %u", threshold, n_keys);
+    ui_display_multisig_header_state_t *state = (ui_display_multisig_header_state_t *)&g_ui_state;
+
+    strncpy(state->wallet_name, name, sizeof(state->wallet_name));
+    snprintf(state->multisig_type, sizeof(state->multisig_type), "%u of %u", threshold, n_keys);
 
     g_dispatcher_context = context;
     g_validate_callback = callback;
@@ -261,8 +290,10 @@ int ui_display_multisig_header(dispatcher_context_t *context, char *name, uint8_
 
 
 int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
-    strncpy(g_pubkey, pubkey, sizeof(g_pubkey));
-    snprintf(g_multisig_signer_index, sizeof(g_multisig_type), "Signer %u of %u", cosigner_index, n_keys);
+    ui_display_multisig_cosigner_pubkey_state_t *state = (ui_display_multisig_cosigner_pubkey_state_t *)&g_ui_state;
+
+    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    snprintf(state->multisig_signer_index, sizeof(state->multisig_signer_index), "Signer %u of %u", cosigner_index, n_keys);
 
     g_dispatcher_context = context;
     g_validate_callback = callback;
