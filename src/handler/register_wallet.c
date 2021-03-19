@@ -100,11 +100,11 @@ void handler_register_wallet(
 
     cx_sha256_init(&state->wallet_hash_context);
 
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&wallet_type, 1, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&wallet_name_len, 1, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->wallet_name, wallet_name_len, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->threshold, 1, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&state->n_keys, 1, NULL, 0);
+    crypto_hash_update(&state->wallet_hash_context.header, &wallet_type, 1);
+    crypto_hash_update(&state->wallet_hash_context.header, &wallet_name_len, 1);
+    crypto_hash_update(&state->wallet_hash_context.header, &state->wallet_name, wallet_name_len);
+    crypto_hash_update(&state->wallet_hash_context.header, &state->threshold, 1);
+    crypto_hash_update(&state->wallet_hash_context.header, &state->n_keys, 1);
 
     state->next_pubkey_index = 0;
     ui_display_multisig_header(dispatcher_context,
@@ -166,8 +166,8 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&pubkey_len, 1, NULL, 0);
-    cx_hash(&state->wallet_hash_context.header, 0, (unsigned char *)&pubkey, pubkey_len, NULL, 0);
+    crypto_hash_update(&state->wallet_hash_context.header, &pubkey_len, 1);
+    crypto_hash_update(&state->wallet_hash_context.header, &pubkey, pubkey_len);
 
     ui_display_multisig_cosigner_pubkey(dc,
                                         (char *)pubkey,
@@ -201,7 +201,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
                 uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
             } response;
 
-            cx_hash(&state->wallet_hash_context.header, CX_LAST, NULL, 0, response.wallet_hash, 32);
+            crypto_hash_digest(&state->wallet_hash_context.header, response.wallet_hash, 32);
 
             // sign hash and produce response
             int signature_len = crypto_sign_sha256_hash(response.wallet_hash, response.signature);

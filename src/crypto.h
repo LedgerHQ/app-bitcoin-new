@@ -82,6 +82,16 @@ int crypto_sign_sha256_hash(
 );
 
 /**
+ * TODO: docs
+ */
+int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len);
+
+/**
+ * TODO: docs
+ */
+int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len);
+
+/**
  * Computes RIPEMD160(SHA256(in).
  *
  * @param[in] in

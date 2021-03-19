@@ -116,6 +116,16 @@ int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_
 }
 
 
+int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len) {
+    return cx_hash(hash_context, 0, in, in_len, NULL, 0);
+}
+
+
+int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
+    return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
+}
+
+
 // TODO: missing unit tests
 void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_ripemd160_t riprip;
