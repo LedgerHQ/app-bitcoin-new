@@ -24,7 +24,6 @@
 
 
 #include "common/base58.h"
-#include "common/segwit_addr.h"
 #include "common/read.h"
 #include "common/write.h"
 
@@ -201,6 +200,7 @@ static void crypto_get_compressed_pubkey_at_path(
 size_t get_serialized_extended_pubkey(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
+    uint32_t bip32_pubkey_version,
     char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]
 ) {
     // find parent key's fingerprint and child number
@@ -231,7 +231,7 @@ size_t get_serialized_extended_pubkey(
         uint8_t checksum[4];
     } ext_pubkey;
 
-    write_u32_be(ext_pubkey.version, 0, 0x0488B21E); // TODO: generalize to all networks
+    write_u32_be(ext_pubkey.version, 0, bip32_pubkey_version);
     ext_pubkey.depth = bip32_path_len;
     write_u32_be(ext_pubkey.parent_fingerprint, 0, parent_fingerprint);
     write_u32_be(ext_pubkey.child_number, 0, child_number);
@@ -266,75 +266,4 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
     memcpy(tmp + version_len, in, 20);
     crypto_get_checksum(tmp, version_len + 20, tmp + version_len + 20);
     return base58_encode(tmp, version_len + 20 + 4, out, out_len);
-}
-
-
-int get_address_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t address_type,
-    char out[static MAX_ADDRESS_LENGTH_STR + 1]
-){
-    cx_ecfp_private_key_t private_key = {0};
-    cx_ecfp_public_key_t public_key;
-
-    struct {
-        uint8_t prefix;
-        uint8_t raw_public_key[64];
-        uint8_t chain_code[32];
-    } keydata;
-
-    keydata.prefix = 0x04;
-    // derive private key according to BIP32 path
-    crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
-    // generate corresponding public key
-    crypto_init_public_key(&private_key, &public_key, keydata.raw_public_key);
-    // reset private key
-    explicit_bzero(&private_key, sizeof(private_key));
-    // compute compressed public key (in-place)
-    crypto_get_compressed_pubkey((uint8_t *)&keydata, (uint8_t *)&keydata);
-
-    uint8_t pubkey_hash[20];
-    size_t address_len;
-
-    switch(address_type) {
-        case ADDRESS_TYPE_PKH:
-            crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
-            address_len = base58_encode_address(pubkey_hash, 0x00, out, MAX_ADDRESS_LENGTH_STR);
-            break;
-        case ADDRESS_TYPE_SH_WPKH: // wrapped segwit
-        case ADDRESS_TYPE_WPKH:    // native segwit
-            {
-                uint8_t script[22];
-                script[0] = 0x00;
-                script[1] = 0x14;
-                crypto_hash160((uint8_t *)&keydata, 33, script+2);
-
-                uint8_t script_rip[20];
-                crypto_hash160((uint8_t *)&script, 22, script_rip);
-
-                if (address_type == ADDRESS_TYPE_SH_WPKH) {
-                    address_len = base58_encode_address(script_rip, 0x05, out, MAX_ADDRESS_LENGTH_STR); // TODO: support for altcoins
-                } else { // ADDRESS_TYPE_WPKH
-
-                    int ret = segwit_addr_encode(
-                        out,
-                        (char *)PIC("bc"), // TODO: generalize for other networks
-                        0, script + 2, 20
-                    );
-
-                    if (ret != 1) {
-                        return -1; // should never happen
-                    }
-
-                    address_len = strlen(out);
-                }
-            }
-            break;
-        default:
-            return -1; // this can never happen
-    }
-
-    out[address_len] = '\0';
-    return address_len;
 }

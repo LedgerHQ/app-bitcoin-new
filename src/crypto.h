@@ -144,6 +144,7 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
 size_t get_serialized_extended_pubkey(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
+    uint32_t bip32_pubkey_version,
     char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]
 );
 
@@ -167,25 +168,3 @@ size_t get_serialized_extended_pubkey(
  *   would be longer than out_len).
  */
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
-
-
-/**
- * Computes an address for one of the supported types at a given BIP32 derivation path.
- *
- * @param[in]  bip32_path
- *   Pointer to 32-bit integer input buffer.
- * @param[in]  bip32_path_len
- *   Maximum number of BIP32 paths in the input buffer.
- * @param[in]  address_type
- *   One of ADDRESS_TYPE_PKH, ADDRESS_TYPE_SH_WPKH, ADDRESS_TYPE_WPKH.
- * @param[out]  out
- *   Pointer to the output array, that must be long enough to contain the result.
- * 
- * @return the length of the computed address on success, -1 on failure.
- */
-int get_address_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t address_type,
-    char out[static MAX_ADDRESS_LENGTH_STR + 1]
-);

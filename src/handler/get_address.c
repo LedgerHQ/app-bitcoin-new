@@ -20,14 +20,23 @@
 
 #include "boilerplate/io.h"
 #include "boilerplate/sw.h"
+#include "../common/segwit_addr.h"
 #include "../constants.h"
 #include "../types.h"
 #include "../crypto.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+extern global_context_t G_context;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
+
+static int get_address_at_path(
+    const uint32_t bip32_path[],
+    uint8_t bip32_path_len,
+    uint8_t address_type,
+    char out[static MAX_ADDRESS_LENGTH_STR + 1]
+);
 
 void handler_get_address(
     uint8_t p1,
@@ -92,12 +101,11 @@ void handler_get_address(
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    uint32_t supported_coin_types[] = {0};
     bool is_path_suspicious = !is_address_path_standard(bip32_path,
                                                         bip32_path_len, 
                                                         purpose,
-                                                        supported_coin_types,
-                                                        1,
+                                                        G_context.bip44_coin_types,
+                                                        G_context.bip44_coin_types_len,
                                                         false);
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
@@ -124,4 +132,89 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     }
 
     ui_menu_main();
+}
+
+
+/**
+ * Computes an address for one of the supported types at a given BIP32 derivation path.
+ *
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit integer input buffer.
+ * @param[in]  bip32_path_len
+ *   Maximum number of BIP32 paths in the input buffer.
+ * @param[in]  address_type
+ *   One of ADDRESS_TYPE_PKH, ADDRESS_TYPE_SH_WPKH, ADDRESS_TYPE_WPKH.
+ * @param[out]  out
+ *   Pointer to the output array, that must be long enough to contain the result.
+ *
+ * @return the length of the computed address on success, -1 on failure.
+ */
+static int get_address_at_path(
+    const uint32_t bip32_path[],
+    uint8_t bip32_path_len,
+    uint8_t address_type,
+    char out[static MAX_ADDRESS_LENGTH_STR + 1]
+){
+    cx_ecfp_private_key_t private_key = {0};
+    cx_ecfp_public_key_t public_key;
+
+    struct {
+        uint8_t prefix;
+        uint8_t raw_public_key[64];
+        uint8_t chain_code[32];
+    } keydata;
+
+    keydata.prefix = 0x04;
+    // derive private key according to BIP32 path
+    crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
+    // generate corresponding public key
+    crypto_init_public_key(&private_key, &public_key, keydata.raw_public_key);
+    // reset private key
+    explicit_bzero(&private_key, sizeof(private_key));
+    // compute compressed public key (in-place)
+    crypto_get_compressed_pubkey((uint8_t *)&keydata, (uint8_t *)&keydata);
+
+    uint8_t pubkey_hash[20];
+    size_t address_len;
+
+    switch(address_type) {
+        case ADDRESS_TYPE_PKH:
+            crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
+            address_len = base58_encode_address(pubkey_hash, G_context.p2pkh_version, out, MAX_ADDRESS_LENGTH_STR);
+            break;
+        case ADDRESS_TYPE_SH_WPKH: // wrapped segwit
+        case ADDRESS_TYPE_WPKH:    // native segwit
+            {
+                uint8_t script[22];
+                script[0] = 0x00;
+                script[1] = 0x14;
+                crypto_hash160((uint8_t *)&keydata, 33, script+2);
+
+                uint8_t script_rip[20];
+                crypto_hash160((uint8_t *)&script, 22, script_rip);
+
+                if (address_type == ADDRESS_TYPE_SH_WPKH) {
+                    address_len = base58_encode_address(script_rip, G_context.p2sh_version, out, MAX_ADDRESS_LENGTH_STR);
+                } else { // ADDRESS_TYPE_WPKH
+
+                    int ret = segwit_addr_encode(
+                        out,
+                        G_context.native_segwit_prefix,
+                        0, script + 2, 20
+                    );
+
+                    if (ret != 1) {
+                        return -1; // should never happen
+                    }
+
+                    address_len = strlen(out);
+                }
+            }
+            break;
+        default:
+            return -1; // this can never happen
+    }
+
+    out[address_len] = '\0';
+    return address_len;
 }

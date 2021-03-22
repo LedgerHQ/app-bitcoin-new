@@ -83,6 +83,21 @@ void app_main() {
 
     // Reset context
     explicit_bzero(&G_context, sizeof(G_context));
+    G_context.bip32_pubkey_version = BIP32_PUBKEY_VERSION;
+    static uint32_t const coin_types[] = BIP44_COIN_TYPES;
+    G_context.bip44_coin_types_len = sizeof(coin_types)/sizeof(coin_types[0]); 
+    G_context.bip44_coin_types = coin_types;
+
+    G_context.p2pkh_version = COIN_P2PKH_VERSION;
+    G_context.p2sh_version = COIN_P2SH_VERSION;
+
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    static char *native_segwit_prefix = COIN_NATIVE_SEGWIT_PREFIX;
+    G_context.native_segwit_prefix = (char const *)PIC(native_segwit_prefix);
+#else
+    coin_config->native_segwit_prefix = 0;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+
 
     // Reset dispatcher state
     explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));

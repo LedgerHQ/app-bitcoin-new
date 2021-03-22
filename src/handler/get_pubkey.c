@@ -26,6 +26,7 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+extern global_context_t G_context;
 
 static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice);
 
@@ -69,7 +70,7 @@ void handler_get_pubkey(
     // TODO: check if path is ok to export, adapt UI to ask for confirmation if suspicious.
 
 
-    get_serialized_extended_pubkey(bip32_path, bip32_path_len, state->serialized_pubkey_str);
+    get_serialized_extended_pubkey(bip32_path, bip32_path_len, G_context.bip32_pubkey_version, state->serialized_pubkey_str);
 
     char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1] = "Master key";
     if (bip32_path_len > 0) {
