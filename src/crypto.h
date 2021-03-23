@@ -19,6 +19,20 @@
 
 
 /**
+ * A serialized extended pubkey according to BIP32 specifications.
+ * All the fields are represented as fixed-length arrays serialized in big-endian.
+ */
+typedef struct serialized_extended_pubkey_s {
+    uint8_t version[4];
+    uint8_t depth;
+    uint8_t parent_fingerprint[4];
+    uint8_t child_number[4];
+    uint8_t chain_code[32];
+    uint8_t compressed_pubkey[33];
+    uint8_t checksum[4];
+} serialized_extended_pubkey_t;
+
+/**
  * Derive private key given BIP32 path.
  *
  * @param[out] private_key
@@ -132,16 +146,20 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
 
 
 /**
- * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
+ * Computes the base58check-encoded extended pubkey at a given path.
  * 
  * @param[in]  bip32_path
  *   Pointer to 32-bit integer input buffer.
  * @param[in]  bip32_path_len
- *   Maximum number of BIP32 paths in the input buffer.
+ *   Number of BIP32 paths in the input buffer.
+ * @param[in]  bip32_pubkey_version
+ *   Version prefix to use for te pubkey.
  * @param[out] out
- *   Pointer to the output buffer, which must be long enough to contain the result.
+ *   Pointer to the output buffer, which must be long enough to contain the result (including the terminating null).
+ *
+ * @return the length of the output pubkey (not including the null character).
  */
-size_t get_serialized_extended_pubkey(
+size_t get_serialized_extended_pubkey_at_path(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
     uint32_t bip32_pubkey_version,

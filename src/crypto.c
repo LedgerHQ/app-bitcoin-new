@@ -24,6 +24,7 @@
 
 
 #include "common/base58.h"
+#include "common/bip32.h"
 #include "common/read.h"
 #include "common/write.h"
 
@@ -153,6 +154,7 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     os_memmove(out, buffer, 4);
 }
 
+
 /**
  * Gets the compressed pubkey and (optionally) the chain code at the given derivation path. 
  *
@@ -197,7 +199,8 @@ static void crypto_get_compressed_pubkey_at_path(
     crypto_get_compressed_pubkey((uint8_t *)&keydata, pubkey);
 }
 
-size_t get_serialized_extended_pubkey(
+
+size_t get_serialized_extended_pubkey_at_path(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
     uint32_t bip32_pubkey_version,
@@ -220,16 +223,7 @@ size_t get_serialized_extended_pubkey(
         child_number = bip32_path[bip32_path_len - 1];
     }
 
-    // all fields are serialized in big-endian
-    static struct {
-        uint8_t version[4];
-        uint8_t depth;
-        uint8_t parent_fingerprint[4];
-        uint8_t child_number[4];
-        uint8_t chain_code[32];
-        uint8_t compressed_pubkey[33];
-        uint8_t checksum[4];
-    } ext_pubkey;
+    serialized_extended_pubkey_t ext_pubkey;
 
     write_u32_be(ext_pubkey.version, 0, bip32_pubkey_version);
     ext_pubkey.depth = bip32_path_len;
