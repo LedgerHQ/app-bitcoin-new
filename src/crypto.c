@@ -30,6 +30,49 @@
 
 #include "crypto.h"
 
+/**
+ * Generator for secp256k1, value 'g' defined in "Standards for Efficient Cryptography" (SEC2) 2.7.1.
+ */
+static const uint8_t secp256k1_generator[] = {
+    0x04,
+    0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
+    0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
+    0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65, 0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
+    0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19, 0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8
+};
+
+/**
+ * Modulo for secp256k1
+ */
+static const uint8_t secp256k1_p[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x2f
+};
+
+
+/**
+ * (p + 1)/4, used to calculate square roots in secp256k1_p
+ */
+static const uint8_t secp256k1_sqr_exponent[] = {
+    0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xff, 0xff, 0x0c
+};
+
+
+static uint32_t crypto_get_key_fingerprint(const uint8_t key[static 33]);
+static int secp256k1_point(const uint8_t scalar[static 32], uint8_t out[static 65]);
+
+
+
+/**
+ * Gets the point on the SECP256K1 that corresponds to kG, where G is the curve's generator point.
+ */
+static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
+    memcpy(out, secp256k1_generator, 65);
+    return cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, out, 65, k, 32);
+}
+
+
 // TODO: missing unit tests
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t chain_code[static 32],
@@ -81,6 +124,57 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 }
 
 
+int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, serialized_extended_pubkey_t *child) {
+    if (index >= BIP32_FIRST_HARDENED_CHILD) {
+        return -1; // can only derive unhardened children
+    }
+
+    if (parent->depth == 255) {
+        return -2; // maximum derivation depth reached
+    }
+
+    cx_hmac_t hmac_context;
+    uint8_t I[64];
+
+    cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
+    cx_hmac(&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
+
+    uint8_t index_be[4];
+    write_u32_be(index_be, 0, index);
+    cx_hmac(&hmac_context, CX_LAST, index_be, 4, I, 64);
+
+    uint8_t *I_L = &I[0];
+    uint8_t *I_R = &I[32];
+
+    // TODO: should fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
+
+    // compute point(I_L)
+    uint8_t P[65];
+    secp256k1_point(I_L, P);
+
+    uint8_t K_par[65];
+    crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
+
+
+    // add K_par
+    uint8_t child_uncompressed_pubkey[65];
+    if (cx_ecfp_add_point(CX_CURVE_SECP256K1, child_uncompressed_pubkey, P, K_par, 32) == 0) {
+        return -3; // the point at infinity is not a valid child pubkey (should never happen in practice)
+    }
+
+    memcpy(child->version, parent->version, 4);
+    child->depth = parent->depth + 1;
+    uint32_t parent_fingerprint = crypto_get_key_fingerprint(parent->compressed_pubkey);
+    write_u32_be(child->parent_fingerprint, 0, parent_fingerprint);
+    write_u32_be(child->child_number, 0, index);
+
+    memcpy(child->chain_code, I_R, 32);
+
+    crypto_get_compressed_pubkey(child_uncompressed_pubkey, child->compressed_pubkey);
+    return 0;
+}
+
+
 int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]) {
     cx_ecfp_private_key_t private_key = {0};
     uint8_t chain_code[32] = {0};
@@ -127,7 +221,7 @@ int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
 
 
 // TODO: missing unit tests
-void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
+void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_ripemd160_t riprip;
     uint8_t buffer[32];
     cx_hash_sha256(in, inlen, buffer, 32);
@@ -136,12 +230,43 @@ void crypto_hash160(uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
 }
 
 
-int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t out[static 33]) {
+int crypto_get_compressed_pubkey(const uint8_t uncompressed_key[static 65], uint8_t out[static 33]) {
     if (uncompressed_key[0] != 0x04) {
         return -1;
     }
     out[0] = (uncompressed_key[64] % 2 == 1) ? 0x03 : 0x02;
-    memmove(out + 1, uncompressed_key + 1, 32);
+    memmove(out + 1, uncompressed_key + 1, 32); // copy x
+    return 0;
+}
+
+
+int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33], uint8_t out[static 65]) {
+    uint8_t prefix = compressed_key[0];
+    if (prefix != 0x02 && prefix != 0x03) {
+        return -1;
+    }
+
+    uint8_t *x = &out[1], *y = &out[1 + 32];
+
+    memmove(x, compressed_key + 1, 32); // copy x
+
+    uint8_t scalar[32] = {0};
+    uint8_t tmp1[32], tmp2[32]; // buffers for intermediate results
+
+    scalar[31] = 3;
+    cx_math_powm(tmp1, x, scalar, 32, secp256k1_p, 32);                    // tmp1 = x^3 (mod p)
+    scalar[31] = 7;
+    cx_math_addm(tmp2, tmp1, scalar, secp256k1_p, 32);                     // tmp2 = x^3 + 7 (mod p)
+    cx_math_powm(tmp1, tmp2, secp256k1_sqr_exponent, 32, secp256k1_p, 32); // tmp1 = sqrt(x^3 + 7) (mod p)
+
+    // if the prefix and y don't have the same parity, take the opposite root (mod p)
+    if (((prefix ^ tmp1[31]) & 1) != 0) {
+        cx_math_subm(y, secp256k1_p, tmp1, secp256k1_p, 32);
+    } else {
+        memcpy(y, tmp1, 32);
+    }
+
+    out[0] = 0x04;
     return 0;
 }
 
@@ -197,9 +322,26 @@ static void crypto_get_compressed_pubkey_at_path(
     explicit_bzero(&private_key, sizeof(private_key)); // delete sensitive data
     // compute compressed public key
     crypto_get_compressed_pubkey((uint8_t *)&keydata, pubkey);
+
+    uint8_t uncompressed_pubkey[65];
+    crypto_get_uncompressed_pubkey(pubkey, uncompressed_pubkey);
 }
 
 
+/**
+ * Computes the fingerprint of a compressed key.
+ */
+static uint32_t crypto_get_key_fingerprint(const uint8_t key[static 33]) {
+    uint8_t key_rip[20];
+    crypto_hash160(key, 33, key_rip);
+
+    return read_u32_be(key_rip, 0);
+}
+
+
+// TODO: Split serialization from key derivation?
+//       It might be difficult to have a clean API without wasting memory, as the checksum
+//       needs to be concatenated to the data before base58 serialization.
 size_t get_serialized_extended_pubkey_at_path(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
@@ -216,26 +358,26 @@ size_t get_serialized_extended_pubkey_at_path(
         uint8_t parent_pubkey[33];
         crypto_get_compressed_pubkey_at_path(bip32_path, bip32_path_len - 1, parent_pubkey, NULL);
 
-        uint8_t parent_key_hash[20];
-        crypto_hash160(parent_pubkey, 33, parent_key_hash);
-
-        parent_fingerprint = read_u32_be(parent_key_hash, 0);
+        parent_fingerprint = crypto_get_key_fingerprint(parent_pubkey);
         child_number = bip32_path[bip32_path_len - 1];
     }
 
-    serialized_extended_pubkey_t ext_pubkey;
+    struct {
+        serialized_extended_pubkey_t ext_pubkey;
+        uint8_t checksum[4];
+    } ext_pubkey_check; // extended pubkey and checksum
 
-    write_u32_be(ext_pubkey.version, 0, bip32_pubkey_version);
-    ext_pubkey.depth = bip32_path_len;
-    write_u32_be(ext_pubkey.parent_fingerprint, 0, parent_fingerprint);
-    write_u32_be(ext_pubkey.child_number, 0, child_number);
+    serialized_extended_pubkey_t *ext_pubkey = &ext_pubkey_check.ext_pubkey;
 
-    // extkey = version + depth + fpr + child + chainCode + publicKey
+    write_u32_be(ext_pubkey->version, 0, bip32_pubkey_version);
+    ext_pubkey->depth = bip32_path_len;
+    write_u32_be(ext_pubkey->parent_fingerprint, 0, parent_fingerprint);
+    write_u32_be(ext_pubkey->child_number, 0, child_number);
 
-    crypto_get_compressed_pubkey_at_path(bip32_path, bip32_path_len, ext_pubkey.compressed_pubkey, ext_pubkey.chain_code);
-    crypto_get_checksum((uint8_t *)&ext_pubkey, 78, ext_pubkey.checksum);
+    crypto_get_compressed_pubkey_at_path(bip32_path, bip32_path_len, ext_pubkey->compressed_pubkey, ext_pubkey->chain_code);
+    crypto_get_checksum((uint8_t *)ext_pubkey, 78, ext_pubkey_check.checksum);
 
-    size_t serialized_pubkey_len = base58_encode((uint8_t *)&ext_pubkey, 78 + 4, out, MAX_SERIALIZED_PUBKEY_LENGTH);
+    size_t serialized_pubkey_len = base58_encode((uint8_t *)&ext_pubkey_check, 78 + 4, out, MAX_SERIALIZED_PUBKEY_LENGTH);
 
     out[serialized_pubkey_len] = '\0';
     return serialized_pubkey_len;

@@ -29,7 +29,6 @@ typedef struct serialized_extended_pubkey_s {
     uint8_t child_number[4];
     uint8_t chain_code[32];
     uint8_t compressed_pubkey[33];
-    uint8_t checksum[4];
 } serialized_extended_pubkey_t;
 
 /**
@@ -80,6 +79,26 @@ int crypto_init_public_key(
 
 
 /**
+ * Initialize public key given private key.
+ *
+ * @param[in]  parent
+ *   Pointer to the extended serialized pubkey of the parent.
+ * @param[out] index
+ *   Index of the child to derive. It MUST be not hardened, that is, strictly less than 0x80000000.
+ * @param[out] child
+ *   Pointer to the output struct for the child's serialized pubkey.
+ *
+ * @return 0 if success, a negative number on failure.
+ *
+ */
+int bip32_CKDpub(
+    const serialized_extended_pubkey_t *parent,
+    uint32_t index,
+    serialized_extended_pubkey_t *child
+);
+
+
+/**
  * Computes the signature of a previously computed sha256 hash as input.
  * The key used to sign is the master key, and the nonce is chosen deterministically as per RFC6979.
  *
@@ -115,21 +134,36 @@ int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len);
  * @param[out] out
  *   Pointer to the 160-bit (20 bytes) output array.
  */
-void crypto_hash160(uint8_t *in, uint16_t in_len, uint8_t *out);
+void crypto_hash160(const uint8_t *in, uint16_t in_len, uint8_t *out);
 
 
 /**
- * Computes the 33-bytes compressed public key from the uncompressed 65-bytes extended public key.
+ * Computes the 33-bytes compressed public key from the uncompressed 65-bytes public key.
  *
  * @param[in] uncompressed_key
  *   Pointer to the uncompressed public key. The first byte must be 0x04, followed by 64 bytes public key data. 
  * @param[out] out
  *   Pointer to the output array, that must be 33 bytes long. The first byte of the output will be 0x02 or 0x03.
- *   It is allowed to set out == uncompressed_key, and in that case the computation will be in place.
+ *   It is allowed to have out == uncompressed_key, and in that case the computation will be done in-place.
  *   Otherwise, the input and output arrays MUST be non-overlapping.
+ *
+ * @return 0 on success, a negative number on failure.
  */
-int crypto_get_compressed_pubkey(uint8_t uncompressed_key[static 65], uint8_t out[static 33]);
+int crypto_get_compressed_pubkey(const uint8_t uncompressed_key[static 65], uint8_t out[static 33]);
 
+/**
+ * Computes the 65-bytes uncompressed public key from the compressed 33-bytes public key.
+ *
+ * @param[in] compressed_key
+ *   Pointer to the compressed public key. The first byte must be 0x02 or 0x03, followed by 32 bytes.
+ * @param[out] out
+ *   Pointer to the output array, that must be 65 bytes long. The first byte of the output will be 0x04.
+ *   It is allowed to have out == compressed_key, and in that case the computation will be done in-place.
+ *   Otherwise, the input and output arrays MUST be non-overlapping.
+ *
+ * @return 0 on success, a negative number on failure.
+ */
+int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33], uint8_t out[static 65]);
 
 /**
  * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
