@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 
 #include <cmocka.h>
@@ -88,6 +89,32 @@ static void test_buffer_read(void **state) {
     assert_int_equal(fourth, 1012478732780767239);     // 0x0E 0x0D 0x0C 0x0B 0x0A 0x09 0x08 0x07
     assert_true(buffer_seek_set(&buf, 8));             // seek at offset 8
     assert_false(buffer_read_u64(&buf, &fourth, BE));  // can't read 8 bytes
+
+
+    uint8_t bytes[32];
+
+    memset(bytes, 0x42, sizeof(bytes));                // we use 0x42 as marker for data that is left unchanged
+
+    assert_true(buffer_seek_set(&buf, 7));             // set back to offset 7
+    assert_true(buffer_read_bytes(&buf, bytes, 0));   // read zero bytes
+    assert_int_equal(bytes[0], 0x42);
+
+    memset(bytes, 0x42, sizeof(bytes));
+    assert_true(buffer_seek_set(&buf, 7));             // set back to offset 7
+    assert_true(buffer_read_bytes(&buf, bytes, 1));
+    assert_int_equal(bytes[0], 0x07);
+    assert_int_equal(bytes[1], 0x42);
+
+    memset(bytes, 0x42, sizeof(bytes));
+    assert_true(buffer_seek_set(&buf, 7));             // set back to offset 7
+    assert_true(buffer_read_bytes(&buf, bytes, 5));
+    assert_int_equal(bytes[0], 0x07);
+    assert_int_equal(bytes[1], 0x08);
+    assert_int_equal(bytes[2], 0x09);
+    assert_int_equal(bytes[3], 0x0A);
+    assert_int_equal(bytes[4], 0x0B);
+    assert_int_equal(bytes[5], 0x42);
+
 
     // clang-format off
     uint8_t temp_varint[] = {

@@ -49,6 +49,7 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[], int n_descript
         }
 
         if (G_command_continuation == NULL) {
+            PRINTF("Unexpected INS_CONTINUE.\n");
             return io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
         }
 

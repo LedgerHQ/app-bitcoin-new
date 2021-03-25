@@ -69,7 +69,7 @@ def device(request, hid):
     base_args = [
         speculos_executable, "../bin/app.elf",
         "--sdk", "1.6",
-        "--display", "headless"
+        # "--display", "headless"
     ]
 
     # Look for the automation_file attribute in the test function, if present

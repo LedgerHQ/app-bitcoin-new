@@ -30,7 +30,9 @@
 #include "../ui/menu.h"
 
 #include "client_commands.h"
+
 #include "register_wallet.h"
+#include "wallet.h"
 
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
 static void request_next_cosigner(dispatcher_context_t *dc);
@@ -53,10 +55,6 @@ void handler_register_wallet(
         io_send_sw(SW_WRONG_P1P2);
         return;
     }
-    if (lc < 3) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -64,53 +62,20 @@ void handler_register_wallet(
         return;
     }
 
-    uint8_t wallet_type;
-    buffer_read_u8(&dispatcher_context->read_buffer, &wallet_type);
-
-    if (wallet_type != WALLET_TYPE_MULTISIG) {
-        io_send_sw(SW_INCORRECT_DATA); // TODO: should add a field for "unsupported"? It might mean the app is outdated.
-        return;
-    }
-
-    uint8_t wallet_name_len;
-    buffer_read_u8(&dispatcher_context->read_buffer, &wallet_name_len);
-
-    if (wallet_name_len > MAX_WALLET_NAME_LENGTH) {
+    int res;
+    if ((res = read_wallet_header(&dispatcher_context->read_buffer, &state->wallet_header)) < 0) {
         io_send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    if (lc != 1 + 1 + wallet_name_len + 1 + 1) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    for (int i = 0; i < wallet_name_len; i++) {
-        buffer_read_u8(&dispatcher_context->read_buffer, &state->wallet_name[i]);
-    }
-    state->wallet_name[wallet_name_len] = '\0';
-
-    buffer_read_u8(&dispatcher_context->read_buffer, &state->threshold);
-    buffer_read_u8(&dispatcher_context->read_buffer, &state->n_keys);
-
-    if (state->threshold == 0 || state->n_keys == 0 || state->n_keys > 15 || state->threshold > state->n_keys) {
-        io_send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    cx_sha256_init(&state->wallet_hash_context);
-
-    crypto_hash_update(&state->wallet_hash_context.header, &wallet_type, 1);
-    crypto_hash_update(&state->wallet_hash_context.header, &wallet_name_len, 1);
-    crypto_hash_update(&state->wallet_hash_context.header, &state->wallet_name, wallet_name_len);
-    crypto_hash_update(&state->wallet_hash_context.header, &state->threshold, 1);
-    crypto_hash_update(&state->wallet_hash_context.header, &state->n_keys, 1);
+    cx_sha256_init(&state->hash_context);
+    hash_update_append_wallet_header(&state->hash_context.header, &state->wallet_header);
 
     state->next_pubkey_index = 0;
     ui_display_multisig_header(dispatcher_context,
-                               (char *)state->wallet_name,
-                               state->threshold,
-                               state->n_keys,
+                               (char *)state->wallet_header.name,
+                               state->wallet_header.threshold,
+                               state->wallet_header.n_keys,
                                ui_action_validate_header);
 }
 
@@ -166,13 +131,13 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
-    crypto_hash_update(&state->wallet_hash_context.header, &pubkey_len, 1);
-    crypto_hash_update(&state->wallet_hash_context.header, &pubkey, pubkey_len);
+    crypto_hash_update(&state->hash_context.header, &pubkey_len, 1);
+    crypto_hash_update(&state->hash_context.header, &pubkey, pubkey_len);
 
     ui_display_multisig_cosigner_pubkey(dc,
                                         (char *)pubkey,
                                         1 + state->next_pubkey_index, // 1-indexed for the UI
-                                        state->n_keys,
+                                        state->wallet_header.n_keys,
                                         ui_action_validate_cosigner);
 }
 
@@ -188,7 +153,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
         ui_menu_main();
     } else {
         ++state->next_pubkey_index;
-        if (state->next_pubkey_index < state->n_keys) {
+        if (state->next_pubkey_index < state->wallet_header.n_keys) {
             request_next_cosigner(dc);
         } else {
 
@@ -201,7 +166,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
                 uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
             } response;
 
-            crypto_hash_digest(&state->wallet_hash_context.header, response.wallet_hash, 32);
+            crypto_hash_digest(&state->hash_context.header, response.wallet_hash, 32);
 
             // sign hash and produce response
             int signature_len = crypto_sign_sha256_hash(response.wallet_hash, response.signature);

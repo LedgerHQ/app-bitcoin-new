@@ -116,7 +116,7 @@ void handler_get_address(
     state->address_len = (size_t)ret;
 
     if (p1 == 1 || is_path_suspicious) {
-        ui_display_address(dispatcher_context, state->address, is_path_suspicious, ui_action_validate_address);
+        ui_display_address(dispatcher_context, state->address, is_path_suspicious, path_str, ui_action_validate_address);
     } else {
         ui_action_validate_address(dispatcher_context, true);
     }
@@ -186,8 +186,8 @@ static int get_address_at_path(
         case ADDRESS_TYPE_WPKH:    // native segwit
             {
                 uint8_t script[22];
-                script[0] = 0x00;
-                script[1] = 0x14;
+                script[0] = 0x00; // OP_0
+                script[1] = 0x14; // PUSH 20 bytes
                 crypto_hash160((uint8_t *)&keydata, 33, script+2);
 
                 uint8_t script_rip[20];

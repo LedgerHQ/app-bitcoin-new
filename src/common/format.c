@@ -134,7 +134,7 @@ int format_hex(const uint8_t *in, size_t in_len, char *out, size_t out_len) {
         return -1;
     }
 
-    const char hex[] = "0123456789ABCDEF";
+    const char hex[] = "0123456789abcdef";
     size_t i = 0;
     int written = 0;
 

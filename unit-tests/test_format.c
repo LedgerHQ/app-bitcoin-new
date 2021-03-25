@@ -91,7 +91,7 @@ static void test_format_hex(void **state) {
 
     assert_int_equal(2 * sizeof(address) + 1,
                      format_hex(address, sizeof(address), output, sizeof(output)));
-    assert_string_equal(output, "DE0B295669A9FD93D5F28D9EC85E40F4CB697BAE");
+    assert_string_equal(output, "de0b295669a9fd93d5f28d9ec85e40f4cb697bae");
     assert_int_equal(-1, format_hex(address, sizeof(address), output, sizeof(address)));
 }
 

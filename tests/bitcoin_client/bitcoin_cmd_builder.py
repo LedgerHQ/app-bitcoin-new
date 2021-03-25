@@ -6,6 +6,8 @@ from typing import List, Tuple, Union, Iterator, cast
 from bitcoin_client.transaction import Transaction
 from bitcoin_client.utils import bip32_path_from_string
 
+from .wallet import Wallet, MultisigWallet
+
 MAX_APDU_LEN: int = 255
 
 
@@ -32,6 +34,7 @@ class BitcoinInsType(enum.IntEnum):
     GET_PUBKEY = 0x00
     GET_ADDRESS = 0x01
     REGISTER_WALLET = 0x02
+    GET_WALLET_ADDRESS = 0x03
     GET_SUM_OF_SQUARES = 0xF0
 
 class FrameworkInsType(enum.IntEnum):
@@ -43,6 +46,14 @@ class AddrType(enum.IntEnum):
     PKH = 0x00
     SH_WPKH = 0x01
     WPKH = 0x02
+
+class ScriptAddrType(enum.IntEnum):
+    """Type of Bitcoin address for a script."""
+
+    PSH = 0x00
+    SH_WPSH = 0x01
+    WPSH = 0x02
+
 
 class ClientCommandCode(enum.IntEnum):
     GET_COSIGNER_PUBKEY = 0x01
@@ -139,19 +150,25 @@ class BitcoinCommandBuilder:
                         ins=BitcoinInsType.GET_ADDRESS,
                         cdata=cdata)
 
-    def register_wallet(self, wallet_type: int, name: str, threshold: int, n_keys:int, pubkeys: List[str]):
-        cdata: bytes = b"".join([
-            wallet_type.to_bytes(1, byteorder="big"),
-            len(name).to_bytes(1, byteorder="big"),
-            name.encode("latin-1"), # TODO: check appropriate encoding
-            threshold.to_bytes(1, byteorder="big"),
-            n_keys.to_bytes(1, byteorder="big"),
-        ])
-
+    def register_wallet(self, wallet: Wallet):
         return self.serialize(cla=self.CLA_BITCOIN,
                         p1=0,
                         p2=0,
                         ins=BitcoinInsType.REGISTER_WALLET,
+                        cdata=wallet.serialize_header())
+
+    def get_wallet_address(self, addr_type: ScriptAddrType, wallet: Wallet, signature: bytes, address_index: int, display: bool = False):
+        cdata: bytes = b"".join([
+            wallet.id,
+            len(signature).to_bytes(1, byteorder="big"),
+            signature,
+            wallet.serialize_header(),
+            address_index.to_bytes(4, byteorder="big")
+        ])
+        return self.serialize(cla=self.CLA_BITCOIN,
+                        p1=1 if display else 0,
+                        p2=addr_type,
+                        ins=BitcoinInsType.GET_WALLET_ADDRESS,
                         cdata=cdata)
 
     def get_sum_of_squares(self, n: int):
@@ -166,7 +183,6 @@ class BitcoinCommandBuilder:
         return self.serialize(cla=self.CLA_BITCOIN,
                               ins=BitcoinInsType.GET_SUM_OF_SQUARES,
                               cdata=n.to_bytes(1, byteorder="big"))
-
 
     def continue_interrupted(self, cdata: bytes):
         """Command builder for CONTINUE.

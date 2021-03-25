@@ -73,3 +73,7 @@ def read_uint(buf: BytesIO,
         raise ValueError(f"Can't read u{bit_len} in buffer!")
 
     return int.from_bytes(b, byteorder)
+
+
+def serialize_str(value: str) -> bytes:
+    return len(value).to_bytes(1, byteorder="big") + value.encode("latin-1")

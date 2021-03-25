@@ -162,6 +162,24 @@ bool buffer_read_varint(buffer_t *buffer, uint64_t *value);
 bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
 
 /**
+ * Read n bytes from buffer, and stores them in out.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     out
+ *   Pointer to output buffer. It is the responsibility of the caller to make sure that the output buffer
+ *   is at least n bytes long.
+ * @param[in]      n
+ *   Number of bytes to read from buffer.
+ *
+ * @return true if success, false otherwise.
+ *
+ */
+bool buffer_read_bytes(buffer_t *buffer, uint8_t out[], size_t n);
+
+
+// TODO: remove?
+/**
  * Copy bytes from buffer without moving offset.
  *
  * @param[in]  buffer
@@ -176,6 +194,8 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
  */
 bool buffer_copy(const buffer_t *buffer, uint8_t *out, size_t out_len);
 
+
+// TODO: remove?
 /**
  * Move bytes from buffer.
  *

@@ -24,6 +24,13 @@
 #include "varint.h"
 #include "bip32.h"
 
+/*
+TODO: simplify buffer functions.
+ - delete buffer_read_u64
+ - remove endianness parameter, we always use big-endian
+*/
+
+
 bool buffer_can_read(const buffer_t *buffer, size_t n) {
     return buffer->size - buffer->offset >= n;
 }
@@ -140,6 +147,17 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len) {
     }
 
     buffer_seek_cur(buffer, sizeof(*out) * out_len);
+
+    return true;
+}
+
+bool buffer_read_bytes(buffer_t *buffer, uint8_t out[], size_t n) {
+    if (buffer->size - buffer->offset < n) {
+        return false;
+    }
+
+    memmove(out, buffer->ptr + buffer->offset, n);
+    buffer_seek_cur(buffer, n);
 
     return true;
 }

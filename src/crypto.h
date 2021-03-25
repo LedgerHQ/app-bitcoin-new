@@ -8,9 +8,19 @@
 #include "cx.h"
 #include "constants.h"
 
+
+// TODO: Bitcoin Core's HWI address type codes are respectively mapped as 0 -> 1, 1 -> 3, 2 -> 2
+//       compared to our constants; perhaps it makes sense to adopt the same standard in the rewrite.
+
+// Single key address types
 #define ADDRESS_TYPE_PKH 0
 #define ADDRESS_TYPE_SH_WPKH 1
 #define ADDRESS_TYPE_WPKH 2
+
+// Script address types
+#define ADDRESS_TYPE_P2SH 0
+#define ADDRESS_TYPE_SH_WSH 1
+#define ADDRESS_TYPE_WSH 2
 
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
@@ -30,6 +40,18 @@ typedef struct serialized_extended_pubkey_s {
     uint8_t chain_code[32];
     uint8_t compressed_pubkey[33];
 } serialized_extended_pubkey_t;
+
+typedef struct {
+    serialized_extended_pubkey_t serialize_extended_pubkey;
+    uint8_t checksum[4];
+} serialized_extended_pubkey_check_t;
+
+
+// TODO: remove.
+// #define cx_ecfp_add_point my_cx_ecfp_add_point
+void debug_write(const char *buf);
+void debug_write_hex(const void *buf, size_t len);
+
 
 /**
  * Derive private key given BIP32 path.
@@ -115,6 +137,26 @@ int crypto_sign_sha256_hash(
 );
 
 /**
+ * Verifies the a signature of some sha256-hashed data.
+ * The key used to sign is the master public key.
+ *
+ * @param[in] hash
+ *   Pointer to the 32-byte sha256 hash of the signed message.
+ * @param[in] sig
+ *   Pointer to the signature.
+ * @param[in] sig_len
+ *   Length of the signature
+ *
+ * @return true if the signature is valid, false otherwise.
+ */
+bool crypto_verify_sha256_hash(
+    const uint8_t hash[static 32],
+    uint8_t sig[],
+    size_t sig_len
+);
+
+
+/**
  * TODO: docs
  */
 int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len);
@@ -125,7 +167,19 @@ int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len);
 int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len);
 
 /**
- * Computes RIPEMD160(SHA256(in).
+ * Computes RIPEMD160(in).
+ *
+ * @param[in] in
+ *   Pointer to input data.
+ * @param[in] in_len
+ *   Length of input data.
+ * @param[out] out
+ *   Pointer to the 160-bit (20 bytes) output array.
+ */
+void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]);
+
+/**
+ * Computes RIPEMD160(SHA256(in)).
  *
  * @param[in] in
  *   Pointer to input data.
