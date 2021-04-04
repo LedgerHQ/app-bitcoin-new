@@ -14,8 +14,12 @@ from bitcoin_client.bitcoin_cmd_builder import (
 from bitcoin_client.button import Button
 from bitcoin_client.exception import DeviceException
 from bitcoin_client.transaction import Transaction
+from bitcoin_client.bip32 import ExtendedPubkey
 
 from .wallet import Wallet, WalletType
+from .utils import ripemd160, serialize_str
+from .merkle import MerkleTree
+
 
 class ClientCommand:
     def execute(self, request: bytes) -> bytes:
@@ -39,13 +43,15 @@ class GetSquareCommand(ClientCommand):
         return (n * n).to_bytes(4, 'big')
 
 
-class GetCosignerPubkeyCommand(ClientCommand):
-    def __init__(self, pubkeys: List[str]):
-        self.pubkeys = pubkeys
+class GetPubkeyInfoCommand(ClientCommand):
+    def __init__(self, keys_info: List[str]):
+        self.keys_info = keys_info
+        keys_info_hashes = map(lambda k: ripemd160(k.encode("latin-1")), keys_info)
+        self.merkle_tree = MerkleTree(keys_info_hashes)
 
     @property
     def code(self) -> int:
-        return ClientCommandCode.GET_COSIGNER_PUBKEY
+        return ClientCommandCode.CCMD_GET_PUBKEY_INFO
 
     def execute(self, request: bytes) -> bytes:
         if len(request) != 2:
@@ -53,12 +59,66 @@ class GetCosignerPubkeyCommand(ClientCommand):
 
         n = request[1]
 
-        assert 0 <= n < len(self.pubkeys)
-        if not (0 <= n < len(self.pubkeys)):
-            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.pubkeys)} pubkeys.")
+        if not (0 <= n < len(self.keys_info)):
+            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys)} keys.")
 
-        result = self.pubkeys[n]
-        return len(result).to_bytes(1, byteorder="big") + result.encode("latin-1")
+        return b''.join([
+            serialize_str(self.keys_info[n]),
+            self.merkle_tree.prove_leaf(n),
+        ])
+
+
+class GetSortedPubkeyInfoCommand(ClientCommand):
+    def __init__(self, keys_info: List[str]):
+        self.keys_info = keys_info
+        keys_info_hashes = map(lambda k: ripemd160(k.encode("latin-1")), keys_info)
+        self.merkle_tree = MerkleTree(keys_info_hashes)
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.CCMD_GET_SORTED_PUBKEY_INFO
+
+    def execute(self, request: bytes) -> bytes:
+        if len(request) < 2:
+            raise ValueError("Wrong request length.")
+
+        n = request[1]
+
+        if not (0 <= n < len(self.keys_info)):
+            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys_info)} keys.")
+
+        bip32_path_len = int(request[2])
+        if not (0 <= bip32_path_len <= 10):
+            raise RuntimeError(f"Invalid derivation len: {bip32_path_len}")
+
+        if len(request) != 1 + 1 + 1 + 4 * bip32_path_len:
+            raise ValueError(f"Wrong request length: {len(request)}")
+
+        bip32_path = []
+        for i in range(bip32_path_len):
+            bip32_path.append(int.from_bytes(request[1 + 1 + 1 + i*4: 1 + 1 + i*4 + 4], byteorder="big"))
+
+        # function to sort keys by the corresponding derived pubkey
+        def derived_pk(pubkey_info: str) -> int:
+            # Remove the key origin info (if present) by looking for the ']' character
+            pos = pubkey_info.find(']')
+            pubkey_str = pubkey_info if pos == -1 else pubkey_info[pos+1:]
+
+            ext_pubkey = ExtendedPubkey.from_base58(pubkey_str)
+            for d in bip32_path:
+                ext_pubkey = ext_pubkey.derive_child(d)
+
+            print(ext_pubkey.compressed_pubkey.hex())
+            return ext_pubkey.compressed_pubkey
+
+        sorted_keys = sorted(enumerate(self.keys_info), key=lambda index_key: derived_pk(index_key[1]))
+
+        i, key_info = sorted_keys[n]
+        return b''.join([
+            i.to_bytes(1, byteorder="big"),
+            serialize_str(key_info),
+            self.merkle_tree.prove_leaf(i),
+        ])
 
 
 class BitcoinCommand:
@@ -68,11 +128,6 @@ class BitcoinCommand:
         self.transport = transport
         self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
-
-    def process_client_commands(self, request: bytes) -> Tuple[int, bytes]:
-        command = ClientCommand.create(request)
-        command_response = command.execute()
-        return self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
 
     def make_request(self, apdu: bytes, commands: List['ClientCommand'] = []) -> Tuple[int, bytes]:
         sw, response = self.transport.exchange_raw(apdu)
@@ -129,14 +184,13 @@ class BitcoinCommand:
 
         return response.decode()
 
-
     def register_wallet(self, wallet: Wallet) -> Tuple[str, str]:
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
         sw, response = self.make_request(
             self.builder.register_wallet(wallet),
-            [GetCosignerPubkeyCommand(wallet.pubkeys)]
+            [GetPubkeyInfoCommand(wallet.keys_info)]
         )
 
         if sw != 0x9000:
@@ -151,21 +205,22 @@ class BitcoinCommand:
 
         return wallet_id.hex(), sig.hex()
 
-
-    def get_wallet_address(self, addr_type: ScriptAddrType, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
+    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
         sw, response = self.make_request(
-            self.builder.get_wallet_address(addr_type, wallet, signature, address_index, display),
-            [GetCosignerPubkeyCommand(wallet.pubkeys)]
+            self.builder.get_wallet_address(wallet, signature, address_index, display),
+            [
+                GetPubkeyInfoCommand(wallet.keys_info),
+                GetSortedPubkeyInfoCommand(wallet.keys_info)
+            ]
         )
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_WALLET_ADDRESS)
 
         return response.decode()
-
 
     def get_sum_of_squares(self, n: int) -> int:
         if n < 0 or n > 255:

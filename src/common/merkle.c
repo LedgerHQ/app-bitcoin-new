@@ -19,7 +19,8 @@
 #include <string.h>   // memset, explicit_bzero
 #include <stdbool.h>  // bool
 
-#include "crypto.h"
+#include "buffer.h"
+#include "../crypto.h"
 
 #include "merkle.h"
 
@@ -80,13 +81,20 @@ static int get_directions(size_t size, size_t index, uint8_t out[], size_t out_l
     return n_directions;
 }
 
+
+
 // TODO: add tests
-bool merkle_proof_verify(uint8_t root[static 20], size_t size, uint8_t element[static 20], size_t index, uint8_t (*proof)[20], size_t proof_size) {
+bool merkle_proof_verify(uint8_t root[static 20], size_t size, uint8_t element_hash[static 20], size_t index, uint8_t (*proof)[20], size_t proof_size) {
     uint8_t cur_hash[20];
-    memcpy(cur_hash, element, sizeof(cur_hash));
+    memcpy(cur_hash, element_hash, sizeof(cur_hash));
 
     uint8_t directions[MAX_MERKLE_TREE_DEPTH];
-    uint8_t n_directions = get_directions(size, index, directions, sizeof(directions));
+    int ret = get_directions(size, index, directions, sizeof(directions));
+    if (ret == -1) {
+        return false;
+    }
+    uint8_t n_directions = (uint8_t)ret;
+
     if (proof_size != n_directions) {
         return false;
     }
@@ -100,4 +108,59 @@ bool merkle_proof_verify(uint8_t root[static 20], size_t size, uint8_t element[s
     }
 
     return memcmp(&cur_hash, root, 20) == 0;
+}
+
+
+// TODO: add tests
+// size:      4
+// index:     4
+// proof_len: 1
+// proof:     20 * proof_len
+bool buffer_read_and_verify_merkle_proof(buffer_t *buffer,
+                                         const uint8_t root[static 20],
+                                         size_t size,
+                                         size_t index,
+                                         const uint8_t element_hash[static 20]) {
+    if (!buffer_can_read(buffer, 4+4+1)) { // size, index and proof_len
+        return false;
+    }
+    uint8_t proof_len;
+
+    if (index >= size || size == 0) {
+        PRINTF("bravmp: Wrong index or size: %u, %u\n", index, size);
+        return false;
+    }
+    buffer_read_u8(buffer, &proof_len);
+
+    uint8_t cur_hash[20];
+    memcpy(cur_hash, element_hash, sizeof(cur_hash));
+
+    uint8_t directions[MAX_MERKLE_TREE_DEPTH];
+    int n_directions = get_directions(size, index, directions, sizeof(directions));
+    if (n_directions == -1 || proof_len != n_directions) {
+        PRINTF("bravmp: Wrong proof_len: %d. Should be: %d\n", proof_len, n_directions);
+        return false;
+    }
+
+    if (!buffer_can_read(buffer, 20 * proof_len)) {
+        PRINTF("bravmp: Buffer too short.\n");
+        return false; // not enough bytes in the stream
+    }
+
+    for (int i = proof_len - 1; i >= 0; i--) {
+        uint8_t proof_i[20];
+        buffer_read_bytes(buffer, proof_i, 20);
+
+        if (directions[i] == 0) {
+            combine_hashes(cur_hash, proof_i, cur_hash);
+        } else {
+            combine_hashes(proof_i, cur_hash, cur_hash);
+        }
+    }
+
+    bool result = memcmp(&cur_hash, root, 20) == 0;
+
+    if (!result) PRINTF("bravmp: Root hash not matching.\n");
+
+    return result;
 }

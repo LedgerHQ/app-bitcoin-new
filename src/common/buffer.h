@@ -16,10 +16,11 @@ typedef enum {
  * Struct for buffer with size and offset.
  */
 typedef struct {
-    const uint8_t *ptr;  /// Pointer to byte buffer
+    uint8_t *ptr;  /// Pointer to byte buffer
     size_t size;         /// Size of byte buffer
     size_t offset;       /// Offset in byte buffer
 } buffer_t;
+
 
 /**
  * Tell whether buffer can read bytes or not.
@@ -175,7 +176,66 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
  * @return true if success, false otherwise.
  *
  */
-bool buffer_read_bytes(buffer_t *buffer, uint8_t out[], size_t n);
+bool buffer_read_bytes(buffer_t *buffer, void *out, size_t n);
+
+
+/**
+ * Write a uint8_t into a buffer.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u8(buffer_t *buffer, uint8_t value);
+
+/**
+ * Write a uint16_t into the buffer as 2 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u16(buffer_t *buffer, uint16_t value, endianness_t endianness);
+
+/**
+ * Write a uint32_t into the buffer as 4 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness);
+
+/**
+ * Write a uint64_t into the buffer as 8 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness);
 
 
 // TODO: remove?

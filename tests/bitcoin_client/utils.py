@@ -1,6 +1,7 @@
 from io import BytesIO
 from typing import List, Optional, Literal
 
+import hashlib
 
 UINT64_MAX: int = 18446744073709551615
 UINT32_MAX: int = 4294967295
@@ -77,3 +78,21 @@ def read_uint(buf: BytesIO,
 
 def serialize_str(value: str) -> bytes:
     return len(value).to_bytes(1, byteorder="big") + value.encode("latin-1")
+
+
+def ripemd160(x: bytes) -> bytes:
+    h = hashlib.new("ripemd160")
+    h.update(x)
+    return h.digest()
+
+
+def sha256(s: bytes) -> bytes:
+    return hashlib.new('sha256', s).digest()
+
+
+def hash160(s: bytes) -> bytes:
+    return ripemd160(sha256(s))
+
+
+def hash256(s: bytes) -> bytes:
+    return sha256(sha256(s))

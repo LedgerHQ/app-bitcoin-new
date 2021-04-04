@@ -305,7 +305,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
 int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]) {
     cx_ecfp_private_key_t private_key = {0};
     uint8_t chain_code[32] = {0};
-    uint32_t info = 0; // TODO: wat?
+    uint32_t info = 0;
 
     // derive private key according to BIP32 path
     // TODO: should we sign with a specific path? e.g. reserve m/0xLED'/... for all internal keys.
@@ -349,7 +349,7 @@ bool crypto_verify_sha256_hash(const uint8_t hash[static 32], uint8_t sig[], siz
 }
 
 
-int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len) {
+int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len) {
     return cx_hash(hash_context, 0, in, in_len, NULL, 0);
 }
 

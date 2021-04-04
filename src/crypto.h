@@ -11,6 +11,8 @@
 
 // TODO: Bitcoin Core's HWI address type codes are respectively mapped as 0 -> 1, 1 -> 3, 2 -> 2
 //       compared to our constants; perhaps it makes sense to adopt the same standard in the rewrite.
+//       That would have the advantage of haveing the same three constants from address types,
+//       regardless if single key addresses. or script addresses.
 
 // Single key address types
 #define ADDRESS_TYPE_PKH 0
@@ -22,10 +24,11 @@
 #define ADDRESS_TYPE_SH_WSH 1
 #define ADDRESS_TYPE_WSH 2
 
-/**
- * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
- */
-#define MAX_SERIALIZED_PUBKEY_LENGTH 113
+
+// Address types as defined in Bitcoin Core's HWI
+#define ADDRESS_TYPE_LEGACY 1  // Legacy address. P2PKH for single sig, P2SH for scripts.
+#define ADDRESS_TYPE_WIT 2     // Native segwit. P2WPKH for single sig, P2WPSH for scripts.
+#define ADDRESS_TYPE_SH_WIT 3  // Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
 
 
 /**
@@ -48,7 +51,7 @@ typedef struct {
 
 
 // TODO: remove.
-// #define cx_ecfp_add_point my_cx_ecfp_add_point
+#define cx_ecfp_add_point my_cx_ecfp_add_point
 void debug_write(const char *buf);
 void debug_write_hex(const void *buf, size_t len);
 
@@ -159,12 +162,42 @@ bool crypto_verify_sha256_hash(
 /**
  * TODO: docs
  */
-int crypto_hash_update(cx_hash_t *hash_context, void *in, size_t in_len);
+int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len);
 
 /**
  * TODO: docs
  */
 int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len);
+
+
+/**
+ * TODO: docs
+ */
+static inline int crypto_hash_update_u8(cx_hash_t *hash_context, uint8_t data) {
+    return crypto_hash_update(hash_context, &data, 1);
+}
+
+/**
+ * TODO: docs
+ */
+static inline int crypto_hash_update_u16(cx_hash_t *hash_context, uint16_t data) {
+    uint8_t buf[2];
+    buf[0] = (uint8_t)(data >> 8);
+    buf[1] = (uint8_t)(data >> 0);
+    return crypto_hash_update(hash_context, &buf, sizeof(buf));
+}
+
+/**
+ * TODO: docs
+ */
+static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data) {
+    uint8_t buf[4];
+    buf[0] = (uint8_t)(data >> 24);
+    buf[1] = (uint8_t)(data >> 16);
+    buf[2] = (uint8_t)(data >> 8);
+    buf[3] = (uint8_t)(data >> 0);
+    return crypto_hash_update(hash_context, &buf, sizeof(buf));
+}
 
 /**
  * Computes RIPEMD160(in).

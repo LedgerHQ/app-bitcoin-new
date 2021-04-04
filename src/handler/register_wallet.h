@@ -12,7 +12,7 @@ typedef struct {
 
     uint8_t next_pubkey_index;
 
-    cx_sha256_t hash_context;
+    uint8_t wallet_id[32];
 } register_wallet_state_t;
 
 void handler_register_wallet(

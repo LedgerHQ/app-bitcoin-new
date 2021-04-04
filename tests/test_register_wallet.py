@@ -1,6 +1,6 @@
 from bitcoin_client.bitcoin_cmd_builder import AddrType
 from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet
+from bitcoin_client.wallet import MultisigWallet, AddressType
 from utils import automation
 from typing import List
 
@@ -22,12 +22,12 @@ root_compressed_pk = "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332
 
 wallet = MultisigWallet(
     name="Cold storage",
+    address_type=AddressType.SH_WIT,
     threshold=2,
-    n_keys=3,
-    pubkeys=[
-        "xpub6DqTtMuqBiBsHirAP1Tfm7w6ASuGqWTpn9A7efDwmYZd5bMfCuxtmBgMmVufK49sKpXgyxMhb7jYwMDa6nSzRjWry5xgDzjqrDxDqcPteqo",
-        "xpub6Dk2M8SzqzeRyuYuSJ1Vy5uRBvKfV7625LoME3KsDYRuEL8dww4MSQWMEkLLuJF9UK86hZUtRmqx1LSd1c6boq24dyq4E8UEPypQsSxupQ2",
-        "xpub6EZ2Bt4cGEhrYbtgzPgZjaC9c8v5edBRYPXHZhNux5muupbeygXB8WnJg9W9nCPRQQJSwPCTJznsmygJ94ojRYgnFPQFP4Zu4TJxz1adFXy"
+    keys_info=[
+        "[61e4f658]xpub6Dk2M8SzqzeRyuYuSJ1Vy5uRBvKfV7625LoME3KsDYRuEL8dww4MSQWMEkLLuJF9UK86hZUtRmqx1LSd1c6boq24dyq4E8UEPypQsSxupQ2",
+        "[acc1fe38]xpub6EZ2Bt4cGEhrYbtgzPgZjaC9c8v5edBRYPXHZhNux5muupbeygXB8WnJg9W9nCPRQQJSwPCTJznsmygJ94ojRYgnFPQFP4Zu4TJxz1adFXy",
+        "[ba16e65d]xpub6DqTtMuqBiBsHirAP1Tfm7w6ASuGqWTpn9A7efDwmYZd5bMfCuxtmBgMmVufK49sKpXgyxMhb7jYwMDa6nSzRjWry5xgDzjqrDxDqcPteqo"
     ]
 )
 

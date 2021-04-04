@@ -21,6 +21,7 @@
 
 #include "buffer.h"
 #include "read.h"
+#include "write.h"
 #include "varint.h"
 #include "bip32.h"
 
@@ -29,6 +30,11 @@ TODO: simplify buffer functions.
  - delete buffer_read_u64
  - remove endianness parameter, we always use big-endian
 */
+
+// TODO: add functions to:
+// - get pointer to ptr[offset]
+// - peek the next byte
+// - buffer_read_char for convenience
 
 
 bool buffer_can_read(const buffer_t *buffer, size_t n) {
@@ -151,7 +157,7 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len) {
     return true;
 }
 
-bool buffer_read_bytes(buffer_t *buffer, uint8_t out[], size_t n) {
+bool buffer_read_bytes(buffer_t *buffer, void *out, size_t n) {
     if (buffer->size - buffer->offset < n) {
         return false;
     }
@@ -161,6 +167,65 @@ bool buffer_read_bytes(buffer_t *buffer, uint8_t out[], size_t n) {
 
     return true;
 }
+
+// TODO: unit tests for the buffer_write_* functions 
+bool buffer_write_u8(buffer_t *buffer, uint8_t value) {
+    if (!buffer_can_read(buffer, 1)) {
+        return false;
+    }
+
+    buffer->ptr[buffer->offset] = value;
+    buffer_seek_cur(buffer, 1);
+
+    return true;
+}
+
+bool buffer_write_u16(buffer_t *buffer, uint16_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 2)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u16_be(buffer->ptr, buffer->offset, value);
+    } else {
+        write_u16_le(buffer->ptr, buffer->offset, value);
+    }
+    buffer_seek_cur(buffer, 2);
+
+    return true;
+}
+
+bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 4)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u32_be(buffer->ptr, buffer->offset, value);
+    } else {
+        write_u32_le(buffer->ptr, buffer->offset, value);
+    }
+    buffer_seek_cur(buffer, 4);
+
+    return true;
+}
+
+bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 8)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u64_be(buffer->ptr, buffer->offset, value);
+    } else {
+        write_u64_le(buffer->ptr, buffer->offset, value);
+    }
+
+    buffer_seek_cur(buffer, 8);
+
+    return true;
+}
+
 
 bool buffer_copy(const buffer_t *buffer, uint8_t *out, size_t out_len) {
     if (buffer->size - buffer->offset > out_len) {

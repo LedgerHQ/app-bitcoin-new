@@ -1,6 +1,7 @@
 import hashlib
-from typing import List
+from typing import List, Iterable
 
+# TODO: a class to represent Markle proofs in a more structured way (including size and leaf index)
 
 NIL = bytes([0] * 32)
 
@@ -37,6 +38,9 @@ def largest_power_of_2_less_than(n: int) -> int:
 
 
 def combine_hashes(left: bytes, right: bytes):
+    if len(left) != 20 or len(right) != 20:
+        raise ValueError("The elements must be 20-bytes ripemd160 outputs.")
+
     h = hashlib.new('ripemd160')
     h.update(left)
     h.update(right)
@@ -101,11 +105,12 @@ class MerkleTree:
     - If a subtree has n > 1 leaves, then the left subchild is a complete subtree with p leaves, where p is the largest
       power of 2 smaller than n.
     """
-    def __init__(self, elements: List[bytes] = []):
+    def __init__(self, elements: Iterable[bytes] = []):
         if elements:
             self.leaves = [Node(None, None, None, el) for el in elements]
-            self.root_node = make_tree(self.leaves, 0, len(elements))
-            self.depth = ceil_lg(len(elements))
+            n_elements = len(self.leaves)
+            self.root_node = make_tree(self.leaves, 0, n_elements)
+            self.depth = ceil_lg(n_elements)
         else:
             self.leaves = []
             self.root_node = None
@@ -194,7 +199,7 @@ class MerkleTree:
         """Return the value of the leaf with index `i`, where 0 <= i < len(self)."""
         return self.leaves[i].value
 
-    def prove_leaf(self, index: int) -> List[bytes]:
+    def prove_leaf(self, index: int) -> bytes:
         """Produce a proof of membership for the leaf with index `i`, where 0 <= i < len(self)."""
         node = self.leaves[index]
         proof = []
@@ -206,58 +211,9 @@ class MerkleTree:
 
             node = node.parent
 
-        return proof
-
-
-def get_directions(size: int, index: int) -> List[bool]:
-    """
-    Returns an array of booleans indicating the directions of tree edges in the path from the root to the node with
-    the given index in a Merkle tree of the given size.
-    """
-
-    assert size > 0
-    assert 0 <= index < size
-
-    directions = []
-    if size == 1:
-        return directions
-
-    while size > 1:
-        depth = ceil_lg(size)
-
-        # bitmask of the direction from the current node; also the number of leaves of the left subtree
-        mask = 1 << (depth - 1)
-
-        right_child = index & mask != 0
-        directions.append(right_child)
-
-        if right_child:
-            size -= mask
-            index -= mask
-        else:
-            size = mask
-        mask //= 2
-
-    return directions
-
-
-def get_proof_size(size: int, index: int):
-    return len(get_directions(size, index))
-
-
-def merkle_proof_verify(root: bytes, size: int, element: bytes, index: int, proof: List[bytes]) -> bool:
-    """Verify that `proof` is a valid membership proof for the statement that the leaf with
-    index `index` is equal to `element` in the tree with the given Merkle `root`."""
-    cur_hash = element
-    directions = get_directions(size, index)
-
-    if len(proof) != len(directions):
-        return False  # wrong proof size
-
-    for h in proof:
-        if directions.pop() is False:
-            cur_hash = combine_hashes(cur_hash, h)
-        else:
-            cur_hash = combine_hashes(h, cur_hash)
-
-    return cur_hash == root
+        return b''.join([
+            len(self.leaves).to_bytes(4, byteorder="big"),
+            index.to_bytes(4, byteorder="big"),
+            len(proof).to_bytes(1, byteorder="big"),
+            b''.join(proof)
+        ])

@@ -340,7 +340,7 @@ int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pub
     ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
 
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
-    snprintf(state->signer_index, sizeof(state->signer_index), "Signer %u of %u", cosigner_index, n_keys);
+    snprintf(state->signer_index, sizeof(state->signer_index), "Signer %u of %u", cosigner_index + 1, n_keys);
 
     g_validate_callback = callback;
 

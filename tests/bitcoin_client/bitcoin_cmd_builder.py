@@ -40,6 +40,9 @@ class BitcoinInsType(enum.IntEnum):
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
 
+# TODO: replace this and the next Enum with just the AddressType from .wallet
+#       (will break compatibility with the constants used in the legacy APDUs, so will
+#       need some support to stay backwards-compatible) 
 class AddrType(enum.IntEnum):
     """Type of Bitcoin address."""
 
@@ -56,7 +59,8 @@ class ScriptAddrType(enum.IntEnum):
 
 
 class ClientCommandCode(enum.IntEnum):
-    GET_COSIGNER_PUBKEY = 0x01
+    CCMD_GET_PUBKEY_INFO = 0x01
+    CCMD_GET_SORTED_PUBKEY_INFO = 0x02
     GET_SQUARE = 0xFF
 
 class BitcoinCommandBuilder:
@@ -155,19 +159,18 @@ class BitcoinCommandBuilder:
                         p1=0,
                         p2=0,
                         ins=BitcoinInsType.REGISTER_WALLET,
-                        cdata=wallet.serialize_header())
+                        cdata=wallet.serialize())
 
-    def get_wallet_address(self, addr_type: ScriptAddrType, wallet: Wallet, signature: bytes, address_index: int, display: bool = False):
+    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False):
         cdata: bytes = b"".join([
             wallet.id,
             len(signature).to_bytes(1, byteorder="big"),
             signature,
-            wallet.serialize_header(),
+            wallet.serialize(),
             address_index.to_bytes(4, byteorder="big")
         ])
         return self.serialize(cla=self.CLA_BITCOIN,
                         p1=1 if display else 0,
-                        p2=addr_type,
                         ins=BitcoinInsType.GET_WALLET_ADDRESS,
                         cdata=cdata)
 

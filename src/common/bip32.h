@@ -19,6 +19,9 @@
  */
 #define MAX_SERIALIZED_BIP32_PATH_LENGTH (12 * MAX_BIP32_PATH_STEPS)
 
+/**
+ * Index of first hardened child according to BIP32; it can also be used as the bitmask for hardened children.
+ */
 #define BIP32_FIRST_HARDENED_CHILD 0x80000000
 
 #define BIP44_PURPOSE_OFFSET 0

@@ -10,7 +10,7 @@
 //   - a command processor, that encodes the state machine (only for interruptible commands)
 // For simple 1-round commands, the global state should not be used (or used only as temporary storage);
 // there is no command processor.
-// For interruptible commands, the command handler initialize the global state; it can return a status word and
+// For interruptible commands, the command handler initializes the global state; it can return a status word and
 // response, and no processor will be called in that case. Otherwise, the command processor is called, which
 // implements the state machines, and must respect specific constraints in the way it's written.
 // TODO: document this.

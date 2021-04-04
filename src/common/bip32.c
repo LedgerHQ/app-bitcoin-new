@@ -30,8 +30,8 @@
 #include "cx.h"
 
 
-// bitmask for hardened derivation steps
-#define H 0x80000000u
+// shortcut for convenience
+#define H BIP32_FIRST_HARDENED_CHILD
 
 bool bip32_path_read(const uint8_t *in, size_t in_len, uint32_t *out, size_t out_len) {
     if (out_len > MAX_BIP32_PATH_STEPS) {

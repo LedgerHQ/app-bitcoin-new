@@ -15,7 +15,18 @@
  */
 bool merkle_proof_verify(uint8_t root[static 20],
                          size_t size,
-                         uint8_t element[static 20],
+                         uint8_t element_hash[static 20],
                          size_t index,
                          uint8_t (*proof)[20],
                          size_t proof_size);
+
+
+/**
+ * TODO: docs
+ */
+bool buffer_read_and_verify_merkle_proof(
+    buffer_t *buffer,
+    const uint8_t root[static 20],
+    size_t size,
+    size_t index,
+    const uint8_t element_hash[static 20]);
