@@ -82,35 +82,6 @@ static int get_directions(size_t size, size_t index, uint8_t out[], size_t out_l
 }
 
 
-
-// TODO: add tests
-bool merkle_proof_verify(uint8_t root[static 20], size_t size, uint8_t element_hash[static 20], size_t index, uint8_t (*proof)[20], size_t proof_size) {
-    uint8_t cur_hash[20];
-    memcpy(cur_hash, element_hash, sizeof(cur_hash));
-
-    uint8_t directions[MAX_MERKLE_TREE_DEPTH];
-    int ret = get_directions(size, index, directions, sizeof(directions));
-    if (ret == -1) {
-        return false;
-    }
-    uint8_t n_directions = (uint8_t)ret;
-
-    if (proof_size != n_directions) {
-        return false;
-    }
-
-    for (int i = n_directions - 1; i >= 0; i--) {
-        if (directions[i] == 0) {
-            combine_hashes(cur_hash, proof[i], cur_hash);
-        } else {
-            combine_hashes(proof[i], cur_hash, cur_hash);
-        }
-    }
-
-    return memcmp(&cur_hash, root, 20) == 0;
-}
-
-
 // TODO: add tests
 // size:      4
 // index:     4
