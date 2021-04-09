@@ -236,37 +236,3 @@ bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness)
  *
  */
 bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness);
-
-
-// TODO: remove?
-/**
- * Copy bytes from buffer without moving offset.
- *
- * @param[in]  buffer
- *   Pointer to input buffer struct.
- * @param[out] out
- *   Pointer to output byte buffer.
- * @param[in]  out_len
- *   Length of output byte buffer.
- *
- * @return true if success, false otherwise.
- *
- */
-bool buffer_copy(const buffer_t *buffer, uint8_t *out, size_t out_len);
-
-
-// TODO: remove?
-/**
- * Move bytes from buffer.
- *
- * @param[in,out]  buffer
- *   Pointer to input buffer struct.
- * @param[out]     out
- *   Pointer to output byte buffer.
- * @param[in]      out_len
- *   Length of output byte buffer.
- *
- * @return true if success, false otherwise.
- *
- */
-bool buffer_move(buffer_t *buffer, uint8_t *out, size_t out_len);

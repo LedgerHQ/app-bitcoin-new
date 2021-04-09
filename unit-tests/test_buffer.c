@@ -137,46 +137,133 @@ static void test_buffer_read(void **state) {
     assert_false(buffer_read_varint(&buf_varint, &varint));
 }
 
-static void test_buffer_copy(void **state) {
+static void test_buffer_write(void **state) {
     (void) state;
 
-    uint8_t output[5] = {0};
-    uint8_t temp[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
-    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
+    uint8_t template[] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+    };
 
-    assert_true(buffer_copy(&buf, output, sizeof(output)));
-    assert_memory_equal(output, temp, sizeof(output));
+    uint8_t data[sizeof(template)];
 
-    uint8_t output2[3] = {0};
-    assert_true(buffer_seek_set(&buf, 2));
-    assert_true(buffer_copy(&buf, output2, sizeof(output2)));
-    assert_memory_equal(output2, ((uint8_t[3]){0x03, 0x04, 0x05}), 3);
-    assert_true(buffer_seek_set(&buf, 0));                      // seek at offset 0
-    assert_false(buffer_copy(&buf, output2, sizeof(output2)));  // can't read 5 bytes
-}
+    memcpy(data, template, sizeof(template));
+    buffer_t buf = {.ptr = data, .size = sizeof(data), .offset = 0};
 
-static void test_buffer_move(void **state) {
-    (void) state;
+    // TEST buffer_write_u8
+    assert_true(buffer_write_u8(&buf, 42));
+    assert_int_equal(data[0], 42);
+    assert_int_equal(data[1], 0x01);
+    assert_int_equal(buf.offset, 1);
+    buffer_seek_end(&buf, 0);
+    assert_false(buffer_write_u8(&buf, 42));
+    assert_int_equal(buf.offset, buf.size);
+    buffer_seek_end(&buf, 1);
+    assert_true(buffer_write_u8(&buf, 42));
 
-    uint8_t output[5] = {0};
-    uint8_t temp[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
-    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
+    // reset data
+    memcpy(data, template, sizeof(template));
+    buffer_seek_set(&buf, 0);
 
-    assert_true(buffer_move(&buf, output, sizeof(output)));
-    assert_memory_equal(output, temp, sizeof(output));
-    assert_int_equal(buf.offset, sizeof(output));
 
-    uint8_t output2[3] = {0};
-    assert_true(buffer_seek_set(&buf, 0));                      // seek at offset 0
-    assert_false(buffer_move(&buf, output2, sizeof(output2)));  // can't read 5 bytes
+    // TEST buffer_write_u16
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u16(&buf, 0x3344, BE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0x33);
+    assert_int_equal(data[4], 0x44);
+    assert_int_equal(data[5], 0x05);
+    assert_int_equal(buf.offset, 5);
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u16(&buf, 0x3344, LE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0x44);
+    assert_int_equal(data[4], 0x33);
+    assert_int_equal(data[5], 0x05);
+    assert_int_equal(buf.offset, 5);
+
+    buffer_seek_end(&buf, 1);
+    assert_false(buffer_write_u16(&buf, 0x4242, BE));                     // not enough space
+    assert_int_equal(data[sizeof(data) - 1], template[sizeof(data) - 1]); // shouldn't change data if not enough space
+    buffer_seek_end(&buf, 2);
+    assert_true(buffer_write_u16(&buf, 0x4242, BE));                      // enough space this time 
+
+    // reset data
+    memcpy(data, template, sizeof(template));
+    buffer_seek_set(&buf, 0);
+
+
+    // TEST buffer_write_u32
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u32(&buf, 0x33445566, BE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0x33);
+    assert_int_equal(data[4], 0x44);
+    assert_int_equal(data[5], 0x55);
+    assert_int_equal(data[6], 0x66);
+    assert_int_equal(data[7], 0x07);
+    assert_int_equal(buf.offset, 7);
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u32(&buf, 0x33445566, LE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0x66);
+    assert_int_equal(data[4], 0x55);
+    assert_int_equal(data[5], 0x44);
+    assert_int_equal(data[6], 0x33);
+    assert_int_equal(data[7], 0x07);
+    assert_int_equal(buf.offset, 7);
+
+    buffer_seek_end(&buf, 3);
+    assert_false(buffer_write_u32(&buf, 0x42424242, BE));                 // not enough space
+    assert_int_equal(data[sizeof(data) - 1], template[sizeof(data) - 1]); // shouldn't change data if not enough space
+    buffer_seek_end(&buf, 4);
+    assert_true(buffer_write_u32(&buf, 0x42424242, BE));                  // enough space this time 
+
+    // reset data
+    memcpy(data, template, sizeof(template));
+    buffer_seek_set(&buf, 0);
+
+
+    // TEST buffer_write_u64
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u64(&buf, 0x33445566778899aaULL, BE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0x33);
+    assert_int_equal(data[4], 0x44);
+    assert_int_equal(data[5], 0x55);
+    assert_int_equal(data[6], 0x66);
+    assert_int_equal(data[7], 0x77);
+    assert_int_equal(data[8], 0x88);
+    assert_int_equal(data[9], 0x99);
+    assert_int_equal(data[10], 0xaa);
+    assert_int_equal(data[11], 0x0b);
+    assert_int_equal(buf.offset, 11);
+    buffer_seek_set(&buf, 3);
+    assert_true(buffer_write_u64(&buf, 0x33445566778899aaULL, LE));
+    assert_int_equal(data[2], 0x02);
+    assert_int_equal(data[3], 0xaa);
+    assert_int_equal(data[4], 0x99);
+    assert_int_equal(data[5], 0x88);
+    assert_int_equal(data[6], 0x77);
+    assert_int_equal(data[7], 0x66);
+    assert_int_equal(data[8], 0x55);
+    assert_int_equal(data[9], 0x44);
+    assert_int_equal(data[10], 0x33);
+    assert_int_equal(data[11], 0x0b);
+    assert_int_equal(buf.offset, 11);
+
+    buffer_seek_end(&buf, 7);
+    assert_false(buffer_write_u64(&buf, 0x4242424242424242ULL, BE));         // not enough space
+    assert_int_equal(data[sizeof(data) - 1], template[sizeof(data) - 1]); // shouldn't change data if not enough space
+    buffer_seek_end(&buf, 8);
+    assert_true(buffer_write_u64(&buf, 0x4242424242424242ULL, BE));          // enough space this time 
+
 }
 
 int main() {
     const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_can_read),
                                        cmocka_unit_test(test_buffer_seek),
                                        cmocka_unit_test(test_buffer_read),
-                                       cmocka_unit_test(test_buffer_copy),
-                                       cmocka_unit_test(test_buffer_move)};
+                                       cmocka_unit_test(test_buffer_write)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

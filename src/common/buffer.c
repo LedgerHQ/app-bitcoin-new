@@ -225,24 +225,3 @@ bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness)
 
     return true;
 }
-
-
-bool buffer_copy(const buffer_t *buffer, uint8_t *out, size_t out_len) {
-    if (buffer->size - buffer->offset > out_len) {
-        return false;
-    }
-
-    memmove(out, buffer->ptr + buffer->offset, buffer->size - buffer->offset);
-
-    return true;
-}
-
-bool buffer_move(buffer_t *buffer, uint8_t *out, size_t out_len) {
-    if (!buffer_copy(buffer, out, out_len)) {
-        return false;
-    }
-
-    buffer_seek_cur(buffer, out_len);
-
-    return true;
-}
