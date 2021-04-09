@@ -50,21 +50,21 @@ void handler_get_address(
         io_send_sw(SW_WRONG_P1P2);
         return;
     }
-    if (p2 != ADDRESS_TYPE_PKH && p2 != ADDRESS_TYPE_SH_WPKH && p2 != ADDRESS_TYPE_WPKH) {
+    if (p2 != ADDRESS_TYPE_LEGACY && p2 != ADDRESS_TYPE_WIT && p2 != ADDRESS_TYPE_SH_WIT) {
         io_send_sw(SW_WRONG_P1P2);
         return;
     }
 
     uint32_t purpose; // the valid purpose depends on the requested address type
     switch(p2) {
-        case ADDRESS_TYPE_PKH:     //legacy
+        case ADDRESS_TYPE_LEGACY:     //legacy
             purpose = 44;
             break;
-        case ADDRESS_TYPE_SH_WPKH: // wrapped segwit
-            purpose = 49;
-            break;
-        case ADDRESS_TYPE_WPKH:    // native segwit
+        case ADDRESS_TYPE_WIT:    // native segwit
             purpose = 84;
+            break;
+        case ADDRESS_TYPE_SH_WIT: // wrapped segwit
+            purpose = 49;
             break;
         default:
             io_send_sw(SW_WRONG_P1P2);
@@ -143,7 +143,7 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
  * @param[in]  bip32_path_len
  *   Maximum number of BIP32 paths in the input buffer.
  * @param[in]  address_type
- *   One of ADDRESS_TYPE_PKH, ADDRESS_TYPE_SH_WPKH, ADDRESS_TYPE_WPKH.
+ *   One of ADDRESS_TYPE_LEGACY, ADDRESS_TYPE_WIT, ADDRESS_TYPE_SH_WIT.
  * @param[out]  out
  *   Pointer to the output array, that must be long enough to contain the result.
  *
@@ -178,12 +178,12 @@ static int get_address_at_path(
     size_t address_len;
 
     switch(address_type) {
-        case ADDRESS_TYPE_PKH:
+        case ADDRESS_TYPE_LEGACY:
             crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
             address_len = base58_encode_address(pubkey_hash, G_context.p2pkh_version, out, MAX_ADDRESS_LENGTH_STR);
             break;
-        case ADDRESS_TYPE_SH_WPKH: // wrapped segwit
-        case ADDRESS_TYPE_WPKH:    // native segwit
+        case ADDRESS_TYPE_WIT:    // native segwit
+        case ADDRESS_TYPE_SH_WIT: // wrapped segwit
             {
                 uint8_t script[22];
                 script[0] = 0x00; // OP_0
@@ -193,10 +193,9 @@ static int get_address_at_path(
                 uint8_t script_rip[20];
                 crypto_hash160((uint8_t *)&script, 22, script_rip);
 
-                if (address_type == ADDRESS_TYPE_SH_WPKH) {
+                if (address_type == ADDRESS_TYPE_SH_WIT) {
                     address_len = base58_encode_address(script_rip, G_context.p2sh_version, out, MAX_ADDRESS_LENGTH_STR);
-                } else { // ADDRESS_TYPE_WPKH
-
+                } else { // ADDRESS_TYPE_WIT
                     int ret = segwit_addr_encode(
                         out,
                         G_context.native_segwit_prefix,

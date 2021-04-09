@@ -1,9 +1,8 @@
 from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet, AddressType
+from bitcoin_client.wallet import AddressType, MultisigWallet, AddressType
 
 from utils import automation
 from typing import List
-from bitcoin_client.bitcoin_cmd_builder import ScriptAddrType
 
 import pytest
 

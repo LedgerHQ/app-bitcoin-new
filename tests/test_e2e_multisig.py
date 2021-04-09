@@ -9,7 +9,7 @@ from bitcoin_client.wallet import MultisigWallet, AddressType
 
 from utils import automation
 from typing import List
-from bitcoin_client.bitcoin_cmd_builder import ScriptAddrType
+from bitcoin_client.wallet import AddressType
 
 import pytest
 

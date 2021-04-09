@@ -4,8 +4,6 @@ from typing import Tuple, List
 from ledgercomm import Transport
 
 from bitcoin_client.bitcoin_cmd_builder import (
-    AddrType,
-    ScriptAddrType,
     BitcoinCommandBuilder,
     BitcoinInsType,
     FrameworkInsType,
@@ -16,7 +14,7 @@ from bitcoin_client.exception import DeviceException
 from bitcoin_client.transaction import Transaction
 from bitcoin_client.bip32 import ExtendedPubkey
 
-from .wallet import Wallet, WalletType
+from .wallet import AddressType, Wallet, WalletType
 from .utils import ripemd160, serialize_str
 from .merkle import MerkleTree
 
@@ -156,16 +154,15 @@ class BitcoinCommand:
         return response.decode()
 
     def get_address(self,
-                    addr_type: AddrType,
+                    address_type: AddressType,
                     bip32_path: str,
                     display: bool = False) -> str:
         """Get an address given address type and BIP32 path. Optionally, validate with the user.
 
         Parameters
         ----------
-        addr_type : AddrType
-            Type of address. Could be AddrType.PKH, AddrType.SH_WPKH,
-            AddrType.WPKH.
+        address_type : AddressType
+            Type of address. Could be AddressType.LEGACY, AddressType.WIT, AddressType.SH_WIT.
         bip32_path : str
             BIP32 path of the public key you want.
         display : bool
@@ -176,7 +173,7 @@ class BitcoinCommand:
 
         """
         sw, response = self.make_request(
-            self.builder.get_address(addr_type, bip32_path, display)
+            self.builder.get_address(address_type, bip32_path, display)
         )
 
         if sw != 0x9000:

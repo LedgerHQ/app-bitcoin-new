@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import IntEnum
 from typing import List
 
 from hashlib import sha256
@@ -6,16 +6,16 @@ from hashlib import sha256
 from .utils import serialize_str, ripemd160
 from .merkle import MerkleTree
 
-class WalletType(Enum):
+class WalletType(IntEnum):
     MULTISIG = 1
 
 
-class AddressType(Enum):
+class AddressType(IntEnum):
     """
-    The type of address to use
+    The type of address to use.
     """
     LEGACY = 1 #: Legacy address type. P2PKH for single sig, P2SH for scripts.
-    WIT = 2 #: Native segwit v0 address type. P2WPKH for single sig, P2WPSH for scripts.
+    WIT = 2    #: Native segwit v0 address type. P2WPKH for single sig, P2WPSH for scripts.
     SH_WIT = 3 #: Nested segwit v0 address type. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
 
 
