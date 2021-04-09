@@ -8,16 +8,6 @@ from bitcoin_client.bitcoin_cmd_builder import ScriptAddrType
 import pytest
 
 
-# default speculos seed: glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin
-# root extended private key: xprv9s21ZrQH143K4QDdULpHJyaEf1RKEhkxHaUReQSGHQ9Qhqzymp1tER1oBLqxePyRHepCzh3wnEoQR77ygSiEXzx9hVF7E8KEGqHLQqEmF9v
-# root private key (hex): 34ac5d784ebb4df4727bcddf6a6743f5d5d46d83dd74aa825866390c694f2938
-# root extended public key: xpub661MyMwAqRbcGtJ6aNMHg7WyD3FoeAUoeoQ2SnqsqjgPaeL8KML8nDLH2c6cFk1EhVDzaFSCDgtLSua2dW7k7Z8hYvbXDRgHmr32jBV1S12
-# root compressed public key (hex): 0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db
-
-# TODO: add test for legacy wallets
-
-
-
 def test_get_wallet_address_legacy(cmd):
     # test for a legacy p2sh wallet
 

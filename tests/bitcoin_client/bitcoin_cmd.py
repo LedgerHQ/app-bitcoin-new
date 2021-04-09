@@ -184,7 +184,7 @@ class BitcoinCommand:
 
         return response.decode()
 
-    def register_wallet(self, wallet: Wallet) -> Tuple[str, str]:
+    def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
@@ -203,7 +203,7 @@ class BitcoinCommand:
         if len(sig) != sig_len:
             raise RuntimeError("Invalid response")
 
-        return wallet_id.hex(), sig.hex()
+        return wallet_id, sig
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
         if wallet.type != WalletType.MULTISIG:

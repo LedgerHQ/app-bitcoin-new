@@ -2,6 +2,7 @@ import subprocess
 import os
 import socket
 import time
+from dataclasses import dataclass
 
 from pathlib import Path
 
@@ -113,3 +114,15 @@ def transport(device, hid):
 @pytest.fixture
 def cmd(transport):
     return BitcoinCommand(transport=transport, debug=False)
+
+@dataclass(frozen=True)
+class SpeculosGlobals:
+    seed = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
+    master_extended_privkey = "xprv9s21ZrQH143K4QDdULpHJyaEf1RKEhkxHaUReQSGHQ9Qhqzymp1tER1oBLqxePyRHepCzh3wnEoQR77ygSiEXzx9hVF7E8KEGqHLQqEmF9v"
+    master_extended_pubkey = "xpub661MyMwAqRbcGtJ6aNMHg7WyD3FoeAUoeoQ2SnqsqjgPaeL8KML8nDLH2c6cFk1EhVDzaFSCDgtLSua2dW7k7Z8hYvbXDRgHmr32jBV1S12"
+    master_compressed_pubkey = bytes.fromhex("0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db")
+
+
+@pytest.fixture
+def speculos_globals():
+    return SpeculosGlobals()
