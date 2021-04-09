@@ -349,16 +349,6 @@ bool crypto_verify_sha256_hash(const uint8_t hash[static 32], uint8_t sig[], siz
 }
 
 
-int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len) {
-    return cx_hash(hash_context, 0, in, in_len, NULL, 0);
-}
-
-
-int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
-    return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
-}
-
-
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_ripemd160_t rip_context;
     cx_ripemd160_init(&rip_context);

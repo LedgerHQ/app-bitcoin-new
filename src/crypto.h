@@ -8,11 +8,7 @@
 #include "cx.h"
 #include "constants.h"
 
-
-// TODO: Bitcoin Core's HWI address type codes are respectively mapped as 0 -> 1, 1 -> 3, 2 -> 2
-//       compared to our constants; perhaps it makes sense to adopt the same standard in the rewrite.
-//       That would have the advantage of haveing the same three constants from address types,
-//       regardless if single key addresses. or script addresses.
+#include "./common/write.h"
 
 // Single key address types
 #define ADDRESS_TYPE_PKH 0
@@ -139,6 +135,7 @@ int crypto_sign_sha256_hash(
     uint8_t out[static MAX_DER_SIG_LEN]
 );
 
+
 /**
  * Verifies the a signature of some sha256-hashed data.
  * The key used to sign is the master public key.
@@ -160,44 +157,88 @@ bool crypto_verify_sha256_hash(
 
 
 /**
- * TODO: docs
+ * Convenience wrapper for cx_hash to add some data to an intialized hash context.
+ *
+ * @param[in] hash_context
+ *   The context of the hash, which must already be initialized.
+ * @param[in] in
+ *   Pointer to the data to be added to the hash computation.
+ * @param[in] in_len
+ *   Size of the passed data.
+ *
+ * @return the return value of cx_hash.
  */
-int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len);
+static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len) {
+    return cx_hash(hash_context, 0, in, in_len, NULL, 0);
+}
+
 
 /**
- * TODO: docs
+ * Convenience wrapper for cx_hash to compute the final hash, without adding any extra data
+ * to the hash context.
+ *
+ * @param[in] hash_context
+ *   The context of the hash, which must already be initialized.
+ * @param[in] out
+ *   Pointer to the output buffer for the result.
+ * @param[in] out_len
+ *   Size of output buffer, which must be large enough to contain the result.
+ *
+ * @return the return value of cx_hash.
  */
-int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len);
+static inline int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
+    return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
+}
 
 
 /**
- * TODO: docs
+ * Convenience wrapper for crypto_hash_update, updating a hash with an uint8_t.
+ *
+ * @param[in] hash_context
+ *  The context of the hash, which must already be initialized.
+ * @param[in] data
+ *  The uint8_t to be added to the hash.
+ *
+ * @return the return value of cx_hash.
  */
 static inline int crypto_hash_update_u8(cx_hash_t *hash_context, uint8_t data) {
     return crypto_hash_update(hash_context, &data, 1);
 }
 
 /**
- * TODO: docs
+ * Convenience wrapper for crypto_hash_update, updating a hash with an uint16_t,
+ * encoded in big-endian.
+ *
+ * @param[in] hash_context
+ *  The context of the hash, which must already be initialized.
+ * @param[in] data
+ *  The uint16_t to be added to the hash.
+ *
+ * @return the return value of cx_hash.
  */
 static inline int crypto_hash_update_u16(cx_hash_t *hash_context, uint16_t data) {
     uint8_t buf[2];
-    buf[0] = (uint8_t)(data >> 8);
-    buf[1] = (uint8_t)(data >> 0);
+    write_u16_be(buf, 0, data);
     return crypto_hash_update(hash_context, &buf, sizeof(buf));
 }
 
 /**
- * TODO: docs
+ * Convenience wrapper for crypto_hash_update, updating a hash with an uint32_t,
+ * encoded in big-endian.
+ *
+ * @param[in] hash_context
+ *  The context of the hash, which must already be initialized.
+ * @param[in] data
+ *  The uint32_t to be added to the hash.
+ *
+ * @return the return value of cx_hash.
  */
 static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data) {
     uint8_t buf[4];
-    buf[0] = (uint8_t)(data >> 24);
-    buf[1] = (uint8_t)(data >> 16);
-    buf[2] = (uint8_t)(data >> 8);
-    buf[3] = (uint8_t)(data >> 0);
+    write_u32_be(buf, 0, data);
     return crypto_hash_update(hash_context, &buf, sizeof(buf));
 }
+
 
 /**
  * Computes RIPEMD160(in).
@@ -210,6 +251,7 @@ static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data)
  *   Pointer to the 160-bit (20 bytes) output array.
  */
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]);
+
 
 /**
  * Computes RIPEMD160(SHA256(in)).
