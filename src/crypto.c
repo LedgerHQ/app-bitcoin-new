@@ -52,7 +52,7 @@ static const uint8_t secp256k1_p[] = {
 
 
 /**
- * (p + 1)/4, used to calculate square roots in secp256k1_p
+ * (p + 1)/4, used to calculate square roots in secp256k1
  */
 static const uint8_t secp256k1_sqr_exponent[] = {
     0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,

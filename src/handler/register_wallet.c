@@ -253,6 +253,8 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
 
         memcpy(response.wallet_id, state->wallet_id, sizeof(state->wallet_id));
 
+        // TODO: HMAC should be good enough in this case, and much faster; also, shorter than sigs
+
         // sign wallet id and produce response
         int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
         response.signature_len = (uint8_t)signature_len;
