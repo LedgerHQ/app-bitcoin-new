@@ -7,6 +7,8 @@
 #include "wallet.h"
 
 typedef struct {
+    machine_context_t ctx;
+
     uint32_t address_index;
     multisig_wallet_header_t wallet_header;
 

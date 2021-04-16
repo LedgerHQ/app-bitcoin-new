@@ -5,6 +5,7 @@
 #include "../boilerplate/dispatcher.h"
 
 typedef struct {
+    machine_context_t ctx;
     char serialized_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 } get_pubkey_state_t;
 

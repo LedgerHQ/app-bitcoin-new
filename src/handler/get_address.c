@@ -18,7 +18,7 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io.h"
+#include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
 #include "../common/segwit_addr.h"
 #include "../constants.h"
@@ -42,16 +42,16 @@ void handler_get_address(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context
+    dispatcher_context_t *dc
 ) {
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (p1 > 1) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
     if (p2 != ADDRESS_TYPE_LEGACY && p2 != ADDRESS_TYPE_WIT && p2 != ADDRESS_TYPE_SH_WIT) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
 
@@ -67,32 +67,32 @@ void handler_get_address(
             purpose = 49;
             break;
         default:
-            io_send_sw(SW_WRONG_P1P2);
+            dc->send_sw(SW_WRONG_P1P2);
             return;
     }
 
     if (lc < 1) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     uint8_t bip32_path_len;
-    buffer_read_u8(&dispatcher_context->read_buffer, &bip32_path_len);
+    buffer_read_u8(&dc->read_buffer, &bip32_path_len);
 
     if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-    if (!buffer_read_bip32_path(&dispatcher_context->read_buffer, bip32_path, bip32_path_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -110,15 +110,16 @@ void handler_get_address(
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
     if (ret < 0) {
-        io_send_sw(SW_BAD_STATE);
+        dc->send_sw(SW_BAD_STATE);
         return;
     }
     state->address_len = (size_t)ret;
 
     if (p1 == 1 || is_path_suspicious) {
-        ui_display_address(dispatcher_context, state->address, is_path_suspicious, path_str, ui_action_validate_address);
+        dc->pause();
+        ui_display_address(dc, state->address, is_path_suspicious, path_str, ui_action_validate_address);
     } else {
-        ui_action_validate_address(dispatcher_context, true);
+        ui_action_validate_address(dc, true);
     }
 }
 
@@ -126,12 +127,12 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (accepted) {
-        io_send_response(state->address, state->address_len, SW_OK);
+        dc->send_response(state->address, state->address_len, SW_OK);
     } else {
-        io_send_sw(SW_DENY);
+        dc->send_sw(SW_DENY);
     }
 
-    ui_menu_main();
+    dc->run();
 }
 
 

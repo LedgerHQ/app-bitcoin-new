@@ -8,6 +8,8 @@
 
 
 typedef struct {
+    machine_context_t ctx;
+
     multisig_wallet_header_t wallet_header;
 
     uint8_t next_pubkey_index;

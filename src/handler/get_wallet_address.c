@@ -45,16 +45,16 @@ void handler_get_wallet_address(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context
+    dispatcher_context_t *dc
 ) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
     if (p1 != 0 && p1 != 1) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
 
     if (p2 != 0) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
 
@@ -62,48 +62,48 @@ void handler_get_wallet_address(
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     uint8_t wallet_id[32];
-    if (!buffer_read_bytes(&dispatcher_context->read_buffer, wallet_id, 32)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     uint8_t sig_len;
     uint8_t sig[MAX_DER_SIG_LEN];
-    if (!buffer_read_u8(&dispatcher_context->read_buffer, &sig_len) ||
-        !buffer_read_bytes(&dispatcher_context->read_buffer, sig, sig_len)
+    if (!buffer_read_u8(&dc->read_buffer, &sig_len) ||
+        !buffer_read_bytes(&dc->read_buffer, sig, sig_len)
     ) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     // Verify signature
     if (!crypto_verify_sha256_hash(wallet_id, sig, sig_len)) {
-        io_send_sw(SW_SIGNATURE_FAIL);
+        dc->send_sw(SW_SIGNATURE_FAIL);
         return;
     }
 
-    if (read_wallet_header(&dispatcher_context->read_buffer, &state->wallet_header) < 0) {
-        io_send_sw(SW_INCORRECT_DATA);
+    if (read_wallet_header(&dc->read_buffer, &state->wallet_header) < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint16_t policy_map_len;
-    if (!buffer_read_u16(&dispatcher_context->read_buffer, &policy_map_len, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_u16(&dc->read_buffer, &policy_map_len, BE)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (policy_map_len > MAX_POLICY_MAP_LEN) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
     char policy_map[MAX_POLICY_MAP_LEN];
-    if (!buffer_read_bytes(&dispatcher_context->read_buffer, policy_map, policy_map_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bytes(&dc->read_buffer, policy_map, policy_map_len)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -113,28 +113,28 @@ void handler_get_wallet_address(
         .size = policy_map_len
     };
     if (buffer_read_multisig_policy_map(&policy_map_buffer, &state->wallet_header.multisig_policy) == -1) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint16_t n_policy_keys;
-    if (!buffer_read_u16(&dispatcher_context->read_buffer, &n_policy_keys, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_u16(&dc->read_buffer, &n_policy_keys, BE)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (n_policy_keys != state->wallet_header.multisig_policy.n_keys) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    if (!buffer_read_bytes(&dispatcher_context->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bytes(&dc->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
 
-    if (!buffer_read_u32(&dispatcher_context->read_buffer, &state->address_index, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -149,7 +149,7 @@ void handler_get_wallet_address(
                          computed_wallet_id);
 
     if (memcmp(wallet_id, computed_wallet_id, sizeof(wallet_id)) != 0) {
-        io_send_sw(SW_INCORRECT_DATA); // TODO: more specific error code
+        dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific error code
         return;
     }
 
@@ -164,7 +164,7 @@ void handler_get_wallet_address(
     };
     crypto_hash_update(&state->script_hash_context.header, script_header, sizeof(script_header));
 
-    request_next_cosigner(dispatcher_context);
+    dc->next(request_next_cosigner);
 }
 
 
@@ -173,8 +173,6 @@ void handler_get_wallet_address(
  */
 static void request_next_cosigner(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    dc->continuation = read_next_cosigner;
 
     if (state->wallet_header.multisig_policy.sorted) {
         // if sortedmulti, we ask the keys by rank based on the derived child pubkeys
@@ -193,14 +191,16 @@ static void request_next_cosigner(dispatcher_context_t *dc) {
         buffer_write_u32(&req_buffer, 0, BE);
         buffer_write_u32(&req_buffer, state->address_index, BE);
 
-        io_send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
+        dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
     } else {
         // if multi, ask the keys in order
 
         uint8_t req[] = { CCMD_GET_PUBKEY_INFO, state->next_pubkey_index};
 
-        io_send_response(req, 2, SW_INTERRUPTED_EXECUTION);
+        dc->send_response(req, 2, SW_INTERRUPTED_EXECUTION);
     }
+
+    dc->next(read_next_cosigner);
 }
 
 
@@ -215,7 +215,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     if (state->wallet_header.multisig_policy.sorted) {
         // if sortedmulti, the host computes the order
         if (!buffer_read_u8(&dc->read_buffer, &key_index)) {
-            io_send_sw(SW_WRONG_DATA_LENGTH);
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
             return;
         }
     } else {
@@ -227,16 +227,16 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     uint8_t key_info_len;
 
     if (!buffer_read_u8(&dc->read_buffer, &key_info_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (key_info_len > MAX_MULTISIG_SIGNER_INFO_LEN) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     if (!buffer_can_read(&dc->read_buffer, key_info_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -252,7 +252,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
@@ -262,12 +262,12 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // read Merkle proof and validate it.
     size_t proof_tree_size, proof_leaf_index;
     if (!buffer_read_u32(&dc->read_buffer, &proof_tree_size, BE) || !buffer_read_u32(&dc->read_buffer, &proof_leaf_index, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     if (proof_leaf_index >= state->wallet_header.multisig_policy.n_keys) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
@@ -276,14 +276,14 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
                                              proof_tree_size,
                                              proof_leaf_index,
                                              key_info_hash)) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
 
     if (state->used_pubkey_indexes[proof_leaf_index]) {
         PRINTF("Key index had already been seen\n");
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
     state->used_pubkey_indexes[proof_leaf_index] = 1;
@@ -291,7 +291,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // decode pubkey
     serialized_extended_pubkey_check_t decoded_pubkey_check;
     if (base58_decode(key_info.ext_pubkey, strlen(key_info.ext_pubkey), (uint8_t *)&decoded_pubkey_check, sizeof(decoded_pubkey_check)) == -1) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
     // TODO: validate checksum
@@ -321,7 +321,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     if (state->wallet_header.multisig_policy.sorted) {
         if (memcmp(state->prev_compressed_pubkey, cosigner_derived_pubkey.compressed_pubkey, 33) >= 0) {
             PRINTF("Keys provided in wrong order\n");
-            io_send_sw(SW_INCORRECT_DATA);
+            dc->send_sw(SW_INCORRECT_DATA);
             return;
         }
     }
@@ -337,9 +337,9 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // TODO: add push opcode to script hash (0x22<pubkey starting with 02 or 03>)
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        request_next_cosigner(dc);
+        dc->next(request_next_cosigner);
     } else {
-        generate_address(dc);
+        dc->next(generate_address);
     }
 }
 
@@ -371,7 +371,7 @@ static void generate_address(dispatcher_context_t *dc) {
         case ADDRESS_TYPE_LEGACY:
             address_len = base58_encode_address(script_rip, G_context.p2sh_version, state->address, sizeof(state->address));
             if (address_len == -1) {
-                io_send_sw(SW_BAD_STATE); // should never happen
+                dc->send_sw(SW_BAD_STATE); // should never happen
                 return;
             } else {
                 state->address_len = (unsigned int)address_len;
@@ -388,7 +388,7 @@ static void generate_address(dispatcher_context_t *dc) {
             if (address_type == ADDRESS_TYPE_SH_WIT) {
                 int address_len = base58_encode_address(redeem_script_rip, G_context.p2sh_version, state->address, sizeof(state->address));
                 if (address_len == -1) {
-                    io_send_sw(SW_BAD_STATE); // should never happen
+                    dc->send_sw(SW_BAD_STATE); // should never happen
                     return;
                 } else {
                     state->address_len = (unsigned int)address_len;
@@ -401,7 +401,7 @@ static void generate_address(dispatcher_context_t *dc) {
                 );
 
                 if (ret != 1) {
-                    io_send_sw(SW_BAD_STATE); // should never happen
+                    dc->send_sw(SW_BAD_STATE); // should never happen
                     return;
                 }
 
@@ -409,7 +409,7 @@ static void generate_address(dispatcher_context_t *dc) {
             }
             break;
         default:
-            io_send_sw(SW_BAD_STATE);
+            dc->send_sw(SW_BAD_STATE);
             return; // this can never happen
     }
     state->address[state->address_len] = '\0';
@@ -426,10 +426,10 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
     if (accepted) {
-        io_send_response(state->address, state->address_len, SW_OK);
+        dc->send_response(state->address, state->address_len, SW_OK);
     } else {
-        io_send_sw(SW_DENY);
+        dc->send_sw(SW_DENY);
     }
 
-    ui_menu_main();
+    dc->run();
 }

@@ -26,17 +26,24 @@ typedef void (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_
 typedef void (*command_processor_t)(dispatcher_context_t *);
 
 
+typedef struct machine_context_s {
+    struct machine_context_s *parent_context;
+    command_processor_t next_processor;
+} machine_context_t;
+
+
 /**
  * TODO: docs
  */
 struct dispatcher_context_s {
+    machine_context_t *machine_context_ptr;
     buffer_t read_buffer;
-    bool is_running; // Set to true once a command is started, false once a response is sent back. 
-    bool is_continuation; // Set to true before a command processor is called in case of continuation. false otherwise.
-                          // A command handler might set it to false once the continuation is processed to signal the
-                          // return to normal execution; the dispatcher ignores its value after calling a command
-                          // handler or processor. 
-    command_processor_t continuation; // will be set by a command handler or processor that interrupts the execution
+
+    void (*pause)();
+    void (*run)();
+    void (*next)(command_processor_t next_processor);
+    void (*send_response)(void *rdata, size_t rdata_len, uint16_t sw);
+    void (*send_sw)(uint16_t sw);
 };
 
 
@@ -49,6 +56,7 @@ typedef struct {
     uint8_t ins;
 } command_descriptor_t;
 
+
 /**
  * Dispatch APDU command received to the right handler.
  * @param[in] command_descriptors
@@ -58,7 +66,14 @@ typedef struct {
  * @param[in] cmd
  *   Structured APDU command (CLA, INS, P1, P2, Lc, Command data).
  *
+ * TODO: update docs with new params
+ *
  * @return zero or positive integer if success, negative integer otherwise.
  *
  */
-int apdu_dispatcher(command_descriptor_t const command_descriptors[], int n_descriptors, const command_t *cmd);
+int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
+                    int n_descriptors,
+                    machine_context_t *top_context,
+                    size_t top_context_size,
+                    void (*termination_cb)(void),
+                    const command_t *cmd) ;

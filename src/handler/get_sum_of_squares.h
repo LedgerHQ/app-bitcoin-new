@@ -5,6 +5,8 @@
 // TODO: docs
 
 typedef struct {
+    machine_context_t ctx;
+
     uint32_t sum;
     uint16_t i;
     uint8_t n;

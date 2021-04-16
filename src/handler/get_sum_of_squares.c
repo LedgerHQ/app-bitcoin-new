@@ -17,16 +17,16 @@
 
 #include <stdint.h>  // uint*_t
 
-#include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
-#include "common/buffer.h"
 #include "../commands.h"
 #include "../constants.h"
 #include "../types.h"
 #include "client_commands.h"
 
 static void processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context);
+static void get_next_square(dispatcher_context_t *dispatcher_context);
+static void receive_next_square(dispatcher_context_t *dispatcher_context);
 
 
 void handler_get_sum_of_squares(
@@ -39,11 +39,11 @@ void handler_get_sum_of_squares(
     uint8_t n;
 
     if (p1 != 0 || p2 != 0) {
-        io_send_sw(SW_WRONG_P1P2);
+        dispatcher_context->send_sw(SW_WRONG_P1P2);
         return;
     }
     if (lc != 1) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dispatcher_context->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -53,57 +53,38 @@ void handler_get_sum_of_squares(
     state->i = 1;
     state->sum = 0;
 
-    processor_get_sum_of_squares(dispatcher_context);
+    dispatcher_context->next(processor_get_sum_of_squares);
 }
 
-// TODO: this API is very clumsy, find a better interface.
-//       The boilerplate part of ext_get_square could be reduced. The only non-boilerplate code is:
-//         - reading the result from the client
-//         - serializing the command for SW_INTERRUPTED_EXECUTION
+static void processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
+    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state;
 
-/**
- * If this is a continuation, fetches the response, writes into `result`, then returns 1.
- * If this is an interruption, alerts the dispatcher and prepares the response, then returns 0.
- * If any error occurs, it returs 0.
- **/
-static int ext_get_square(dispatcher_context_t *dispatcher_context, uint32_t *result, uint8_t n) {
-    if (dispatcher_context->is_continuation) {
-        dispatcher_context->is_continuation = false;
-
-        // TODO: should only reach here if the interrupted command is GET_SUM_OF_SQUARES
-        //       It would make sense to have an integrity check here.
-
-        // read the result from the client
-        if (!buffer_read_u32(&dispatcher_context->read_buffer, result, BE)) {
-            io_set_response(NULL, 0, SW_WRONG_DATA_LENGTH);
-            return 0;
-        }
-
-        return 1;
+    if (state->i <= state->n) {
+        dispatcher_context->next(get_next_square);
     } else {
-        dispatcher_context->continuation = processor_get_sum_of_squares;
-
-        // prepare the EXT_GET_SQUARE response for the user
-        uint8_t req[] = { CCMD_GET_SQUARE, n };
-
-        io_set_response(req, 2, SW_INTERRUPTED_EXECUTION);
-
-        return 0;
+        dispatcher_context->send_response(&state->sum, 4, SW_OK);
     }
 }
 
-void processor_get_sum_of_squares(dispatcher_context_t *dispatcher_context) {
-    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state; 
-    for ( ; state->i <= state->n; state->i++) {
-        uint32_t result;
-        if (!ext_get_square(dispatcher_context, &result, state->i)) {
-            io_confirm_response();
-            return;
-        }
+static void get_next_square(dispatcher_context_t *dispatcher_context) {
+    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state;
+
+    // prepare the EXT_GET_SQUARE response for the user
+    uint8_t req[] = { CCMD_GET_SQUARE, state->i };
+    dispatcher_context->send_response(req, 2, SW_INTERRUPTED_EXECUTION);
+
+    dispatcher_context->next(receive_next_square);
+}
+
+static void receive_next_square(dispatcher_context_t *dispatcher_context) {
+    get_sum_of_squares_state_t *state = (get_sum_of_squares_state_t *)&G_command_state;
+
+    uint32_t result;
+    if (!buffer_read_u32(&dispatcher_context->read_buffer, &result, BE)) {
+        dispatcher_context->send_sw(SW_WRONG_DATA_LENGTH);
+    } else {
         state->sum += result;
+        ++state->i;
+        dispatcher_context->next(processor_get_sum_of_squares);
     }
-
-    io_send_response(&state->sum, 4, SW_OK);
 }
-
-

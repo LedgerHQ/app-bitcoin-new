@@ -150,11 +150,6 @@ int io_confirm_response() {
             break;
     }
 
-    if (G_dispatcher_context.continuation != NULL) {
-        // store where execution should restart when INS_CONTINUE is called
-        G_command_continuation = G_dispatcher_context.continuation;
-    }
-
     return ret;
 }
 

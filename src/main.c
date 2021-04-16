@@ -42,7 +42,6 @@ bolos_ux_params_t G_ux_params;
 global_context_t G_context;
 command_state_t G_command_state;
 
-command_processor_t G_command_continuation;
 dispatcher_context_t G_dispatcher_context;
 
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
@@ -107,7 +106,6 @@ void app_main() {
 
     // Reset dispatcher state
     explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));
-    G_command_continuation = NULL;
 
     for (;;) {
         BEGIN_TRY {
@@ -138,9 +136,12 @@ void app_main() {
 
                 // Dispatch structured APDU command to handler
                 int n_command_descriptors = sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]);
-                if (apdu_dispatcher(COMMAND_DESCRIPTORS, n_command_descriptors, &cmd) < 0) {
-                    return;
-                }
+                apdu_dispatcher(COMMAND_DESCRIPTORS,
+                                n_command_descriptors,
+                                (machine_context_t *)&G_command_state,
+                                sizeof(G_command_state),
+                                ui_menu_main,
+                                &cmd);
             }
             CATCH(EXCEPTION_IO_RESET) {
                 THROW(EXCEPTION_IO_RESET);

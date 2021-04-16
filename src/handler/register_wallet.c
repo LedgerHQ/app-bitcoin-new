@@ -20,7 +20,6 @@
 #include "os.h"
 #include "cx.h"
 
-#include "../boilerplate/io.h"
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
 #include "../common/write.h"
@@ -50,39 +49,39 @@ void handler_register_wallet(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context
+    dispatcher_context_t *dc
 ) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     if (p1 != 0 || p2 != 0) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     int res;
-    if ((res = read_wallet_header(&dispatcher_context->read_buffer, &state->wallet_header)) < 0) {
-        io_send_sw(SW_INCORRECT_DATA);
+    if ((res = read_wallet_header(&dc->read_buffer, &state->wallet_header)) < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint16_t policy_map_len;
-    if (!buffer_read_u16(&dispatcher_context->read_buffer, &policy_map_len, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_u16(&dc->read_buffer, &policy_map_len, BE)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (policy_map_len > MAX_POLICY_MAP_LEN) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
     char policy_map[MAX_POLICY_MAP_LEN];
-    if (!buffer_read_bytes(&dispatcher_context->read_buffer, policy_map, policy_map_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bytes(&dc->read_buffer, policy_map, policy_map_len)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -92,22 +91,22 @@ void handler_register_wallet(
         .size = policy_map_len
     };
     if (buffer_read_multisig_policy_map(&policy_map_buffer, &state->wallet_header.multisig_policy) == -1) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint16_t n_policy_keys;
-    if (!buffer_read_u16(&dispatcher_context->read_buffer, &n_policy_keys, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_u16(&dc->read_buffer, &n_policy_keys, BE)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (n_policy_keys != state->wallet_header.multisig_policy.n_keys) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    if (!buffer_read_bytes(&dispatcher_context->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bytes(&dc->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -121,10 +120,13 @@ void handler_register_wallet(
 
     state->next_pubkey_index = 0;
 
+    PRINTF("SHOWING CONFIRMATION HEADER\n");
+
+    dc->pause();
     // TODO: this does not show address type and if it's sorted. Is it a problem?
     //       a possible attack would be to show the user a different wallet rather than the correct one.
     //       Funds wouldn't be lost, but the user might think they are and fall victim of ransom nonetheless.
-    ui_display_multisig_header(dispatcher_context,
+    ui_display_multisig_header(dc,
                                (char *)state->wallet_header.name,
                                state->wallet_header.multisig_policy.threshold,
                                state->wallet_header.multisig_policy.n_keys,
@@ -136,11 +138,11 @@ void handler_register_wallet(
  */
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
     if (!accept) {
-        io_send_sw(SW_DENY);
-        ui_menu_main();
+        dc->send_sw(SW_DENY);
     } else {
-        request_next_cosigner(dc);
+        dc->next(request_next_cosigner);
     }
+    dc->run();
 }
 
 /**
@@ -149,11 +151,10 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
 static void request_next_cosigner(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    dc->continuation = read_next_cosigner;
-
     uint8_t req[] = { CCMD_GET_PUBKEY_INFO, state->next_pubkey_index};
 
-    io_send_response(req, 2, SW_INTERRUPTED_EXECUTION);
+    dc->send_response(req, 2, SW_INTERRUPTED_EXECUTION);
+    dc->next(read_next_cosigner);
 }
 
 /**
@@ -166,16 +167,16 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     uint8_t key_info_len;
 
     if (!buffer_read_u8(&dc->read_buffer, &key_info_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
     if (key_info_len > MAX_MULTISIG_SIGNER_INFO_LEN) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     if (!buffer_can_read(&dc->read_buffer, key_info_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -191,7 +192,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
@@ -200,7 +201,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // read Merkle proof and validate it.
     size_t proof_tree_size, proof_leaf_index;
     if (!buffer_read_u32(&dc->read_buffer, &proof_tree_size, BE) || !buffer_read_u32(&dc->read_buffer, &proof_leaf_index, BE)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -209,7 +210,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
                                              proof_tree_size,
                                              proof_leaf_index,
                                              key_info_hash)) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
@@ -217,6 +218,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
+    dc->pause();
     ui_display_multisig_cosigner_pubkey(dc,
                                         key_info.ext_pubkey,
                                         state->next_pubkey_index, // 1-indexed for the UI
@@ -232,14 +234,14 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     if (!accept) {
-        io_send_sw(SW_DENY);
-        ui_menu_main();
+        dc->send_sw(SW_DENY);
+        dc->run();
         return;
     }
  
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        request_next_cosigner(dc);
+        dc->next(request_next_cosigner);
     } else {
 
         // TODO: validate wallet.
@@ -259,8 +261,8 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
         int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
         response.signature_len = (uint8_t)signature_len;
 
-        io_send_response(&response, 32 + 1 + signature_len, SW_OK);
-
-        ui_menu_main();
+        dc->send_response(&response, 32 + 1 + signature_len, SW_OK);
     }
+
+    dc->run();
 }

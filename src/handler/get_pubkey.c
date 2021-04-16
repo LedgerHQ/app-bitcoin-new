@@ -15,7 +15,7 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>  // uint*_t
+#include <stdint.h>
 
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
@@ -34,36 +34,36 @@ void handler_get_pubkey(
     uint8_t p1,
     uint8_t p2,
     uint8_t lc,
-    dispatcher_context_t *dispatcher_context
+    dispatcher_context_t *dc
 ) {
     get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
 
     if (p1 > 1 || p2 != 0) {
-        io_send_sw(SW_WRONG_P1P2);
+        dc->send_sw(SW_WRONG_P1P2);
         return;
     }
     if (lc < 1) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        io_send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     uint8_t bip32_path_len;
-    buffer_read_u8(&dispatcher_context->read_buffer, &bip32_path_len);
+    buffer_read_u8(&dc->read_buffer, &bip32_path_len);
 
     if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
-        io_send_sw(SW_INCORRECT_DATA);
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-    if (!buffer_read_bip32_path(&dispatcher_context->read_buffer, bip32_path, bip32_path_len)) {
-        io_send_sw(SW_WRONG_DATA_LENGTH);
+    if (!buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -78,19 +78,19 @@ void handler_get_pubkey(
     }
 
     if (p1 == 1) {
-        ui_display_pubkey(dispatcher_context, path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
+        ui_display_pubkey(dc, path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
-        io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
+        dc->send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
     }
 }
 
 static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice) {
     get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
     if (choice) {
-        io_send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
+        dc->send_response(state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
     } else {
-        io_send_sw(SW_DENY);
+        dc->send_sw(SW_DENY);
     }
 
-    ui_menu_main();
+    dc->run();
 }
