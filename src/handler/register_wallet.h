@@ -6,15 +6,23 @@
 
 #include "wallet.h"
 
+#include "flows/get_merkle_leaf_element.h"
+
 
 typedef struct {
     machine_context_t ctx;
 
     multisig_wallet_header_t wallet_header;
 
+    uint8_t wallet_id[32];
+
     uint8_t next_pubkey_index;
 
-    uint8_t wallet_id[32];
+    uint8_t next_pubkey_info[MAX_MULTISIG_SIGNER_INFO_LEN];
+
+    union {
+        flow_get_merkle_leaf_element_state_t get_merkle_leaf_element;
+    } subcontext;
 } register_wallet_state_t;
 
 void handler_register_wallet(

@@ -1,5 +1,6 @@
 import struct
-from typing import Tuple, List
+from typing import Tuple, List, Mapping, Iterable
+from collections import deque
 
 from ledgercomm import Transport
 
@@ -14,7 +15,7 @@ from bitcoin_client.exception import DeviceException
 from bitcoin_client.transaction import Transaction
 from bitcoin_client.bip32 import ExtendedPubkey
 
-from .wallet import AddressType, Wallet, WalletType
+from .wallet import AddressType, Wallet, WalletType, MultisigWallet
 from .utils import ripemd160, serialize_str
 from .merkle import MerkleTree, element_hash
 
@@ -41,6 +42,86 @@ class GetSquareCommand(ClientCommand):
         return (n * n).to_bytes(4, 'big')
 
 
+class GetPreimageCommand(ClientCommand):
+    def __init__(self, known_images: Mapping[bytes, bytes]):
+        if any(len(k) != 20 for k in known_images.keys()):
+            raise ValueError("RIPEMD160 hashes must be exactly 20 bytes long.")
+
+        if any(len(v) > 254 for v in known_images.values()):
+            raise ValueError("Supported preimages are at most 254 bytes long.")
+
+        self.known_images = known_images
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.GET_PREIMAGE
+
+    def execute(self, request: bytes) -> bytes:
+        if len(request) != 1 + 20:
+            raise ValueError("Wrong request length.")
+
+        hash = request[1:]
+        for known_hash, known_preimage in self.known_images.items():
+            if hash == known_hash:
+                return len(known_preimage).to_bytes(1, byteorder="big") + known_preimage
+
+        # not found
+        raise RuntimeError(f"Requested unknown preimage for: {hex(hash)}")
+
+
+class GetMerkleLeafHashCommand(ClientCommand):
+    def __init__(self, elements_lists: List[Iterable[bytes]], queue: "deque[bytes]"):
+        self.roots_map = {}
+        self.queue = queue
+
+        for elements in elements_lists:
+            if any(len(el) > 254 for el in elements):
+                raise ValueError("Supported preimages are at most 254 bytes long.")
+
+            mt = MerkleTree(elements)
+            self.roots_map[mt.root] = mt
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.GET_MERKLE_LEAF_PROOF
+
+    def execute(self, request: bytes) -> bytes:
+        if len(request) != 1 + 20 + 4 + 4:
+            raise ValueError("Wrong request length.")
+
+        root = request[1:21]
+        tree_size = int.from_bytes(request[21:25], byteorder="big")
+        leaf_index = int.from_bytes(request[25:29], byteorder="big")
+
+        if not root in self.roots_map:
+            raise ValueError(f"Unknown Merkle root: {root.hex()}.")
+
+        mt: MerkleTree = self.roots_map[root]
+
+        if leaf_index >= tree_size or len(mt) != tree_size:
+            raise ValueError(f"Invalid index or tree size.")
+
+        if len(self.queue) != 0:
+            raise RuntimeError("This command should not execute when the queue is not empty.")
+
+        proof = mt.prove_leaf(leaf_index)
+        n_proof_elements = len(proof)//20
+
+        # Compute how many elements we can fit in 255 - 20 - 1 - 1 = 233 bytes
+        n_response_elements = min(233//20, len(proof))
+        n_leftover_elements = len(proof) - n_response_elements
+
+        # Add to the queue any proof elements that do not fit the response
+        self.queue.extend(proof[-n_leftover_elements:])
+
+        return b''.join([
+            mt.get(leaf_index),
+            len(proof).to_bytes(1, byteorder="big"),
+            n_proof_elements.to_bytes(1, byteorder="big"),
+            *proof[:n_response_elements]
+        ])
+
+
 class GetPubkeyInfoCommand(ClientCommand):
     def __init__(self, keys_info: List[str]):
         self.keys_info = keys_info
@@ -49,7 +130,7 @@ class GetPubkeyInfoCommand(ClientCommand):
 
     @property
     def code(self) -> int:
-        return ClientCommandCode.CCMD_GET_PUBKEY_INFO
+        return ClientCommandCode.GET_PUBKEY_INFO
 
     def execute(self, request: bytes) -> bytes:
         if len(request) != 2:
@@ -62,7 +143,7 @@ class GetPubkeyInfoCommand(ClientCommand):
 
         return b''.join([
             serialize_str(self.keys_info[n]),
-            self.merkle_tree.prove_leaf(n),
+            self.merkle_tree.prove_leaf_serialized(n),
         ])
 
 
@@ -74,7 +155,7 @@ class GetSortedPubkeyInfoCommand(ClientCommand):
 
     @property
     def code(self) -> int:
-        return ClientCommandCode.CCMD_GET_SORTED_PUBKEY_INFO
+        return ClientCommandCode.GET_SORTED_PUBKEY_INFO
 
     def execute(self, request: bytes) -> bytes:
         if len(request) < 2:
@@ -115,7 +196,42 @@ class GetSortedPubkeyInfoCommand(ClientCommand):
         return b''.join([
             i.to_bytes(1, byteorder="big"),
             serialize_str(key_info),
-            self.merkle_tree.prove_leaf(i),
+            self.merkle_tree.prove_leaf_serialized(i),
+        ])
+
+
+class GetMoreElementsCommand(ClientCommand):
+    def __init__(self, queue: "deque[bytes]"):
+        self.queue = queue
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.GET_MORE_ELEMENTS
+
+    def execute(self, request: bytes) -> bytes:
+        if len(request) != 1:
+            raise ValueError("Wrong request length.")
+
+        if len(self.queue) == 0:
+            raise ValueError("No elements to get.")
+
+        element_len = len(self.queue[0])
+        if any(len(el) != element_len for el in self.queue):
+            raise ValueError("The queue contains elements of different byte length, which is not expected.")
+
+        # pop from the queue, keeping the total response length at most 255
+
+        response_elements = bytearray()
+
+        n_added_elements = 0
+        while len(self.queue) > 0 and len(response_elements) + element_len <= 253:
+            response_elements.extend(self.queue.popleft())
+            n_added_elements += 1
+
+        return b''.join([
+            n_added_elements.to_bytes(1, byteorder="big"),
+            element_len.to_bytes(1, byteorder="big"),
+            bytes(response_elements)
         ])
 
 
@@ -185,9 +301,27 @@ class BitcoinCommand:
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
+        queue = deque()
+
+        known_images: Mapping[bytes, bytes] = {}
+        elements_lists: List[List[bytes]] = []
+
+        if isinstance(wallet, MultisigWallet):
+            known_images = {
+                element_hash(el.encode()): el.encode() for el in wallet.keys_info
+            }
+            elements_lists.append(list(element_hash(el.encode()) for el in wallet.keys_info))
+        else:
+            raise RuntimeError(f"wallet has unexpected class '{type(wallet).__name__}'")
+
+
         sw, response = self.make_request(
-            self.builder.register_wallet(wallet),
-            [GetPubkeyInfoCommand(wallet.keys_info)]
+            self.builder.register_wallet(wallet), 
+            [
+                GetPreimageCommand(known_images),
+                GetMerkleLeafHashCommand(elements_lists, queue),
+                GetMoreElementsCommand(queue)
+            ]
         )
 
         if sw != 0x9000:
@@ -203,6 +337,8 @@ class BitcoinCommand:
         return wallet_id, sig
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
+        # TODO: rewrite with new Merkle proof flow
+
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
@@ -216,6 +352,23 @@ class BitcoinCommand:
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_WALLET_ADDRESS)
+
+        return response.decode()
+
+    # TODO: placeholder of the future command that will instead take a psbt as input; just for testing
+    def sign_psbt(self, preimage: bytes) -> str:
+        hash = ripemd160(preimage)
+        sw, response = self.make_request(
+            self.builder.sign_psbt(hash),
+            [
+                GetPreimageCommand({
+                    hash: preimage
+                })
+            ]
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
 
         return response.decode()
 

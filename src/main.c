@@ -47,18 +47,18 @@ dispatcher_context_t G_dispatcher_context;
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
-        .ins = GET_PUBKEY,
-        .handler = (command_handler_t)handler_get_pubkey
-    },
-    {
-        .cla = CLA_APP,
         .ins = GET_ADDRESS,
         .handler = (command_handler_t)handler_get_address
     },
     {
         .cla = CLA_APP,
-        .ins = REGISTER_WALLET,
-        .handler = (command_handler_t)handler_register_wallet
+        .ins = GET_PUBKEY,
+        .handler = (command_handler_t)handler_get_pubkey
+    },
+    {
+        .cla = CLA_APP,
+        .ins = GET_SUM_OF_SQUARES,
+        .handler = (command_handler_t)handler_get_sum_of_squares
     },
     {
         .cla = CLA_APP,
@@ -67,9 +67,14 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     },
     {
         .cla = CLA_APP,
-        .ins = GET_SUM_OF_SQUARES,
-        .handler = (command_handler_t)handler_get_sum_of_squares
-    }
+        .ins = REGISTER_WALLET,
+        .handler = (command_handler_t)handler_register_wallet
+    },
+    {
+        .cla = CLA_APP,
+        .ins = SIGN_PSBT,
+        .handler = (command_handler_t)handler_sign_psbt
+    },
 };
 
 

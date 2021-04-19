@@ -29,7 +29,6 @@ def test_register_wallet_accept_legacy(cmd, speculos_globals):
     wallet = get_wallet(AddressType.LEGACY)
 
     wallet_id, sig = cmd.register_wallet(wallet)
-    print(f"SIGNATURE for LEGACY: {sig.hex()}")
 
     assert wallet_id == wallet.id
 
@@ -50,7 +49,6 @@ def test_register_wallet_accept_wit(cmd, speculos_globals):
     wallet = get_wallet(AddressType.WIT)
 
     wallet_id, sig = cmd.register_wallet(wallet)
-    print(f"SIGNATURE for WIT: {sig.hex()}")
 
     assert wallet_id == wallet.id
 
@@ -71,7 +69,6 @@ def test_register_wallet_accept_sh_wit(cmd, speculos_globals):
     wallet = get_wallet(AddressType.SH_WIT)
 
     wallet_id, sig = cmd.register_wallet(wallet)
-    print(f"SIGNATURE for SH_WIT: {sig.hex()}")
 
     assert wallet_id == wallet.id
 

@@ -44,8 +44,18 @@ struct dispatcher_context_s {
     void (*next)(command_processor_t next_processor);
     void (*send_response)(void *rdata, size_t rdata_len, uint16_t sw);
     void (*send_sw)(uint16_t sw);
+    void (*start_flow)(command_processor_t first_processor, machine_context_t *subcontext, command_processor_t return_processor);
 };
 
+// TODO: instead of exposing a method like send_response, it might be more efficient to expose the response buffer,
+//       so that one could use the buffer_write_* methods directly.
+//       On the other hand, buth the read_buffer and the write buffer would point to the same shared global space
+//       (part of G_io_apdu_buffer).
+//       Therefore, one would have to make sure that no read happens after writes happen, and it would probably be
+//       better if the dispatcher enforces this, by making it impossible to accidentally read the read_buffer after
+//       writes happened.
+//       One way could be have a function get_output_buffer() in the dispatches context, that returns the output
+//       buffer but it first zeroes the read_buffer.
 
 /**
  * Describes a command that can be processed by the dispatcher.
@@ -76,4 +86,4 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                     machine_context_t *top_context,
                     size_t top_context_size,
                     void (*termination_cb)(void),
-                    const command_t *cmd) ;
+                    const command_t *cmd);

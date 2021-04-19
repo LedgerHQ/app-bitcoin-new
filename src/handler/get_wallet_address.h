@@ -6,6 +6,16 @@
 
 #include "wallet.h"
 
+// TODO:
+// - refactor flow using Merkle trees; delete CCMD_GET_PUBKEY_INFO;
+// - think of a more general command to replace CCMD_GET_SORTED_PUBKEY_INFO, if possible
+//
+// Possible replacement for CCMD_GET_SORTED_PUBKEY_INFO:
+// - give the Merkle key info tree, a subset of indexes of those keys, and a derivation path, the client returns
+//   the list of indexes such that the corresponing derived pubkeys are in lexicographical order.
+//   This might better generalize to future complex scripts where sortedmulti() descriptors involve only a subset of the keys.
+
+
 typedef struct {
     machine_context_t ctx;
 

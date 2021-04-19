@@ -64,6 +64,18 @@ static void run() {
     dispatcher_loop();
 }
 
+static void start_flow(command_processor_t first_processor, machine_context_t *subcontext, command_processor_t return_processor) {
+    // set the return_processor as the next processor for the current flow
+    G_dispatcher_context.machine_context_ptr->next_processor = return_processor;
+
+    // initialize subcontext's parent context and initial processor
+    subcontext->parent_context = G_dispatcher_context.machine_context_ptr;
+    subcontext->next_processor = first_processor;
+
+    // switch machine context to subcontext
+    G_dispatcher_context.machine_context_ptr = subcontext;
+}
+
 
 int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                     int n_descriptors,
@@ -85,6 +97,7 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.send_sw = send_sw;
     G_dispatcher_context.pause = pause;
     G_dispatcher_context.run = run;
+    G_dispatcher_context.start_flow = start_flow;
 
     G_dispatcher_context.read_buffer.ptr = cmd->data;
     G_dispatcher_context.read_buffer.size = cmd->lc;
@@ -155,6 +168,11 @@ static void dispatcher_loop() {
             return;
         }
 
+        if (G_dispatcher_state.sw != 0) {
+            PRINTF("DISPATCHER HALTED, RESPONSE SENT\n");
+            break;
+        }
+
         if (G_dispatcher_context.machine_context_ptr->next_processor) {
             // the current submachine ended, continue to parent's context
             command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
@@ -178,6 +196,9 @@ static void dispatcher_loop() {
             break; // all done
         }
     }
+
+    // TODO: here a response (either success or error) should have been send.
+    //       We could add a check, and send a BAD_STATE error otherwise
 
     // call the termination callback (e.g. to return to main menu), if given
     if (G_dispatcher_state.termination_cb != NULL) {

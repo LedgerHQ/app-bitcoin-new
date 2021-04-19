@@ -212,8 +212,8 @@ class MerkleTree:
         """Return the value of the leaf with index `i`, where 0 <= i < len(self)."""
         return self.leaves[i].value
 
-    def prove_leaf(self, index: int) -> bytes:
-        """Produce a proof of membership for the leaf with index `i`, where 0 <= i < len(self)."""
+    def prove_leaf(self, index: int) -> List[bytes]:
+        """Produce the Merkle proof a proof of membership for the leaf with the given index where 0 <= index < len(self)."""
         node = self.leaves[index]
         proof = []
         while node.parent is not None:
@@ -223,6 +223,12 @@ class MerkleTree:
             proof.append(sibling.value)
 
             node = node.parent
+
+        return proof
+
+    def prove_leaf_serialized(self, index: int) -> bytes:
+        """Produce the Merkle proof a proof of membership for the leaf with the given index where 0 <= index < len(self)."""
+        proof = self.prove_leaf(index)
 
         return b''.join([
             len(self.leaves).to_bytes(4, byteorder="big"),

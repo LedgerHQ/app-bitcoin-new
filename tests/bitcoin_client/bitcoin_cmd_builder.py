@@ -35,6 +35,7 @@ class BitcoinInsType(enum.IntEnum):
     GET_ADDRESS = 0x01
     REGISTER_WALLET = 0x02
     GET_WALLET_ADDRESS = 0x03
+    SIGN_PSBT = 0x04
     GET_SUM_OF_SQUARES = 0xF0
 
 class FrameworkInsType(enum.IntEnum):
@@ -42,9 +43,13 @@ class FrameworkInsType(enum.IntEnum):
 
 
 class ClientCommandCode(enum.IntEnum):
-    CCMD_GET_PUBKEY_INFO = 0x01
-    CCMD_GET_SORTED_PUBKEY_INFO = 0x02
+    GET_PUBKEY_INFO = 0x01
+    GET_SORTED_PUBKEY_INFO = 0x02
+    GET_PREIMAGE = 0x40
+    GET_MERKLE_LEAF_PROOF = 0x41
+    GET_MORE_ELEMENTS = 0xA0
     GET_SQUARE = 0xFF
+
 
 class BitcoinCommandBuilder:
     """APDU command builder for the Bitcoin application.
@@ -156,6 +161,17 @@ class BitcoinCommandBuilder:
                         p1=1 if display else 0,
                         ins=BitcoinInsType.GET_WALLET_ADDRESS,
                         cdata=cdata)
+
+
+    # TODO: placeholder for the actual command, just for testing
+    def sign_psbt(self, hash: bytes):
+        if len(hash) != 20:
+            raise ValueError("Lenght of hash should be 20 bytes.")
+
+        return self.serialize(cla=self.CLA_BITCOIN,
+                        ins=BitcoinInsType.SIGN_PSBT,
+                        cdata=hash)
+
 
     def get_sum_of_squares(self, n: int):
         """Command builder for GET_SUM_OF_SQUARES.

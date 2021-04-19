@@ -16,6 +16,7 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <string.h>
 
 #include "os.h"
 #include "cx.h"
@@ -37,8 +38,8 @@
 #include "wallet.h"
 
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
-static void request_next_cosigner(dispatcher_context_t *dc);
-static void read_next_cosigner(dispatcher_context_t *dc);
+static void request_next_cosigner_info(dispatcher_context_t *dc);
+static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
 
 
@@ -52,6 +53,8 @@ void handler_register_wallet(
     dispatcher_context_t *dc
 ) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
+
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
     if (p1 != 0 || p2 != 0) {
         dc->send_sw(SW_WRONG_P1P2);
@@ -120,8 +123,6 @@ void handler_register_wallet(
 
     state->next_pubkey_index = 0;
 
-    PRINTF("SHOWING CONFIRMATION HEADER\n");
-
     dc->pause();
     // TODO: this does not show address type and if it's sorted. Is it a problem?
     //       a possible attack would be to show the user a different wallet rather than the correct one.
@@ -137,10 +138,12 @@ void handler_register_wallet(
  * Abort if the user rejected the wallet header, otherwise start processing the pubkeys.
  */
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+
     if (!accept) {
         dc->send_sw(SW_DENY);
     } else {
-        dc->next(request_next_cosigner);
+        dc->next(request_next_cosigner_info);
     }
     dc->run();
 }
@@ -148,72 +151,43 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
 /**
  * Interrupts the command, asking the host for the next pubkey (in signing order).
  */
-static void request_next_cosigner(dispatcher_context_t *dc) {
+static void request_next_cosigner_info(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    uint8_t req[] = { CCMD_GET_PUBKEY_INFO, state->next_pubkey_index};
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
-    dc->send_response(req, 2, SW_INTERRUPTED_EXECUTION);
-    dc->next(read_next_cosigner);
+    call_flow_get_merkle_leaf_element(dc,
+                                      &state->subcontext.get_merkle_leaf_element,
+                                      process_next_cosigner_info,
+                                      state->wallet_header.keys_info_merkle_root,
+                                      state->wallet_header.multisig_policy.n_keys,
+                                      state->next_pubkey_index,
+                                      state->next_pubkey_info,
+                                      sizeof(state->next_pubkey_info));
 }
 
 /**
- * Receives and parses the next pubkey info and Merkle proof.
- * Checks the proof's validity, then asks the user to validate the pubkey info.
+ * Receives and parses the next pubkey info.
+ * Asks the user to validate the pubkey info.
  */
-static void read_next_cosigner(dispatcher_context_t *dc) {
+static void process_next_cosigner_info(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    uint8_t key_info_len;
-
-    if (!buffer_read_u8(&dc->read_buffer, &key_info_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (key_info_len > MAX_MULTISIG_SIGNER_INFO_LEN) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (!buffer_can_read(&dc->read_buffer, key_info_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    uint8_t key_info_hash[20];
-    merkle_compute_element_hash(&dc->read_buffer.ptr[dc->read_buffer.offset], key_info_len, key_info_hash);
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
-        .ptr = &dc->read_buffer.ptr[dc->read_buffer.offset],
+        .ptr = state->next_pubkey_info,
         .offset = 0,
-        .size = key_info_len
+        .size = state->subcontext.get_merkle_leaf_element.element_len
     };
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+        PRINTF("Incorrect policy map\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
-
-    buffer_seek_cur(&dc->read_buffer, key_info_len); // skip, data already parsed 
-
-    // read Merkle proof and validate it.
-    size_t proof_tree_size, proof_leaf_index;
-    if (!buffer_read_u32(&dc->read_buffer, &proof_tree_size, BE) || !buffer_read_u32(&dc->read_buffer, &proof_leaf_index, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    if (!buffer_read_and_verify_merkle_proof(&dc->read_buffer,
-                                             state->wallet_header.keys_info_merkle_root,
-                                             proof_tree_size,
-                                             proof_leaf_index,
-                                             key_info_hash)) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
 
     // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
@@ -227,11 +201,13 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
 }
 
 /**
- * Aborts if the user rejected the pubkey; if more xpubs are to be read, goes back to request_next_cosigner.
+ * Aborts if the user rejected the pubkey; if more xpubs are to be read, goes back to request_next_cosigner_hash.
  * Otherwise, finalizes the hash, and returns the sha256 digest and the signature as the final response.
  */
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
+
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
     if (!accept) {
         dc->send_sw(SW_DENY);
@@ -241,7 +217,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
  
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        dc->next(request_next_cosigner);
+        dc->next(request_next_cosigner_info);
     } else {
 
         // TODO: validate wallet.

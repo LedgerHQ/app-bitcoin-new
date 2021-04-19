@@ -33,6 +33,7 @@ Currently supported wallet policies for multisig:
   sh(wsh(sortedmulti(...)))
 */
 
+// TODO: might be worth adopting the same descriptor template syntax proposed for BSMS (that is using key/** for the wallet path roots)
 
 // TODO: add unit tests to this module
 
@@ -368,8 +369,6 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         ++ext_pubkey_len;
     }
     out->ext_pubkey[ext_pubkey_len] = '\0';
-
-    PRINTF("ext_pubkey_len = %d\n", ext_pubkey_len);
 
     // Make sure that the buffer is indeed exhausted
     if (buffer_can_read(buffer, 1)) {

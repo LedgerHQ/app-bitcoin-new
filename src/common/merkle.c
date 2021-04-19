@@ -47,7 +47,7 @@ void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[s
 }
 
 
-static void combine_hashes(uint8_t left[20], uint8_t right[20], uint8_t out[]) {
+void merkle_combine_hashes(const uint8_t left[static 20], const uint8_t right[static 20], uint8_t out[static 20]) {
     cx_ripemd160_t rip_context;
     cx_ripemd160_init(&rip_context);
 
@@ -60,7 +60,7 @@ static void combine_hashes(uint8_t left[20], uint8_t right[20], uint8_t out[]) {
 }
 
 
-static int get_directions(size_t size, size_t index, uint8_t out[], size_t out_len) {
+int merkle_get_directions(size_t size, size_t index, uint8_t out[], size_t out_len) {
     if (size == 0 || index >= size) {
         return -1;
     }
@@ -124,7 +124,7 @@ bool buffer_read_and_verify_merkle_proof(buffer_t *buffer,
     memcpy(cur_hash, element_hash, sizeof(cur_hash));
 
     uint8_t directions[MAX_MERKLE_TREE_DEPTH];
-    int n_directions = get_directions(size, index, directions, sizeof(directions));
+    int n_directions = merkle_get_directions(size, index, directions, sizeof(directions));
     if (n_directions == -1 || proof_len != n_directions) {
         PRINTF("bravmp: Wrong proof_len: %d. Should be: %d\n", proof_len, n_directions);
         return false;
@@ -136,13 +136,13 @@ bool buffer_read_and_verify_merkle_proof(buffer_t *buffer,
     }
 
     for (int i = proof_len - 1; i >= 0; i--) {
-        uint8_t proof_i[20];
-        buffer_read_bytes(buffer, proof_i, 20);
+        uint8_t sibling_hash[20];
+        buffer_read_bytes(buffer, sibling_hash, 20);
 
         if (directions[i] == 0) {
-            combine_hashes(cur_hash, proof_i, cur_hash);
+            merkle_combine_hashes(cur_hash, sibling_hash, cur_hash);
         } else {
-            combine_hashes(proof_i, cur_hash, cur_hash);
+            merkle_combine_hashes(sibling_hash, cur_hash, cur_hash);
         }
     }
 
