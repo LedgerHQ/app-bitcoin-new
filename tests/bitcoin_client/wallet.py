@@ -3,8 +3,8 @@ from typing import List
 
 from hashlib import sha256
 
-from .utils import serialize_str, ripemd160
-from .merkle import MerkleTree
+from .utils import serialize_str
+from .merkle import MerkleTree, element_hash
 
 class WalletType(IntEnum):
     MULTISIG = 1
@@ -60,7 +60,7 @@ class PolicyMapWallet(Wallet):
         return len(self.keys_info)
 
     def serialize(self) -> bytes:
-        keys_info_hashes = map(lambda k: ripemd160(k.encode("latin-1")), self.keys_info)
+        keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), self.keys_info)
 
         return b"".join([
             super().serialize(),

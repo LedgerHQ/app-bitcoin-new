@@ -35,11 +35,28 @@ static uint8_t ceil_lg(uint32_t n) {
 }
 
 
+void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static 20]) {
+    cx_ripemd160_t rip_context;
+    cx_ripemd160_init(&rip_context);
+
+    // H(0x00 | in)
+    crypto_hash_update_u8(&rip_context.header, 0x00);
+    crypto_hash_update(&rip_context.header, in, in_len);
+
+    crypto_hash_digest(&rip_context.header, out, 20);
+}
+
+
 static void combine_hashes(uint8_t left[20], uint8_t right[20], uint8_t out[]) {
     cx_ripemd160_t rip_context;
     cx_ripemd160_init(&rip_context);
-    cx_hash(&rip_context.header, 0, left, 20, NULL, 0);
-    cx_hash(&rip_context.header, CX_LAST, right, 20, out, 20);
+
+    // H(0x01 | left | right)
+    crypto_hash_update_u8(&rip_context.header, 0x01);
+    crypto_hash_update(&rip_context.header, left, 20);
+    crypto_hash_update(&rip_context.header, right, 20);
+
+    crypto_hash_digest(&rip_context.header, out, 20);
 }
 
 
@@ -82,7 +99,7 @@ static int get_directions(size_t size, size_t index, uint8_t out[], size_t out_l
 }
 
 
-// TODO: add tests
+// TODO: add tests; remove debug code
 // size:      4
 // index:     4
 // proof_len: 1

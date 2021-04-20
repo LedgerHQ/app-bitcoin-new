@@ -16,7 +16,7 @@ from bitcoin_client.bip32 import ExtendedPubkey
 
 from .wallet import AddressType, Wallet, WalletType
 from .utils import ripemd160, serialize_str
-from .merkle import MerkleTree
+from .merkle import MerkleTree, element_hash
 
 
 class ClientCommand:
@@ -44,7 +44,7 @@ class GetSquareCommand(ClientCommand):
 class GetPubkeyInfoCommand(ClientCommand):
     def __init__(self, keys_info: List[str]):
         self.keys_info = keys_info
-        keys_info_hashes = map(lambda k: ripemd160(k.encode("latin-1")), keys_info)
+        keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), keys_info)
         self.merkle_tree = MerkleTree(keys_info_hashes)
 
     @property
@@ -58,7 +58,7 @@ class GetPubkeyInfoCommand(ClientCommand):
         n = request[1]
 
         if not (0 <= n < len(self.keys_info)):
-            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys)} keys.")
+            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys_info)} keys.")
 
         return b''.join([
             serialize_str(self.keys_info[n]),
@@ -69,7 +69,7 @@ class GetPubkeyInfoCommand(ClientCommand):
 class GetSortedPubkeyInfoCommand(ClientCommand):
     def __init__(self, keys_info: List[str]):
         self.keys_info = keys_info
-        keys_info_hashes = map(lambda k: ripemd160(k.encode("latin-1")), keys_info)
+        keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), keys_info)
         self.merkle_tree = MerkleTree(keys_info_hashes)
 
     @property

@@ -37,14 +37,25 @@ def largest_power_of_2_less_than(n: int) -> int:
         return 1 << floor_lg(n)
 
 
-def combine_hashes(left: bytes, right: bytes):
+def element_hash(element_preimage: bytes) -> bytes:
+    """Computes the hash of an element to be stored in the Merkle tree."""
+
+    h = hashlib.new('ripemd160')
+    h.update(b'\x00')
+    h.update(element_preimage)
+    return h.digest()
+
+
+def combine_hashes(left: bytes, right: bytes) -> bytes:
     if len(left) != 20 or len(right) != 20:
         raise ValueError("The elements must be 20-bytes ripemd160 outputs.")
 
     h = hashlib.new('ripemd160')
+    h.update(b'\x01')
     h.update(left)
     h.update(right)
     return h.digest()
+
 
 # root is the only node with parent == None
 # leaves have left == right == None
@@ -97,8 +108,10 @@ class MerkleTree:
     as the leaves of a binary tree. It is possible to add a new element to the vector, or change an existing element;
     the hashes in the Merkle tree will be recomputed after each operation in O(log n) time, for a vector with n
     elements.
-    The value of each internal node is the hash of the values of the left child, concatenated to the value of the right
-    child.
+    The value of each internal node is the hash of the concatenation of:
+    - a single byte 0x01;
+    - the values of the left child;
+    - the value of the right child.
 
     The binary tree has the following properties (assuming the vector contains n leaves):
     - There are always n - 1 internal nodes; all the internal nodes have exactly two children.

@@ -241,7 +241,7 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     }
 
     uint8_t key_info_hash[20];
-    crypto_ripemd160(&dc->read_buffer.ptr[dc->read_buffer.offset], key_info_len, key_info_hash);
+    merkle_compute_element_hash(&dc->read_buffer.ptr[dc->read_buffer.offset], key_info_len, key_info_hash);
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
