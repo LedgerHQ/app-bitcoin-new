@@ -9,8 +9,7 @@
             "includePath": [
                 "/usr/include",
                 "${workspaceFolder}/src",
-                "${env:BOLOS_SDK}/include/*",
-                "${env:BOLOS_SDK}/lib_ux/include/*"
+                "${workspaceFolder}/../nanos-secure-sdk/**"
             ],
             "defines": [
                 "TARGET_NANOS",
@@ -25,7 +24,7 @@
                 "USB_SEGMENT_SIZE=64",
                 "UNUSED(x)=(void)x",
                 "APPVERSION=\"0.0.1\"",
-                "APPNAME=\"Bitcoin\"",
+                "APPNAME=\"Bitcoin NEW\"",
                 "MAJOR_VERSION=0",
                 "MINOR_VERSION=0",
                 "PATCH_VERSION=1",
@@ -38,7 +37,7 @@
             "compilerPath": "${env:BOLOS_ENV}/gcc-arm-none-eabi-5_3-2016q1/bin/arm-none-eabi-gcc",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "gcc-arm",
+            "intelliSenseMode": "linux-gcc-arm",
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
