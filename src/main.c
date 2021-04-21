@@ -31,7 +31,6 @@
 
 #include "handler/get_pubkey.h"
 #include "handler/get_address.h"
-#include "handler/get_sum_of_squares.h"
 #include "handler/register_wallet.h"
 #include "handler/get_wallet_address.h"
 
@@ -54,11 +53,6 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
         .cla = CLA_APP,
         .ins = GET_PUBKEY,
         .handler = (command_handler_t)handler_get_pubkey
-    },
-    {
-        .cla = CLA_APP,
-        .ins = GET_SUM_OF_SQUARES,
-        .handler = (command_handler_t)handler_get_sum_of_squares
     },
     {
         .cla = CLA_APP,

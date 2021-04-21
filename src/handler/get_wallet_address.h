@@ -6,6 +6,8 @@
 
 #include "wallet.h"
 
+#include "flows/get_merkle_leaf_element.h"
+
 // TODO:
 // - refactor flow using Merkle trees; delete CCMD_GET_PUBKEY_INFO;
 // - think of a more general command to replace CCMD_GET_SORTED_PUBKEY_INFO, if possible
@@ -23,18 +25,24 @@ typedef struct {
     multisig_wallet_header_t wallet_header;
 
     uint8_t next_pubkey_index;
+    uint8_t next_pubkey_info[MAX_MULTISIG_SIGNER_INFO_LEN];
+
     uint8_t display_address;
 
     char address[MAX_ADDRESS_LENGTH_STR + 1];
     size_t address_len;
 
-    // bitmap of keys, to keep track of the ones that have already been seen; up to 15 for multisig.
-    // could save some bytes with a bit vector, should this get too big
-    uint8_t used_pubkey_indexes[15];
+    // the index of the pubkeys, ranked in the correct order for the script
+    // This is necessary to handle sortedmulti() correctly
+    uint8_t ordered_pubkeys[15];
 
     // previous compressed pubkey, to validate lexicographic sorting in multisig
     uint8_t prev_compressed_pubkey[33];
     cx_sha256_t script_hash_context;
+
+    union {
+        get_merkle_leaf_element_state_t get_merkle_leaf_element;
+    } subcontext;
 } get_wallet_address_state_t;
 
 

@@ -38,7 +38,7 @@ class ExtendedPubkey:
             raise ValueError("depth must be between 0 and 255")
         if len(parent_fingerprint) != 4:
             raise ValueError(f"parent_fingerprint must be exactly 4 bytes long")
-        if not 0 <= child_number < 2^32:
+        if not 0 <= child_number < 2**32:
             raise ValueError(f"child_number must be a 32-bit integer")
         if len(chain_code) != 32:
             raise ValueError(f"chain_code must be exactly 32 bytes long")

@@ -24,10 +24,10 @@ typedef struct {
 
     // internal state
     union {
-        flow_get_merkle_preimage_state_t get_merkle_preimage;
-        flow_get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
+        get_merkle_preimage_state_t get_merkle_preimage;
+        get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
     } subcontext;
-} flow_get_merkle_leaf_element_state_t;
+} get_merkle_leaf_element_state_t;
 
 
 /**
@@ -40,8 +40,8 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context);
  * Convenience function to call the get_merkle_preimage flow.
  * TODO: more precise docs
  */
-static inline void call_flow_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
-                                   flow_get_merkle_leaf_element_state_t *flow_state,
+static inline void call_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
+                                   get_merkle_leaf_element_state_t *flow_state,
                                    command_processor_t ret_proc,
                                    const uint8_t merkle_root[static 20],
                                    uint32_t tree_size,

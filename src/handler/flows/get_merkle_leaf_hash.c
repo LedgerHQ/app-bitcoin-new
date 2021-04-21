@@ -16,12 +16,12 @@ static void receive_more_proof_data(dispatcher_context_t *dc);
 static void check_root(dispatcher_context_t *dc);
 
 // utility functions
-static void process_proof_steps(flow_get_merkle_leaf_hash_state_t *state, buffer_t *read_buffer, size_t n_proof_elements);
+static void process_proof_steps(get_merkle_leaf_hash_state_t *state, buffer_t *read_buffer, size_t n_proof_elements);
 
 
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
 void flow_get_merkle_leaf_hash(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_hash_state_t *state = (flow_get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -39,7 +39,7 @@ void flow_get_merkle_leaf_hash(dispatcher_context_t *dc) {
 
 // Parses the response to the GET_MERKLE_LEAF_PROOF request; process the portion of the received Mekle proof.
 static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_hash_state_t *state = (flow_get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -86,7 +86,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
 
 // Checks if the proof is complete; if not, sends a GET_MORE_ELEMENTS command; otherwise, go to final state.
 static void request_more_proof_data(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_hash_state_t *state = (flow_get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -102,7 +102,7 @@ static void request_more_proof_data(dispatcher_context_t *dc) {
 
 // Receives and processes additional Merkle proof elements 
 static void receive_more_proof_data(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_hash_state_t *state = (flow_get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -134,7 +134,7 @@ static void receive_more_proof_data(dispatcher_context_t *dc) {
 
 // Once the full Merkle proof is received, sets the result to true if the Merkle root matches, false otherwise.
 static void check_root(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_hash_state_t *state = (flow_get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -143,7 +143,7 @@ static void check_root(dispatcher_context_t *dc) {
 
 
 // Utility function to process a number of steps of the Merkle proof
-static void process_proof_steps(flow_get_merkle_leaf_hash_state_t *state, buffer_t *read_buffer, size_t n_proof_elements) {
+static void process_proof_steps(get_merkle_leaf_hash_state_t *state, buffer_t *read_buffer, size_t n_proof_elements) {
     int end_step = state->cur_step + n_proof_elements; 
     for ( ; state->cur_step < end_step; state->cur_step++) {
         uint8_t sibling_hash[20];

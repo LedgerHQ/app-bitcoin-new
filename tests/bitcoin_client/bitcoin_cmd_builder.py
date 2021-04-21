@@ -44,11 +44,11 @@ class FrameworkInsType(enum.IntEnum):
 
 class ClientCommandCode(enum.IntEnum):
     GET_PUBKEY_INFO = 0x01
-    GET_SORTED_PUBKEY_INFO = 0x02
+    GET_PUBKEYS_IN_DERIVATION_ORDER = 0x20
     GET_PREIMAGE = 0x40
     GET_MERKLE_LEAF_PROOF = 0x41
+    GET_MERKLE_LEAF_INDEX = 0x42
     GET_MORE_ELEMENTS = 0xA0
-    GET_SQUARE = 0xFF
 
 
 class BitcoinCommandBuilder:
@@ -172,19 +172,6 @@ class BitcoinCommandBuilder:
                         ins=BitcoinInsType.SIGN_PSBT,
                         cdata=hash)
 
-
-    def get_sum_of_squares(self, n: int):
-        """Command builder for GET_SUM_OF_SQUARES.
-
-        Returns
-        -------
-        bytes
-            APDU command for GET_SUM_OF_SQUARES.
-
-        """
-        return self.serialize(cla=self.CLA_BITCOIN,
-                              ins=BitcoinInsType.GET_SUM_OF_SQUARES,
-                              cdata=n.to_bytes(1, byteorder="big"))
 
     def continue_interrupted(self, cdata: bytes):
         """Command builder for CONTINUE.

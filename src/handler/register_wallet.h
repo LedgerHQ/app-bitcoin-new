@@ -21,7 +21,7 @@ typedef struct {
     uint8_t next_pubkey_info[MAX_MULTISIG_SIGNER_INFO_LEN];
 
     union {
-        flow_get_merkle_leaf_element_state_t get_merkle_leaf_element;
+        get_merkle_leaf_element_state_t get_merkle_leaf_element;
     } subcontext;
 } register_wallet_state_t;
 

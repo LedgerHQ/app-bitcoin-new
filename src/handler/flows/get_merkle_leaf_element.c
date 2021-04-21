@@ -18,11 +18,11 @@ static void finalize_output(dispatcher_context_t *dc);
  * This flow requests a leaf hash from the Merkle tree, then it requests and verifies its preimage
  */
 void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_element_state_t *state = (flow_get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
-    call_flow_get_merkle_leaf_hash(dc,
+    call_get_merkle_leaf_hash(dc,
                                     &state->subcontext.get_merkle_leaf_hash,
                                     check_merkle_proof_result,
                                     state->merkle_root,
@@ -31,7 +31,7 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
 }
 
 static void check_merkle_proof_result(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_element_state_t *state = (flow_get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -41,7 +41,7 @@ static void check_merkle_proof_result(dispatcher_context_t *dc) {
         return;
     }
 
-    call_flow_get_merkle_preimage(dc,
+    call_get_merkle_preimage(dc,
                            &state->subcontext.get_merkle_preimage,
                            finalize_output,
                            state->subcontext.get_merkle_leaf_hash.merkle_leaf,
@@ -51,7 +51,7 @@ static void check_merkle_proof_result(dispatcher_context_t *dc) {
 
 
 static void finalize_output(dispatcher_context_t *dc) {
-    flow_get_merkle_leaf_element_state_t *state = (flow_get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
+    get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 

@@ -4,7 +4,6 @@
 #include "constants.h"
 #include "handler/get_address.h"
 #include "handler/get_pubkey.h"
-#include "handler/get_sum_of_squares.h"
 #include "handler/get_wallet_address.h"
 #include "handler/register_wallet.h"
 #include "handler/sign_psbt.h"
@@ -18,7 +17,6 @@ typedef enum {
     REGISTER_WALLET = 0x02,
     GET_WALLET_ADDRESS = 0x03,
     SIGN_PSBT = 0x04,
-    GET_SUM_OF_SQUARES = 0xF0, /// compute the sum of the squares up to a number (I know, right?)
 } command_e;
 
 /**
@@ -29,7 +27,6 @@ typedef union {
     get_pubkey_state_t get_pubkey_state;
     register_wallet_state_t register_wallet_state;
     get_wallet_address_state_t get_wallet_address_state;
-    get_sum_of_squares_state_t get_sum_of_squares_state;
     sign_psbt_state_t sign_psbt_state;
 } command_state_t;
 

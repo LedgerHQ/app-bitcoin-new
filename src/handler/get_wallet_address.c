@@ -36,8 +36,11 @@
 
 extern global_context_t G_context;
 
+static void request_keys_order(dispatcher_context_t *dc);
+static void receive_keys_order(dispatcher_context_t *dc);
+
 static void request_next_cosigner(dispatcher_context_t *dc);
-static void read_next_cosigner(dispatcher_context_t *dc);
+static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void generate_address(dispatcher_context_t *dc);
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
@@ -155,14 +158,86 @@ void handler_get_wallet_address(
 
     // Init command state
     state->next_pubkey_index = 0;
-    memset(state->used_pubkey_indexes, 0, sizeof(state->used_pubkey_indexes));
-    memset(state->prev_compressed_pubkey, 0, sizeof(state->prev_compressed_pubkey));
 
     cx_sha256_init(&state->script_hash_context);
-    uint8_t script_header[] = {
-        0x50 + state->wallet_header.multisig_policy.threshold, // OP_m
-    };
-    crypto_hash_update(&state->script_hash_context.header, script_header, sizeof(script_header));
+
+    uint8_t threshold = state->wallet_header.multisig_policy.threshold;
+    crypto_hash_update_u8(&state->script_hash_context.header, 0x50 + threshold); // OP_m
+
+    if (state->wallet_header.multisig_policy.sorted) {
+        dc->next(request_keys_order);
+    } else {
+        // Keep the canonical order for multi()
+        for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
+            state->ordered_pubkeys[i] = i;
+        }
+        dc->next(request_next_cosigner);
+    }
+}
+
+// TODO: this processor and the next could be outsourced to a flow
+static void request_keys_order(dispatcher_context_t *dc) {
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+
+    uint8_t request[1 + 20 + 4 + 1 + 4*10 + 1 + 15]; // max size
+    request[0] = CCMD_GET_PUBKEYS_IN_DERIVATION_ORDER;
+    memcpy(request + 1, state->wallet_header.keys_info_merkle_root, 20);
+
+    int pos = 1 + 20;
+
+    write_u32_be(request, pos, state->wallet_header.multisig_policy.n_keys);
+    pos += 4;
+
+    request[pos++] = 2; // 2 derivation steps
+    write_u32_be(request, pos, 0);
+    pos += 4;
+    write_u32_be(request, pos, state->address_index);
+    pos += 4;
+
+    request[pos++] = state->wallet_header.multisig_policy.n_keys;
+
+    for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
+        request[pos++] = i;
+    }
+
+    dc->send_response(request, pos, SW_INTERRUPTED_EXECUTION);
+    dc->next(receive_keys_order);
+}
+
+static void receive_keys_order(dispatcher_context_t *dc) {
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+
+    uint8_t n_key_indexes;
+    if (!buffer_read_u8(&dc->read_buffer, &n_key_indexes) || !buffer_can_read(&dc->read_buffer, n_key_indexes)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+
+    if (n_key_indexes == 0 || n_key_indexes > 15) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    uint8_t seen_pubkeys[15];
+    memset(seen_pubkeys, 0, sizeof(seen_pubkeys));
+
+    // read the result, and make sure it is a permutation of [0, 1, ..., n_key_indexes - 1]
+    for (int i = 0; i < n_key_indexes; i++) {
+        uint8_t k;
+        buffer_read_u8(&dc->read_buffer, &k);
+
+        if (k >= n_key_indexes || seen_pubkeys[k] > 0) {
+            dc->send_sw(SW_INCORRECT_DATA);
+            return;
+        }
+        seen_pubkeys[k] = 1;
+
+        state->ordered_pubkeys[i] = k;
+    }
 
     dc->next(request_next_cosigner);
 }
@@ -174,80 +249,34 @@ void handler_get_wallet_address(
 static void request_next_cosigner(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    if (state->wallet_header.multisig_policy.sorted) {
-        // if sortedmulti, we ask the keys by rank based on the derived child pubkeys
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
-        uint8_t req[1+1+1+4+4];
-        buffer_t req_buffer = {
-            .ptr = req,
-            .offset = 0,
-            .size = sizeof(req)
-        };
+    // we request a key, in the order committed in state->ordered_pubkeys
 
-        buffer_write_u8(&req_buffer, CCMD_GET_SORTED_PUBKEY_INFO);
-        buffer_write_u8(&req_buffer, state->next_pubkey_index);
-
-        buffer_write_u8(&req_buffer, 2); // BIP32 derivation length, followed by /0/address_index
-        buffer_write_u32(&req_buffer, 0, BE);
-        buffer_write_u32(&req_buffer, state->address_index, BE);
-
-        dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
-    } else {
-        // if multi, ask the keys in order
-
-        uint8_t req[] = { CCMD_GET_PUBKEY_INFO, state->next_pubkey_index};
-
-        dc->send_response(req, 2, SW_INTERRUPTED_EXECUTION);
-    }
-
-    dc->next(read_next_cosigner);
+    call_get_merkle_leaf_element(dc,
+                                    &state->subcontext.get_merkle_leaf_element,
+                                    process_next_cosigner_info,
+                                    state->wallet_header.keys_info_merkle_root,
+                                    state->wallet_header.multisig_policy.n_keys,
+                                    state->ordered_pubkeys[state->next_pubkey_index],
+                                    state->next_pubkey_info,
+                                    sizeof(state->next_pubkey_info));
 }
 
 
 /**
  * Receives the next pubkey, accumulates it in the hash context, derives the appropriate child key.
  */
-static void read_next_cosigner(dispatcher_context_t *dc) {
+static void process_next_cosigner_info(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    uint8_t key_index; // index of the key in the Merkle tree
-
-    if (state->wallet_header.multisig_policy.sorted) {
-        // if sortedmulti, the host computes the order
-        if (!buffer_read_u8(&dc->read_buffer, &key_index)) {
-            dc->send_sw(SW_WRONG_DATA_LENGTH);
-            return;
-        }
-    } else {
-        // if multi, the order is kept as in the registered Merkle tree
-        key_index = state->address_index;
-    }
-
-    // the rest of the CCMD_GET_PUBKEY_INFO or CCMD_GET_SORTED_PUBKEY_INFO response is the same
-    uint8_t key_info_len;
-
-    if (!buffer_read_u8(&dc->read_buffer, &key_info_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (key_info_len > MAX_MULTISIG_SIGNER_INFO_LEN) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (!buffer_can_read(&dc->read_buffer, key_info_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    uint8_t key_info_hash[20];
-    merkle_compute_element_hash(&dc->read_buffer.ptr[dc->read_buffer.offset], key_info_len, key_info_hash);
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
-        .ptr = &dc->read_buffer.ptr[dc->read_buffer.offset],
+        .ptr = (uint8_t *)&state->next_pubkey_info,
         .offset = 0,
-        .size = key_info_len
+        .size = state->subcontext.get_merkle_leaf_element.element_len
     };
 
     policy_map_key_info_t key_info;
@@ -255,38 +284,6 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
-
-    buffer_seek_cur(&dc->read_buffer, key_info_len); // skip, data already parsed 
-
-
-    // read Merkle proof and validate it.
-    size_t proof_tree_size, proof_leaf_index;
-    if (!buffer_read_u32(&dc->read_buffer, &proof_tree_size, BE) || !buffer_read_u32(&dc->read_buffer, &proof_leaf_index, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    if (proof_leaf_index >= state->wallet_header.multisig_policy.n_keys) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (!buffer_read_and_verify_merkle_proof(&dc->read_buffer,
-                                             state->wallet_header.keys_info_merkle_root,
-                                             proof_tree_size,
-                                             proof_leaf_index,
-                                             key_info_hash)) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-
-    if (state->used_pubkey_indexes[proof_leaf_index]) {
-        PRINTF("Key index had already been seen\n");
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-    state->used_pubkey_indexes[proof_leaf_index] = 1;
 
     // decode pubkey
     serialized_extended_pubkey_check_t decoded_pubkey_check;
@@ -304,21 +301,9 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
     bip32_CKDpub(decoded_pubkey, 0, &tmp_pubkey);
     bip32_CKDpub(&tmp_pubkey, state->address_index, &cosigner_derived_pubkey);
 
-    // TODO: remove debug code
-
-    // PRINTF("Key %d with rank %d: ", proof_leaf_index, state->next_pubkey_index);
-    // for (int i = 0; i < 33; i++)
-    //     PRINTF("%02x", cosigner_derived_pubkey.compressed_pubkey[i]);
-    // PRINTF("\n");
-
-
-    // PRINTF("Prev: ");
-    // for (int i = 0; i < 33; i++)
-    //     PRINTF("%02x", state->prev_compressed_pubkey[i]);
-    // PRINTF("\n");
 
     // check lexicographic sorting if appropriate
-    if (state->wallet_header.multisig_policy.sorted) {
+    if (state->wallet_header.multisig_policy.sorted && state->next_pubkey_index > 0) {
         if (memcmp(state->prev_compressed_pubkey, cosigner_derived_pubkey.compressed_pubkey, 33) >= 0) {
             PRINTF("Keys provided in wrong order\n");
             dc->send_sw(SW_INCORRECT_DATA);
@@ -328,10 +313,8 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
 
     memcpy(state->prev_compressed_pubkey, cosigner_derived_pubkey.compressed_pubkey, 33);
 
-
     // update script hash with PUSH opcode for this pubkey
-    uint8_t push33 = 0x21;
-    crypto_hash_update(&state->script_hash_context.header, &push33, 1);
+    crypto_hash_update_u8(&state->script_hash_context.header, 0x21); // PUSH 33 bytes
     crypto_hash_update(&state->script_hash_context.header, cosigner_derived_pubkey.compressed_pubkey, 33);
 
     // TODO: add push opcode to script hash (0x22<pubkey starting with 02 or 03>)
@@ -347,11 +330,11 @@ static void read_next_cosigner(dispatcher_context_t *dc) {
 static void generate_address(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    uint8_t script_final[] = {
-        0x50 + state->wallet_header.multisig_policy.n_keys, // OP_n
-        0xae	                                            // OP_CHECKMULTISIG
-    };
-    crypto_hash_update(&state->script_hash_context.header, script_final, sizeof(script_final));
+    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+
+    uint8_t n_keys = state->wallet_header.multisig_policy.n_keys;
+    crypto_hash_update_u8(&state->script_hash_context.header, 0x50 + n_keys); // OP_n
+    crypto_hash_update_u8(&state->script_hash_context.header, 0xae);          // OP_CHECKMULTISIG
 
     uint8_t script_sha256[32];
     crypto_hash_digest(&state->script_hash_context.header, script_sha256, 32);
@@ -364,6 +347,8 @@ static void generate_address(dispatcher_context_t *dc) {
     uint8_t redeem_script_rip[20];
 
     int address_len;
+
+    // TODO: extract address generation function from the script_sha256
 
     // Compute address
     int address_type = state->wallet_header.multisig_policy.address_type;

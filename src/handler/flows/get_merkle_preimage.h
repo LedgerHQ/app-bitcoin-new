@@ -16,7 +16,7 @@ typedef struct {
     // outputs
     size_t preimage_len;
     bool result; // true if the hash is correct, false otherwise
-} flow_get_merkle_preimage_state_t;
+} get_merkle_preimage_state_t;
 
 
 /**
@@ -32,8 +32,8 @@ void flow_get_merkle_preimage(dispatcher_context_t *dispatcher_context);
  * Convenience function to call the get_merkle_preimage flow.
  * TODO: more precise docs
  */
-static inline void call_flow_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
-                                   flow_get_merkle_preimage_state_t *flow_state,
+static inline void call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
+                                   get_merkle_preimage_state_t *flow_state,
                                    command_processor_t ret_proc,
                                    const uint8_t hash[static 20],
                                    uint8_t *out_ptr,

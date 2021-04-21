@@ -28,18 +28,9 @@ class ClientCommand:
     def code(self) -> int:
         raise NotImplementedError("Subclasses should implement this method.")
 
-
-class GetSquareCommand(ClientCommand):
-    @property
-    def code(self) -> int:
-        return ClientCommandCode.GET_SQUARE
-
-    def execute(self, request: bytes) -> bytes:
-        if len(request) != 2:
-            raise ValueError("Wrong request length.")
-        n = request[1]
-
-        return (n * n).to_bytes(4, 'big')
+# TODO: make a class similar to io.BytesIO that raises an error if read(n) reads less than n bytes,
+#       and refactor all the ClientCommands below.
+#       It could also have utils like read_int(size), etc.
 
 
 class GetPreimageCommand(ClientCommand):
@@ -122,7 +113,37 @@ class GetMerkleLeafHashCommand(ClientCommand):
         ])
 
 
-class GetPubkeyInfoCommand(ClientCommand):
+# TODO: not tested yet
+class GetMerkleLeafIndexCommand(ClientCommand):
+    def __init__(self, known_trees: Iterable[MerkleTree]):
+        self.merkle_trees = {
+            mt.root: mt for mt in known_trees
+        }
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.GET_MERKLE_LEAF_INDEX
+
+    def execute(self, request: bytes) -> bytes:
+        if len(request) != 1 + 20 + 20:
+            raise ValueError("Wrong request length.")
+
+        root = request[1:21]
+        leaf_hash = request[21:]
+
+        if root not in self.merkle_trees:
+            raise ValueError(f"Unknown Merkle root: {root.hex()}.")
+
+        try:
+            leaf_index = self.merkle_trees[root].leaves.index()
+        except ValueError:
+            raise ValueError(f"The Merkle tree with root {root.hex()} does not have a leaf with hash {leaf_hash.hex()}.")
+
+        return leaf_index.to_bytes(4, byteorder="big")
+
+
+
+class GetPubkeysInDerivationOrder(ClientCommand):
     def __init__(self, keys_info: List[str]):
         self.keys_info = keys_info
         keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), keys_info)
@@ -130,55 +151,55 @@ class GetPubkeyInfoCommand(ClientCommand):
 
     @property
     def code(self) -> int:
-        return ClientCommandCode.GET_PUBKEY_INFO
+        return ClientCommandCode.GET_PUBKEYS_IN_DERIVATION_ORDER
 
     def execute(self, request: bytes) -> bytes:
-        if len(request) != 2:
+        if len(request) < 1 + 20 + 4 + 1:
             raise ValueError("Wrong request length.")
 
-        n = request[1]
+        root: bytes = request[1:1 + 20]
 
-        if not (0 <= n < len(self.keys_info)):
-            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys_info)} keys.")
+        if root != self.merkle_tree.root:
+            raise ValueError(f"Unknown Merkle root: {root.hex()}")
 
-        return b''.join([
-            serialize_str(self.keys_info[n]),
-            self.merkle_tree.prove_leaf_serialized(n),
-        ])
+        tree_size = int.from_bytes(request[1 + 20:1 + 20 + 4], byteorder="big")
+        if tree_size != len(self.keys_info):
+            raise ValueError(f"Invalid tree size: expected {len(self.keys_info)}, not {tree_size}")
 
+        bip32_path_len = request[1 + 20 + 4]
 
-class GetSortedPubkeyInfoCommand(ClientCommand):
-    def __init__(self, keys_info: List[str]):
-        self.keys_info = keys_info
-        keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), keys_info)
-        self.merkle_tree = MerkleTree(keys_info_hashes)
-
-    @property
-    def code(self) -> int:
-        return ClientCommandCode.GET_SORTED_PUBKEY_INFO
-
-    def execute(self, request: bytes) -> bytes:
-        if len(request) < 2:
-            raise ValueError("Wrong request length.")
-
-        n = request[1]
-
-        if not (0 <= n < len(self.keys_info)):
-            raise RuntimeError(f"Unexpected request: n = {n}, but there are {len(self.keys_info)} keys.")
-
-        bip32_path_len = int(request[2])
         if not (0 <= bip32_path_len <= 10):
             raise RuntimeError(f"Invalid derivation len: {bip32_path_len}")
 
-        if len(request) != 1 + 1 + 1 + 4 * bip32_path_len:
-            raise ValueError(f"Wrong request length: {len(request)}")
+        if len(request) < 1 + 20 + 4 + 1 + 4 * bip32_path_len + 1:
+            raise ValueError("Wrong request length.")
 
         bip32_path = []
-        for i in range(bip32_path_len):
-            bip32_path.append(int.from_bytes(request[1 + 1 + 1 + i*4: 1 + 1 + i*4 + 4], byteorder="big"))
+        pos = 1 + 20 + 4 + 1
+        for _ in range(bip32_path_len):
+            bip32_path.append(int.from_bytes(request[pos:pos + 4], byteorder="big"))
+            pos += 4
+
+        if any(bip32_step >= 0x80000000 for bip32_step in bip32_path):
+            raise ValueError("Only unhardened derivation steps are allowed.")
+
+        n_key_indexes = request[pos]
+        pos += 1
+
+        key_indexes = []
+        for _ in range(n_key_indexes):
+            key_indexes.append(request[pos])
+            pos += 1
+
+        if any(not 0 <= i < tree_size for i in key_indexes):
+            raise ValueError("Key index out of range.")
+
+        if pos != len(request):
+            raise ValueError("Wrong request length.")
 
         # function to sort keys by the corresponding derived pubkey
         def derived_pk(pubkey_info: str) -> int:
+
             # Remove the key origin info (if present) by looking for the ']' character
             pos = pubkey_info.find(']')
             pubkey_str = pubkey_info if pos == -1 else pubkey_info[pos+1:]
@@ -187,17 +208,17 @@ class GetSortedPubkeyInfoCommand(ClientCommand):
             for d in bip32_path:
                 ext_pubkey = ext_pubkey.derive_child(d)
 
-            print(ext_pubkey.compressed_pubkey.hex())
             return ext_pubkey.compressed_pubkey
 
-        sorted_keys = sorted(enumerate(self.keys_info), key=lambda index_key: derived_pk(index_key[1]))
+        # attach its index to every key
+        used_keys = [(i, self.keys_info[i]) for i in key_indexes]
+        # sort according to the derived pubkey
+        sorted_keys = sorted(used_keys, key=lambda index_key: derived_pk(index_key[1]))
 
-        i, key_info = sorted_keys[n]
-        return b''.join([
-            i.to_bytes(1, byteorder="big"),
-            serialize_str(key_info),
-            self.merkle_tree.prove_leaf_serialized(i),
-        ])
+        result = bytearray([n_key_indexes])
+        result.extend(idx_key[0] for idx_key in sorted_keys)
+        return bytes(result)
+
 
 
 class GetMoreElementsCommand(ClientCommand):
@@ -337,16 +358,29 @@ class BitcoinCommand:
         return wallet_id, sig
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
-        # TODO: rewrite with new Merkle proof flow
-
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
+
+        queue = deque()
+
+        known_images: Mapping[bytes, bytes] = {}
+        elements_lists: List[List[bytes]] = []
+
+        if isinstance(wallet, MultisigWallet):
+            known_images = {
+                element_hash(el.encode()): el.encode() for el in wallet.keys_info
+            }
+            elements_lists.append(list(element_hash(el.encode()) for el in wallet.keys_info))
+        else:
+            raise RuntimeError(f"wallet has unexpected class '{type(wallet).__name__}'")
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(wallet, signature, address_index, display),
             [
-                GetPubkeyInfoCommand(wallet.keys_info),
-                GetSortedPubkeyInfoCommand(wallet.keys_info)
+                GetPreimageCommand(known_images),
+                GetMerkleLeafHashCommand(elements_lists, queue),
+                GetMoreElementsCommand(queue),
+                GetPubkeysInDerivationOrder(wallet.keys_info)
             ]
         )
 
@@ -371,19 +405,3 @@ class BitcoinCommand:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
 
         return response.decode()
-
-    def get_sum_of_squares(self, n: int) -> int:
-        if n < 0 or n > 255:
-            raise ValueError("n must be an integer between 0 and 255 (inclusive)")
-
-        sw, response = self.make_request(
-            self.builder.get_sum_of_squares(n),
-            [GetSquareCommand()]
-        )
-
-        if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_SUM_OF_SQUARES)
-
-        assert len(response) == 4
-        result, = struct.unpack("<L", response)
-        return result

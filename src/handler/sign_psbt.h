@@ -10,7 +10,7 @@ typedef struct {
     uint8_t preimage[64];
 
     union {
-        flow_get_merkle_preimage_state_t get_merkle_preimage;
+        get_merkle_preimage_state_t get_merkle_preimage;
     } subcontext;
 } sign_psbt_state_t;
 

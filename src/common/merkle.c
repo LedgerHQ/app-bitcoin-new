@@ -99,7 +99,8 @@ int merkle_get_directions(size_t size, size_t index, uint8_t out[], size_t out_l
 }
 
 
-// TODO: add tests; remove debug code
+// TODO: delete once get_wallet_address is refactored
+
 // size:      4
 // index:     4
 // proof_len: 1

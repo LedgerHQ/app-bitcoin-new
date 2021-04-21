@@ -13,7 +13,7 @@ static void receive_and_check_preimage(dispatcher_context_t *dc);
 
 
 void flow_get_merkle_preimage(dispatcher_context_t *dc) {
-    flow_get_merkle_preimage_state_t *state = (flow_get_merkle_preimage_state_t *)dc->machine_context_ptr;
+    get_merkle_preimage_state_t *state = (get_merkle_preimage_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
@@ -28,7 +28,7 @@ void flow_get_merkle_preimage(dispatcher_context_t *dc) {
 
 
 static void receive_and_check_preimage(dispatcher_context_t *dc) {
-    flow_get_merkle_preimage_state_t *state = (flow_get_merkle_preimage_state_t *)dc->machine_context_ptr;
+    get_merkle_preimage_state_t *state = (get_merkle_preimage_state_t *)dc->machine_context_ptr;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 

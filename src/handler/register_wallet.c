@@ -156,7 +156,7 @@ static void request_next_cosigner_info(dispatcher_context_t *dc) {
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
-    call_flow_get_merkle_leaf_element(dc,
+    call_get_merkle_leaf_element(dc,
                                       &state->subcontext.get_merkle_leaf_element,
                                       process_next_cosigner_info,
                                       state->wallet_header.keys_info_merkle_root,

@@ -136,6 +136,8 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
 }
 
 
+// TODO: refactor: split the pubkey generation for the BIP32 path from the address generation
+
 /**
  * Computes an address for one of the supported types at a given BIP32 derivation path.
  *
