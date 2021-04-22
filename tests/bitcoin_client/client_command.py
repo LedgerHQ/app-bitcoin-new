@@ -5,6 +5,10 @@ from .common import ByteStreamParser
 from .key import ExtendedKey
 from .merkle import MerkleTree, element_hash
 
+# TODO: The current version treats all client commands individually, forcing the code of each command in command.py
+#       to explicitly handle the specific commands that are enabled for their specific needs. It might be easier to
+#       instead have a ClientCommandInterpreter that is aware of all the client commands, and has utility functions
+#       to manage the client side state (e.g.: the known hashes and Merkle trees).
 
 class ClientCommandCode(IntEnum):
     GET_PUBKEY_INFO = 0x01
@@ -133,7 +137,6 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         return leaf_index.to_bytes(4, byteorder="big")
 
 
-
 class GetPubkeysInDerivationOrder(ClientCommand):
     def __init__(self, keys_info: List[str]):
         self.keys_info = keys_info
@@ -199,7 +202,6 @@ class GetPubkeysInDerivationOrder(ClientCommand):
         result = bytearray([n_key_indexes])
         result.extend(idx_key[0] for idx_key in sorted_keys)
         return bytes(result)
-
 
 
 class GetMoreElementsCommand(ClientCommand):
