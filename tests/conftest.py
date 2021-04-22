@@ -10,7 +10,7 @@ import pytest
 
 from ledgercomm import Transport
 
-from bitcoin_client.bitcoin_cmd import BitcoinCommand
+from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.button import ButtonTCP, ButtonFake
 
 

@@ -41,15 +41,6 @@ class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
 
 
-class ClientCommandCode(enum.IntEnum):
-    GET_PUBKEY_INFO = 0x01
-    GET_PUBKEYS_IN_DERIVATION_ORDER = 0x20
-    GET_PREIMAGE = 0x40
-    GET_MERKLE_LEAF_PROOF = 0x41
-    GET_MERKLE_LEAF_INDEX = 0x42
-    GET_MORE_ELEMENTS = 0xA0
-
-
 class BitcoinCommandBuilder:
     """APDU command builder for the Bitcoin application.
 
