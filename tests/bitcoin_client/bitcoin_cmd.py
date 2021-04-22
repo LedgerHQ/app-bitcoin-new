@@ -16,7 +16,7 @@ from bitcoin_client.transaction import Transaction
 from bitcoin_client.bip32 import ExtendedPubkey
 
 from .wallet import AddressType, Wallet, WalletType, MultisigWallet
-from .utils import ripemd160, serialize_str
+from .utils import ripemd160, serialize_str, ByteStreamParser
 from .merkle import MerkleTree, element_hash
 
 
@@ -48,10 +48,10 @@ class GetPreimageCommand(ClientCommand):
         return ClientCommandCode.GET_PREIMAGE
 
     def execute(self, request: bytes) -> bytes:
-        if len(request) != 1 + 20:
-            raise ValueError("Wrong request length.")
+        req = ByteStreamParser(request[1:])
+        hash = req.read_bytes(20)
+        req.assert_empty()
 
-        hash = request[1:]
         for known_hash, known_preimage in self.known_images.items():
             if hash == known_hash:
                 return len(known_preimage).to_bytes(1, byteorder="big") + known_preimage
@@ -77,12 +77,12 @@ class GetMerkleLeafHashCommand(ClientCommand):
         return ClientCommandCode.GET_MERKLE_LEAF_PROOF
 
     def execute(self, request: bytes) -> bytes:
-        if len(request) != 1 + 20 + 4 + 4:
-            raise ValueError("Wrong request length.")
+        req = ByteStreamParser(request[1:])
 
-        root = request[1:21]
-        tree_size = int.from_bytes(request[21:25], byteorder="big")
-        leaf_index = int.from_bytes(request[25:29], byteorder="big")
+        root = req.read_bytes(20)
+        tree_size = req.read_uint(4)
+        leaf_index = req.read_uint(4)
+        req.assert_empty()
 
         if not root in self.roots_map:
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
@@ -125,11 +125,11 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         return ClientCommandCode.GET_MERKLE_LEAF_INDEX
 
     def execute(self, request: bytes) -> bytes:
-        if len(request) != 1 + 20 + 20:
-            raise ValueError("Wrong request length.")
+        req = ByteStreamParser(request[1:])
 
-        root = request[1:21]
-        leaf_hash = request[21:]
+        root = req.read_bytes(20)
+        leaf_hash = req.read_bytes(20)
+        req.assert_empty()
 
         if root not in self.merkle_trees:
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
@@ -154,48 +154,39 @@ class GetPubkeysInDerivationOrder(ClientCommand):
         return ClientCommandCode.GET_PUBKEYS_IN_DERIVATION_ORDER
 
     def execute(self, request: bytes) -> bytes:
-        if len(request) < 1 + 20 + 4 + 1:
-            raise ValueError("Wrong request length.")
+        req = ByteStreamParser(request[1:])
 
-        root: bytes = request[1:1 + 20]
+        root = req.read_bytes(20)
 
         if root != self.merkle_tree.root:
             raise ValueError(f"Unknown Merkle root: {root.hex()}")
 
-        tree_size = int.from_bytes(request[1 + 20:1 + 20 + 4], byteorder="big")
+        tree_size = req.read_uint(4)
         if tree_size != len(self.keys_info):
             raise ValueError(f"Invalid tree size: expected {len(self.keys_info)}, not {tree_size}")
 
-        bip32_path_len = request[1 + 20 + 4]
+        bip32_path_len = req.read_uint(1)
 
         if not (0 <= bip32_path_len <= 10):
             raise RuntimeError(f"Invalid derivation len: {bip32_path_len}")
 
-        if len(request) < 1 + 20 + 4 + 1 + 4 * bip32_path_len + 1:
-            raise ValueError("Wrong request length.")
-
         bip32_path = []
-        pos = 1 + 20 + 4 + 1
         for _ in range(bip32_path_len):
-            bip32_path.append(int.from_bytes(request[pos:pos + 4], byteorder="big"))
-            pos += 4
+            bip32_path.append(req.read_uint(4))
 
         if any(bip32_step >= 0x80000000 for bip32_step in bip32_path):
             raise ValueError("Only unhardened derivation steps are allowed.")
 
-        n_key_indexes = request[pos]
-        pos += 1
+        n_key_indexes = req.read_uint(1)
 
         key_indexes = []
         for _ in range(n_key_indexes):
-            key_indexes.append(request[pos])
-            pos += 1
+            key_indexes.append(req.read_uint(1))
 
         if any(not 0 <= i < tree_size for i in key_indexes):
             raise ValueError("Key index out of range.")
 
-        if pos != len(request):
-            raise ValueError("Wrong request length.")
+        req.assert_empty()
 
         # function to sort keys by the corresponding derived pubkey
         def derived_pk(pubkey_info: str) -> int:

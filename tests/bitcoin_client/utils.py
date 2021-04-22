@@ -1,5 +1,5 @@
 from io import BytesIO
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 
 import hashlib
 
@@ -96,3 +96,21 @@ def hash160(s: bytes) -> bytes:
 
 def hash256(s: bytes) -> bytes:
     return sha256(sha256(s))
+
+
+class ByteStreamParser:
+    def __init__(self, input: bytes):
+        self.stream = BytesIO(input)
+
+    def assert_empty(self) -> bytes:
+        if self.stream.read(1) != b'':
+            raise ValueError("Byte stream was expected to be empty")
+
+    def read_bytes(self, n: int) -> bytes:
+        result = self.stream.read(n)
+        if len(result) < n:
+            raise ValueError("Byte stream exhausted")
+        return result
+
+    def read_uint(self, n: int, byteorder: Literal['big', 'little'] = "big") -> int:
+        return int.from_bytes(self.stream.read(n), byteorder)
