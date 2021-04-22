@@ -3,10 +3,9 @@ import logging
 import struct
 from typing import List, Tuple, Union, Iterator, cast
 
-from bitcoin_client.transaction import Transaction
-from bitcoin_client.utils import bip32_path_from_string
+from bitcoin_client.common import bip32_path_from_string, AddressType
 
-from .wallet import AddressType, Wallet, MultisigWallet
+from .wallet import Wallet, MultisigWallet
 
 MAX_APDU_LEN: int = 255
 

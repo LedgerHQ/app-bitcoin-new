@@ -1,4 +1,4 @@
-from bitcoin_client.wallet import AddressType
+from bitcoin_client.common import AddressType
 
 # default speculos seed: glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin
 

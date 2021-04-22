@@ -1,11 +1,45 @@
 from io import BytesIO
 from typing import List, Optional, Literal, Union
+from enum import Enum, IntEnum
 
 import hashlib
 
 UINT64_MAX: int = 18446744073709551615
 UINT32_MAX: int = 4294967295
 UINT16_MAX: int = 65535
+
+
+# from bitcoin-core/HWI
+class Chain(Enum):
+    """
+    The blockchain network to use
+    """
+    MAIN = 0 #: Bitcoin Main network
+    TEST = 1 #: Bitcoin Test network
+    REGTEST = 2 #: Bitcoin Core Regression Test network
+    SIGNET = 3 #: Bitcoin Signet
+
+    def __str__(self) -> str:
+        return self.name.lower()
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
+# from bitcoin-core/HWI
+class AddressType(IntEnum):
+    """
+    The type of address to use
+    """
+    LEGACY = 1 #: Legacy address type. P2PKH for single sig, P2SH for scripts.
+    WIT = 2 #: Native segwit v0 address type. P2WPKH for single sig, P2WPSH for scripts.
+    SH_WIT = 3 #: Nested segwit v0 address type. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
+
+    def __str__(self) -> str:
+        return self.name.lower()
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 def bip32_path_from_string(path: str) -> List[bytes]:

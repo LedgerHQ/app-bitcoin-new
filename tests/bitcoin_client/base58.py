@@ -12,7 +12,7 @@ import hashlib
 from binascii import hexlify, unhexlify
 from typing import List
 
-from .utils import sha256, hash256
+from .common import sha256, hash256
 
 
 b58_digits: str = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'

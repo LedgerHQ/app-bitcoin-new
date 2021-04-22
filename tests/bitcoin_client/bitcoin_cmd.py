@@ -10,13 +10,13 @@ from bitcoin_client.bitcoin_cmd_builder import (
     FrameworkInsType,
     ClientCommandCode
 )
-from bitcoin_client.button import Button
-from bitcoin_client.exception import DeviceException
-from bitcoin_client.transaction import Transaction
 from bitcoin_client.bip32 import ExtendedPubkey
+from bitcoin_client.button import Button
+from bitcoin_client.common import AddressType
+from bitcoin_client.exception import DeviceException
 
-from .wallet import AddressType, Wallet, WalletType, MultisigWallet
-from .utils import ripemd160, serialize_str, ByteStreamParser
+from .wallet import Wallet, WalletType, MultisigWallet
+from .common import ripemd160, serialize_str, ByteStreamParser
 from .merkle import MerkleTree, element_hash
 
 

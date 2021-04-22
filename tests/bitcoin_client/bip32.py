@@ -5,7 +5,7 @@ from ecdsa.curves import SECP256k1
 import hashlib
 
 from . import base58
-from .utils import ripemd160, hash160, hash256
+from .common import ripemd160, hash160, hash256
 
 BIP32_FIRST_HARDENED_CHILD = 0x80000000
 

@@ -5,11 +5,11 @@ from ecdsa.keys import VerifyingKey
 from ecdsa.util import sigdecode_der
 
 from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet, AddressType
+from bitcoin_client.wallet import MultisigWallet
+from bitcoin_client.common import AddressType
 
 from utils import automation
 from typing import List
-from bitcoin_client.wallet import AddressType
 
 import pytest
 
