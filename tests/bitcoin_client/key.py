@@ -10,7 +10,7 @@ Key Classes and Utilities
 Classes and utilities for working with extended public keys, key origins, and other key related things.
 """
 
-from . import _base58 as base58
+from . import base58
 from .common import (
     AddressType,
     Chain,

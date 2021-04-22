@@ -10,15 +10,14 @@ from bitcoin_client.bitcoin_cmd_builder import (
     FrameworkInsType,
     ClientCommandCode
 )
-from bitcoin_client.bip32 import ExtendedPubkey
 from bitcoin_client.button import Button
 from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DeviceException
 
-from .wallet import Wallet, WalletType, MultisigWallet
 from .common import ripemd160, serialize_str, ByteStreamParser
 from .merkle import MerkleTree, element_hash
-
+from .wallet import Wallet, WalletType, MultisigWallet
+from .key import ExtendedKey
 
 class ClientCommand:
     def execute(self, request: bytes) -> bytes:
@@ -195,11 +194,10 @@ class GetPubkeysInDerivationOrder(ClientCommand):
             pos = pubkey_info.find(']')
             pubkey_str = pubkey_info if pos == -1 else pubkey_info[pos+1:]
 
-            ext_pubkey = ExtendedPubkey.from_base58(pubkey_str)
-            for d in bip32_path:
-                ext_pubkey = ext_pubkey.derive_child(d)
+            ext_pubkey = ExtendedKey.deserialize(pubkey_str)
+            ext_pubkey = ext_pubkey.derive_pub_path(bip32_path)
 
-            return ext_pubkey.compressed_pubkey
+            return ext_pubkey.pubkey
 
         # attach its index to every key
         used_keys = [(i, self.keys_info[i]) for i in key_indexes]
