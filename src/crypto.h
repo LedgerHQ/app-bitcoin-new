@@ -46,12 +46,6 @@ typedef struct {
 } serialized_extended_pubkey_check_t;
 
 
-// TODO: remove.
-#define cx_ecfp_add_point my_cx_ecfp_add_point
-void debug_write(const char *buf);
-void debug_write_hex(const void *buf, size_t len);
-
-
 /**
  * Derive private key given BIP32 path.
  *
