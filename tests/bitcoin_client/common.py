@@ -147,4 +147,16 @@ class ByteStreamParser:
         return result
 
     def read_uint(self, n: int, byteorder: Literal['big', 'little'] = "big") -> int:
-        return int.from_bytes(self.stream.read(n), byteorder)
+        return int.from_bytes(self.read_bytes(n), byteorder)
+
+    def read_varint(self) -> int:
+        prefix = self.read_uint(1)
+
+        if prefix == 253:
+            return self.read_uint(2)
+        elif prefix == 254:
+            return self.read_uint(4)
+        elif prefix == 255:
+            return self.read_uint(8)
+        else:
+            return prefix

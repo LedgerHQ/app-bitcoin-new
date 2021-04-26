@@ -2,15 +2,22 @@
 
 #include "../boilerplate/dispatcher.h"
 
-#include "flows/get_merkle_preimage.h"
+#include "flows/check_merkle_tree_sorted.h"
 
 typedef struct {
     machine_context_t ctx;
 
-    uint8_t preimage[64];
+    size_t global_map_size;
+    uint8_t global_keys_root[20];
+    uint8_t global_values_root[20];
+
+    size_t n_inputs;
+    uint8_t inputs_root[20];
+    size_t n_outputs;
+    uint8_t outputs_root[20];
 
     union {
-        get_merkle_preimage_state_t get_merkle_preimage;
+        check_merkle_tree_sorted_state_t check_merkle_tree_sorted;
     } subcontext;
 } sign_psbt_state_t;
 

@@ -1,6 +1,8 @@
 import hashlib
 from typing import List, Iterable, Mapping, Tuple
 
+from .common import write_varint
+
 # TODO: a class to represent Markle proofs in a more structured way (including size and leaf index)
 
 NIL = bytes([0] * 32)
@@ -89,6 +91,8 @@ def make_tree(leaves: List[Node], begin: int, size: int) -> Node:
     It returns the root of the newly built tree.
     """
 
+    if size == 0:
+        return []
     if size == 1:
         return leaves[begin]
 
@@ -119,13 +123,12 @@ class MerkleTree:
       power of 2 smaller than n.
     """
     def __init__(self, elements: Iterable[bytes] = []):
-        if elements:
-            self.leaves = [Node(None, None, None, el) for el in elements]
+        self.leaves = [Node(None, None, None, el) for el in elements]
+        if len(self.leaves) > 0:
             n_elements = len(self.leaves)
             self.root_node = make_tree(self.leaves, 0, n_elements)
             self.depth = ceil_lg(n_elements)
         else:
-            self.leaves = []
             self.root_node = None
             self.depth = None
 
@@ -213,7 +216,7 @@ class MerkleTree:
         return self.leaves[i].value
 
     def prove_leaf(self, index: int) -> List[bytes]:
-        """Produce the Merkle proof a proof of membership for the leaf with the given index where 0 <= index < len(self)."""
+        """Produce the Merkle proof of membership for the leaf with the given index where 0 <= index < len(self)."""
         node = self.leaves[index]
         proof = []
         while node.parent is not None:
@@ -226,21 +229,9 @@ class MerkleTree:
 
         return proof
 
-    def prove_leaf_serialized(self, index: int) -> bytes:
-        """Produce the Merkle proof a proof of membership for the leaf with the given index where 0 <= index < len(self)."""
-        proof = self.prove_leaf(index)
 
-        return b''.join([
-            len(self.leaves).to_bytes(4, byteorder="big"),
-            index.to_bytes(4, byteorder="big"),
-            len(proof).to_bytes(1, byteorder="big"),
-            b''.join(proof)
-        ])
-
-
-
-def get_merkleized_map_commitment(m: Mapping[bytes, bytes]) -> Tuple[MerkleTree, MerkleTree]:
-    m_sorted = dict(sorted(m.items()))
-    keys = m_sorted.keys()
-    values = m_sorted.values()
-    return MerkleTree(keys), MerkleTree(values)
+def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> Tuple[MerkleTree, MerkleTree]:
+    items_sorted = list(sorted(mapping.items()))
+    keys_hashes = [element_hash(i[0]) for i in items_sorted]
+    values_hahses = [element_hash(i[1]) for i in items_sorted]
+    return write_varint(len(mapping)) + MerkleTree(keys_hashes).root + MerkleTree(values_hahses).root

@@ -105,7 +105,7 @@ class BitcoinCommand:
             raise ValueError("wallet type must be MULTISIG")
 
         cmd_interpreter = ClientCommandInterpreter()
-        cmd_interpreter.add_known_keylist(wallet.keys_info)
+        cmd_interpreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.register_wallet(wallet),
@@ -129,7 +129,7 @@ class BitcoinCommand:
             raise ValueError("wallet type must be MULTISIG")
 
         cmd_interpreter = ClientCommandInterpreter()
-        cmd_interpreter.add_known_keylist(wallet.keys_info)
+        cmd_interpreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(wallet, signature, address_index, display),
@@ -141,7 +141,6 @@ class BitcoinCommand:
 
         return response.decode()
 
-    # TODO: placeholder of the future command that will instead take a psbt as input; just for testing
     def sign_psbt(self, psbt: PSBT) -> str:
         psbt_bytes = base64.b64decode(psbt.serialize())
         f = BytesIO(psbt_bytes)
@@ -149,7 +148,10 @@ class BitcoinCommand:
 
         assert f.read(5) == b"psbt\xff"
 
-        global_map = parse_stream_to_map(f)
+        client_intepreter = ClientCommandInterpreter()
+
+        global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
+        client_intepreter.add_known_mapping(global_map)
 
         if b'\x00' not in global_map:
             raise ValueError("Invalid PSBT: PSBT_GLOBAL_UNSIGNED_TX")
@@ -160,38 +162,31 @@ class BitcoinCommand:
         tx = CTransaction()
         tx.deserialize(BytesIO(global_map[b'\x00']))
 
-        input_maps = []
+        input_maps: List[Mapping[bytes, bytes]] = []
         for _ in tx.vin:
-            print("INPUT START:", f.tell())
             input_maps.append(parse_stream_to_map(f))
+        for m in input_maps:
+            client_intepreter.add_known_mapping(m)
 
-        output_maps = []
+        output_maps: List[Mapping[bytes, bytes]] = []
         for _ in tx.vout:
-            print("OUTPUT START:", f.tell())
             output_maps.append(parse_stream_to_map(f))
+        for m in output_maps:
+            client_intepreter.add_known_mapping(m)
 
-        print(end, f.tell())
-        print(len(input_maps), len(output_maps))
+        # We also add the Merkle tree of the (resp. output) input map commitments as a known tree
+        input_commitments = [get_merkleized_map_commitment(m_in) for m_in in input_maps]
+        output_commitments = [get_merkleized_map_commitment(m_out) for m_out in output_maps]
 
-        print(tx)
-        print()
+        client_intepreter.add_known_list(input_commitments)
+        client_intepreter.add_known_list(output_commitments)
 
-        print(global_map)
-        print(input_maps)
-        print(output_maps)
+        sw, response = self.make_request(
+            self.builder.sign_psbt(global_map, input_maps, output_maps),
+            client_intepreter
+        )
 
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
 
-        return
-        # sw, response = self.make_request(
-        #     self.builder.sign_psbt(hash),
-        #     [
-        #         GetPreimageCommand({
-        #             hash: preimage
-        #         })
-        #     ]
-        # )
-
-        # if sw != 0x9000:
-        #     raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
-
-        # return response.decode()
+        return response

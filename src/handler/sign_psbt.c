@@ -34,11 +34,11 @@
 #include "client_commands.h"
 
 #include "sign_psbt.h"
-
+#include "flows/check_merkle_tree_sorted.h"
 
 // TODO: this is just a placeholder for now.
 
-static void receive_preimage(dispatcher_context_t *dc);
+static void check_global_merkle_tree_sorted_result(dispatcher_context_t *dc);
 
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in it.
@@ -62,30 +62,72 @@ void handler_sign_psbt(
         return;
     }
 
-    uint8_t hash[20];
-    if (!buffer_read_bytes(&dc->read_buffer, hash, 20)) {
+    uint64_t global_map_size;
+    if (!buffer_read_varint(&dc->read_buffer, &global_map_size)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (global_map_size > 252) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+    state->global_map_size = (size_t)global_map_size;
+
+
+    if (!buffer_read_bytes(&dc->read_buffer, state->global_keys_root, 20)
+        || !buffer_read_bytes(&dc->read_buffer, state->global_values_root, 20))
+    {
         PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
-    dc->start_flow(flow_get_merkle_preimage, (machine_context_t *)&state->subcontext.get_merkle_preimage, receive_preimage);
 
-    call_get_merkle_preimage(dc,
-                             &state->subcontext.get_merkle_preimage,
-                             receive_preimage,
-                             hash,
-                             state->preimage,
-                             sizeof(state->preimage));
+    uint64_t n_inputs;
+    if (!buffer_read_varint(&dc->read_buffer, &n_inputs)
+        || !buffer_read_bytes(&dc->read_buffer, state->inputs_root, 20))
+    {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (n_inputs > 252) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+    state->n_inputs = (size_t)n_inputs;
+
+
+    uint64_t n_outputs;
+    if (!buffer_read_varint(&dc->read_buffer, &n_outputs)
+        || !buffer_read_bytes(&dc->read_buffer, state->outputs_root, 20))
+    {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (n_outputs > 252) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+    state->n_outputs = (size_t)n_outputs;
+
+
+    call_check_merkle_tree_sorted(dc,
+                                  &state->subcontext.check_merkle_tree_sorted,
+                                  check_global_merkle_tree_sorted_result,
+                                  state->global_keys_root,
+                                  state->global_map_size);
 }
 
-static void receive_preimage(dispatcher_context_t *dc) {
+static void check_global_merkle_tree_sorted_result(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
-    dc->send_sw(SW_OK);
+    if (!state->subcontext.check_merkle_tree_sorted.result) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
 
-    PRINTF("Result: %d \n", state->subcontext.get_merkle_preimage.result);
-    // TODO
+
+    dc->send_sw(SW_OK);
 }

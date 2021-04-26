@@ -1,10 +1,12 @@
 import enum
 import logging
 import struct
-from typing import List, Tuple, Union, Iterator, cast
+from typing import List, Tuple, Mapping, Union, Iterator, cast
 
 from bitcoin_client.common import bip32_path_from_string, AddressType
 
+from .common import write_varint
+from .merkle import get_merkleized_map_commitment
 from .wallet import Wallet, MultisigWallet
 
 MAX_APDU_LEN: int = 255
@@ -152,15 +154,24 @@ class BitcoinCommandBuilder:
                         ins=BitcoinInsType.GET_WALLET_ADDRESS,
                         cdata=cdata)
 
+    def sign_psbt(self, global_mapping: Mapping[bytes, bytes],
+                  input_mappings: List[Mapping[bytes, bytes]],
+                  output_mappings: List[Mapping[bytes, bytes]]):
 
-    # TODO: placeholder for the actual command, just for testing
-    def sign_psbt(self, hash: bytes):
-        if len(hash) != 20:
-            raise ValueError("Lenght of hash should be 20 bytes.")
+        cdata = bytearray()
+        cdata += get_merkleized_map_commitment(global_mapping)
+
+        cdata += write_varint(len(input_mappings))
+        for m_in in input_mappings:
+            cdata += get_merkleized_map_commitment(m_in)
+
+        cdata += write_varint(len(output_mappings))
+        for m_out in output_mappings:
+            cdata += get_merkleized_map_commitment(m_out)
 
         return self.serialize(cla=self.CLA_BITCOIN,
                         ins=BitcoinInsType.SIGN_PSBT,
-                        cdata=hash)
+                        cdata=bytes(cdata))
 
 
     def continue_interrupted(self, cdata: bytes):

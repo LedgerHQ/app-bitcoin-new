@@ -35,8 +35,8 @@ class GetPreimageCommand(ClientCommand):
         if any(len(k) != 20 for k in known_preimages.keys()):
             raise ValueError("RIPEMD160 hashes must be exactly 20 bytes long.")
 
-        if any(len(v) > 254 for v in known_preimages.values()):
-            raise ValueError("Supported preimages are at most 254 bytes long.")
+        if any(len(v) > 252 for v in known_preimages.values()):
+            raise ValueError("Supported preimages are at most 252 bytes long.")
 
         self.known_preimages = known_preimages
 
@@ -54,7 +54,6 @@ class GetPreimageCommand(ClientCommand):
                 return len(known_preimage).to_bytes(1, byteorder="big") + known_preimage
 
         # not found
-        print(self.known_preimages)
         raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
 
 
@@ -264,6 +263,7 @@ class ClientCommandInterpreter:
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
+        print(f"Known preimage for: {ripemd160(element).hex()}")
         self.known_preimages[ripemd160(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
@@ -271,11 +271,25 @@ class ClientCommandInterpreter:
             self.add_known_preimage(b'\x00' + el)
 
         mt = MerkleTree(element_hash(el) for el in elements)
+
+        print(f"Known merkle tree root: {mt.root.hex()}")
+
         self.known_trees[mt.root] = mt
 
-    def add_known_keylist(self, keys_info: List[str]):
+    def add_known_pubkey_list(self, keys_info: List[str]):
         elements_encoded = [key_info.encode() for key_info in keys_info]
         self.add_known_list(elements_encoded)
 
         mt = MerkleTree(element_hash(el) for el in elements_encoded)
         self.known_keylists[mt.root] = keys_info
+
+    def add_known_mapping(self, mapping: Mapping[bytes, bytes]):
+        items_sorted = list(sorted(mapping.items()))
+
+        print("Added known mapping:")
+        print(items_sorted)
+
+        keys = [i[0] for i in items_sorted]
+        values = [i[1] for i in items_sorted]
+        self.add_known_list(keys)
+        self.add_known_list(values)
