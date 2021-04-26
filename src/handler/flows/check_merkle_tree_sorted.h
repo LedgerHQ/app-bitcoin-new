@@ -45,10 +45,10 @@ void flow_check_merkle_tree_sorted(dispatcher_context_t *dispatcher_context);
  * TODO: more precise docs
  */
 static inline void call_check_merkle_tree_sorted(dispatcher_context_t *dispatcher_context,
-                                   check_merkle_tree_sorted_state_t *flow_state,
-                                   command_processor_t ret_proc,
-                                   const uint8_t root[static 20],
-                                   size_t size)
+                                                 check_merkle_tree_sorted_state_t *flow_state,
+                                                 command_processor_t ret_proc,
+                                                 const uint8_t root[static 20],
+                                                 size_t size)
 {
     memcpy(flow_state->root, root, 20);
 

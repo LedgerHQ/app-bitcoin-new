@@ -40,18 +40,19 @@ static void receive_and_check_preimage(dispatcher_context_t *dc) {
         return;
     }
 
-    state->preimage_len = preimage_len;
+    state->preimage_len = preimage_len - 1; // 1 byte less to remove the 0x00 prefix
 
-    if (state->out_ptr_len < preimage_len) {
+    if (state->out_ptr_len < preimage_len - 1) {
         // output buffer too short
         state->result = false;
         return;
     }
 
     uint8_t hash[20];
-    buffer_read_bytes(&dc->read_buffer, state->out_ptr, preimage_len);
+    crypto_ripemd160(dc->read_buffer.ptr + dc->read_buffer.offset, preimage_len, hash);
 
-    merkle_compute_element_hash(state->out_ptr, preimage_len, hash);
+    buffer_seek_cur(&dc->read_buffer, 1); // skip 0x00 prefix
+    buffer_read_bytes(&dc->read_buffer, state->out_ptr, preimage_len - 1);
 
     state->result = (memcmp(state->hash, hash, 20) == 0);
 }

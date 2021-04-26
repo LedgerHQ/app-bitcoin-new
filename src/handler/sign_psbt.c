@@ -71,7 +71,12 @@ void handler_sign_psbt(
 
     dc->start_flow(flow_get_merkle_preimage, (machine_context_t *)&state->subcontext.get_merkle_preimage, receive_preimage);
 
-    call_get_merkle_preimage(dc, &state->subcontext.get_merkle_preimage, receive_preimage, hash, state->preimage, sizeof(state->preimage));
+    call_get_merkle_preimage(dc,
+                             &state->subcontext.get_merkle_preimage,
+                             receive_preimage,
+                             hash,
+                             state->preimage,
+                             sizeof(state->preimage));
 }
 
 static void receive_preimage(dispatcher_context_t *dc) {

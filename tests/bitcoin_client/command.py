@@ -1,6 +1,8 @@
 import struct
 from typing import Tuple, List, Mapping
 from collections import deque
+import base64
+from io import BytesIO, BufferedReader
 
 from ledgercomm import Transport
 
@@ -11,17 +13,32 @@ from bitcoin_client.command_builder import (
 from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DeviceException
 
-from .client_command import (
-    GetPreimageCommand,
-    GetMerkleLeafHashCommand,
-    GetMerkleLeafIndexCommand,
-    GetMoreElementsCommand,
-    GetPubkeysInDerivationOrder,
-)
+from .client_command import ClientCommandInterpreter
 
 from .common import ripemd160
-from .merkle import element_hash
+from .merkle import element_hash, get_merkleized_map_commitment, MerkleTree
 from .wallet import Wallet, WalletType, MultisigWallet
+from .psbt import PSBT, deser_string
+from .tx import CTransaction
+
+def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
+    result = {}
+    while True:
+        try:
+            key = deser_string(f)
+        except Exception:
+            break
+
+        # Check for separator
+        if len(key) == 0:
+            break
+
+        value = deser_string(f)
+        print(f"Key type: {key[0]}")
+        print(f"{key.hex()}:{value.hex()}")
+
+        result[key] = value
+    return result
 
 
 class BitcoinCommand:
@@ -32,17 +49,14 @@ class BitcoinCommand:
         self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
 
-    def make_request(self, apdu: bytes, commands: List['ClientCommand'] = []) -> Tuple[int, bytes]:
+    def make_request(self, apdu: bytes, client_intepreter: ClientCommandInterpreter = None) -> Tuple[int, bytes]:
         sw, response = self.transport.exchange_raw(apdu)
 
-        commands = { cmd.code: cmd for cmd in commands }
-
         while sw == 0xE000:
-            cmd_code = response[0]
-            if cmd_code not in commands:
-                raise RuntimeError("Unexpected command code: 0x{:02X}".format(cmd_code))  # TODO: more precise Error type
+            if not client_intepreter:
+                raise RuntimeError("Unexpected SW_INTERRUPTED_EXECUTION received.")
 
-            command_response = commands[cmd_code].execute(response)
+            command_response = client_intepreter.execute(response)
             sw, response = self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
 
         return sw, response
@@ -90,27 +104,12 @@ class BitcoinCommand:
         if wallet.type != WalletType.MULTISIG:
             raise ValueError("wallet type must be MULTISIG")
 
-        queue = deque()
-
-        known_images: Mapping[bytes, bytes] = {}
-        elements_lists: List[List[bytes]] = []
-
-        if isinstance(wallet, MultisigWallet):
-            known_images = {
-                element_hash(el.encode()): el.encode() for el in wallet.keys_info
-            }
-            elements_lists.append(list(element_hash(el.encode()) for el in wallet.keys_info))
-        else:
-            raise RuntimeError(f"wallet has unexpected class '{type(wallet).__name__}'")
-
+        cmd_interpreter = ClientCommandInterpreter()
+        cmd_interpreter.add_known_keylist(wallet.keys_info)
 
         sw, response = self.make_request(
-            self.builder.register_wallet(wallet), 
-            [
-                GetPreimageCommand(known_images),
-                GetMerkleLeafHashCommand(elements_lists, queue),
-                GetMoreElementsCommand(queue)
-            ]
+            self.builder.register_wallet(wallet),
+            cmd_interpreter
         )
 
         if sw != 0x9000:
@@ -126,30 +125,15 @@ class BitcoinCommand:
         return wallet_id, sig
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
-        if wallet.type != WalletType.MULTISIG:
+        if wallet.type != WalletType.MULTISIG or not isinstance(wallet, MultisigWallet):
             raise ValueError("wallet type must be MULTISIG")
 
-        queue = deque()
-
-        known_images: Mapping[bytes, bytes] = {}
-        elements_lists: List[List[bytes]] = []
-
-        if isinstance(wallet, MultisigWallet):
-            known_images = {
-                element_hash(el.encode()): el.encode() for el in wallet.keys_info
-            }
-            elements_lists.append(list(element_hash(el.encode()) for el in wallet.keys_info))
-        else:
-            raise RuntimeError(f"wallet has unexpected class '{type(wallet).__name__}'")
+        cmd_interpreter = ClientCommandInterpreter()
+        cmd_interpreter.add_known_keylist(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(wallet, signature, address_index, display),
-            [
-                GetPreimageCommand(known_images),
-                GetMerkleLeafHashCommand(elements_lists, queue),
-                GetMoreElementsCommand(queue),
-                GetPubkeysInDerivationOrder(wallet.keys_info)
-            ]
+            cmd_interpreter
         )
 
         if sw != 0x9000:
@@ -158,18 +142,56 @@ class BitcoinCommand:
         return response.decode()
 
     # TODO: placeholder of the future command that will instead take a psbt as input; just for testing
-    def sign_psbt(self, preimage: bytes) -> str:
-        hash = ripemd160(preimage)
-        sw, response = self.make_request(
-            self.builder.sign_psbt(hash),
-            [
-                GetPreimageCommand({
-                    hash: preimage
-                })
-            ]
-        )
+    def sign_psbt(self, psbt: PSBT) -> str:
+        psbt_bytes = base64.b64decode(psbt.serialize())
+        f = BytesIO(psbt_bytes)
+        end = len(psbt_bytes)
 
-        if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
+        assert f.read(5) == b"psbt\xff"
 
-        return response.decode()
+        global_map = parse_stream_to_map(f)
+
+        if b'\x00' not in global_map:
+            raise ValueError("Invalid PSBT: PSBT_GLOBAL_UNSIGNED_TX")
+
+        # as the psbt format v1 does not specifies the number of inputs and outputs, we need to parse the
+        # PSBT_GLOBAL_UNSIGNED_TX = 0x00 field from the global map.
+
+        tx = CTransaction()
+        tx.deserialize(BytesIO(global_map[b'\x00']))
+
+        input_maps = []
+        for _ in tx.vin:
+            print("INPUT START:", f.tell())
+            input_maps.append(parse_stream_to_map(f))
+
+        output_maps = []
+        for _ in tx.vout:
+            print("OUTPUT START:", f.tell())
+            output_maps.append(parse_stream_to_map(f))
+
+        print(end, f.tell())
+        print(len(input_maps), len(output_maps))
+
+        print(tx)
+        print()
+
+        print(global_map)
+        print(input_maps)
+        print(output_maps)
+
+
+        return
+        # sw, response = self.make_request(
+        #     self.builder.sign_psbt(hash),
+        #     [
+        #         GetPreimageCommand({
+        #             hash: preimage
+        #         })
+        #     ]
+        # )
+
+        # if sw != 0x9000:
+        #     raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
+
+        # return response.decode()

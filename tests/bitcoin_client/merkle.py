@@ -1,5 +1,5 @@
 import hashlib
-from typing import List, Iterable
+from typing import List, Iterable, Mapping, Tuple
 
 # TODO: a class to represent Markle proofs in a more structured way (including size and leaf index)
 
@@ -236,3 +236,11 @@ class MerkleTree:
             len(proof).to_bytes(1, byteorder="big"),
             b''.join(proof)
         ])
+
+
+
+def get_merkleized_map_commitment(m: Mapping[bytes, bytes]) -> Tuple[MerkleTree, MerkleTree]:
+    m_sorted = dict(sorted(m.items()))
+    keys = m_sorted.keys()
+    values = m_sorted.values()
+    return MerkleTree(keys), MerkleTree(values)

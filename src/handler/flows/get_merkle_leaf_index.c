@@ -52,11 +52,11 @@ static void process_response(dispatcher_context_t *dc) {
 
     // We ask the host for the leaf hash with that index
     call_get_merkle_leaf_hash(dc,
-                                 &state->subcontext.get_merkle_leaf_hash,
-                                 verify_proof,
-                                 state->root,
-                                 state->size,
-                                 index);
+                              &state->subcontext.get_merkle_leaf_hash,
+                              verify_proof,
+                              state->root,
+                              state->size,
+                              index);
 }
 
 static void verify_proof(dispatcher_context_t *dc) {

@@ -23,11 +23,11 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
     PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
 
     call_get_merkle_leaf_hash(dc,
-                                    &state->subcontext.get_merkle_leaf_hash,
-                                    check_merkle_proof_result,
-                                    state->merkle_root,
-                                    state->tree_size,
-                                    state->leaf_index);
+                              &state->subcontext.get_merkle_leaf_hash,
+                              check_merkle_proof_result,
+                              state->merkle_root,
+                              state->tree_size,
+                              state->leaf_index);
 }
 
 static void check_merkle_proof_result(dispatcher_context_t *dc) {
@@ -42,11 +42,11 @@ static void check_merkle_proof_result(dispatcher_context_t *dc) {
     }
 
     call_get_merkle_preimage(dc,
-                           &state->subcontext.get_merkle_preimage,
-                           finalize_output,
-                           state->subcontext.get_merkle_leaf_hash.merkle_leaf,
-                           state->out_ptr,
-                           state->out_ptr_len);
+                             &state->subcontext.get_merkle_preimage,
+                             finalize_output,
+                             state->subcontext.get_merkle_leaf_hash.merkle_leaf,
+                             state->out_ptr,
+                             state->out_ptr_len);
 }
 
 

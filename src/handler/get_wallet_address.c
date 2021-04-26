@@ -254,13 +254,13 @@ static void request_next_cosigner(dispatcher_context_t *dc) {
     // we request a key, in the order committed in state->ordered_pubkeys
 
     call_get_merkle_leaf_element(dc,
-                                    &state->subcontext.get_merkle_leaf_element,
-                                    process_next_cosigner_info,
-                                    state->wallet_header.keys_info_merkle_root,
-                                    state->wallet_header.multisig_policy.n_keys,
-                                    state->ordered_pubkeys[state->next_pubkey_index],
-                                    state->next_pubkey_info,
-                                    sizeof(state->next_pubkey_info));
+                                 &state->subcontext.get_merkle_leaf_element,
+                                 process_next_cosigner_info,
+                                 state->wallet_header.keys_info_merkle_root,
+                                 state->wallet_header.multisig_policy.n_keys,
+                                 state->ordered_pubkeys[state->next_pubkey_index],
+                                 state->next_pubkey_info,
+                                 sizeof(state->next_pubkey_info));
 }
 
 

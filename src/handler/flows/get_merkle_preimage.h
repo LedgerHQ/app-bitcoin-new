@@ -33,11 +33,11 @@ void flow_get_merkle_preimage(dispatcher_context_t *dispatcher_context);
  * TODO: more precise docs
  */
 static inline void call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
-                                   get_merkle_preimage_state_t *flow_state,
-                                   command_processor_t ret_proc,
-                                   const uint8_t hash[static 20],
-                                   uint8_t *out_ptr,
-                                   size_t out_ptr_len)
+                                            get_merkle_preimage_state_t *flow_state,
+                                            command_processor_t ret_proc,
+                                            const uint8_t hash[static 20],
+                                            uint8_t *out_ptr,
+                                            size_t out_ptr_len)
 {
     memcpy(flow_state->hash, hash, 20);
     flow_state->out_ptr = out_ptr;

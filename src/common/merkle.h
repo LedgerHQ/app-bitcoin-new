@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+// TODO: RFC6962 defines the empty list hash as sha256(b''); while we're using 0 here. Should we change?
+
 /*
   Implementation of Merkle proof verification. Follows RFC 6962: https://www.rfc-editor.org/rfc/pdfrfc/rfc6962.txt.pdf,
   using RIPEMD160 as the hash function.

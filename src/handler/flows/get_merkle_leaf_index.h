@@ -42,11 +42,11 @@ void flow_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context);
  * TODO: more precise docs
  */
 static inline void call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
-                                   get_merkle_leaf_index_state_t *flow_state,
-                                   command_processor_t ret_proc,
-                                   size_t size,
-                                   const uint8_t root[static 20],
-                                   const uint8_t leaf_hash[static 20])
+                                              get_merkle_leaf_index_state_t *flow_state,
+                                              command_processor_t ret_proc,
+                                              size_t size,
+                                              const uint8_t root[static 20],
+                                              const uint8_t leaf_hash[static 20])
 {
     flow_state->root = root;
     flow_state->leaf_hash = leaf_hash;

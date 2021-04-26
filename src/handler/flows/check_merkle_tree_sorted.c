@@ -26,13 +26,13 @@ void flow_check_merkle_tree_sorted(dispatcher_context_t *dc) {
     state->prev_el_len = 0;
 
     call_get_merkle_leaf_element(dc,
-                                      &state->subcontext.get_merkle_leaf_element,
-                                      receive_element,
-                                      state->root,
-                                      state->size,
-                                      state->cur_el_idx,
-                                      state->cur_el,
-                                      sizeof(state->cur_el));
+                                 &state->subcontext.get_merkle_leaf_element,
+                                 receive_element,
+                                 state->root,
+                                 state->size,
+                                 state->cur_el_idx,
+                                 state->cur_el,
+                                 sizeof(state->cur_el));
 }
 
 // Receives an element; checks if lexicographical order is correct 

@@ -1,7 +1,9 @@
 from enum import IntEnum
 from typing import List, Mapping, Iterable
+from collections import deque
+from hashlib import sha256
 
-from .common import ByteStreamParser
+from .common import ByteStreamParser, ripemd160
 from .key import ExtendedKey
 from .merkle import MerkleTree, element_hash
 
@@ -29,14 +31,14 @@ class ClientCommand:
 
 
 class GetPreimageCommand(ClientCommand):
-    def __init__(self, known_images: Mapping[bytes, bytes]):
-        if any(len(k) != 20 for k in known_images.keys()):
+    def __init__(self, known_preimages: Mapping[bytes, bytes]):
+        if any(len(k) != 20 for k in known_preimages.keys()):
             raise ValueError("RIPEMD160 hashes must be exactly 20 bytes long.")
 
-        if any(len(v) > 254 for v in known_images.values()):
+        if any(len(v) > 254 for v in known_preimages.values()):
             raise ValueError("Supported preimages are at most 254 bytes long.")
 
-        self.known_images = known_images
+        self.known_preimages = known_preimages
 
     @property
     def code(self) -> int:
@@ -44,28 +46,22 @@ class GetPreimageCommand(ClientCommand):
 
     def execute(self, request: bytes) -> bytes:
         req = ByteStreamParser(request[1:])
-        hash = req.read_bytes(20)
+        req_hash = req.read_bytes(20)
         req.assert_empty()
 
-        for known_hash, known_preimage in self.known_images.items():
-            if hash == known_hash:
+        for known_hash, known_preimage in self.known_preimages.items():
+            if req_hash == known_hash:
                 return len(known_preimage).to_bytes(1, byteorder="big") + known_preimage
 
         # not found
-        raise RuntimeError(f"Requested unknown preimage for: {hex(hash)}")
+        print(self.known_preimages)
+        raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
 
 
 class GetMerkleLeafHashCommand(ClientCommand):
-    def __init__(self, elements_lists: List[Iterable[bytes]], queue: "deque[bytes]"):
-        self.roots_map = {}
+    def __init__(self, known_trees: Mapping[bytes, MerkleTree], queue: "deque[bytes]"):
         self.queue = queue
-
-        for elements in elements_lists:
-            if any(len(el) > 254 for el in elements):
-                raise ValueError("Supported preimages are at most 254 bytes long.")
-
-            mt = MerkleTree(elements)
-            self.roots_map[mt.root] = mt
+        self.known_trees = known_trees
 
     @property
     def code(self) -> int:
@@ -79,10 +75,10 @@ class GetMerkleLeafHashCommand(ClientCommand):
         leaf_index = req.read_uint(4)
         req.assert_empty()
 
-        if not root in self.roots_map:
+        if not root in self.known_trees:
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
 
-        mt: MerkleTree = self.roots_map[root]
+        mt: MerkleTree = self.known_trees[root]
 
         if leaf_index >= tree_size or len(mt) != tree_size:
             raise ValueError(f"Invalid index or tree size.")
@@ -108,12 +104,10 @@ class GetMerkleLeafHashCommand(ClientCommand):
         ])
 
 
-# TODO: not tested yet
+# TODO: not tested yet.
 class GetMerkleLeafIndexCommand(ClientCommand):
-    def __init__(self, known_trees: Iterable[MerkleTree]):
-        self.merkle_trees = {
-            mt.root: mt for mt in known_trees
-        }
+    def __init__(self, known_trees: Mapping[bytes, MerkleTree]):
+        self.known_trees = known_trees
 
     @property
     def code(self) -> int:
@@ -126,11 +120,11 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         leaf_hash = req.read_bytes(20)
         req.assert_empty()
 
-        if root not in self.merkle_trees:
+        if root not in self.known_trees:
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
 
         try:
-            leaf_index = self.merkle_trees[root].leaves.index()
+            leaf_index = self.known_trees[root].leaves.index()
         except ValueError:
             raise ValueError(f"The Merkle tree with root {root.hex()} does not have a leaf with hash {leaf_hash.hex()}.")
 
@@ -138,10 +132,8 @@ class GetMerkleLeafIndexCommand(ClientCommand):
 
 
 class GetPubkeysInDerivationOrder(ClientCommand):
-    def __init__(self, keys_info: List[str]):
-        self.keys_info = keys_info
-        keys_info_hashes = map(lambda k: element_hash(k.encode("latin-1")), keys_info)
-        self.merkle_tree = MerkleTree(keys_info_hashes)
+    def __init__(self, known_keylists: Mapping[bytes, List[str]]):
+        self.known_keylists = known_keylists
 
     @property
     def code(self) -> int:
@@ -152,12 +144,14 @@ class GetPubkeysInDerivationOrder(ClientCommand):
 
         root = req.read_bytes(20)
 
-        if root != self.merkle_tree.root:
+        if root not in self.known_keylists:
             raise ValueError(f"Unknown Merkle root: {root.hex()}")
 
+        keys_info = self.known_keylists[root]
+
         tree_size = req.read_uint(4)
-        if tree_size != len(self.keys_info):
-            raise ValueError(f"Invalid tree size: expected {len(self.keys_info)}, not {tree_size}")
+        if tree_size != len(keys_info):
+            raise ValueError(f"Invalid tree size: expected {len(keys_info)}, not {tree_size}")
 
         bip32_path_len = req.read_uint(1)
 
@@ -195,7 +189,7 @@ class GetPubkeysInDerivationOrder(ClientCommand):
             return ext_pubkey.pubkey
 
         # attach its index to every key
-        used_keys = [(i, self.keys_info[i]) for i in key_indexes]
+        used_keys = [(i, keys_info[i]) for i in key_indexes]
         # sort according to the derived pubkey
         sorted_keys = sorted(used_keys, key=lambda index_key: derived_pk(index_key[1]))
 
@@ -237,3 +231,51 @@ class GetMoreElementsCommand(ClientCommand):
             element_len.to_bytes(1, byteorder="big"),
             bytes(response_elements)
         ])
+
+
+
+class ClientCommandInterpreter:
+    # TODO: should we enable a constructor to only pass a subset of the commands?
+    def __init__(self):
+        self.known_preimages: Mapping[bytes, bytes] = {}
+        self.known_trees: Mapping[bytes, MerkleTree] = {}
+        self.known_keylists: Mapping[bytes, List[str]] = {}
+
+        queue = deque()
+
+        commands = [
+            GetPreimageCommand(self.known_preimages),
+            GetMerkleLeafIndexCommand(self.known_trees),
+            GetMerkleLeafHashCommand(self.known_trees, queue),
+            GetMoreElementsCommand(queue),
+            GetPubkeysInDerivationOrder(self.known_keylists)
+        ]
+
+        self.commands = {cmd.code: cmd for cmd in commands}
+
+    def execute(self, hw_response: bytes) -> bytes:
+        if len(hw_response) == 0:
+            raise RuntimeError("Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet.")
+
+        cmd_code = hw_response[0]
+        if cmd_code not in self.commands:
+            raise RuntimeError("Unexpected command code: 0x{:02X}".format(cmd_code))  # TODO: more precise Error type
+
+        return self.commands[cmd_code].execute(hw_response)
+
+    def add_known_preimage(self, element: bytes):
+        self.known_preimages[ripemd160(element)] = element
+
+    def add_known_list(self, elements: List[bytes]):
+        for el in elements:
+            self.add_known_preimage(b'\x00' + el)
+
+        mt = MerkleTree(element_hash(el) for el in elements)
+        self.known_trees[mt.root] = mt
+
+    def add_known_keylist(self, keys_info: List[str]):
+        elements_encoded = [key_info.encode() for key_info in keys_info]
+        self.add_known_list(elements_encoded)
+
+        mt = MerkleTree(element_hash(el) for el in elements_encoded)
+        self.known_keylists[mt.root] = keys_info
