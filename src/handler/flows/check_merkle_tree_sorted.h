@@ -17,9 +17,6 @@ typedef struct {
     uint8_t root[20];
     size_t size;
 
-    // outputs
-    bool result; // true if the hash is correct, false otherwise
-
     // internal state
     size_t cur_el_idx;
     int cur_el_len;
@@ -36,6 +33,7 @@ typedef struct {
 /**
  * Given a Merkle tree root and the size of the tree, it requests all the elements to the client (verifying Merkle
  * proofs) and verifies that the leaf preimages are in lexicographical order.
+ * Fails with SW_INCORRECT_DATA if any at any key is not lexicographically strictly larger than the previous.
  */
 void flow_check_merkle_tree_sorted(dispatcher_context_t *dispatcher_context);
 

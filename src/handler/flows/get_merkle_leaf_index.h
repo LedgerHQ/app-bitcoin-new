@@ -1,8 +1,5 @@
 #pragma once
 
-#include "os.h"
-#include "cx.h"
-
 #include "get_merkle_leaf_hash.h"
 
 #include "../../boilerplate/dispatcher.h"

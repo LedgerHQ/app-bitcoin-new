@@ -11,6 +11,7 @@
 
 // processors
 static void receive_element(dispatcher_context_t *dc);
+static void request_element(dispatcher_context_t *dc);
 
 
 // other utility functions
@@ -19,11 +20,17 @@ static int compare_byte_arrays(const uint8_t array1[], size_t array1_len, const 
 
 void flow_check_merkle_tree_sorted(dispatcher_context_t *dc) {
     check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
-
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->cur_el_idx = 0;
     state->prev_el_len = 0;
+
+    dc->next(request_element);
+}
+
+static void request_element(dispatcher_context_t *dc) {
+    check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     call_get_merkle_leaf_element(dc,
                                  &state->subcontext.get_merkle_leaf_element,
@@ -38,8 +45,7 @@ void flow_check_merkle_tree_sorted(dispatcher_context_t *dc) {
 // Receives an element; checks if lexicographical order is correct 
 static void receive_element(dispatcher_context_t *dc) {
     check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
-
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->subcontext.get_merkle_leaf_element.result == false) {
         dc->send_sw(SW_INCORRECT_DATA);
@@ -48,13 +54,25 @@ static void receive_element(dispatcher_context_t *dc) {
 
     state->cur_el_len = state->subcontext.get_merkle_leaf_element.element_len;
 
+    PRINTF("ELEMENT: ");
+    for (int i = 0; i < state->cur_el_len; i++)
+        PRINTF("%02x", state->cur_el[i]);
+    PRINTF("\n");
+
+    if (state->cur_el_idx > 0) {
+        PRINTF("PREV ELEMENT: ");
+        for (int i = 0; i < state->prev_el_len; i++)
+            PRINTF("%02x", state->prev_el[i]);
+        PRINTF("\n");
+    }
+
+
     if (state->cur_el_idx > 0
         && compare_byte_arrays(state->prev_el, state->prev_el_len, state->cur_el, state->cur_el_len) >= 0)
     {
+        PRINTF("WRONG ORDER\n");
         // elements are not in (strict) lexicographical order
-        PRINTF("Not in lexicographical order.");
-
-        state->result = false;
+        dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
@@ -63,10 +81,9 @@ static void receive_element(dispatcher_context_t *dc) {
 
     ++state->cur_el_idx;
 
+    // repeat if there are more keys
     if (state->cur_el_idx < state->size) {
-        dc->next(receive_element);
-    } else {
-        state->result = true;
+        dc->next(request_element);
     }
 }
 
@@ -80,7 +97,7 @@ static int compare_byte_arrays(const uint8_t array1[], size_t array1_len, const 
 
     // it is unclear from the docs if memcmp(_, _, 0) is guaranteed to return 0; therefore we avoid relying on it here.
     int memcmp_result;
-    if (min_len == 0 || (memcmp_result = memcmp(array1, array2, min_len) == 0)) {
+    if (min_len == 0 || ((memcmp_result = memcmp(array1, array2, min_len)) == 0)) {
         // One of the arrays is a prefix of the other; the shortest comes first
         if (array1_len < array2_len) return -1;
         else if (array1_len > array2_len) return 1;

@@ -54,7 +54,7 @@ void handler_register_wallet(
 ) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (p1 != 0 || p2 != 0) {
         dc->send_sw(SW_WRONG_P1P2);
@@ -138,7 +138,7 @@ void handler_register_wallet(
  * Abort if the user rejected the wallet header, otherwise start processing the pubkeys.
  */
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (!accept) {
         dc->send_sw(SW_DENY);
@@ -154,7 +154,7 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
 static void request_next_cosigner_info(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     call_get_merkle_leaf_element(dc,
                                  &state->subcontext.get_merkle_leaf_element,
@@ -173,7 +173,7 @@ static void request_next_cosigner_info(dispatcher_context_t *dc) {
 static void process_next_cosigner_info(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
@@ -207,7 +207,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (!accept) {
         dc->send_sw(SW_DENY);

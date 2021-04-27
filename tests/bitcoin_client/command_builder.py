@@ -6,7 +6,7 @@ from typing import List, Tuple, Mapping, Union, Iterator, cast
 from bitcoin_client.common import bip32_path_from_string, AddressType
 
 from .common import write_varint
-from .merkle import get_merkleized_map_commitment
+from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
 from .wallet import Wallet, MultisigWallet
 
 MAX_APDU_LEN: int = 255
@@ -162,12 +162,10 @@ class BitcoinCommandBuilder:
         cdata += get_merkleized_map_commitment(global_mapping)
 
         cdata += write_varint(len(input_mappings))
-        for m_in in input_mappings:
-            cdata += get_merkleized_map_commitment(m_in)
+        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_in)) for m_in in input_mappings]).root
 
         cdata += write_varint(len(output_mappings))
-        for m_out in output_mappings:
-            cdata += get_merkleized_map_commitment(m_out)
+        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_out)) for m_out in output_mappings]).root
 
         return self.serialize(cla=self.CLA_BITCOIN,
                         ins=BitcoinInsType.SIGN_PSBT,

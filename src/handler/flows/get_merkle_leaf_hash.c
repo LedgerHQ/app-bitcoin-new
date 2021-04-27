@@ -23,7 +23,7 @@ static void process_proof_steps(get_merkle_leaf_hash_state_t *state, buffer_t *r
 void flow_get_merkle_leaf_hash(dispatcher_context_t *dc) {
     get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t req[1 + 20 + 4 + 4];
     req[0] = CCMD_GET_MERKLE_LEAF_PROOF;
@@ -41,7 +41,7 @@ void flow_get_merkle_leaf_hash(dispatcher_context_t *dc) {
 static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
     get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t proof_size, n_proof_elements;
     if (!buffer_read_bytes(&dc->read_buffer, &state->merkle_leaf, 20)
@@ -88,7 +88,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
 static void request_more_proof_data(dispatcher_context_t *dc) {
     get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->cur_step == state->proof_size) {
         dc->next(check_root);
@@ -104,7 +104,7 @@ static void request_more_proof_data(dispatcher_context_t *dc) {
 static void receive_more_proof_data(dispatcher_context_t *dc) {
     get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t n_proof_elements, elements_len;
     if (!buffer_read_u8(&dc->read_buffer, &n_proof_elements)
@@ -136,7 +136,7 @@ static void receive_more_proof_data(dispatcher_context_t *dc) {
 static void check_root(dispatcher_context_t *dc) {
     get_merkle_leaf_hash_state_t *state = (get_merkle_leaf_hash_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->result = (memcmp(state->merkle_root, state->cur_hash, 20) == 0);
 }

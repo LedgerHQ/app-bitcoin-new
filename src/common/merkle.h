@@ -78,23 +78,13 @@ void merkle_combine_hashes(const uint8_t left[static 20], const uint8_t right[st
  */
 int merkle_get_directions(size_t size, size_t index, uint8_t out[], size_t out_len);
 
-/**
- * TODO: docs
- */
-bool merkle_proof_verify(uint8_t root[static 20],
-                         size_t size,
-                         uint8_t element_hash[static 20],
-                         size_t index,
-                         uint8_t (*proof)[20],
-                         size_t proof_size);
-
 
 /**
- * TODO: docs
+ * Represents the Merkleized version of a key-value map, holding the number of elements, the root of the Merkle tree of the
+ * sorted list of keys, and the root of the Merkle tree of the values (sorted by their correpsonding key).
  */
-bool buffer_read_and_verify_merkle_proof(
-    buffer_t *buffer,
-    const uint8_t root[static 20],
-    size_t size,
-    size_t index,
-    const uint8_t element_hash[static 20]);
+typedef struct {
+  uint64_t size;
+  uint8_t keys_root[20];
+  uint8_t values_root[20];
+} merkleized_map_commitment_t;

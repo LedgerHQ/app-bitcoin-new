@@ -263,7 +263,7 @@ class ClientCommandInterpreter:
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
-        print(f"Known preimage for: {ripemd160(element).hex()}")
+        print(f"Known preimage for: {ripemd160(element).hex()}")  # TODO: remove
         self.known_preimages[ripemd160(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
@@ -272,7 +272,7 @@ class ClientCommandInterpreter:
 
         mt = MerkleTree(element_hash(el) for el in elements)
 
-        print(f"Known merkle tree root: {mt.root.hex()}")
+        print(f"Known merkle tree root: {mt.root.hex()}")  # TODO: remove
 
         self.known_trees[mt.root] = mt
 
@@ -286,8 +286,8 @@ class ClientCommandInterpreter:
     def add_known_mapping(self, mapping: Mapping[bytes, bytes]):
         items_sorted = list(sorted(mapping.items()))
 
-        print("Added known mapping:")
-        print(items_sorted)
+        print("Added known mapping:")  # TODO: remove
+        print(items_sorted)  # TODO: remove
 
         keys = [i[0] for i in items_sorted]
         values = [i[1] for i in items_sorted]

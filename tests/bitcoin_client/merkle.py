@@ -230,7 +230,7 @@ class MerkleTree:
         return proof
 
 
-def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> Tuple[MerkleTree, MerkleTree]:
+def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> bytes:
     items_sorted = list(sorted(mapping.items()))
     keys_hashes = [element_hash(i[0]) for i in items_sorted]
     values_hahses = [element_hash(i[1]) for i in items_sorted]

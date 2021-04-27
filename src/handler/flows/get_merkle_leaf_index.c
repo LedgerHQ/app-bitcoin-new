@@ -17,7 +17,7 @@ static void verify_proof(dispatcher_context_t *dc);
 void flow_get_merkle_leaf_index(dispatcher_context_t *dc) {
     get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t request[1 + 20 + 20];
     request[0] = CCMD_GET_MERKLE_LEAF_INDEX;
@@ -32,7 +32,7 @@ void flow_get_merkle_leaf_index(dispatcher_context_t *dc) {
 static void process_response(dispatcher_context_t *dc) {
     get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t found;
     uint32_t index;
@@ -62,7 +62,7 @@ static void process_response(dispatcher_context_t *dc) {
 static void verify_proof(dispatcher_context_t *dc) {
     get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // Verify that the merkle proof was successful and the hash matches the expected one
     if (state->subcontext.get_merkle_leaf_hash.result == false

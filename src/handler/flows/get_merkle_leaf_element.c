@@ -20,7 +20,7 @@ static void finalize_output(dispatcher_context_t *dc);
 void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
     get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     call_get_merkle_leaf_hash(dc,
                               &state->subcontext.get_merkle_leaf_hash,
@@ -33,7 +33,7 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
 static void check_merkle_proof_result(dispatcher_context_t *dc) {
     get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->subcontext.get_merkle_leaf_hash.result == false) {
         PRINTF("get_merkle_leaf_hash failed!\n");
@@ -53,7 +53,7 @@ static void check_merkle_proof_result(dispatcher_context_t *dc) {
 static void finalize_output(dispatcher_context_t *dc) {
     get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->element_len = state->subcontext.get_merkle_preimage.preimage_len;
     state->result = state->subcontext.get_merkle_preimage.result;

@@ -179,7 +179,7 @@ void handler_get_wallet_address(
 static void request_keys_order(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t request[1 + 20 + 4 + 1 + 4*10 + 1 + 15]; // max size
     request[0] = CCMD_GET_PUBKEYS_IN_DERIVATION_ORDER;
@@ -209,7 +209,7 @@ static void request_keys_order(dispatcher_context_t *dc) {
 static void receive_keys_order(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t n_key_indexes;
     if (!buffer_read_u8(&dc->read_buffer, &n_key_indexes) || !buffer_can_read(&dc->read_buffer, n_key_indexes)) {
@@ -249,7 +249,7 @@ static void receive_keys_order(dispatcher_context_t *dc) {
 static void request_next_cosigner(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // we request a key, in the order committed in state->ordered_pubkeys
 
@@ -270,7 +270,7 @@ static void request_next_cosigner(dispatcher_context_t *dc) {
 static void process_next_cosigner_info(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
@@ -330,7 +330,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 static void generate_address(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t n_keys = state->wallet_header.multisig_policy.n_keys;
     crypto_hash_update_u8(&state->script_hash_context.header, 0x50 + n_keys); // OP_n

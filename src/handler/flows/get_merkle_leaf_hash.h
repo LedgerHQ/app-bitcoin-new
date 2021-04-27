@@ -1,8 +1,5 @@
 #pragma once
 
-#include "os.h"
-#include "cx.h"
-
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
 

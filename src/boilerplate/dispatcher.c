@@ -197,8 +197,12 @@ static void dispatcher_loop() {
         }
     }
 
-    // TODO: here a response (either success or error) should have been send.
-    //       We could add a check, and send a BAD_STATE error otherwise
+    // Here a response (either success or error) should have been send.
+    // Failure to do so indicates a bug in the last command processors.
+    if (G_dispatcher_state.sw == 0) {
+        PRINTF("No response sent from processor befor terminating\n");
+        io_send_sw(SW_BAD_STATE);
+    }
 
     // call the termination callback (e.g. to return to main menu), if given
     if (G_dispatcher_state.termination_cb != NULL) {

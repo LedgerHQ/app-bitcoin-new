@@ -15,7 +15,7 @@ static void receive_and_check_preimage(dispatcher_context_t *dc);
 void flow_get_merkle_preimage(dispatcher_context_t *dc) {
     get_merkle_preimage_state_t *state = (get_merkle_preimage_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t req[1 + 20];
     req[0] = CCMD_GET_PREIMAGE;
@@ -30,7 +30,7 @@ void flow_get_merkle_preimage(dispatcher_context_t *dc) {
 static void receive_and_check_preimage(dispatcher_context_t *dc) {
     get_merkle_preimage_state_t *state = (get_merkle_preimage_state_t *)dc->machine_context_ptr;
 
-    PRINTF("%s %d: %s\n", __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t preimage_len;
     if (!buffer_read_u8(&dc->read_buffer, &preimage_len)

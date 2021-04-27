@@ -1,0 +1,55 @@
+#pragma once
+
+#include "../../boilerplate/dispatcher.h"
+#include "../../common/merkle.h"
+
+#include "../flows/get_merkle_leaf_element.h"
+#include "../flows/check_merkle_tree_sorted.h"
+
+typedef struct {
+    machine_context_t ctx;
+
+    // input
+    uint8_t root[20];
+    int size;
+    int index;
+    merkleized_map_commitment_t *out_ptr;
+
+    // internal state
+    uint8_t raw_output[9 + 2*20]; // maximum size of serialized result (9 bytes for the varint, and the 2 Merkle roots)
+
+    union {
+        get_merkle_leaf_element_state_t get_merkle_leaf_element;
+        check_merkle_tree_sorted_state_t check_merkle_tree_sorted;
+    } subcontext;
+} get_merkleized_map_state_t;
+
+
+/**
+ * TODO
+ */
+void flow_get_merkleized_map(dispatcher_context_t *dispatcher_context);
+
+
+/**
+ * Convenience function to call the call_get_merkleized_map flow.
+ */
+static inline void call_get_merkleized_map(dispatcher_context_t *dispatcher_context,
+                                           get_merkleized_map_state_t *flow_state,
+                                           command_processor_t ret_proc,
+                                           const uint8_t root[static 20],
+                                           int size,
+                                           int index,
+                                           merkleized_map_commitment_t *out_ptr)
+{
+    memcpy(flow_state->root, root, 20);
+    flow_state->size = size;
+    flow_state->index = index;
+    flow_state->out_ptr = out_ptr;
+
+    dispatcher_context->start_flow(
+        flow_get_merkleized_map,
+        (machine_context_t *)flow_state,
+        ret_proc
+    );
+}

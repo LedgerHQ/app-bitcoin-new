@@ -54,7 +54,7 @@ struct dispatcher_context_s {
 //       Therefore, one would have to make sure that no read happens after writes happen, and it would probably be
 //       better if the dispatcher enforces this, by making it impossible to accidentally read the read_buffer after
 //       writes happened.
-//       One way could be have a function get_output_buffer() in the dispatches context, that returns the output
+//       One way could be have a function get_output_buffer() in the dispatcher context, that returns the output
 //       buffer but it first zeroes the read_buffer.
 
 /**
@@ -87,3 +87,21 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                     size_t top_context_size,
                     void (*termination_cb)(void),
                     const command_t *cmd);
+
+
+// Debug utilities
+
+#include "os.h"
+
+// Print current filename, line number and function name.
+// Indents according to the nesting depth for subprocessors. 
+static inline void print_dispatcher_info(dispatcher_context_t *dc, const char *file, int line, const char *func) {
+    machine_context_t *ctx = dc->machine_context_ptr;
+    while (ctx->parent_context != NULL) {
+        PRINTF("----");
+        ctx = ctx->parent_context;
+    }
+    PRINTF("->%s %d: %s\n", file, line, func);
+}
+
+#define LOG_PROCESSOR(dc, file, line, func) print_dispatcher_info(dc, file, line, func)
