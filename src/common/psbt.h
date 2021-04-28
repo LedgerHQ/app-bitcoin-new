@@ -1,0 +1,23 @@
+#pragma once
+
+enum PsbtGlobalType {
+	PSBT_GLOBAL_UNSIGNED_TX = 0,
+};
+
+enum PsbtInputType {
+	PSBT_IN_NON_WITNESS_UTXO    = 0,
+	PSBT_IN_WITNESS_UTXO        = 1,
+	PSBT_IN_PARTIAL_SIG         = 2,
+	PSBT_IN_SIGHASH_TYPE        = 3,
+	PSBT_IN_REDEEM_SCRIPT       = 4,
+	PSBT_IN_WITNESS_SCRIPT      = 5,
+	PSBT_IN_BIP32_DERIVATION    = 6,
+	PSBT_IN_FINAL_SCRIPTSIG     = 7,
+	PSBT_IN_FINAL_SCRIPTWITNESS = 8,
+};
+
+enum PsbtOutputType {
+	PSBT_OUT_REDEEM_SCRIPT      = 0,
+	PSBT_OUT_WITNESS_SCRIPT     = 1,
+	PSBT_OUT_BIP32_DERIVATION   = 2,
+};

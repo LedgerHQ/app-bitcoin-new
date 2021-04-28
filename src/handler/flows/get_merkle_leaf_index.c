@@ -35,9 +35,9 @@ static void process_response(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t found;
-    uint32_t index;
+    uint64_t index;
 
-    if (!buffer_read_u8(&dc->read_buffer, &found) || !buffer_read_u32(&dc->read_buffer, &index, BE)) {
+    if (!buffer_read_u8(&dc->read_buffer, &found) || !buffer_read_varint(&dc->read_buffer, &index)) {
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
@@ -48,7 +48,7 @@ static void process_response(dispatcher_context_t *dc) {
 
     // set results
     state->found = found;
-    state->index = index;
+    state->index = (uint32_t)index;
 
     // We ask the host for the leaf hash with that index
     call_get_merkle_leaf_hash(dc,

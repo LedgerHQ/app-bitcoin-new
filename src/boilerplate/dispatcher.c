@@ -200,7 +200,7 @@ static void dispatcher_loop() {
     // Here a response (either success or error) should have been send.
     // Failure to do so indicates a bug in the last command processors.
     if (G_dispatcher_state.sw == 0) {
-        PRINTF("No response sent from processor befor terminating\n");
+        PRINTF("No response sent from processor before terminating\n");
         io_send_sw(SW_BAD_STATE);
     }
 

@@ -22,8 +22,9 @@
 
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
-#include "../common/write.h"
+#include "../common/psbt.h"
 #include "../common/merkle.h"
+#include "../common/write.h"
 
 #include "../constants.h"
 #include "../types.h"
@@ -36,10 +37,9 @@
 #include "sign_psbt.h"
 
 
-// TODO: this is just a placeholder for now.
-
 static void request_next_input_map(dispatcher_context_t *dc);
 static void receive_next_input_map(dispatcher_context_t *dc);
+static void receive_non_witness_utxo(dispatcher_context_t *dc);
 
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in it.
@@ -124,7 +124,6 @@ static void request_next_input_map(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // TODO: get merkleized input map
     call_get_merkleized_map(dc,
                             &state->subcontext.get_merkleized_map,
                             receive_next_input_map,
@@ -139,5 +138,29 @@ static void receive_next_input_map(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    
+    // TODO
+
+    state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
+
+    call_get_merkleized_map_value(dc,
+                                 &state->subcontext.get_merkleized_map_value,
+                                 receive_non_witness_utxo,
+                                 &state->cur_input_map,
+                                 state->tmp,
+                                 1,
+                                 state->out,
+                                 sizeof(state->out));
+}
+
+static void receive_non_witness_utxo(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    for (int i = 0; i < (int)state->subcontext.get_merkleized_map_value.value_len; i++) {
+        PRINTF("%02x", state->out[i]);
+    }
+    PRINTF("\n");
+
+
 }

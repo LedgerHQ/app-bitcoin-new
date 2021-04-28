@@ -3,7 +3,7 @@ from typing import List, Mapping, Iterable
 from collections import deque
 from hashlib import sha256
 
-from .common import ByteStreamParser, ripemd160
+from .common import ByteStreamParser, ripemd160, write_varint
 from .key import ExtendedKey
 from .merkle import MerkleTree, element_hash
 
@@ -103,7 +103,6 @@ class GetMerkleLeafHashCommand(ClientCommand):
         ])
 
 
-# TODO: not tested yet.
 class GetMerkleLeafIndexCommand(ClientCommand):
     def __init__(self, known_trees: Mapping[bytes, MerkleTree]):
         self.known_trees = known_trees
@@ -123,11 +122,14 @@ class GetMerkleLeafIndexCommand(ClientCommand):
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
 
         try:
-            leaf_index = self.known_trees[root].leaves.index()
+            leaf_index = self.known_trees[root].leaf_index(leaf_hash)
+            found = 1
         except ValueError:
+            leaf_index = 0
+            found = 0
             raise ValueError(f"The Merkle tree with root {root.hex()} does not have a leaf with hash {leaf_hash.hex()}.")
 
-        return leaf_index.to_bytes(4, byteorder="big")
+        return found.to_bytes(1, byteorder="big") + write_varint(leaf_index)
 
 
 class GetPubkeysInDerivationOrder(ClientCommand):

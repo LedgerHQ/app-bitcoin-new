@@ -24,7 +24,6 @@ typedef struct {
 
 
 /**
- * In this flow, the HWW sends a CCMD_MERKLE_LEAF_PROOF.
  * TODO
  */
 void flow_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_context);

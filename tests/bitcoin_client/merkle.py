@@ -215,6 +215,15 @@ class MerkleTree:
         """Return the value of the leaf with index `i`, where 0 <= i < len(self)."""
         return self.leaves[i].value
 
+    def leaf_index(self, x: bytes) -> int:
+        """Return the index of the leaf with hash `x`. Raises `ValueError` if not found."""
+        idx = 0
+        while idx < len(self):
+            if self.leaves[idx].value == x:
+                return idx
+            idx += 1
+        raise ValueError("Leaf not found")
+
     def prove_leaf(self, index: int) -> List[bytes]:
         """Produce the Merkle proof of membership for the leaf with the given index where 0 <= index < len(self)."""
         node = self.leaves[index]
