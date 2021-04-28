@@ -76,6 +76,10 @@ static void start_flow(command_processor_t first_processor, machine_context_t *s
     G_dispatcher_context.machine_context_ptr = subcontext;
 }
 
+static void run_callback(dispatcher_callback_descriptor_t cb, void *calldata) {
+    cb.fn(cb.state, calldata);
+}
+
 
 int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                     int n_descriptors,
@@ -98,6 +102,7 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.pause = pause;
     G_dispatcher_context.run = run;
     G_dispatcher_context.start_flow = start_flow;
+    G_dispatcher_context.run_callback = run_callback;
 
     G_dispatcher_context.read_buffer.ptr = cmd->data;
     G_dispatcher_context.read_buffer.size = cmd->lc;
