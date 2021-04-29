@@ -31,13 +31,8 @@ class ClientCommand:
 
 
 class GetPreimageCommand(ClientCommand):
-    def __init__(self, known_preimages: Mapping[bytes, bytes]):
-        if any(len(k) != 20 for k in known_preimages.keys()):
-            raise ValueError("RIPEMD160 hashes must be exactly 20 bytes long.")
-
-        if any(len(v) > 252 for v in known_preimages.values()):
-            raise ValueError("Supported preimages are at most 252 bytes long.")
-
+    def __init__(self, known_preimages: Mapping[bytes, bytes], queue: "deque[bytes]"):
+        self.queue = queue
         self.known_preimages = known_preimages
 
     @property
@@ -51,7 +46,19 @@ class GetPreimageCommand(ClientCommand):
 
         for known_hash, known_preimage in self.known_preimages.items():
             if req_hash == known_hash:
-                return len(known_preimage).to_bytes(1, byteorder="big") + known_preimage
+                preimage_len_out = write_varint(len(known_preimage))
+
+                # We can send at most 255 - len(preimage_len_out) - 1 bytes in a single message;
+                # the rest will be stored for GET_MORE_ELEMENTS
+
+                max_payload_size = 255 - len(preimage_len_out) - 1
+
+                payload_size = min(max_payload_size, len(known_preimage))
+
+                if (payload_size < len(known_preimage)):
+                    self.queue.extend(known_preimage[payload_size:])  # add to the queue any remaining extra bytes
+
+                return preimage_len_out + payload_size.to_bytes(1, byteorder="big") + known_preimage[:payload_size]
 
         # not found
         raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
@@ -245,7 +252,7 @@ class ClientCommandInterpreter:
         queue = deque()
 
         commands = [
-            GetPreimageCommand(self.known_preimages),
+            GetPreimageCommand(self.known_preimages, queue),
             GetMerkleLeafIndexCommand(self.known_trees),
             GetMerkleLeafHashCommand(self.known_trees, queue),
             GetMoreElementsCommand(queue),

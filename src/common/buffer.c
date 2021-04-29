@@ -225,3 +225,13 @@ bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness)
 
     return true;
 }
+
+bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n) {
+    if (!buffer_can_read(buffer, n)) {
+        return false;
+    }
+
+    memmove(buffer->ptr + buffer->offset, data, n);
+    buffer_seek_cur(buffer, n);
+    return true;
+}

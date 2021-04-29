@@ -183,7 +183,7 @@ bool buffer_read_bytes(buffer_t *buffer, void *out, size_t n);
  * Write a uint8_t into a buffer.
  *
  * @param[in,out]  buffer
- *   Pointer to input buffer struct.
+ *   Pointer to output buffer struct.
  * @param[out]     value
  *   Value to be written.
  *
@@ -196,7 +196,7 @@ bool buffer_write_u8(buffer_t *buffer, uint8_t value);
  * Write a uint16_t into the buffer as 2 bytes, with the given endianness.
  *
  * @param[in,out]  buffer
- *   Pointer to input buffer struct.
+ *   Pointer to output buffer struct.
  * @param[out]     value
  *   Value to be written.
  * @param[in]      endianness
@@ -211,7 +211,7 @@ bool buffer_write_u16(buffer_t *buffer, uint16_t value, endianness_t endianness)
  * Write a uint32_t into the buffer as 4 bytes, with the given endianness.
  *
  * @param[in,out]  buffer
- *   Pointer to input buffer struct.
+ *   Pointer to output buffer struct.
  * @param[out]     value
  *   Value to be written.
  * @param[in]      endianness
@@ -226,7 +226,7 @@ bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness)
  * Write a uint64_t into the buffer as 8 bytes, with the given endianness.
  *
  * @param[in,out]  buffer
- *   Pointer to input buffer struct.
+ *   Pointer to output buffer struct.
  * @param[out]     value
  *   Value to be written.
  * @param[in]      endianness
@@ -236,3 +236,19 @@ bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness)
  *
  */
 bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness);
+
+
+/**
+ * Write a number of bytes to a buffer.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to output buffer struct.
+ * @param[in]      data
+ *   Pointer to bytes to be written.
+ * @param[in]      n
+ *   Size of bytes to be written.
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n);

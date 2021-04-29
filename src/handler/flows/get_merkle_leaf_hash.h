@@ -7,7 +7,7 @@ typedef struct {
     machine_context_t ctx;
 
     // inputs/outputs
-    uint8_t merkle_root[20];
+    const uint8_t *merkle_root;
     uint32_t tree_size;
     uint32_t leaf_index;
 
@@ -40,7 +40,7 @@ static inline void call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_co
                                              uint32_t tree_size,
                                              uint32_t leaf_index)
 {
-    memcpy(flow_state->merkle_root, merkle_root, 20);
+    flow_state->merkle_root = merkle_root;
     flow_state->tree_size = tree_size;
     flow_state->leaf_index = leaf_index;
     dispatcher_context->start_flow(

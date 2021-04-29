@@ -47,30 +47,12 @@ static void receive_element(dispatcher_context_t *dc) {
     check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->subcontext.get_merkle_leaf_element.result == false) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
     state->cur_el_len = state->subcontext.get_merkle_leaf_element.element_len;
-
-    PRINTF("ELEMENT: ");
-    for (int i = 0; i < state->cur_el_len; i++)
-        PRINTF("%02x", state->cur_el[i]);
-    PRINTF("\n");
-
-    if (state->cur_el_idx > 0) {
-        PRINTF("PREV ELEMENT: ");
-        for (int i = 0; i < state->prev_el_len; i++)
-            PRINTF("%02x", state->prev_el[i]);
-        PRINTF("\n");
-    }
 
 
     if (state->cur_el_idx > 0
         && compare_byte_arrays(state->prev_el, state->prev_el_len, state->cur_el, state->cur_el_len) >= 0)
     {
-        PRINTF("WRONG ORDER\n");
         // elements are not in (strict) lexicographical order
         dc->send_sw(SW_INCORRECT_DATA);
         return;

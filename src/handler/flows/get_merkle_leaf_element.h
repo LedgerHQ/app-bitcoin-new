@@ -13,16 +13,16 @@ typedef struct {
     machine_context_t ctx;
 
     // inputs/outputs
-    uint8_t merkle_root[20];
+    const uint8_t *merkle_root;
     uint32_t tree_size;
     uint32_t leaf_index;
     uint8_t *out_ptr;
     size_t out_ptr_len;
 
     size_t element_len;
-    bool result;
 
     // internal state
+    uint8_t leaf_hash[20];
     union {
         get_merkle_preimage_state_t get_merkle_preimage;
         get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
@@ -49,7 +49,7 @@ static inline void call_get_merkle_leaf_element(dispatcher_context_t *dispatcher
                                                 uint8_t *out_ptr,
                                                 size_t out_ptr_len)
 {
-    memcpy(flow_state->merkle_root, merkle_root, 20);
+    flow_state->merkle_root = merkle_root;
     flow_state->tree_size = tree_size;
     flow_state->leaf_index = leaf_index;
     flow_state->out_ptr = out_ptr;

@@ -10,7 +10,7 @@ typedef struct {
     machine_context_t ctx;
 
     // input
-    uint8_t root[20];
+    const uint8_t *root;
     int size;
     int index;
     merkleized_map_commitment_t *out_ptr;
@@ -42,7 +42,7 @@ static inline void call_get_merkleized_map(dispatcher_context_t *dispatcher_cont
                                            int index,
                                            merkleized_map_commitment_t *out_ptr)
 {
-    memcpy(flow_state->root, root, 20);
+    flow_state->root = root;
     flow_state->size = size;
     flow_state->index = index;
     flow_state->out_ptr = out_ptr;

@@ -51,12 +51,6 @@ static void receive_value(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (!state->subcontext.get_merkle_leaf_element.result) {
-        PRINTF("Error fetching value.");
-        dc->send_sw(SW_BAD_STATE); // this should never happen
-        return;
-    }
-
     // all done
     state->value_len = state->subcontext.get_merkle_leaf_element.element_len;
 }

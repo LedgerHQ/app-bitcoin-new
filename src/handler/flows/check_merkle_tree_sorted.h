@@ -8,21 +8,22 @@
 #include "../../boilerplate/dispatcher.h"
 
 // this flow aborts if any element is larger than this size
-#define MAX_CHECK_MERKLE_TREE_PREIMAGE_SIZE 128
+// In PSBT, keys are currently up to 1+78 (for a serialized extended public key).
+#define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE 80
 
 typedef struct {
     machine_context_t ctx;
 
     // input
-    uint8_t root[20];
+    const uint8_t *root;
     size_t size;
 
     // internal state
     size_t cur_el_idx;
     int cur_el_len;
-    uint8_t cur_el[MAX_CHECK_MERKLE_TREE_PREIMAGE_SIZE];
+    uint8_t cur_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
     int prev_el_len;
-    uint8_t prev_el[MAX_CHECK_MERKLE_TREE_PREIMAGE_SIZE];
+    uint8_t prev_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
 
     union {
         get_merkle_leaf_element_state_t get_merkle_leaf_element;
@@ -48,8 +49,7 @@ static inline void call_check_merkle_tree_sorted(dispatcher_context_t *dispatche
                                                  const uint8_t root[static 20],
                                                  size_t size)
 {
-    memcpy(flow_state->root, root, 20);
-
+    flow_state->root = root;
     flow_state->size = size;
 
     dispatcher_context->start_flow(

@@ -27,7 +27,9 @@ void flow_get_merkle_leaf_hash(dispatcher_context_t *dc) {
 
     uint8_t req[1 + 20 + 4 + 4];
     req[0] = CCMD_GET_MERKLE_LEAF_PROOF;
+
     memcpy(&req[1], state->merkle_root, 20);
+
     write_u32_be(req, 1 + 20, state->tree_size);
     write_u32_be(req, 1 + 20 + 4, state->leaf_index);
 
@@ -106,6 +108,7 @@ static void receive_more_proof_data(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    // Parse response to CCMD_GET_MORE_ELEMENTS
     uint8_t n_proof_elements, elements_len;
     if (!buffer_read_u8(&dc->read_buffer, &n_proof_elements)
         || !buffer_read_u8(&dc->read_buffer, &elements_len)
