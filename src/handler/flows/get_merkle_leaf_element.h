@@ -37,7 +37,7 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context);
 
 
 /**
- * Convenience function to call the get_merkle_preimage flow.
+ * Convenience function to call the get_merkle_leaf_element flow.
  * TODO: more precise docs
  */
 static inline void call_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context,

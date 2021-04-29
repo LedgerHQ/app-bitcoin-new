@@ -38,7 +38,8 @@
 
 
 static void request_next_input_map(dispatcher_context_t *dc);
-static void receive_next_input_map(dispatcher_context_t *dc);
+static void validate_input_map(dispatcher_context_t *dc);
+static void process_input_map(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
 
 /**
@@ -126,41 +127,60 @@ static void request_next_input_map(dispatcher_context_t *dc) {
 
     call_get_merkleized_map(dc,
                             &state->subcontext.get_merkleized_map,
-                            receive_next_input_map,
+                            validate_input_map,
                             state->inputs_root,
                             state->n_inputs,
                             state->cur_input_index,
                             &state->cur_input_map);
 }
 
-static void receive_next_input_map(dispatcher_context_t *dc) {
+
+static void validate_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // TODO
+    call_check_merkle_tree_sorted(dc,
+                                  &state->subcontext.check_merkle_tree_sorted,
+                                  process_input_map,
+                                  state->cur_input_map.keys_root,
+                                  (size_t)state->cur_input_map.size);
+}
+
+
+static void cb_process_data(sign_psbt_state_t *state, buffer_t *data) {
+    PRINTF("Callback called with %d bytes\n", data->size - data->offset);
+
+    uint8_t byte;
+    while (buffer_read_u8(data, &byte)) {
+        PRINTF("%02X", byte);
+    }
+    PRINTF("\n");
+}
+
+
+static void process_input_map(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
 
-    call_get_merkleized_map_value(dc,
-                                  &state->subcontext.get_merkleized_map_value,
-                                  receive_non_witness_utxo,
-                                  &state->cur_input_map,
-                                  state->tmp,
-                                  1,
-                                  state->out,
-                                  sizeof(state->out));
+    call_stream_merkleized_map_value(dc,
+                                     &state->subcontext.stream_merkleized_map_value,
+                                     receive_non_witness_utxo,
+                                     &state->cur_input_map,
+                                     state->tmp,
+                                     1,
+                                     make_callback(dc, (dispatcher_callback_t)cb_process_data));
 }
+
 
 static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    for (int i = 0; i < (int)state->subcontext.get_merkleized_map_value.value_len; i++) {
-        PRINTF("%02x", state->out[i]);
-    }
-    PRINTF("\n");
-
-
+    // TODO
+    dc->send_sw(SW_OK);
 }

@@ -4,9 +4,9 @@
 #include "../common/merkle.h"
 
 #include "flows/check_merkle_tree_sorted.h"
-#include "flows/get_merkle_leaf_element.h"
+#include "flows/stream_merkle_leaf_element.h"
 #include "flows/get_merkleized_map.h"
-#include "flows/get_merkleized_map_value.h"
+#include "flows/stream_merkleized_map_value.h"
 
 
 typedef struct {
@@ -24,13 +24,11 @@ typedef struct {
 
     uint8_t tmp[80];  // temporary array to store keys requested in the PSBT maps
 
-    uint8_t out[128]; // temporary array to store outputs
-
     union {
         check_merkle_tree_sorted_state_t check_merkle_tree_sorted;
-        get_merkle_leaf_element_state_t get_merkle_leaf_element;
+        stream_merkle_leaf_element_state_t stream_merkle_leaf_element;
         get_merkleized_map_state_t get_merkleized_map;
-        get_merkleized_map_value_state_t get_merkleized_map_value;
+        stream_merkleized_map_value_state_t stream_merkleized_map_value;
     } subcontext;
 } sign_psbt_state_t;
 

@@ -12,7 +12,7 @@
 static void check_result(dispatcher_context_t *dc);
 
 
-void process_data(get_merkle_preimage_state_t *state, buffer_t *data) {
+static void cb_process_data(get_merkle_preimage_state_t *state, buffer_t *data) {
     if (!state->first_chunk_processed) {
         // On the first batch of data, skip the 0x00 prefix for Merkle leaves
         buffer_seek_cur(data, 1);
@@ -48,7 +48,7 @@ void flow_get_merkle_preimage(dispatcher_context_t *dc) {
     };
     call_stream_preimage(dc, &state->subcontext.stream_preimage, check_result,
                          state->hash,
-                         make_callback(state, (dispatcher_callback_t)process_data));
+                         make_callback(state, (dispatcher_callback_t)cb_process_data));
 }
 
 // Check if an overflow occurred
