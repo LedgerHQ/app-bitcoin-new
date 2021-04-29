@@ -143,13 +143,13 @@ static void receive_next_input_map(dispatcher_context_t *dc) {
     state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
 
     call_get_merkleized_map_value(dc,
-                                 &state->subcontext.get_merkleized_map_value,
-                                 receive_non_witness_utxo,
-                                 &state->cur_input_map,
-                                 state->tmp,
-                                 1,
-                                 state->out,
-                                 sizeof(state->out));
+                                  &state->subcontext.get_merkleized_map_value,
+                                  receive_non_witness_utxo,
+                                  &state->cur_input_map,
+                                  state->tmp,
+                                  1,
+                                  state->out,
+                                  sizeof(state->out));
 }
 
 static void receive_non_witness_utxo(dispatcher_context_t *dc) {

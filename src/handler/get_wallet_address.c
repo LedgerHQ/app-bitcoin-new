@@ -156,8 +156,10 @@ void handler_get_wallet_address(
         return;
     }
 
+    /* STAGE 0 STARTS HERE */
+
     // Init command state
-    state->next_pubkey_index = 0;
+    state->shared.stage0.next_pubkey_index = 0;
 
     cx_sha256_init(&state->script_hash_context);
 
@@ -169,7 +171,7 @@ void handler_get_wallet_address(
     } else {
         // Keep the canonical order for multi()
         for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
-            state->ordered_pubkeys[i] = i;
+            state->shared.stage0.ordered_pubkeys[i] = i;
         }
         dc->next(request_next_cosigner);
     }
@@ -236,7 +238,7 @@ static void receive_keys_order(dispatcher_context_t *dc) {
         }
         seen_pubkeys[k] = 1;
 
-        state->ordered_pubkeys[i] = k;
+        state->shared.stage0.ordered_pubkeys[i] = k;
     }
 
     dc->next(request_next_cosigner);
@@ -258,9 +260,9 @@ static void request_next_cosigner(dispatcher_context_t *dc) {
                                  process_next_cosigner_info,
                                  state->wallet_header.keys_info_merkle_root,
                                  state->wallet_header.multisig_policy.n_keys,
-                                 state->ordered_pubkeys[state->next_pubkey_index],
-                                 state->next_pubkey_info,
-                                 sizeof(state->next_pubkey_info));
+                                 state->shared.stage0.ordered_pubkeys[state->shared.stage0.next_pubkey_index],
+                                 state->shared.stage0.next_pubkey_info,
+                                 sizeof(state->shared.stage0.next_pubkey_info));
 }
 
 
@@ -274,7 +276,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = {
-        .ptr = (uint8_t *)&state->next_pubkey_info,
+        .ptr = (uint8_t *)&state->shared.stage0.next_pubkey_info,
         .offset = 0,
         .size = state->subcontext.get_merkle_leaf_element.element_len
     };
@@ -293,39 +295,39 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     }
     // TODO: validate checksum
 
-    serialized_extended_pubkey_t *decoded_pubkey = &decoded_pubkey_check.serialize_extended_pubkey;
+    serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialize_extended_pubkey;
 
     // we derive the /0/i child of this pubkey
-    serialized_extended_pubkey_t tmp_pubkey; // temporary variable to store the /0 derivation
-    serialized_extended_pubkey_t cosigner_derived_pubkey; // pubkey of the /0/i derivation
-    bip32_CKDpub(decoded_pubkey, 0, &tmp_pubkey);
-    bip32_CKDpub(&tmp_pubkey, state->address_index, &cosigner_derived_pubkey);
-
+    // we reuse the same memory of ext_pubkey to save RAM
+    bip32_CKDpub(ext_pubkey, 0, ext_pubkey);
+    bip32_CKDpub(ext_pubkey, state->address_index, ext_pubkey);
 
     // check lexicographic sorting if appropriate
-    if (state->wallet_header.multisig_policy.sorted && state->next_pubkey_index > 0) {
-        if (memcmp(state->prev_compressed_pubkey, cosigner_derived_pubkey.compressed_pubkey, 33) >= 0) {
-            PRINTF("Keys provided in wrong order\n");
+    if (state->wallet_header.multisig_policy.sorted && state->shared.stage0.next_pubkey_index > 0) {
+        if (memcmp(state->shared.stage0.prev_compressed_pubkey, ext_pubkey->compressed_pubkey, 33) >= 0) {
             dc->send_sw(SW_INCORRECT_DATA);
             return;
         }
     }
 
-    memcpy(state->prev_compressed_pubkey, cosigner_derived_pubkey.compressed_pubkey, 33);
+    memcpy(state->shared.stage0.prev_compressed_pubkey, ext_pubkey->compressed_pubkey, 33);
 
     // update script hash with PUSH opcode for this pubkey
     crypto_hash_update_u8(&state->script_hash_context.header, 0x21); // PUSH 33 bytes
-    crypto_hash_update(&state->script_hash_context.header, cosigner_derived_pubkey.compressed_pubkey, 33);
+    crypto_hash_update(&state->script_hash_context.header, ext_pubkey->compressed_pubkey, 33);
 
     // TODO: add push opcode to script hash (0x22<pubkey starting with 02 or 03>)
-    ++state->next_pubkey_index;
-    if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
+    ++state->shared.stage0.next_pubkey_index;
+    if (state->shared.stage0.next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
         dc->next(request_next_cosigner);
     } else {
         dc->next(generate_address);
     }
 }
 
+/* STAGE 0 ENDS HERE */
+
+/* STAGE 1 STARTS HERE */
 
 static void generate_address(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
@@ -354,12 +356,12 @@ static void generate_address(dispatcher_context_t *dc) {
     int address_type = state->wallet_header.multisig_policy.address_type;
     switch (address_type) {
         case ADDRESS_TYPE_LEGACY:
-            address_len = base58_encode_address(script_rip, G_context.p2sh_version, state->address, sizeof(state->address));
+            address_len = base58_encode_address(script_rip, G_context.p2sh_version, state->shared.stage1.address, sizeof(state->shared.stage1.address));
             if (address_len == -1) {
                 dc->send_sw(SW_BAD_STATE); // should never happen
                 return;
             } else {
-                state->address_len = (unsigned int)address_len;
+                state->shared.stage1.address_len = (unsigned int)address_len;
             }
 
             break;
@@ -371,16 +373,19 @@ static void generate_address(dispatcher_context_t *dc) {
 
             crypto_hash160(redeem_script, 2 + 32, redeem_script_rip);
             if (address_type == ADDRESS_TYPE_SH_WIT) {
-                int address_len = base58_encode_address(redeem_script_rip, G_context.p2sh_version, state->address, sizeof(state->address));
+                int address_len = base58_encode_address(redeem_script_rip,
+                                                        G_context.p2sh_version,
+                                                        state->shared.stage1.address,
+                                                        sizeof(state->shared.stage1.address));
                 if (address_len == -1) {
                     dc->send_sw(SW_BAD_STATE); // should never happen
                     return;
                 } else {
-                    state->address_len = (unsigned int)address_len;
+                    state->shared.stage1.address_len = (unsigned int)address_len;
                 }
             } else { // address_type == ADDRESS_TYPE_WIT
                 int ret = segwit_addr_encode(
-                    state->address,
+                    state->shared.stage1.address,
                     G_context.native_segwit_prefix,
                     0, redeem_script + 2, 32
                 );
@@ -390,19 +395,19 @@ static void generate_address(dispatcher_context_t *dc) {
                     return;
                 }
 
-                state->address_len = strlen(state->address);
+                state->shared.stage1.address_len = strlen(state->shared.stage1.address);
             }
             break;
         default:
             dc->send_sw(SW_BAD_STATE);
             return; // this can never happen
     }
-    state->address[state->address_len] = '\0';
+    state->shared.stage1.address[state->shared.stage1.address_len] = '\0';
 
     if (state->display_address == 0) {
         ui_action_validate_address(dc, true);
     } else {
-        ui_display_wallet_address(dc, state->wallet_header.name, state->address, ui_action_validate_address);
+        ui_display_wallet_address(dc, state->wallet_header.name, state->shared.stage1.address, ui_action_validate_address);
     }
 }
 
@@ -411,10 +416,12 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
     if (accepted) {
-        dc->send_response(state->address, state->address_len, SW_OK);
+        dc->send_response(state->shared.stage1.address, state->shared.stage1.address_len, SW_OK);
     } else {
         dc->send_sw(SW_DENY);
     }
 
     dc->run();
 }
+
+/* STAGE 1 ENDS HERE */

@@ -31,6 +31,7 @@
 
 #include "crypto.h"
 
+
 /**
  * Generator for secp256k1, value 'g' defined in "Standards for Efficient Cryptography" (SEC2) 2.7.1.
  */
@@ -213,7 +214,6 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
     cx_hmac_t hmac_context;
     uint8_t I[64];
 
-
     cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
     cx_hmac(&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
 
@@ -240,7 +240,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
         return -3; // the point at infinity is not a valid child pubkey (should never happen in practice)
     }
 
-    memcpy(child->version, parent->version, 4);
+    memmove(child->version, parent->version, 4);
     child->depth = parent->depth + 1;
 
     uint32_t parent_fingerprint = crypto_get_key_fingerprint(parent->compressed_pubkey);

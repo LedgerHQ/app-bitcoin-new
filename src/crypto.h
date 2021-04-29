@@ -101,7 +101,8 @@ int crypto_init_public_key(
  * @param[out] index
  *   Index of the child to derive. It MUST be not hardened, that is, strictly less than 0x80000000.
  * @param[out] child
- *   Pointer to the output struct for the child's serialized pubkey.
+ *   Pointer to the output struct for the child's serialized pubkey. It can equal parent, which in that case is
+ *   overwritten.
  *
  * @return 0 if success, a negative number on failure.
  *

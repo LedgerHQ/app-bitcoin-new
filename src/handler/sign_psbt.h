@@ -22,10 +22,9 @@ typedef struct {
     int cur_input_index;
     merkleized_map_commitment_t cur_input_map;
 
-    uint8_t tmp[128];  // temporary array to store keys requested in the PSBT maps
-                       // TODO: figure out the correct maximum length
+    uint8_t tmp[80];  // temporary array to store keys requested in the PSBT maps
 
-    uint8_t out[256];  // temporary array to store outputs
+    uint8_t out[128]; // temporary array to store outputs
 
     union {
         check_merkle_tree_sorted_state_t check_merkle_tree_sorted;
