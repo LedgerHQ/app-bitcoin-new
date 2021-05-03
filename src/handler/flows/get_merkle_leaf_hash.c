@@ -46,7 +46,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t proof_size, n_proof_elements;
-    if (!buffer_read_bytes(&dc->read_buffer, state->merkle_leaf, 20)
+    if (!buffer_read_bytes(&dc->read_buffer, state->cur_hash, 20)
         || !buffer_read_u8(&dc->read_buffer, &proof_size)
         || !buffer_read_u8(&dc->read_buffer, &n_proof_elements))
     {
@@ -76,8 +76,10 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
         return;
     }
 
-    // Initialize other necessary variables to verify the proof
-    memcpy(state->cur_hash, state->merkle_leaf, 20);
+    // Copy leaf hash to output (although it is not verified yet)
+    memcpy(state->out, state->cur_hash, 20);
+
+    // Initialize proof verification
     state->cur_step = 0;
 
     process_proof_steps(state, &dc->read_buffer, n_proof_elements);
@@ -141,7 +143,12 @@ static void check_root(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    state->result = (memcmp(state->merkle_root, state->cur_hash, 20) == 0);
+    if (memcmp(state->merkle_root, state->cur_hash, 20) != 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    // all done
 }
 
 

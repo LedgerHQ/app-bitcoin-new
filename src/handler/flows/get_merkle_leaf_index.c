@@ -11,7 +11,7 @@
 
 
 static void process_response(dispatcher_context_t *dc);
-static void verify_proof(dispatcher_context_t *dc);
+static void verify_hash(dispatcher_context_t *dc);
 
 
 void flow_get_merkle_leaf_index(dispatcher_context_t *dc) {
@@ -53,21 +53,20 @@ static void process_response(dispatcher_context_t *dc) {
     // We ask the host for the leaf hash with that index
     call_get_merkle_leaf_hash(dc,
                               &state->subcontext.get_merkle_leaf_hash,
-                              verify_proof,
+                              verify_hash,
                               state->root,
                               state->size,
-                              index);
+                              index,
+                              state->returned_merkle_leaf_hash);
 }
 
-static void verify_proof(dispatcher_context_t *dc) {
+static void verify_hash(dispatcher_context_t *dc) {
     get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // Verify that the merkle proof was successful and the hash matches the expected one
-    if (state->subcontext.get_merkle_leaf_hash.result == false
-        || memcmp(state->leaf_hash, state->subcontext.get_merkle_leaf_hash.merkle_leaf, 20) != 0)
-    {
+    // Verify that the hash matches the expected one
+    if (memcmp(state->leaf_hash, state->returned_merkle_leaf_hash, 20) != 0){
         dc->send_sw(SW_INCORRECT_DATA);
     }
 

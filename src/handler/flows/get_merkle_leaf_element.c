@@ -27,16 +27,14 @@ void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
                               get_preimage,
                               state->merkle_root,
                               state->tree_size,
-                              state->leaf_index);
+                              state->leaf_index,
+                              state->leaf_hash);
 }
 
 static void get_preimage(dispatcher_context_t *dc) {
     get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    // copy result from the subcontext's memory
-    memcpy(state->leaf_hash, state->subcontext.get_merkle_leaf_hash.merkle_leaf, 20);
 
     call_get_merkle_preimage(dc,
                              &state->subcontext.get_merkle_preimage,

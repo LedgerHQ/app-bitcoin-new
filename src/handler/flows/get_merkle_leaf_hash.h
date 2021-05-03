@@ -11,8 +11,7 @@ typedef struct {
     uint32_t tree_size;
     uint32_t leaf_index;
 
-    uint8_t merkle_leaf[20];
-    bool result; // true if the merkle root matches, false otherwise
+    uint8_t *out;
 
     // internal state
     uint8_t cur_hash[20]; // temporary buffer for intermediate hashes
@@ -38,11 +37,13 @@ static inline void call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_co
                                              command_processor_t ret_proc,
                                              const uint8_t merkle_root[static 20],
                                              uint32_t tree_size,
-                                             uint32_t leaf_index)
+                                             uint32_t leaf_index,
+                                             uint8_t out[static 20])
 {
     flow_state->merkle_root = merkle_root;
     flow_state->tree_size = tree_size;
     flow_state->leaf_index = leaf_index;
+    flow_state->out = out;
     dispatcher_context->start_flow(
         flow_get_merkle_leaf_hash,
         (machine_context_t *)flow_state,
