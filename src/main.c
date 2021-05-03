@@ -26,7 +26,7 @@
 #include "io.h"
 #include "sw.h"
 #include "ui/menu.h"
-#include "boilerplate/parser.h"
+#include "boilerplate/apdu_parser.h"
 #include "boilerplate/dispatcher.h"
 
 #include "handler/get_pubkey.h"

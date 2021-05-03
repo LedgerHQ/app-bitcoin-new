@@ -157,7 +157,7 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len) {
     return true;
 }
 
-bool buffer_read_bytes(buffer_t *buffer, void *out, size_t n) {
+bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n) {
     if (buffer->size - buffer->offset < n) {
         return false;
     }

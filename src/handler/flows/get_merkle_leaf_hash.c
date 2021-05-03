@@ -46,7 +46,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t proof_size, n_proof_elements;
-    if (!buffer_read_bytes(&dc->read_buffer, &state->merkle_leaf, 20)
+    if (!buffer_read_bytes(&dc->read_buffer, state->merkle_leaf, 20)
         || !buffer_read_u8(&dc->read_buffer, &proof_size)
         || !buffer_read_u8(&dc->read_buffer, &n_proof_elements))
     {

@@ -8,7 +8,7 @@
 #include <cmocka.h>
 
 #include "types.h"
-#include "boilerplate/parser.h"
+#include "boilerplate/apdu_parser.h"
 
 static void test_apdu_parser(void **state) {
     (void) state;

@@ -259,11 +259,25 @@ static void test_buffer_write(void **state) {
 
 }
 
+static void test_buffer_create(void **state) {
+    (void) state;
+
+    uint8_t data[32];
+
+    buffer_t buffer = buffer_create(data, 15);
+
+    assert_ptr_equal(buffer.ptr, data);
+    assert_int_equal(buffer.size, 15);
+    assert_int_equal(buffer.offset, 0);
+}
+
+
 int main() {
     const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_can_read),
                                        cmocka_unit_test(test_buffer_seek),
                                        cmocka_unit_test(test_buffer_read),
-                                       cmocka_unit_test(test_buffer_write)};
+                                       cmocka_unit_test(test_buffer_write),
+                                       cmocka_unit_test(test_buffer_create)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

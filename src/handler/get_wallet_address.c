@@ -105,7 +105,7 @@ void handler_get_wallet_address(
         return;
     }
     char policy_map[MAX_POLICY_MAP_LEN];
-    if (!buffer_read_bytes(&dc->read_buffer, policy_map, policy_map_len)) {
+    if (!buffer_read_bytes(&dc->read_buffer, (uint8_t *)policy_map, policy_map_len)) {
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }

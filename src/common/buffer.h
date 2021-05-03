@@ -176,7 +176,7 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
  * @return true if success, false otherwise.
  *
  */
-bool buffer_read_bytes(buffer_t *buffer, void *out, size_t n);
+bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n);
 
 
 /**
@@ -252,3 +252,23 @@ bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness)
  *
  */
 bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n);
+
+
+/**
+ * Creates a buffer pointing at ptr and with the given size; the initial offset is 0.
+ *
+ * @param[in]  ptr
+ *   Pointer to the buffer's data.
+ * @param[in]  size
+ *   Size of the buffer.
+ *
+ * @return the new buffer with the given pointer and size.
+ *
+ */
+static inline buffer_t buffer_create(void *ptr, size_t size) {
+    return (buffer_t) {
+        .ptr = ptr,
+        .size = size,
+        .offset = 0
+    };
+}

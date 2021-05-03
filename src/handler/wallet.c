@@ -65,7 +65,7 @@ int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header) {
         return -4;
     }
 
-    if (!buffer_read_bytes(buffer, header->name, header->name_len)) {
+    if (!buffer_read_bytes(buffer, (uint8_t *)header->name, header->name_len)) {
         return -5;
     }
     header->name[header->name_len] = '\0';
@@ -334,7 +334,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         }
         for (int i = 0; i < 4; i++) {
             char num[2];
-            buffer_read_bytes(buffer, num, 2);
+            buffer_read_bytes(buffer, (uint8_t *)num, 2);
             if (!is_lowercase_hex(num[0]) || !is_lowercase_hex(num[1])) {
                 return -1;
             }
