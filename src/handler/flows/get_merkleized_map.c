@@ -30,11 +30,7 @@ static void receive_and_check_preimage(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    buffer_t buf = {
-        .ptr = state->raw_output,
-        .offset = 0,
-        .size = state->subcontext.get_merkle_leaf_element.element_len
-    };
+    buffer_t buf = buffer_create(state->raw_output, state->subcontext.get_merkle_leaf_element.element_len);
 
     if (!buffer_read_varint(&buf, &state->out_ptr->size)
         || !buffer_read_bytes(&buf, state->out_ptr->keys_root, 20)

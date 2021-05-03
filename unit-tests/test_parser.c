@@ -81,17 +81,8 @@ static void test_parser_oneshot_from_store(void **state) {
 
     uint8_t stream[32] = {0};
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = sizeof(store),
-        .offset = 0
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = sizeof(stream),
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, sizeof(store));
+    buffer_t stream_buf = buffer_create(stream, sizeof(stream));
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state;
@@ -131,17 +122,8 @@ static void test_parser_oneshot_with_empty_store(void **state) {
         0xc0
     };
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = 0,
-        .offset = 0
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = 4+8+1,
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, 0);
+    buffer_t stream_buf = buffer_create(stream, 4+8+1);
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state;
@@ -184,17 +166,9 @@ static void test_parser_oneshot_part_store_part_stream(void **state) {
         0xc0
     };
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = 5+4+2, // size includes the initial zeros
-        .offset = 5    // skip initial bytes
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = 6 + 1,
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, 5+4+2); // size includes the initial zeros
+    buffer_seek_cur(&store_buf, 5);                   // skip initial zeros
+    buffer_t stream_buf = buffer_create(stream, 6 + 1);
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state;
@@ -235,17 +209,9 @@ static void test_parser_stream_ends(void **state) {
         0xb2, 0xb3, 0xb4, 0xb5, 0xb6 // stream ends while parsing the B field
     };
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = 5+4+2, // size includes the initial zeros
-        .offset = 5    // skip initial bytes
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = 5,
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, 5 + 4 + 2); // size includes the initial zeros
+    buffer_seek_cur(&store_buf, 5);                       // skip initial zeros
+    buffer_t stream_buf = buffer_create(stream, 5);
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state;
@@ -285,17 +251,8 @@ static void test_parser_continue_partial(void **state) {
         0xc0
     };
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = 2,
-        .offset = 0
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = 6+1,
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, 2);
+    buffer_t stream_buf = buffer_create(stream, 6 + 1);
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state = {
@@ -340,17 +297,8 @@ static void test_parser_error(void **state) {
 
     uint8_t stream[32] = {0};
 
-    buffer_t store_buf = {
-        .ptr = store,
-        .size = sizeof(store),
-        .offset = 0
-    };
-
-    buffer_t stream_buf = {
-        .ptr = stream,
-        .size = sizeof(stream),
-        .offset = 0
-    };
+    buffer_t store_buf = buffer_create(store, 4 + 8 + 1);
+    buffer_t stream_buf = buffer_create(stream, sizeof(stream));
     buffer_t *buffers[2] = { &store_buf, &stream_buf };
 
     parse_ABC_state_t parser_state;

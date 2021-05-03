@@ -41,11 +41,7 @@ void flow_get_merkle_preimage(dispatcher_context_t *dc) {
     state->overflow = false;
     state->preimage_len = 0;
 
-    state->out_buffer = (buffer_t) {
-        .ptr = state->out_ptr,
-        .offset = 0,
-        .size = state->out_ptr_len
-    };
+    state->out_buffer = buffer_create(state->out_ptr, state->out_ptr_len);
     call_stream_preimage(dc, &state->subcontext.stream_preimage, check_result,
                          state->hash,
                          make_callback(state, (dispatcher_callback_t)cb_process_data));

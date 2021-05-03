@@ -3,8 +3,8 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
 
-#include "../flows/get_merkle_leaf_index.h"
-#include "../flows/get_merkle_leaf_element.h"
+#include "get_merkle_leaf_index.h"
+#include "get_merkle_leaf_element.h"
 
 typedef struct {
     machine_context_t ctx;

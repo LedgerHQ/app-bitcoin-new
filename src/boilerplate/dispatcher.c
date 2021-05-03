@@ -104,10 +104,7 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.start_flow = start_flow;
     G_dispatcher_context.run_callback = run_callback;
 
-    G_dispatcher_context.read_buffer.ptr = cmd->data;
-    G_dispatcher_context.read_buffer.size = cmd->lc;
-    G_dispatcher_context.read_buffer.offset = 0;
-
+    G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
     if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (cmd->p1 != 0 || cmd->p2 != 0) {

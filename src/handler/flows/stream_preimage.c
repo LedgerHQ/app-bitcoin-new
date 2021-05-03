@@ -60,11 +60,7 @@ static void process_get_preimage_response(dispatcher_context_t *dc) {
     crypto_hash_update(&state->hash_context.header, data_ptr, partial_data_len);
 
     // call callback with data
-    buffer_t buf = {
-        .ptr = data_ptr,
-        .offset = 0,
-        .size = partial_data_len
-    };
+    buffer_t buf = buffer_create(data_ptr, partial_data_len);
     dc->run_callback(state->callback, &buf);
 
     state->bytes_remaining = (size_t)preimage_len - partial_data_len;
@@ -121,11 +117,7 @@ static void receive_more_data(dispatcher_context_t *dc) {
     crypto_hash_update(&state->hash_context.header, data_ptr, n_bytes);
 
     // call callback with data
-    buffer_t buf = {
-        .ptr = data_ptr,
-        .offset = 0,
-        .size = n_bytes
-    };
+    buffer_t buf = buffer_create(data_ptr, n_bytes);
     dc->run_callback(state->callback, &buf);
 
     state->bytes_remaining -= n_bytes;

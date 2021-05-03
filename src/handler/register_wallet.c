@@ -88,11 +88,7 @@ void handler_register_wallet(
         return;
     }
 
-    buffer_t policy_map_buffer = {
-        .ptr = (uint8_t *)&policy_map,
-        .offset = 0,
-        .size = policy_map_len
-    };
+    buffer_t policy_map_buffer = buffer_create(&policy_map, policy_map_len);
     if (buffer_read_multisig_policy_map(&policy_map_buffer, &state->wallet_header.multisig_policy) == -1) {
         dc->send_sw(SW_INCORRECT_DATA);
         return;
@@ -176,11 +172,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = {
-        .ptr = state->next_pubkey_info,
-        .offset = 0,
-        .size = state->subcontext.get_merkle_leaf_element.element_len
-    };
+    buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, state->subcontext.get_merkle_leaf_element.element_len);
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
