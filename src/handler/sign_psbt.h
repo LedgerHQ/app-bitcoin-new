@@ -7,7 +7,7 @@
 #include "flows/stream_merkle_leaf_element.h"
 #include "flows/get_merkleized_map.h"
 #include "flows/stream_merkleized_map_value.h"
-
+#include "flows/psbt_parse_rawtx.h"
 
 typedef struct {
     machine_context_t ctx;
@@ -29,8 +29,10 @@ typedef struct {
         stream_merkle_leaf_element_state_t stream_merkle_leaf_element;
         get_merkleized_map_state_t get_merkleized_map;
         stream_merkleized_map_value_state_t stream_merkleized_map_value;
+        psbt_parse_rawtx_state_t psbt_parse_rawtx;
     } subcontext;
 } sign_psbt_state_t;
+
 
 void handler_sign_psbt(
     uint8_t p1,

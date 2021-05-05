@@ -37,8 +37,9 @@
 #include "sign_psbt.h"
 
 
+static void parse_global_tx(dispatcher_context_t *dc);
+static void receive_global_tx_info(dispatcher_context_t *dc);
 static void request_next_input_map(dispatcher_context_t *dc);
-static void validate_input_map(dispatcher_context_t *dc);
 static void process_input_map(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
 
@@ -114,11 +115,46 @@ void handler_sign_psbt(
 
     call_check_merkle_tree_sorted(dc,
                                   &state->subcontext.check_merkle_tree_sorted,
-                                  request_next_input_map,
+                                  parse_global_tx,
                                   state->global_map.keys_root,
                                   (size_t)state->global_map.size);
 }
 
+
+static void parse_global_tx(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    state->tmp[0] = PSBT_GLOBAL_UNSIGNED_TX;
+    call_psbt_parse_rawtx(dc,
+                          &state->subcontext.psbt_parse_rawtx,
+                          receive_global_tx_info,
+                          &state->global_map,
+                          state->tmp,
+                          1);
+}
+
+static void receive_global_tx_info(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->n_inputs != state->subcontext.psbt_parse_rawtx.n_inputs) {
+        PRINTF("Mismatching n_inputs.");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (state->n_outputs != state->subcontext.psbt_parse_rawtx.n_outputs) {
+        PRINTF("Mismatching n_outputs.");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    state->cur_input_index = 0;
+    dc->next(request_next_input_map);
+}
 
 static void request_next_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
@@ -127,37 +163,12 @@ static void request_next_input_map(dispatcher_context_t *dc) {
 
     call_get_merkleized_map(dc,
                             &state->subcontext.get_merkleized_map,
-                            validate_input_map,
+                            process_input_map,
                             state->inputs_root,
                             state->n_inputs,
                             state->cur_input_index,
                             &state->cur_input_map);
 }
-
-
-static void validate_input_map(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    call_check_merkle_tree_sorted(dc,
-                                  &state->subcontext.check_merkle_tree_sorted,
-                                  process_input_map,
-                                  state->cur_input_map.keys_root,
-                                  (size_t)state->cur_input_map.size);
-}
-
-
-static void cb_process_data(sign_psbt_state_t *state, buffer_t *data) {
-    PRINTF("Callback called with %d bytes\n", data->size - data->offset);
-
-    uint8_t byte;
-    while (buffer_read_u8(data, &byte)) {
-        PRINTF("%02X", byte);
-    }
-    PRINTF("\n");
-}
-
 
 static void process_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
@@ -166,13 +177,12 @@ static void process_input_map(dispatcher_context_t *dc) {
 
     state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
 
-    call_stream_merkleized_map_value(dc,
-                                     &state->subcontext.stream_merkleized_map_value,
-                                     receive_non_witness_utxo,
-                                     &state->cur_input_map,
-                                     state->tmp,
-                                     1,
-                                     make_callback(dc, (dispatcher_callback_t)cb_process_data));
+    call_psbt_parse_rawtx(dc,
+                          &state->subcontext.psbt_parse_rawtx,
+                          receive_non_witness_utxo,
+                          &state->cur_input_map,
+                          state->tmp,
+                          1);
 }
 
 
@@ -180,6 +190,13 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    PRINTF("n inputs: %d\n", state->subcontext.psbt_parse_rawtx.parser_state.n_inputs);
+    PRINTF("n outputs: %d\n", state->subcontext.psbt_parse_rawtx.parser_state.n_outputs);
+
+    PRINTF("txid: ");
+    for (int i = 0; i < 32; i++) PRINTF("%02x", state->subcontext.psbt_parse_rawtx.txid[i]);
+    PRINTF("\n");
 
     // TODO
     dc->send_sw(SW_OK);

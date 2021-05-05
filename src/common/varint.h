@@ -4,6 +4,8 @@
 #include <stddef.h>   // size_t
 #include <stdbool.h>  // bool
 
+// TODO: write unit tests
+
 /**
  * Size of value represented as Bitcoin-like varint.
  *

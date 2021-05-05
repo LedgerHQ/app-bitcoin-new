@@ -59,6 +59,11 @@ bool dbuffer_read_u32(buffer_t *buffers[2], uint32_t *out, endianness_t endianne
 /**
  * TODO: docs.
  */
+bool dbuffer_read_varint(buffer_t *buffers[2], uint64_t *out);
+
+/**
+ * TODO: docs.
+ */
 static inline void parser_init_context(parser_context_t *parser_context, void *state) {
     parser_context->cur_step = 0;
     parser_context->state = state;
@@ -81,4 +86,5 @@ bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size);
 int parser_run(const parsing_step_t *parsing_steps,
                size_t n_steps,
                parser_context_t *parser_context,
-               buffer_t *buffers[2]);
+               buffer_t *buffers[2],
+               unsigned int (*pic_fn)(unsigned int));

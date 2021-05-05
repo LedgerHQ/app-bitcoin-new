@@ -60,6 +60,41 @@ bool dbuffer_read_u32(buffer_t *buffers[2], uint32_t *out, endianness_t endianne
     return true;
 }
 
+bool dbuffer_read_varint(buffer_t *buffers[2], uint64_t *out) {
+    if (!dbuffer_can_read(buffers, 1)) {
+        return false;
+    }
+
+    // peek the first byte without changing the offsets
+    uint8_t first_byte = buffer_can_read(buffers[0], 1) ? buffers[0]->ptr[buffers[0]->offset]
+                                                        : buffers[1]->ptr[buffers[1]->offset];
+    uint8_t len; // length excluding the prefix
+    switch (first_byte) {
+        case 0xfd: len = 2; break;
+        case 0xfe: len = 4; break;
+        case 0xff: len = 8; break;
+        default: len = 0; break;
+    }
+
+    if (!dbuffer_can_read(buffers, 1 + len)) {
+        return false;
+    }
+
+    dbuffer_read_u8(buffers, &first_byte); // redundant, just to skip 1 byte
+
+    if (first_byte <= 0xfc) {
+        *out = first_byte;
+        return true;
+    }
+
+    uint8_t data[8] = {0};
+    dbuffer_read_bytes(buffers, data, len);
+
+    // Since data was zeroed, parsing the entire array as a little-endian works for any size
+    *out = read_u64_le(data, 0);
+    return true;
+}
+
 
 bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size) {
     size_t length0 = buffers[0]->size - buffers[0]->offset;
@@ -79,10 +114,15 @@ bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size) {
 int parser_run(const parsing_step_t *parsing_steps,
                size_t n_steps,
                parser_context_t *parser_context,
-               buffer_t *buffers[2])
+               buffer_t *buffers[2],
+               unsigned int (*pic_fn)(unsigned int))
 {
     while (parser_context->cur_step < n_steps) {
-        int step_result = parsing_steps[parser_context->cur_step](parser_context->state, buffers);
+        parsing_step_t step_fn = pic_fn != NULL ? (parsing_step_t)pic_fn((unsigned int)parsing_steps[parser_context->cur_step])
+                                                : parsing_steps[parser_context->cur_step];
+
+        int step_result = step_fn(parser_context->state, buffers);
+
         if (step_result <= 0) {
             // Either error, or parsing incomplete and more data is needed
             return step_result;

@@ -92,7 +92,7 @@ static void test_parser_oneshot_from_store(void **state) {
 
     parser_init_context(&parser_context, &parser_state);
 
-    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, 1);
     assert_int_equal(parser_context.cur_step, n_ABC_STEPS); // parsing completed
@@ -133,7 +133,7 @@ static void test_parser_oneshot_with_empty_store(void **state) {
 
     parser_init_context(&parser_context, &parser_state);
 
-    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, 1);
     assert_int_equal(parser_context.cur_step, n_ABC_STEPS); // parsing completed
@@ -178,7 +178,7 @@ static void test_parser_oneshot_part_store_part_stream(void **state) {
 
     parser_init_context(&parser_context, &parser_state);
 
-    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, 1);
     assert_int_equal(parser_context.cur_step, n_ABC_STEPS); // parsing completed
@@ -221,7 +221,7 @@ static void test_parser_stream_ends(void **state) {
 
     parser_init_context(&parser_context, &parser_state);
 
-    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, 0);
     assert_int_equal(parser_context.cur_step, 1); // second parsing step was not completed
@@ -265,7 +265,7 @@ static void test_parser_continue_partial(void **state) {
     parser_context.state = &parser_state;
     parser_context.cur_step = 1; // restart from step_B
 
-    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, 1);
     assert_int_equal(parser_context.cur_step, 3); // completed
@@ -308,7 +308,7 @@ static void test_parser_error(void **state) {
 
     parser_init_context(&parser_context, &parser_state);
 
-    int result = parser_run(parse_ABC_error_steps, n_ABC_STEPS, &parser_context, buffers);
+    int result = parser_run(parse_ABC_error_steps, n_ABC_STEPS, &parser_context, buffers, NULL);
 
     assert_int_equal(result, -1); // parsing error
     assert_int_equal(parser_context.cur_step, 1); // index of the parsing function causing the error

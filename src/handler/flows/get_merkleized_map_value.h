@@ -29,13 +29,15 @@ typedef struct {
 
 
 /**
- * Given a commitment to a merkleized key-value map, this flow find out the index of the corresponding element,
- * then it stores it in the pointer, which must be large enough to store the value.
+ * Given a commitment to a merkleized key-value map, this flow finds out the index of the element corresponding to the
+ * key, then fetches the corresponding element and verifies that its hash and Merkle proof matches. The value is then
+ * stored in the `out` pointer, which must be large enough to contain the preimage.
  * As the value is a Merkle tree preimage, it always start with a 0x00 byte.
- * In case of success, the length of the preimage (including the 0x00 byte) is stores in value_len at the end of the
+ * In case of success, the length of the preimage (including the 0x00 byte) is stored in value_len at the end of the
  * flow.
  *
- * The flow will fail with SW_WRONG_DATA_LENGTH if the response is too long to fit into the output buffer.
+ * The flow will fail with SW_WRONG_DATA_LENGTH if the response is too long to fit into the output buffer, and with
+ * SW_INCORRECT_DATA if the key is not found, or any of the proofs failed.
  *
  * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to be done before.
  */
@@ -43,7 +45,7 @@ void flow_get_merkleized_map_value(dispatcher_context_t *dispatcher_context);
 
 
 /**
- * Convenience function to call the call_get_merkleized_map flow.
+ * Convenience function to call the call_get_merkleized_map_value flow.
  */
 static inline void call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                                  get_merkleized_map_value_state_t *flow_state,
