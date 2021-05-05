@@ -56,7 +56,9 @@ class GetPreimageCommand(ClientCommand):
                 payload_size = min(max_payload_size, len(known_preimage))
 
                 if (payload_size < len(known_preimage)):
-                    self.queue.extend(known_preimage[payload_size:])  # add to the queue any remaining extra bytes
+                    # split into list of length-1 bytes elements
+                    extra_elements = [known_preimage[i:i+1] for i in range(payload_size, len(known_preimage))]
+                    self.queue.extend(extra_elements)  # add to the queue any remaining extra bytes
 
                 return preimage_len_out + payload_size.to_bytes(1, byteorder="big") + known_preimage[:payload_size]
 
