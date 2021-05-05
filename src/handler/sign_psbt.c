@@ -194,8 +194,8 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     PRINTF("n inputs: %d\n", state->subcontext.psbt_parse_rawtx.parser_state.n_inputs);
     PRINTF("n outputs: %d\n", state->subcontext.psbt_parse_rawtx.parser_state.n_outputs);
 
-    PRINTF("txid: ");
-    for (int i = 0; i < 32; i++) PRINTF("%02x", state->subcontext.psbt_parse_rawtx.txid[i]);
+    PRINTF("txid (reversed): ");
+    for (int i = 0; i < 32; i++) PRINTF("%02x", state->subcontext.psbt_parse_rawtx.txhash[i]);
     PRINTF("\n");
 
     // TODO

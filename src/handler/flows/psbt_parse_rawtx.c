@@ -24,7 +24,7 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
     if (result) {
-        crypto_hash_update(&state->hash_context_ptr->header, txid, 32);
+        crypto_hash_update(&state->parent_state->hash_context.header, txid, 32);
     }
     return result;
 }
@@ -34,7 +34,7 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->hash_context_ptr->header, vout_bytes, 4);
+        crypto_hash_update(&state->parent_state->hash_context.header, vout_bytes, 4);
     }
     return result;
 }
@@ -46,7 +46,7 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
     if (result) {
         uint8_t data[9];
         int data_len = varint_write(data, 0, scriptsig_size);
-        crypto_hash_update(&state->hash_context_ptr->header, data, data_len);
+        crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
         state->scriptsig_size = (int)scriptsig_size;
     }
     return result;
@@ -73,7 +73,7 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
         return 0; // could not read enough data
     }
 
-    crypto_hash_update(&state->hash_context_ptr->header, data, data_len);
+    crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
     state->scriptsig_counter += data_len;
 
     if (state->scriptsig_counter == state->scriptsig_size) {
@@ -88,7 +88,7 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
     uint8_t sequence_bytes[4];
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->hash_context_ptr->header, sequence_bytes, 4);
+        crypto_hash_update(&state->parent_state->hash_context.header, sequence_bytes, 4);
     }
     return result;
 }
@@ -111,7 +111,7 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
-        crypto_hash_update(&state->hash_context_ptr->header, value_bytes, 8);
+        crypto_hash_update(&state->parent_state->hash_context.header, value_bytes, 8);
         state->value = read_u64_le(value_bytes, 0);
     }
     return result;
@@ -124,7 +124,7 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
     if (result) {
         uint8_t data[9];
         int data_len = varint_write(data, 0, scriptpubkey_size);
-        crypto_hash_update(&state->hash_context_ptr->header, data, data_len);
+        crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
         state->scriptpubkey_size = (int)scriptpubkey_size;
     }
     return result;
@@ -151,7 +151,7 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
         return 0; // could not read enough data
     }
 
-    crypto_hash_update(&state->hash_context_ptr->header, data, data_len);
+    crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
     state->scriptpubkey_counter += data_len;
 
     if (state->scriptpubkey_counter == state->scriptpubkey_size) {
@@ -209,7 +209,7 @@ static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers
     state->counter = 0;
     parser_init_context(&state->input_parser_context, &state->input_parser_state);
 
-    state->input_parser_state.hash_context_ptr = &state->hash_context;
+    state->input_parser_state.parent_state = state;
     return 1;
 }
 
@@ -249,9 +249,10 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
 
 static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+
     state->counter = 0;
     parser_init_context(&state->output_parser_context, &state->output_parser_state);
-    state->output_parser_state.hash_context_ptr = &state->hash_context;
+    state->output_parser_state.parent_state = state;
     return 1;
 }
 
@@ -291,15 +292,8 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
 static int parse_rawtx_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
-    crypto_hash_digest(&state->hash_context.header, state->txid, 32);
-    cx_hash_sha256(state->txid, 32, state->txid, 32);
-
-    // reverse txid in-place
-    for (int i = 0; i < 16; i++) {
-        uint8_t tmp = state->txid[31 - i];
-        state->txid[31 - i] = state->txid[i];
-        state->txid[i] = tmp;
-    }
+    crypto_hash_digest(&state->hash_context.header, state->txhash, 32);
+    cx_hash_sha256(state->txhash, 32, state->txhash, 32);
 
     return 1;
 }
@@ -353,6 +347,7 @@ static void init_parsing(dispatcher_context_t *dc){
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->store_data_length = 0;
+    state->parser_state.txhash = state->txhash;
     parser_init_context(&state->parser_context, &state->parser_state);
 
     call_stream_preimage(dc, &state->subcontext.stream_preimage, rawtx_parsed,
@@ -364,7 +359,6 @@ static void rawtx_parsed(dispatcher_context_t *dc){
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    memcpy(state->txid, state->parser_state.txid, 32);
     state->n_inputs = state->parser_state.n_inputs;
     state->n_outputs = state->parser_state.n_outputs;
     // TODO
