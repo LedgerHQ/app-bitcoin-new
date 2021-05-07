@@ -12,9 +12,10 @@
 #include "../../crypto.h"
 #include "../../constants.h"
 
-static void init_parsing(dispatcher_context_t *dc);
-static void rawtx_parsed(dispatcher_context_t *dc);
+static void start_parsing(dispatcher_context_t *dc);
+static void firstpass_completed(dispatcher_context_t *dc);
 
+static void compute_hash(dispatcher_context_t *dc);
 
 /*   PARSER FOR A RAWTX INPUT */
 
@@ -24,7 +25,12 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
     if (result) {
-        crypto_hash_update(&state->parent_state->hash_context.header, txid, 32);
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update(&state->parent_state->hash_context->header, txid, 32);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -34,7 +40,12 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->parent_state->hash_context.header, vout_bytes, 4);
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update(&state->parent_state->hash_context->header, vout_bytes, 4);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -44,10 +55,16 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
     uint64_t scriptsig_size;
     bool result = dbuffer_read_varint(buffers, &scriptsig_size);
     if (result) {
-        uint8_t data[9];
-        int data_len = varint_write(data, 0, scriptsig_size);
-        crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
         state->scriptsig_size = (int)scriptsig_size;
+
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+            uint8_t data[9];
+            int data_len = varint_write(data, 0, scriptsig_size);
+            crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -73,7 +90,13 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
         return 0; // could not read enough data
     }
 
-    crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
+    if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+        crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
+    } else {
+        PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+        return -1;
+    }
+
     state->scriptsig_counter += data_len;
 
     if (state->scriptsig_counter == state->scriptsig_size) {
@@ -88,7 +111,12 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
     uint8_t sequence_bytes[4];
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->parent_state->hash_context.header, sequence_bytes, 4);
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+        crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -111,8 +139,14 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
-        crypto_hash_update(&state->parent_state->hash_context.header, value_bytes, 8);
         state->value = read_u64_le(value_bytes, 0);
+
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -122,10 +156,16 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
     uint64_t scriptpubkey_size;
     bool result = dbuffer_read_varint(buffers, &scriptpubkey_size);
     if (result) {
-        uint8_t data[9];
-        int data_len = varint_write(data, 0, scriptpubkey_size);
-        crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
         state->scriptpubkey_size = (int)scriptpubkey_size;
+
+        if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+            uint8_t data[9];
+            int data_len = varint_write(data, 0, scriptpubkey_size);
+            crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -151,7 +191,13 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
         return 0; // could not read enough data
     }
 
-    crypto_hash_update(&state->parent_state->hash_context.header, data, data_len);
+    if (state->parent_state->parse_mode == PARSEMODE_TXID) {
+        crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
+    } else {
+        PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+        return -1;
+    }
+
     state->scriptpubkey_counter += data_len;
 
     if (state->scriptpubkey_counter == state->scriptpubkey_size) {
@@ -174,8 +220,6 @@ const int n_parse_rawtxoutput_steps = sizeof(parse_rawtxoutput_steps)/sizeof(par
 
 static int parse_rawtx_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-    // init the general state
-    cx_sha256_init(&state->hash_context);
 
     uint8_t first_byte;
     if (!dbuffer_read_u8(buffers, &first_byte) || first_byte != 0x00) {
@@ -190,7 +234,12 @@ static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2])
     uint8_t version_bytes[4];
     bool result = dbuffer_read_bytes(buffers, version_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->hash_context.header, version_bytes, 4);
+        if (state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update(&state->hash_context->header, version_bytes, 4);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -199,7 +248,12 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     bool result = dbuffer_read_u8(buffers, &state->n_inputs);
     if (result) {
-        crypto_hash_update_u8(&state->hash_context.header, state->n_inputs);
+        if (state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update_u8(&state->hash_context->header, state->n_inputs);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
 }
@@ -239,7 +293,12 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     bool result = dbuffer_read_u8(buffers, &state->n_outputs);
     if (result) {
-        crypto_hash_update_u8(&state->hash_context.header, state->n_outputs);
+        if (state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update_u8(&state->hash_context->header, state->n_outputs);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
 
         state->counter = 0;
         parser_init_context(&state->output_parser_context, &state->output_parser_state);
@@ -283,19 +342,16 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
     uint8_t value_bytes[4];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 4);
     if (result) {
-        crypto_hash_update(&state->hash_context.header, value_bytes, 4);
         state->locktime = read_u32_le(value_bytes, 0);
+
+        if (state->parse_mode == PARSEMODE_TXID) {
+            crypto_hash_update(&state->hash_context->header, value_bytes, 4);
+        } else {
+            PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
+            return -1;
+        }
     }
     return result;
-}
-
-static int parse_rawtx_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
-    crypto_hash_digest(&state->hash_context.header, state->txhash, 32);
-    cx_hash_sha256(state->txhash, 32, state->txhash, 32);
-
-    return 1;
 }
 
 static const parsing_step_t parse_rawtx_steps[] = {
@@ -306,7 +362,6 @@ static const parsing_step_t parse_rawtx_steps[] = {
     (parsing_step_t)parse_rawtx_output_count,
     (parsing_step_t)parse_rawtx_outputs_init, (parsing_step_t)parse_rawtx_outputs,
     (parsing_step_t)parse_rawtx_locktime,
-    (parsing_step_t)parse_rawtx_finalize,
 };
 
 const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps)/sizeof(parse_rawtx_steps[0]);
@@ -319,7 +374,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
 
     // merkle_compute_element_hash(state->key, state->key_len, state->key_merkle_hash);
 
-    call_get_merkleized_map_value_hash(dc, &state->subcontext.get_merkleized_map_value_hash, init_parsing,
+    call_get_merkleized_map_value_hash(dc, &state->subcontext.get_merkleized_map_value_hash, start_parsing,
                                        state->map,
                                        state->key,
                                        state->key_len,
@@ -327,7 +382,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
 }
 
 
-static void cb_process_data(psbt_parse_rawtx_state_t *state, buffer_t *data) {
+static void cb_process_data_firstpass(psbt_parse_rawtx_state_t *state, buffer_t *data) {
     buffer_t store_buf = buffer_create(state->store, state->store_data_length);
     buffer_t *buffers[] = { &store_buf, data };
 
@@ -341,25 +396,67 @@ static void cb_process_data(psbt_parse_rawtx_state_t *state, buffer_t *data) {
     //       of callbacks to return a success value (and abort on failures).
 }
 
-static void init_parsing(dispatcher_context_t *dc){
+static void start_parsing(dispatcher_context_t *dc) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    state->store_data_length = 0;
-    state->parser_state.txhash = state->txhash;
-    parser_init_context(&state->parser_context, &state->parser_state);
+    // init the state of the parser (global)
+    state->parser_state.hash_context = &state->hash_context;
+    state->parser_state.program_state = &state->program_state;
 
-    call_stream_preimage(dc, &state->subcontext.stream_preimage, rawtx_parsed,
+    // init the parser, based on the program type
+    if (state->program == PROGRAM_TXID) {
+        state->parser_state.parse_mode = PARSEMODE_TXID;
+    } else if (state->program == PROGRAM_LEGACY) {
+        state->parser_state.parse_mode = PARSEMODE_LEGACY_PASS1;
+
+        // TODO
+        PRINTF("Not implemented.");
+        dc->send_sw(SW_BAD_STATE);
+    } else if (state->program == PROGRAM_SEGWIT_V0) {
+        // TODO
+        PRINTF("Not implemented.");
+        dc->send_sw(SW_BAD_STATE);
+    } else {
+        PRINTF("Illegal program.");
+        dc->send_sw(SW_BAD_STATE);
+    }
+
+    call_stream_preimage(dc, &state->subcontext.stream_preimage, firstpass_completed,
                          state->value_hash,
-                         make_callback(state, (dispatcher_callback_t)cb_process_data));
+                         make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
 }
 
-static void rawtx_parsed(dispatcher_context_t *dc){
+static void firstpass_completed(dispatcher_context_t *dc) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->n_inputs = state->parser_state.n_inputs;
     state->n_outputs = state->parser_state.n_outputs;
-    // TODO
+
+    if (state->program == PROGRAM_TXID) {
+        dc->next(compute_hash);
+    } else if (state->program == PROGRAM_LEGACY) {
+        // TODO
+        PRINTF("Not implemented.");
+        dc->send_sw(SW_BAD_STATE);
+    } else if (state->program == PROGRAM_SEGWIT_V0) {
+        // TODO
+        PRINTF("Not implemented.");
+        dc->send_sw(SW_BAD_STATE);
+    } else {
+        PRINTF("Illegal program.");
+        dc->send_sw(SW_BAD_STATE);
+    }
+}
+
+
+
+static void compute_hash(dispatcher_context_t *dc) {
+    psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    crypto_hash_digest(&state->hash_context.header, state->txhash, 32);
+    cx_hash_sha256(state->txhash, 32, state->txhash, 32);
 }

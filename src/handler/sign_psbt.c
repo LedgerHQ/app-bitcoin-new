@@ -132,7 +132,10 @@ static void parse_global_tx(dispatcher_context_t *dc) {
                           receive_global_tx_info,
                           &state->global_map,
                           state->tmp,
-                          1);
+                          1,
+                          PROGRAM_TXID,
+                          0,
+                          0);
 }
 
 static void receive_global_tx_info(dispatcher_context_t *dc) {
@@ -182,7 +185,10 @@ static void process_input_map(dispatcher_context_t *dc) {
                           receive_non_witness_utxo,
                           &state->cur_input_map,
                           state->tmp,
-                          1);
+                          1,
+                          PROGRAM_TXID,
+                          state->cur_input_index,
+                          0);
 }
 
 
