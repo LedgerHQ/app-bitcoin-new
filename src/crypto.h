@@ -9,6 +9,7 @@
 #include "constants.h"
 
 #include "./common/write.h"
+#include "./common/varint.h"
 
 // Single key address types
 #define ADDRESS_TYPE_PKH 0
@@ -216,6 +217,24 @@ static inline int crypto_hash_update_u16(cx_hash_t *hash_context, uint16_t data)
     write_u16_be(buf, 0, data);
     return crypto_hash_update(hash_context, &buf, sizeof(buf));
 }
+
+/**
+ * Convenience wrapper for crypto_hash_update, updating a hash with an uint64_t, serialized as a variable length
+ * integer in bitcoin's format.
+ *
+ * @param[in] hash_context
+ *  The context of the hash, which must already be initialized.
+ * @param[in] data
+ *  The uint64_t to be added to the hash as a bitcoin-style varint.
+ *
+ * @return the return value of cx_hash.
+ */
+static inline int crypto_hash_update_varint(cx_hash_t *hash_context, uint64_t data) {
+    uint8_t buf[9];
+    int len = varint_write(buf, 0, data);
+    return crypto_hash_update(hash_context, &buf, len);
+}
+
 
 /**
  * Convenience wrapper for crypto_hash_update, updating a hash with an uint32_t,

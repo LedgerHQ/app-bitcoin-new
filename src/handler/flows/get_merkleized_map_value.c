@@ -32,7 +32,7 @@ static void receive_index(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (!state->subcontext.get_merkle_leaf_index.found) {
-        PRINTF("Key not found.");
+        PRINTF("Key not found.\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }

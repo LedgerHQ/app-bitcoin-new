@@ -16,6 +16,8 @@ typedef struct {
     merkleized_map_commitment_t *out_ptr;
 
     // internal state
+    dispatcher_callback_descriptor_t keys_callback;
+
     uint8_t raw_output[9 + 2*20]; // maximum size of serialized result (9 bytes for the varint, and the 2 Merkle roots)
 
     union {
@@ -34,6 +36,32 @@ void flow_get_merkleized_map(dispatcher_context_t *dispatcher_context);
 /**
  * Convenience function to call the call_get_merkleized_map flow.
  */
+static inline void call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
+                                                         get_merkleized_map_state_t *flow_state,
+                                                         command_processor_t ret_proc,
+                                                         const uint8_t root[static 20],
+                                                         int size,
+                                                         int index,
+                                                         dispatcher_callback_descriptor_t keys_callback,
+                                                         merkleized_map_commitment_t *out_ptr)
+{
+    flow_state->root = root;
+    flow_state->size = size;
+    flow_state->index = index;
+    flow_state->out_ptr = out_ptr;
+    flow_state->keys_callback = keys_callback;
+
+    dispatcher_context->start_flow(
+        flow_get_merkleized_map,
+        (machine_context_t *)flow_state,
+        ret_proc
+    );
+}
+
+
+/**
+ * Convenience function to call the call_get_merkleized_map flow.
+ */
 static inline void call_get_merkleized_map(dispatcher_context_t *dispatcher_context,
                                            get_merkleized_map_state_t *flow_state,
                                            command_processor_t ret_proc,
@@ -42,14 +70,12 @@ static inline void call_get_merkleized_map(dispatcher_context_t *dispatcher_cont
                                            int index,
                                            merkleized_map_commitment_t *out_ptr)
 {
-    flow_state->root = root;
-    flow_state->size = size;
-    flow_state->index = index;
-    flow_state->out_ptr = out_ptr;
-
-    dispatcher_context->start_flow(
-        flow_get_merkleized_map,
-        (machine_context_t *)flow_state,
-        ret_proc
-    );
+    call_get_merkleized_map_with_callback(dispatcher_context,
+                                          flow_state,
+                                          ret_proc,
+                                          root,
+                                          size,
+                                          index,
+                                          make_callback(NULL, NULL),
+                                          out_ptr);
 }

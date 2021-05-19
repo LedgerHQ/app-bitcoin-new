@@ -76,7 +76,7 @@ static void start_flow(command_processor_t first_processor, machine_context_t *s
     G_dispatcher_context.machine_context_ptr = subcontext;
 }
 
-static void run_callback(dispatcher_callback_descriptor_t cb, void *calldata) {
+static void run_callback(dispatcher_callback_descriptor_t cb, buffer_t *calldata) {
     cb.fn(cb.state, calldata);
 }
 
@@ -163,15 +163,11 @@ static void dispatcher_loop() {
     }
 
     while (true) {
-        PRINTF("DISPATCHER LOOP: %u, %u\n", G_dispatcher_context.machine_context_ptr->next_processor, G_dispatcher_context.machine_context_ptr->parent_context);
-
         if (G_dispatcher_state.paused) {
-            PRINTF("DISPATCHER PAUSED\n");
             return;
         }
 
         if (G_dispatcher_state.sw != 0) {
-            PRINTF("DISPATCHER HALTED, RESPONSE SENT\n");
             break;
         }
 
@@ -187,7 +183,7 @@ static void dispatcher_loop() {
             // in that case, there MUST be a next_processor
             if (G_dispatcher_state.sw == SW_INTERRUPTED_EXECUTION) {
                 if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
-                    PRINTF("Interruption requested, but the next processor was not set.");
+                    PRINTF("Interruption requested, but the next processor was not set.\n");
                 }
                 return;
             }

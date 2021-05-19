@@ -10,7 +10,7 @@ size_t dbuffer_get_length(buffer_t *buffers[2]) {
 }
 
 bool dbuffer_can_read(buffer_t *buffers[2], size_t n) {
-    return dbuffer_get_length(buffers) > n;
+    return dbuffer_get_length(buffers) >= n;
 }
 
 bool dbuffer_read_bytes(buffer_t *buffers[2], uint8_t *out, size_t n) {

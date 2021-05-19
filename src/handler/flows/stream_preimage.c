@@ -100,13 +100,13 @@ static void receive_more_data(dispatcher_context_t *dc) {
     }
 
     if (elements_len != 1) {
-        PRINTF("Elements should be single bytes");
+        PRINTF("Elements should be single bytes\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
     if (n_bytes > state->bytes_remaining) {
-        PRINTF("Received more bytes than expected.");
+        PRINTF("Received more bytes than expected.\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
@@ -136,7 +136,7 @@ static void verify_hash(dispatcher_context_t *dc) {
     crypto_hash_digest(&state->hash_context.header, computed_hash, 20);
 
     if (memcmp(computed_hash, state->hash, 20) != 0) {
-        PRINTF("Hash mismatch.");
+        PRINTF("Hash mismatch.\n");
         dc->send_sw(SW_INCORRECT_DATA);
     }
 

@@ -61,6 +61,12 @@ static void receive_element(dispatcher_context_t *dc) {
     memcpy(state->prev_el, state->cur_el, state->cur_el_len);
     state->prev_el_len = state->cur_el_len;
 
+    if (state->callback.fn != NULL) {
+        // call callback with data
+        buffer_t buf = buffer_create(state->cur_el, state->cur_el_len);
+        dc->run_callback(state->callback, &buf);
+    }
+
     ++state->cur_el_idx;
 
     // repeat if there are more keys

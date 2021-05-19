@@ -42,6 +42,11 @@
 
 
 /**
+ * Maximum scriptPubKey length for an input that we can sign.
+ */
+#define MAX_PREVOUT_SCRIPTPUBKEY_LEN 34 // P2WSH's scriptPubKeys are the longest supported
+
+/**
  * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
  */
 #define MAX_WALLET_NAME_LENGTH 16
@@ -51,3 +56,10 @@
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
  */
 #define MAX_SERIALIZED_PUBKEY_LENGTH 113
+
+
+// SIGHASH flags
+#define SIGHASH_ALL          0x00000001
+#define SIGHASH_NONE         0x00000002
+#define SIGHASH_SINGLE       0x00000003
+#define SIGHASH_ANYONECANPAY 0x00000080

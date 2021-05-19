@@ -262,7 +262,7 @@ int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_
     uint32_t info = 0;
 
     // derive private key according to BIP32 path
-    // TODO: should we sign with a specific path? e.g. reserve m/0xLED'/... for all internal keys.
+    // TODO: should we sign with a specific path? e.g. reserve m/0xC0FF33'/... for all internal keys.
     const uint32_t root_path[] = {};
     crypto_derive_private_key(&private_key, chain_code, root_path, 0);
 

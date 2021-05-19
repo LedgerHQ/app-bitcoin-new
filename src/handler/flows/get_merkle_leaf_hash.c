@@ -55,7 +55,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
     }
 
     if (n_proof_elements > proof_size) {
-        PRINTF("Received more proof data than expected.");
+        PRINTF("Received more proof data than expected.\n");
 
         // Wrong length of the Merkle proof.
         dc->send_sw(SW_INCORRECT_DATA);
@@ -70,7 +70,7 @@ static void receive_and_check_merkle_proof(dispatcher_context_t *dc) {
 
     // Initialize the directions array
     if (merkle_get_directions(state->tree_size, state->leaf_index, state->directions, sizeof(state->directions)) != proof_size) {
-        PRINTF("Proof size is not correct.");
+        PRINTF("Proof size is not correct.\n");
 
         dc->send_sw(SW_INCORRECT_DATA);
         return;

@@ -136,7 +136,6 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         except ValueError:
             leaf_index = 0
             found = 0
-            raise ValueError(f"The Merkle tree with root {root.hex()} does not have a leaf with hash {leaf_hash.hex()}.")
 
         return found.to_bytes(1, byteorder="big") + write_varint(leaf_index)
 
@@ -274,7 +273,7 @@ class ClientCommandInterpreter:
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
-        print(f"Known preimage for: {ripemd160(element).hex()}")  # TODO: remove
+        print(f"Known preimage for {ripemd160(element).hex()}: {element.hex()}")  # TODO: remove
         self.known_preimages[ripemd160(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
@@ -298,7 +297,8 @@ class ClientCommandInterpreter:
         items_sorted = list(sorted(mapping.items()))
 
         print("Added known mapping:")  # TODO: remove
-        print(items_sorted)  # TODO: remove
+        for key, value in items_sorted:
+            print(f"  {key.hex()}:{value.hex()}") 
 
         keys = [i[0] for i in items_sorted]
         values = [i[1] for i in items_sorted]

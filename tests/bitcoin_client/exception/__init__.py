@@ -1,6 +1,7 @@
 from .device_exception import DeviceException
 from .errors import (UnknownDeviceError,
                      DenyError,
+                     IncorrectDataError,
                      WrongP1P2Error,
                      WrongDataLengthError,
                      InsNotSupportedError,
@@ -18,6 +19,7 @@ from .errors import (UnknownDeviceError,
 __all__ = [
     "DeviceException",
     "DenyError",
+    "IncorrectDataError",
     "UnknownDeviceError",
     "WrongP1P2Error",
     "WrongDataLengthError",

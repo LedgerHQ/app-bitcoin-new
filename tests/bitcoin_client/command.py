@@ -144,7 +144,6 @@ class BitcoinCommand:
     def sign_psbt(self, psbt: PSBT) -> str:
         psbt_bytes = base64.b64decode(psbt.serialize())
         f = BytesIO(psbt_bytes)
-        end = len(psbt_bytes)
 
         assert f.read(5) == b"psbt\xff"
 
@@ -154,7 +153,7 @@ class BitcoinCommand:
         client_intepreter.add_known_mapping(global_map)
 
         if b'\x00' not in global_map:
-            raise ValueError("Invalid PSBT: PSBT_GLOBAL_UNSIGNED_TX")
+            raise ValueError("Invalid PSBT: missing PSBT_GLOBAL_UNSIGNED_TX")
 
         # as the psbt format v1 does not specifies the number of inputs and outputs, we need to parse the
         # PSBT_GLOBAL_UNSIGNED_TX = 0x00 field from the global map.

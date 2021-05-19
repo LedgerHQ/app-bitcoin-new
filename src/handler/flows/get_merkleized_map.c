@@ -40,7 +40,8 @@ static void receive_and_check_preimage(dispatcher_context_t *dc) {
         return;
     }
 
-    call_check_merkle_tree_sorted(dc, &state->subcontext.check_merkle_tree_sorted, NULL,
-                                  state->out_ptr->keys_root,
-                                  state->out_ptr->size);
+    call_check_merkle_tree_sorted_with_callback(dc, &state->subcontext.check_merkle_tree_sorted, NULL,
+                                                state->out_ptr->keys_root,
+                                                state->out_ptr->size,
+                                                state->keys_callback);
 }

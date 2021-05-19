@@ -257,7 +257,7 @@ int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *
                 break;
 
             default:
-                PRINTF("Uknown token"); // this should never happen
+                PRINTF("Uknown token\n"); // this should never happen
                 return -1;
         }
 
@@ -290,7 +290,7 @@ int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *
     } else if (wsh_found) {
         out->address_type = ADDRESS_TYPE_WIT;
     } else {
-        PRINTF("Unexpected address type"); // should never happen
+        PRINTF("Unexpected address type\n"); // should never happen
         return -1;
     }
 

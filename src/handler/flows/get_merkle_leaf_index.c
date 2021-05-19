@@ -44,20 +44,23 @@ static void process_response(dispatcher_context_t *dc) {
 
     if (found != 0 && found != 1) {
         dc->send_sw(SW_INCORRECT_DATA);
+        return;
     }
 
     // set results
     state->found = found;
     state->index = (uint32_t)index;
 
-    // We ask the host for the leaf hash with that index
-    call_get_merkle_leaf_hash(dc,
-                              &state->subcontext.get_merkle_leaf_hash,
-                              verify_hash,
-                              state->root,
-                              state->size,
-                              index,
-                              state->returned_merkle_leaf_hash);
+    if (found) {
+        // We ask the host for the leaf hash with that index
+        call_get_merkle_leaf_hash(dc,
+                                  &state->subcontext.get_merkle_leaf_hash,
+                                  verify_hash,
+                                  state->root,
+                                  state->size,
+                                  index,
+                                  state->returned_merkle_leaf_hash);
+    }
 }
 
 static void verify_hash(dispatcher_context_t *dc) {
