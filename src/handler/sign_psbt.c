@@ -238,10 +238,9 @@ static void process_input_map(dispatcher_context_t *dc) {
                                       state->cur_input_sighash_type_le,
                                       sizeof(state->cur_input_sighash_type_le));
     } else {
-        // sighash type defaults to 1
-        // TODO: PSBT standard prescribes defaulting to 0 instead
-        state->cur_input_sighash_type = 0;
-        dc->next(request_non_witness_utxo);
+        // PSBT_IN_SIGHASH_TYPE is compulsory
+        PRINTF("Missing SIGHASH TYPE for input %d\n", state->cur_input_index);
+        dc->send_sw(SW_INCORRECT_DATA);
     }
 }
 
