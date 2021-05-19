@@ -46,14 +46,17 @@ static void receive_sighash_type(dispatcher_context_t *dc);
 static void request_non_witness_utxo(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
 
-static void sign_legacy_p2pkh(dispatcher_context_t *dc);
+static void sign_legacy(dispatcher_context_t *dc);
 static void sign_legacy_first_pass_completed(dispatcher_context_t *dc);
 
-static void sign_legacy_p2sh(dispatcher_context_t *dc);
+static void sign_legacy_validate_redeemScript(dispatcher_context_t *dc);
+
+static void sign_legacy_start_second_pass(dispatcher_context_t *dc);
+
+static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc);
 
 static void sign_segwit(dispatcher_context_t *dc);
 
-static void compute_sighash_and_sign(dispatcher_context_t *dc);
 
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in it.
@@ -308,11 +311,7 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
            state->cur_input_prevout_scriptpubkey_len);
 
     if (!state->cur_input_has_witnessUtxo) {
-        if (!state->cur_input_has_redeemScript) {
-            dc->next(sign_legacy_p2pkh);
-        } else {
-            dc->next(sign_legacy_p2sh);
-        }
+        dc->next(sign_legacy);
     } else {
         dc->next(sign_segwit);
     }
@@ -320,7 +319,9 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
 
 
 
-static void sign_legacy_p2pkh(dispatcher_context_t *dc) {
+static void sign_legacy(dispatcher_context_t *dc) {
+    // sign legacy P2PKH or P2SH
+
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -345,21 +346,63 @@ static void sign_legacy_p2pkh(dispatcher_context_t *dc) {
 }
 
 
+
 static void sign_legacy_first_pass_completed(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    crypto_hash_update_varint(&state->hash_context.header, state->cur_input_prevout_scriptpubkey_len);
-    crypto_hash_update(&state->hash_context.header,
-                       state->cur_input_prevout_scriptpubkey,
-                       state->cur_input_prevout_scriptpubkey_len);
 
+    if (!state->cur_input_has_redeemScript) {
+        // P2PKH, the script_code is the prevout's scriptPubKey
+        crypto_hash_update_varint(&state->hash_context.header, state->cur_input_prevout_scriptpubkey_len);
+        crypto_hash_update(&state->hash_context.header,
+                           state->cur_input_prevout_scriptpubkey,
+                           state->cur_input_prevout_scriptpubkey_len);
+        dc->next(sign_legacy_start_second_pass);
+    } else {
+        // P2SH, the script_code is the redeemScript
+        state->tmp[0] = PSBT_IN_SIGHASH_TYPE;
+        call_psbt_process_redeemScript(dc, &state->subcontext.psbt_process_redeemScript, sign_legacy_validate_redeemScript,
+                                       &state->hash_context,
+                                       &state->cur_input_map,
+                                       state->tmp,
+                                       1);
+    }
+}
+
+static void sign_legacy_validate_redeemScript(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    // TODO: P2SH still untested.
+
+    if (state->cur_input_prevout_scriptpubkey_len != 1 + 20 + 1) {
+        PRINTF("P2SH's scriptPubKey should be exactly 22 bytes\n");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (memcmp(state->cur_input_prevout_scriptpubkey, state->subcontext.psbt_process_redeemScript.p2sh_script, 22) != 0) {
+        PRINTF("redeemScript does not match prevout's scriptPubKey\n");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    dc->next(sign_legacy_start_second_pass);
+}
+
+
+static void sign_legacy_start_second_pass(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     state->tmp[0] = PSBT_GLOBAL_UNSIGNED_TX;
     call_psbt_parse_rawtx(dc,
                           &state->subcontext.psbt_parse_rawtx,
-                          compute_sighash_and_sign,
+                          compute_sighash_and_sign_legacy,
                           &state->hash_context,
                           &state->global_map,
                           state->tmp,
@@ -371,27 +414,8 @@ static void sign_legacy_first_pass_completed(dispatcher_context_t *dc) {
                           );
 }
 
-static void sign_legacy_p2sh(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    PRINTF("NOT IMPLEMENTED\n");
-    dc->send_sw(SW_BAD_STATE);
-}
-
-static void sign_segwit(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    PRINTF("NOT IMPLEMENTED\n");
-    dc->send_sw(SW_BAD_STATE);
-}
-
-
-
-static void compute_sighash_and_sign(dispatcher_context_t *dc) {
+static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -422,6 +446,9 @@ static void compute_sighash_and_sign(dispatcher_context_t *dc) {
          1,
          1
     };
+
+
+    // TODO: refactor the signing code elsewhere
     crypto_derive_private_key(&private_key, chain_code, sign_path, 5);
 
     uint8_t sig[MAX_DER_SIG_LEN];
@@ -454,4 +481,14 @@ static void compute_sighash_and_sign(dispatcher_context_t *dc) {
     PRINTF("\n");
 
     dc->send_sw(SW_OK);
+}
+
+
+static void sign_segwit(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    PRINTF("NOT IMPLEMENTED\n");
+    dc->send_sw(SW_BAD_STATE);
 }

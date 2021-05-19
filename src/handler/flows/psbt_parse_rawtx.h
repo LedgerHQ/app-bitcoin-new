@@ -51,7 +51,6 @@ typedef union {
     struct {
         uint32_t sighash_type;
         size_t input_index;
-        // TODO
     } compute_sighash_legacy;
 
     struct {

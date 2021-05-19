@@ -9,6 +9,7 @@
 #include "flows/get_merkleized_map_value.h"
 #include "flows/stream_merkleized_map_value.h"
 #include "flows/psbt_parse_rawtx.h"
+#include "flows/psbt_process_redeemScript.h"
 
 typedef struct {
     machine_context_t ctx;
@@ -47,6 +48,7 @@ typedef struct {
         get_merkleized_map_value_state_t get_merkleized_map_value;
         stream_merkleized_map_value_state_t stream_merkleized_map_value;
         psbt_parse_rawtx_state_t psbt_parse_rawtx;
+        psbt_process_redeemScript_state_t psbt_process_redeemScript;
     } subcontext;
 } sign_psbt_state_t;
 
