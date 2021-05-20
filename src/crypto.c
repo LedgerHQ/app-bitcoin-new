@@ -409,9 +409,6 @@ static void crypto_get_compressed_pubkey_at_path(
     explicit_bzero(&private_key, sizeof(private_key)); // delete sensitive data
     // compute compressed public key
     crypto_get_compressed_pubkey((uint8_t *)&keydata, pubkey);
-
-    uint8_t uncompressed_pubkey[65];
-    crypto_get_uncompressed_pubkey(pubkey, uncompressed_pubkey);
 }
 
 
