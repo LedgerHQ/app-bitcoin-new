@@ -323,6 +323,38 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
 
 
 /**
+ * Gets the compressed pubkey and (optionally) the chain code at the given derivation path. 
+ *
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit integer input buffer.
+ * @param[in]  bip32_path_len
+ *   Number of derivation steps.
+ * @param[out]  pubkey
+ *   A pointer to a 33-bytes buffer that will receive the compressed public key.
+ * @param[out]  chaincode
+ *   Either NULL, or a pointer to a 32-bytes buffer that will receive the chain code.
+ */
+void crypto_get_compressed_pubkey_at_path(
+    const uint32_t bip32_path[],
+    uint8_t bip32_path_len,
+    uint8_t pubkey[static 33],
+    uint8_t chain_code[]
+);
+
+
+/**
+ * Computes the fingerprint of a compressed key as per BIP32; that is, the first 4 bytes of the HASH160 of the given
+ * compressed pubkey, interpreted as a big-endian 32-bit unsigned integer.
+ *
+ * @param[in]  pub_key
+ *   Pointer to 32-bit integer input buffer.
+ *
+ * @return the fingerprint of pub_key.
+ */
+uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]);
+
+
+/**
  * Computes the base58check-encoded extended pubkey at a given path.
  * 
  * @param[in]  bip32_path

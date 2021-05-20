@@ -130,16 +130,7 @@ int my_cx_ecfp_add_point(cx_curve_t curve, unsigned char *R, const unsigned char
 //// END
 
 
-static uint32_t crypto_get_key_fingerprint(const uint8_t key[static 33]);
-
-static void crypto_get_compressed_pubkey_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t pubkey[static 33],
-    uint8_t chain_code[]
-);
 static int secp256k1_point(const uint8_t scalar[static 32], uint8_t out[static 65]);
-
 
 
 /**
@@ -367,19 +358,7 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
 }
 
 
-/**
- * Gets the compressed pubkey and (optionally) the chain code at the given derivation path. 
- *
- * @param[in]  bip32_path
- *   Pointer to 32-bit integer input buffer.
- * @param[in]  bip32_path_len
- *   Maximum number of BIP32 paths in the input buffer.
- * @param[out]  pubkey
- *   A pointer to a 33-bytes buffer that will receive the compressed public key.
- * @param[out]  chaincode
- *   Either NULL, or a pointer to a 32-bytes buffer that will receive the chain code.
- */
-static void crypto_get_compressed_pubkey_at_path(
+void crypto_get_compressed_pubkey_at_path(
     const uint32_t bip32_path[],
     uint8_t bip32_path_len,
     uint8_t pubkey[static 33],
@@ -412,12 +391,9 @@ static void crypto_get_compressed_pubkey_at_path(
 }
 
 
-/**
- * Computes the fingerprint of a compressed key.
- */
-static uint32_t crypto_get_key_fingerprint(const uint8_t key[static 33]) {
+uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {
     uint8_t key_rip[20];
-    crypto_hash160(key, 33, key_rip);
+    crypto_hash160(pub_key, 33, key_rip);
 
     return read_u32_be(key_rip, 0);
 }
