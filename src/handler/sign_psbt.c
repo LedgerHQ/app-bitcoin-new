@@ -126,7 +126,13 @@ void handler_sign_psbt(
     }
     state->n_outputs = (size_t)n_outputs;
 
-    state->cur_input_index = 0;
+
+    // Get the master's key fingerprint
+    uint8_t master_pub_key[33];
+    uint32_t bip32_path[] = {};
+    crypto_get_compressed_pubkey_at_path(bip32_path, 0, master_pub_key, NULL);
+    state->master_key_fingerprint = crypto_get_key_fingerprint(master_pub_key);
+
 
     // Check integrity of the global map
     call_check_merkle_tree_sorted(dc,
@@ -196,14 +202,14 @@ static void receive_global_tx_info(dispatcher_context_t *dc) {
  */
 static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
     size_t data_len = data->size - data->offset;
-    if (data_len == 1) {
-        uint8_t key;
-        buffer_read_u8(data, &key);
-        if (key == PSBT_IN_WITNESS_UTXO) {
+    if (data_len >= 1) {
+        uint8_t key_type;
+        buffer_read_u8(data, &key_type);
+        if (key_type == PSBT_IN_WITNESS_UTXO) {
             state->cur_input_has_witnessUtxo = true;
-        } else if (key == PSBT_IN_REDEEM_SCRIPT) {
+        } else if (key_type == PSBT_IN_REDEEM_SCRIPT) {
             state->cur_input_has_redeemScript = true;
-        } else if (key == PSBT_IN_SIGHASH_TYPE) {
+        } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
             state->cur_input_has_sighash_type = true;
         }
     }

@@ -21,13 +21,17 @@ typedef struct {
     int n_outputs;
     uint8_t outputs_root[20];
 
+    uint32_t master_key_fingerprint;
+
     int cur_input_index;
     merkleized_map_commitment_t cur_input_map;
     uint8_t cur_prevout_hash[32];    // stores the prevout_hash of the current input
     int cur_prevout_n;               // stores the prevout index of the current input
+    uint64_t cur_prevout_amount;     // stores the value of the prevout of the current input
     bool cur_input_has_witnessUtxo;
     bool cur_input_has_redeemScript;
     bool cur_input_has_sighash_type;
+
 
     uint8_t cur_input_prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int cur_input_prevout_scriptpubkey_len;

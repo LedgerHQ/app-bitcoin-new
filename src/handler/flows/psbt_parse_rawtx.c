@@ -61,6 +61,8 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
                     must_add_to_hash = false;
                 }                
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, txid, 32);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -116,6 +118,8 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
                     must_add_to_hash = false;
                 }                
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, vout_bytes, 4);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -159,6 +163,8 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
                 crypto_hash_update_u8(&state->parent_state->hash_context->header, 1);    // script length
                 crypto_hash_update_u8(&state->parent_state->hash_context->header, 0x00); // empty script (0x00)
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            // nothing to do
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -199,6 +205,8 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
             crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1 || parse_mode == PARSEMODE_LEGACY_PASS2) {
             // nothing to do here, already handled in parse_rawtxinput_scriptsig_size
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            // nothing to do
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -252,6 +260,8 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
                 // add for inputs greater than or equal to the current input
                 must_add_to_hash = state->parent_state->in_counter >= input_index;
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -287,11 +297,14 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
-        state->value = read_u64_le(value_bytes, 0);
-
         ParseMode_t parse_mode = state->parent_state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
             crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
+
+            int relevant_output_index = state->parent_state->program_state->compute_txid.output_index;
+            if (state->parent_state->out_counter == relevant_output_index) {
+                state->parent_state->program_state->compute_txid.prevout_value = read_u64_le(value_bytes, 0);
+            }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             // nothing to do, all outputs are past the script_code, therefore handled in pass 2
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
@@ -313,6 +326,13 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
             } else {
                 // SIGHASH_ALL
                 crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
+            }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
+            int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
+
+            if ((sighash_type & 0x1f) != SIGHASH_SINGLE || state->parent_state->out_counter == input_index) {
+                crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashOutputs_context.header, value_bytes, 8);
             }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
@@ -359,6 +379,13 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
             } else {
                 // SIGHASH_ALL
                 crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptpubkey_size);
+            }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
+            int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
+
+            if ((sighash_type & 0x1f) != SIGHASH_SINGLE || state->parent_state->out_counter == input_index) {
+                crypto_hash_update_varint(&state->parent_state->program_state->compute_sighash_segwit_v0.hashOutputs_context.header, scriptpubkey_size);
             }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
@@ -423,6 +450,13 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
                 // SIGHASH_ALL
                 crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
+            int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
+
+            if ((sighash_type & 0x1f) != SIGHASH_SINGLE || state->parent_state->out_counter == input_index) {
+                crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashOutputs_context.header, data, data_len);
+            }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -450,6 +484,7 @@ const int n_parse_rawtxoutput_steps = sizeof(parse_rawtxoutput_steps)/sizeof(par
 static int parse_rawtx_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
+    // skip the initial 0x00 byte for Merkle leafs
     uint8_t first_byte;
     if (!dbuffer_read_u8(buffers, &first_byte) || first_byte != 0x00) {
         return -1;
@@ -469,6 +504,8 @@ static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2])
             crypto_hash_update(&state->hash_context->header, version_bytes, 4);
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
             // skip
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            state->program_state->compute_sighash_segwit_v0.nVersion = read_u32_le(version_bytes, 0);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -517,6 +554,7 @@ static int parse_rawtx_check_segwit(parse_rawtx_state_t *state, buffer_t *buffer
 static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
+
     uint64_t n_inputs; 
     bool result = dbuffer_read_varint(buffers, &n_inputs);
     if (result) {
@@ -533,7 +571,9 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
             } else {
                 crypto_hash_update_varint(&state->hash_context->header, n_inputs);
             }
-    } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
+        } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
+            // skip
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
             // skip
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
@@ -546,6 +586,13 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
 static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->in_counter = 0;
+
+    if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
+        // init hash contexts related to the inputs
+        cx_sha256_init(&state->program_state->compute_sighash_segwit_v0.hashPrevouts_context);
+        cx_sha256_init(&state->program_state->compute_sighash_segwit_v0.hashSequence_context);
+    }
+
     parser_init_context(&state->input_parser_context, &state->input_parser_state);
 
     state->input_parser_state.parent_state = state;
@@ -571,6 +618,42 @@ static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) 
         ++state->in_counter;
         parser_init_context(&state->input_parser_context, &state->input_parser_state);
     }
+    return 1;
+}
+
+static int parse_rawtx_inputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+
+    if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
+        uint32_t sighash_type = state->program_state->compute_sighash_segwit_v0.sighash_type;
+
+        // if SIGHASH_ANYONECANPAY, hashPrevouts is zeroed
+        if (sighash_type & SIGHASH_ANYONECANPAY) {
+            memset(state->program_state->compute_sighash_segwit_v0.hashPrevouts, 0, 32);
+        } else {
+            crypto_hash_digest(&state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header,
+                               state->program_state->compute_sighash_segwit_v0.hashPrevouts,
+                               32);
+            cx_hash_sha256(state->program_state->compute_sighash_segwit_v0.hashPrevouts, 32,
+                           state->program_state->compute_sighash_segwit_v0.hashPrevouts, 32);
+        }
+
+
+        // if any of SIGHASH_ANYONECANPAY or SIGHASH_SINGLE or SIGHASH_NONE, hashSequence is zeroed
+        if ((sighash_type & SIGHASH_ANYONECANPAY)
+            || (sighash_type & 0x1f) == SIGHASH_SINGLE
+            || (sighash_type & 0x1f) == SIGHASH_NONE)
+        {
+            memset(state->program_state->compute_sighash_segwit_v0.hashSequence, 0, 32);
+        } else {
+            crypto_hash_digest(&state->program_state->compute_sighash_segwit_v0.hashSequence_context.header,
+                               state->program_state->compute_sighash_segwit_v0.hashSequence,
+                               32);
+            cx_hash_sha256(state->program_state->compute_sighash_segwit_v0.hashSequence, 32,
+                           state->program_state->compute_sighash_segwit_v0.hashSequence, 32);
+        }
+    }
+
     return 1;
 }
 
@@ -612,6 +695,12 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
 
     state->out_counter = 0;
     parser_init_context(&state->output_parser_context, &state->output_parser_state);
+
+    if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
+        // init hash context related to the outputs
+        cx_sha256_init(&state->program_state->compute_sighash_segwit_v0.hashOutputs_context);
+    }
+
     state->output_parser_state.parent_state = state;
     return 1;
 }
@@ -634,6 +723,35 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
 
         ++state->out_counter;
         parser_init_context(&state->output_parser_context, &state->output_parser_state);
+    }
+    return 1;
+}
+
+static int parse_rawtx_outputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+
+    if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
+        uint32_t sighash_type = state->program_state->compute_sighash_segwit_v0.sighash_type;
+
+        // hashOutputs is zeroed if either:
+        // - sighash type is SIGHASH_NONE (or SIGHASH_NONE | SIGHASH_ANYONECANPAY)
+        // - sighash type is SIGHASH_SINGLE and the input index is >= the number of outputs
+        // Otherwise:
+        // - if SIGHASH_SINGLE, only the corresponding output is part of the hash (handled in the output parsing section)
+        // - in any other case, all outputs are hashed in hashOutputs
+        
+        int in_index = state->program_state->compute_sighash_segwit_v0.input_index;
+        if ((sighash_type & 0x1f) == SIGHASH_NONE
+            || ((sighash_type & 0x1f) == SIGHASH_SINGLE && in_index >= state->n_outputs))
+        {
+            memset(state->program_state->compute_sighash_segwit_v0.hashOutputs, 0, 32);
+        } else {
+            crypto_hash_digest(&state->program_state->compute_sighash_segwit_v0.hashOutputs_context.header,
+                               state->program_state->compute_sighash_segwit_v0.hashOutputs,
+                               32);
+            cx_hash_sha256(state->program_state->compute_sighash_segwit_v0.hashOutputs, 32,
+                           state->program_state->compute_sighash_segwit_v0.hashOutputs, 32);
+        }
     }
     return 1;
 }
@@ -705,18 +823,20 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
 static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
-    uint8_t value_bytes[4];
-    bool result = dbuffer_read_bytes(buffers, value_bytes, 4);
+    uint8_t locktime_bytes[4];
+    bool result = dbuffer_read_bytes(buffers, locktime_bytes, 4);
     if (result) {
-        state->locktime = read_u32_le(value_bytes, 0);
+        state->locktime = read_u32_le(locktime_bytes, 0);
 
         ParseMode_t parse_mode = state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
-            crypto_hash_update(&state->hash_context->header, value_bytes, 4);
+            crypto_hash_update(&state->hash_context->header, locktime_bytes, 4);
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             // nothing to do, as we are past the script_code
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
-            crypto_hash_update(&state->hash_context->header, value_bytes, 4);
+            crypto_hash_update(&state->hash_context->header, locktime_bytes, 4);
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            // nothing to do
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -733,10 +853,9 @@ static int parse_rawtx_add_sighash(parse_rawtx_state_t *state, buffer_t *buffers
         uint8_t sighash_type_bytes[4];
         write_u32_le(sighash_type_bytes, 0, state->program_state->compute_sighash_legacy.sighash_type);
         crypto_hash_update(&state->hash_context->header, sighash_type_bytes, 4);
-    } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
-        PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
-        return -1;
     }
+
+    // nothing to do for PARSEMODE_SEGWIT_V0
 
     return 1;
 }
@@ -746,9 +865,9 @@ static const parsing_step_t parse_rawtx_steps[] = {
     (parsing_step_t)parse_rawtx_version,
     (parsing_step_t)parse_rawtx_check_segwit,
     (parsing_step_t)parse_rawtx_input_count,
-    (parsing_step_t)parse_rawtx_inputs_init, (parsing_step_t)parse_rawtx_inputs,
+    (parsing_step_t)parse_rawtx_inputs_init, (parsing_step_t)parse_rawtx_inputs, (parsing_step_t)parse_rawtx_inputs_finalize,
     (parsing_step_t)parse_rawtx_output_count,
-    (parsing_step_t)parse_rawtx_outputs_init, (parsing_step_t)parse_rawtx_outputs,
+    (parsing_step_t)parse_rawtx_outputs_init, (parsing_step_t)parse_rawtx_outputs, (parsing_step_t)parse_rawtx_outputs_finalize,
     (parsing_step_t)parse_rawtx_witness_count,
     (parsing_step_t)parse_rawtx_witnesses,
     (parsing_step_t)parse_rawtx_locktime,

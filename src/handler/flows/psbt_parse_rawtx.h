@@ -22,7 +22,6 @@ typedef struct {
     struct parse_rawtx_state_s *parent_state; 
     int scriptpubkey_size;    // max 10_000 bytes
     int scriptpubkey_counter; // counter of scriptpubkey bytes already received
-    uint64_t value;
 } parse_rawtxoutput_state_t;
 
 
@@ -41,6 +40,7 @@ typedef union {
         int input_index;               // index of queried input, or -1
         uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
         int prevout_n;                 // will contain tx.input[input_index].prevout.n
+        uint64_t prevout_value;        // will contain tx.input[input_index].prevout.value
 
         int output_index;              // index of queried output, or -1
         // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
@@ -56,7 +56,23 @@ typedef union {
     struct {
         uint32_t sighash_type;
         size_t input_index;
-        // TODO
+        uint32_t nVersion;
+        uint8_t hashPrevouts[32];
+        uint8_t hashSequence[32];
+        // outpoint already known
+        // scriptCode not part of the parsing
+        uint8_t hashOutputs[32];
+        //sighash type
+
+
+        // We overlap hash contexts that are not used at the same time, in otder to save memory
+        union {
+            struct {
+                cx_sha256_t hashPrevouts_context;
+                cx_sha256_t hashSequence_context;
+            };
+            cx_sha256_t hashOutputs_context;
+        };
     } compute_sighash_segwit_v0;
 } program_state_t;
 
