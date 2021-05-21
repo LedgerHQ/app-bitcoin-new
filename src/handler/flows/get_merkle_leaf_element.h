@@ -25,7 +25,6 @@ typedef struct {
     uint8_t leaf_hash[20];
     union {
         get_merkle_preimage_state_t get_merkle_preimage;
-        get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
     } subcontext;
 } get_merkle_leaf_element_state_t;
 

@@ -81,6 +81,43 @@ static void run_callback(dispatcher_callback_descriptor_t cb, buffer_t *calldata
 }
 
 
+// TODO: refactor code in common with the main apdu loop
+static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rdata_len) {
+    command_t cmd;
+    int input_len;
+
+    // Reset structured APDU command
+    memset(&cmd, 0, sizeof(cmd));
+
+    io_send_response(rdata, rdata_len, SW_INTERRUPTED_EXECUTION);
+
+    // Receive command bytes in G_io_apdu_buffer
+    if ((input_len = io_recv_command()) < 0) {
+        return -1;
+    }
+
+    // Parse APDU command from G_io_apdu_buffer
+    if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
+        PRINTF("=> (INT) /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return -1;
+    }
+
+    PRINTF("=> (INT) CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=%.*H\n",
+            cmd.cla,
+            cmd.ins,
+            cmd.p1,
+            cmd.p2,
+            cmd.lc,
+            cmd.lc,
+            cmd.data);
+
+    dc->read_buffer = buffer_create(cmd.data, cmd.lc);
+
+    return 0;
+}
+
+
 int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                     int n_descriptors,
                     machine_context_t *top_context,
@@ -103,6 +140,7 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.run = run;
     G_dispatcher_context.start_flow = start_flow;
     G_dispatcher_context.run_callback = run_callback;
+    G_dispatcher_context.process_interruption = process_interruption;
 
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
@@ -115,10 +153,6 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
             PRINTF("Unexpected INS_CONTINUE.\n");
             return io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
         }
-
-
-        dispatcher_loop();
-
     } else {
         // If a previous command was interrupted but any command other than INS_CONTINUE is received,
         // the interrupted command is discarded.
@@ -149,10 +183,9 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         }
 
         handler(cmd->p1, cmd->p2, cmd->lc, &G_dispatcher_context);
-
-        dispatcher_loop();
     }
 
+    dispatcher_loop();
     return 0;
 }
 
@@ -199,7 +232,7 @@ static void dispatcher_loop() {
     // Here a response (either success or error) should have been send.
     // Failure to do so indicates a bug in the last command processors.
     if (G_dispatcher_state.sw == 0) {
-        PRINTF("No response sent from processor before terminating\n");
+        PRINTF("No response before terminating\n");
         io_send_sw(SW_BAD_STATE);
     }
 

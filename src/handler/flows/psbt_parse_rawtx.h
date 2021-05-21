@@ -65,7 +65,7 @@ typedef union {
         //sighash type
 
 
-        // We overlap hash contexts that are not used at the same time, in otder to save memory
+        // We overlap hash contexts that are not used at the same time, in order to save memory
         union {
             struct {
                 cx_sha256_t hashPrevouts_context;

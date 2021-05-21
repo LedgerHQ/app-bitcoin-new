@@ -21,9 +21,6 @@ typedef struct {
 
     // internal state
     uint8_t returned_merkle_leaf_hash[20];
-    union {
-        get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
-    } subcontext;
 } get_merkle_leaf_index_state_t;
 
 

@@ -23,7 +23,6 @@ typedef struct {
 
     union {
         get_merkle_leaf_index_state_t get_merkle_leaf_index;
-        get_merkle_leaf_hash_state_t get_merkle_leaf_hash;
     } subcontext;
 } get_merkleized_map_value_hash_state_t;
 

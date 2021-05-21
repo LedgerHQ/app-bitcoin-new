@@ -27,7 +27,7 @@ typedef union {
     get_pubkey_state_t get_pubkey_state;
     register_wallet_state_t register_wallet_state;
     get_wallet_address_state_t get_wallet_address_state;
-    sign_psbt_state_t sign_psbt_state;
+    // sign_psbt_state_t sign_psbt_state; // TODO: add this back
 } command_state_t;
 
 

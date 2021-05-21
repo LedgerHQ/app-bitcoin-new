@@ -37,7 +37,7 @@ static void receive_index(dispatcher_context_t *dc) {
     }
 
     int index = state->subcontext.get_merkle_leaf_index.index;
-    call_get_merkle_leaf_hash(dc, &state->subcontext.get_merkle_leaf_hash, NULL,
+    call_get_merkle_leaf_hash(dc,
                               state->map->values_root,
                               state->map->size,
                               index,

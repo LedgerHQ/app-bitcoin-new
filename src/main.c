@@ -133,10 +133,34 @@ void app_main() {
                        cmd.lc,
                        cmd.data);
 
+
+                // PRINTF("total command state size: %d\n", sizeof(command_state_t));
+
+
+                // PRINTF("handler_get_address: %d\n", sizeof(get_address_state_t));
+                // PRINTF("handler_get_pubkey: %d\n", sizeof(get_pubkey_state_t));
+                // PRINTF("handler_get_wallet_address: %d\n", sizeof(get_wallet_address_state_t));
+                // PRINTF("handler_register_wallet: %d\n", sizeof(register_wallet_state_t));
+                // PRINTF("handler_sign_psbt: %d\n", sizeof(sign_psbt_state_t));
+
+                // PRINTF("\npsbt_parse_rawtx_state_t: %d\n", sizeof(psbt_parse_rawtx_state_t));
+                // PRINTF("parse_rawtx_state_s: %d\n", sizeof(parse_rawtx_state_t));
+
+                // PRINTF("check_merkle_tree_sorted     : %d\n", sizeof(check_merkle_tree_sorted_state_t));
+                // PRINTF("get_merkle_leaf_element      : %d\n", sizeof(get_merkle_leaf_element_state_t));
+                // PRINTF("get_merkle_leaf_index        : %d\n", sizeof(get_merkle_leaf_index_state_t));
+                // PRINTF("get_merkle_preimage          : %d\n", sizeof(get_merkle_preimage_state_t));
+                // PRINTF("get_merkleized_map_value_hash: %d\n", sizeof(get_merkleized_map_value_hash_state_t));
+                // PRINTF("get_merkleized_map           : %d\n", sizeof(get_merkleized_map_state_t));
+                // PRINTF("psbt_parse_rawtx             : %d\n", sizeof(psbt_parse_rawtx_state_t));
+                // PRINTF("psbt_process_redeemScript    : %d\n", sizeof(psbt_process_redeemScript_state_t));
+                // PRINTF("stream_merkle_leaf_element   : %d\n", sizeof(stream_merkle_leaf_element_state_t));
+                // PRINTF("stream_merkleized_map_value  : %d\n", sizeof(stream_merkleized_map_value_state_t));
+                // PRINTF("stream_preimage              : %d\n", sizeof(stream_preimage_state_t));
+
                 // Dispatch structured APDU command to handler
-                int n_command_descriptors = sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]);
                 apdu_dispatcher(COMMAND_DESCRIPTORS,
-                                n_command_descriptors,
+                                sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]),
                                 (machine_context_t *)&G_command_state,
                                 sizeof(G_command_state),
                                 ui_menu_main,

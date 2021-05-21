@@ -14,7 +14,7 @@
 typedef struct {
     machine_context_t ctx;
 
-    merkleized_map_commitment_t global_map;
+    merkleized_map_commitment_t global_map; // 48 bytes
 
     int n_inputs;
     uint8_t inputs_root[20];
@@ -43,7 +43,7 @@ typedef struct {
         uint32_t cur_input_sighash_type;
     };
 
-    uint8_t tmp[80];  // temporary array to store keys requested in the PSBT maps
+    uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
 
     union {
         check_merkle_tree_sorted_state_t check_merkle_tree_sorted;

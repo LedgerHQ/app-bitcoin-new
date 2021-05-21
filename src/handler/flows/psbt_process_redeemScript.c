@@ -27,7 +27,7 @@ void flow_psbt_process_redeemScript(dispatcher_context_t *dc) {
                                      state->map,
                                      state->key,
                                      state->key_len,
-                                     make_callback(state, process_redeem_script_callback));
+                                     make_callback(state, (dispatcher_callback_t)process_redeem_script_callback));
 }
 
 

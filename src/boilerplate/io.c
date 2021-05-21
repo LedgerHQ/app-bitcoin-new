@@ -140,9 +140,11 @@ int io_confirm_response() {
             ret = -1;
             break;
         case RECEIVED:
-            G_io_state = READY;
-            ret = 0;
-            break;
+            // TODO: what is this? Check if still needed for some reason; it currently breaks the inner loop for interruptions
+
+            // G_io_state = READY;
+            // ret = 0;
+            // break;
         case WAITING:
             ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
             G_output_len = 0;

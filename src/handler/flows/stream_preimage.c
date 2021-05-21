@@ -26,9 +26,8 @@ void flow_stream_preimage(dispatcher_context_t *dc) {
     req[0] = CCMD_GET_PREIMAGE;
     memcpy(&req[1], state->hash, 20);
 
-    dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
-
     dc->next(process_get_preimage_response);
+    dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
 }
 
 
@@ -78,8 +77,8 @@ static void check_if_done(dispatcher_context_t *dc) {
         dc->next(verify_hash);
     } else {
         uint8_t req[] = { CCMD_GET_MORE_ELEMENTS };
-        dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
         dc->next(receive_more_data);
+        dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
     }
 }
 
