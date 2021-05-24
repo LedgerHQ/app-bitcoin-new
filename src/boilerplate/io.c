@@ -103,6 +103,7 @@ int io_recv_command() {
             G_io_state = WAITING;
             ret = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, G_output_len);
             G_io_state = RECEIVED;
+            ret = 0;
             break;
         case WAITING:
             G_io_state = READY;
@@ -131,7 +132,6 @@ void io_set_response(void *rdata, size_t rdata_len, uint16_t sw) {
     G_output_len = rdata_len + 2;
 }
 
-
 int io_confirm_response() {
     int ret;
 
@@ -142,9 +142,9 @@ int io_confirm_response() {
         case RECEIVED:
             // TODO: what is this? Check if still needed for some reason; it currently breaks the inner loop for interruptions
 
-            // G_io_state = READY;
-            // ret = 0;
-            // break;
+            G_io_state = READY;
+            ret = 0;
+            break;
         case WAITING:
             ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
             G_output_len = 0;

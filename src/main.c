@@ -113,8 +113,12 @@ void app_main() {
                 memset(&cmd, 0, sizeof(cmd));
 
                 // Receive command bytes in G_io_apdu_buffer
+
                 if ((input_len = io_recv_command()) < 0) {
                     return;
+                } else if (input_len == 0) {
+                    // TODO: workaround for async responses not working properly. Figure out the more appropriate way.
+                    continue;
                 }
 
                 // Parse APDU command from G_io_apdu_buffer
@@ -134,7 +138,7 @@ void app_main() {
                        cmd.data);
 
 
-                // PRINTF("total command state size: %d\n", sizeof(command_state_t));
+                PRINTF("total command state size: %d\n", sizeof(command_state_t));
 
 
                 // PRINTF("handler_get_address: %d\n", sizeof(get_address_state_t));
@@ -148,7 +152,6 @@ void app_main() {
 
                 // PRINTF("check_merkle_tree_sorted     : %d\n", sizeof(check_merkle_tree_sorted_state_t));
                 // PRINTF("get_merkle_leaf_element      : %d\n", sizeof(get_merkle_leaf_element_state_t));
-                // PRINTF("get_merkle_leaf_index        : %d\n", sizeof(get_merkle_leaf_index_state_t));
                 // PRINTF("get_merkle_preimage          : %d\n", sizeof(get_merkle_preimage_state_t));
                 // PRINTF("get_merkleized_map_value_hash: %d\n", sizeof(get_merkleized_map_value_hash_state_t));
                 // PRINTF("get_merkleized_map           : %d\n", sizeof(get_merkleized_map_state_t));
@@ -156,7 +159,6 @@ void app_main() {
                 // PRINTF("psbt_process_redeemScript    : %d\n", sizeof(psbt_process_redeemScript_state_t));
                 // PRINTF("stream_merkle_leaf_element   : %d\n", sizeof(stream_merkle_leaf_element_state_t));
                 // PRINTF("stream_merkleized_map_value  : %d\n", sizeof(stream_merkleized_map_value_state_t));
-                // PRINTF("stream_preimage              : %d\n", sizeof(stream_preimage_state_t));
 
                 // Dispatch structured APDU command to handler
                 apdu_dispatcher(COMMAND_DESCRIPTORS,
