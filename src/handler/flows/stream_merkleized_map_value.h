@@ -21,7 +21,6 @@ typedef struct {
     uint8_t key_merkle_hash[20];
 
     union {
-        get_merkle_leaf_index_state_t get_merkle_leaf_index;
         stream_merkle_leaf_element_state_t stream_merkle_leaf_element;
     } subcontext;
 } stream_merkleized_map_value_state_t;

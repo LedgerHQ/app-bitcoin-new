@@ -10,8 +10,6 @@
 #include "../client_commands.h"
 
 
-static void finalize_output(dispatcher_context_t *dc);
-
 /**
  * This flow requests a leaf hash from the Merkle tree, then it requests and verifies its preimage
  */
@@ -26,18 +24,12 @@ void flow_stream_merkle_leaf_element(dispatcher_context_t *dc) {
                               state->leaf_index,
                               state->leaf_hash);
 
-    call_stream_preimage(dc,
-                         &state->subcontext.stream_preimage,
-                         finalize_output,
-                         state->leaf_hash,
-                         state->callback);
-}
+    int preimage_len = call_stream_preimage(dc, state->leaf_hash, state->callback);
 
+    if (preimage_len < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
 
-static void finalize_output(dispatcher_context_t *dc) {
-    stream_merkle_leaf_element_state_t *state = (stream_merkle_leaf_element_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    state->element_len = state->subcontext.stream_preimage.preimage_len;
+    state->element_len = preimage_len;
 }

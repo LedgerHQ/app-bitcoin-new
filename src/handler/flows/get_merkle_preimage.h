@@ -19,10 +19,6 @@ typedef struct {
     buffer_t out_buffer;
     bool first_chunk_processed;
     bool overflow;
-
-    union {
-        stream_preimage_state_t stream_preimage;
-    } subcontext;
 } get_merkle_preimage_state_t;
 
 

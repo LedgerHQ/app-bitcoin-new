@@ -9,135 +9,99 @@
 #include "../../constants.h"
 #include "../client_commands.h"
 
-static void process_get_preimage_response(dispatcher_context_t *dc);
-static void check_if_done(dispatcher_context_t *dc);
-static void receive_more_data(dispatcher_context_t *dc);
-static void verify_hash(dispatcher_context_t *dc);
 
+int call_stream_preimage(dispatcher_context_t *dispatcher_context,
+                         const uint8_t hash[static 20],
+                         dispatcher_callback_descriptor_t callback) {
 
-void flow_stream_preimage(dispatcher_context_t *dc) {
-    stream_preimage_state_t *state = (stream_preimage_state_t *)dc->machine_context_ptr;
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    cx_ripemd160_t hash_context;
 
-    cx_ripemd160_init(&state->hash_context);
+    cx_ripemd160_init(&hash_context);
 
-    uint8_t req[1 + 20];
-    req[0] = CCMD_GET_PREIMAGE;
-    memcpy(&req[1], state->hash, 20);
+    uint8_t get_preimage_req[1 + 20];
+    get_preimage_req[0] = CCMD_GET_PREIMAGE;
+    memcpy(&get_preimage_req[1], hash, 20);
 
-    dc->next(process_get_preimage_response);
-    dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
-}
-
-
-static void process_get_preimage_response(dispatcher_context_t *dc) {
-    stream_preimage_state_t *state = (stream_preimage_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    if (dispatcher_context->process_interruption(dispatcher_context, get_preimage_req, sizeof(get_preimage_req)) < 0) {
+        return -1;
+    }
 
     uint64_t preimage_len;
 
     uint8_t partial_data_len;
 
-    if (!buffer_read_varint(&dc->read_buffer, &preimage_len)
-        || !buffer_read_u8(&dc->read_buffer, &partial_data_len)
-        || !buffer_can_read(&dc->read_buffer, partial_data_len))
+    if (!buffer_read_varint(&dispatcher_context->read_buffer, &preimage_len)
+        || !buffer_read_u8(&dispatcher_context->read_buffer, &partial_data_len)
+        || !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len))
     {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
+        return -2;
     }
 
     if (partial_data_len > preimage_len) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -3;
     }
 
-    uint8_t *data_ptr = dc->read_buffer.ptr + dc->read_buffer.offset;
+    uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
     // update hash
-    crypto_hash_update(&state->hash_context.header, data_ptr, partial_data_len);
+    crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
 
     // call callback with data
+    // TODO: can we use a regular C-style callback here?
     buffer_t buf = buffer_create(data_ptr, partial_data_len);
-    dc->run_callback(state->callback, &buf);
+    dispatcher_context->run_callback(callback, &buf);
 
-    state->bytes_remaining = (size_t)preimage_len - partial_data_len;
+    size_t bytes_remaining = (size_t)preimage_len - partial_data_len;
 
-    dc->next(check_if_done);
-}
+    while (bytes_remaining > 0) {
+        uint8_t get_more_elements_req[] = { CCMD_GET_MORE_ELEMENTS };
+        if (dispatcher_context->process_interruption(dispatcher_context, get_more_elements_req, 1) < 0) {
+            return -4;
+        }
 
+        // Parse response to CCMD_GET_MORE_ELEMENTS
+        uint8_t n_bytes, elements_len;
+        if (!buffer_read_u8(&dispatcher_context->read_buffer, &n_bytes)
+            || !buffer_read_u8(&dispatcher_context->read_buffer, &elements_len)
+            || !buffer_can_read(&dispatcher_context->read_buffer, (size_t)n_bytes * elements_len))
+        {
+            return -5;
+        }
 
-static void check_if_done(dispatcher_context_t *dc) {
-    stream_preimage_state_t *state = (stream_preimage_state_t *)dc->machine_context_ptr;
+        if (elements_len != 1) {
+            PRINTF("Elements should be single bytes\n");
+            return -6;
+        }
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+        if (n_bytes > bytes_remaining) {
+            PRINTF("Received more bytes than expected.\n");
+            return -7;
+        }
 
-    if (state->bytes_remaining == 0) {
-        dc->next(verify_hash);
-    } else {
-        uint8_t req[] = { CCMD_GET_MORE_ELEMENTS };
-        dc->next(receive_more_data);
-        dc->send_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
+        uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+
+        // update hash
+        crypto_hash_update(&hash_context.header, data_ptr, n_bytes);
+
+        // call callback with data
+        buffer_t buf = buffer_create(data_ptr, n_bytes);
+        dispatcher_context->run_callback(callback, &buf);
+
+        bytes_remaining -= n_bytes;
     }
-}
-
-
-static void receive_more_data(dispatcher_context_t *dc) {
-    stream_preimage_state_t *state = (stream_preimage_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    // Parse response to CCMD_GET_MORE_ELEMENTS
-    uint8_t n_bytes, elements_len;
-    if (!buffer_read_u8(&dc->read_buffer, &n_bytes)
-        || !buffer_read_u8(&dc->read_buffer, &elements_len)
-        || !buffer_can_read(&dc->read_buffer, (size_t)n_bytes * elements_len))
-    {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    if (elements_len != 1) {
-        PRINTF("Elements should be single bytes\n");
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (n_bytes > state->bytes_remaining) {
-        PRINTF("Received more bytes than expected.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    uint8_t *data_ptr = dc->read_buffer.ptr + dc->read_buffer.offset;
-
-    // update hash
-    crypto_hash_update(&state->hash_context.header, data_ptr, n_bytes);
-
-    // call callback with data
-    buffer_t buf = buffer_create(data_ptr, n_bytes);
-    dc->run_callback(state->callback, &buf);
-
-    state->bytes_remaining -= n_bytes;
-
-    dc->next(check_if_done);
-}
-
-
-static void verify_hash(dispatcher_context_t *dc) {
-    stream_preimage_state_t *state = (stream_preimage_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint8_t computed_hash[20];
 
-    crypto_hash_digest(&state->hash_context.header, computed_hash, 20);
+    crypto_hash_digest(&hash_context.header, computed_hash, 20);
 
-    if (memcmp(computed_hash, state->hash, 20) != 0) {
+    if (memcmp(computed_hash, hash, 20) != 0) {
         PRINTF("Hash mismatch.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        return -5;
     }
 
-    // all done
+    return (int)preimage_len;
 }
+
+

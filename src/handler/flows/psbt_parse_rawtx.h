@@ -140,7 +140,6 @@ typedef struct psbt_parse_rawtx_state_s {
 
     union {
         get_merkleized_map_value_hash_state_t get_merkleized_map_value_hash;
-        stream_preimage_state_t stream_preimage;
     } subcontext;
 } psbt_parse_rawtx_state_t;
 

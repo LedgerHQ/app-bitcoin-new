@@ -5,61 +5,50 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../boilerplate/sw.h"
 #include "../../common/merkle.h"
-#include "../../crypto.h"
 #include "../../constants.h"
 #include "../client_commands.h"
 
 
-static void process_response(dispatcher_context_t *dc);
-
-
-void flow_get_merkle_leaf_index(dispatcher_context_t *dc) {
-    get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
+                               size_t size,
+                               const uint8_t root[static 20],
+                               const uint8_t leaf_hash[static 20])
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     uint8_t request[1 + 20 + 20];
     request[0] = CCMD_GET_MERKLE_LEAF_INDEX;
-    memcpy(request + 1, state->root, 20);
-    memcpy(request + 1 + 20, state->leaf_hash, 20);
+    memcpy(request + 1, root, 20);
+    memcpy(request + 1 + 20, leaf_hash, 20);
 
-    dc->send_response(request, sizeof(request), SW_INTERRUPTED_EXECUTION);
-    dc->next(process_response);
-}
-
-
-static void process_response(dispatcher_context_t *dc) {
-    get_merkle_leaf_index_state_t *state = (get_merkle_leaf_index_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    if (dispatcher_context->process_interruption(dispatcher_context, request, sizeof(request)) < 0) {
+        return -3;
+    }
 
     uint8_t found;
     uint64_t index;
 
-    if (!buffer_read_u8(&dc->read_buffer, &found) || !buffer_read_varint(&dc->read_buffer, &index)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
+    if (!buffer_read_u8(&dispatcher_context->read_buffer, &found)
+        || !buffer_read_varint(&dispatcher_context->read_buffer, &index))
+    {
+        return -2;
     }
 
     if (found != 0 && found != 1) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -2;
     }
 
-    // set results
-    state->found = found;
-    state->index = (uint32_t)index;
-
-    if (found) {
-        // We ask the host for the leaf hash with that index
-        call_get_merkle_leaf_hash(dc,
-                                  state->root,
-                                  state->size,
-                                  index,
-                                  state->returned_merkle_leaf_hash);
-
-        if (memcmp(state->leaf_hash, state->returned_merkle_leaf_hash, 20) != 0){
-            dc->send_sw(SW_INCORRECT_DATA);
-        }
+    if (!found) {
+        return -1;
     }
+
+    // Ask the host for the leaf hash with that index
+    uint8_t returned_merkle_leaf_hash[20];
+    call_get_merkle_leaf_hash(dispatcher_context, root, size, index, returned_merkle_leaf_hash);
+
+    if (memcmp(leaf_hash, returned_merkle_leaf_hash, 20) != 0){
+        return -2;
+    }
+
+    return index;
 }

@@ -13,7 +13,6 @@
 #include "../../constants.h"
 
 static void start_parsing(dispatcher_context_t *dc);
-static void parse_completed(dispatcher_context_t *dc);
 
 /*   PARSER FOR A RAWTX INPUT */
 
@@ -926,14 +925,13 @@ static void start_parsing(dispatcher_context_t *dc) {
         return;
     }
 
-    call_stream_preimage(dc, &state->subcontext.stream_preimage, parse_completed,
-                         state->value_hash,
-                         make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
-}
-
-static void parse_completed(dispatcher_context_t *dc) {
-    psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    int res = call_stream_preimage(dc,
+                                   state->value_hash,
+                                   make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
 
     state->n_inputs = state->parser_state.n_inputs;
     state->n_outputs = state->parser_state.n_outputs;

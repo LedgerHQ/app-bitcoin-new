@@ -22,9 +22,6 @@ typedef struct {
 
     // internal state
     uint8_t leaf_hash[20];
-    union {
-        stream_preimage_state_t stream_preimage;
-    } subcontext;
 } stream_merkle_leaf_element_state_t;
 
 
