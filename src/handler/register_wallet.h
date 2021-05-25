@@ -17,12 +17,7 @@ typedef struct {
     uint8_t wallet_id[32];
 
     uint8_t next_pubkey_index;
-
     uint8_t next_pubkey_info[MAX_MULTISIG_SIGNER_INFO_LEN];
-
-    union {
-        get_merkle_leaf_element_state_t get_merkle_leaf_element;
-    } subcontext;
 } register_wallet_state_t;
 
 void handler_register_wallet(

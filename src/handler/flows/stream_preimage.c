@@ -2,11 +2,7 @@
 
 #include "stream_preimage.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../common/merkle.h"
 #include "../../crypto.h"
-#include "../../constants.h"
 #include "../client_commands.h"
 
 

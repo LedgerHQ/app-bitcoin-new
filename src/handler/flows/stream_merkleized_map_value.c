@@ -1,43 +1,29 @@
-#include "string.h"
-
 #include "stream_merkleized_map_value.h"
-
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-
-#include "../../common/buffer.h"
-#include "../../constants.h"
-
-static void receive_value(dispatcher_context_t *dc);
+#include "get_merkle_leaf_index.h"
+#include "stream_merkle_leaf_element.h"
 
 
-void flow_stream_merkleized_map_value(dispatcher_context_t *dc) {
-    stream_merkleized_map_value_state_t *state = (stream_merkleized_map_value_state_t *)dc->machine_context_ptr;
+int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
+                                     const merkleized_map_commitment_t *map,
+                                     const uint8_t *key,
+                                     int key_len,
+                                     dispatcher_callback_descriptor_t callback)
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    uint8_t key_merkle_hash[20];
+    merkle_compute_element_hash(key, key_len, key_merkle_hash);
 
-    merkle_compute_element_hash(state->key, state->key_len, state->key_merkle_hash);
-
-    int index = call_get_merkle_leaf_index(dc, state->map->size, state->map->keys_root, state->key_merkle_hash);
+    int index = call_get_merkle_leaf_index(dispatcher_context, map->size, map->keys_root, key_merkle_hash);
 
     if (index < 0) {
         PRINTF("Key not found, or incorrect data.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -1;
     }
 
-    call_stream_merkle_leaf_element(dc, &state->subcontext.stream_merkle_leaf_element, receive_value,
-                                    state->map->values_root,
-                                    state->map->size,
+    return call_stream_merkle_leaf_element(dispatcher_context,
+                                    map->values_root,
+                                    map->size,
                                     index,
-                                    state->callback);
-}
-
-static void receive_value(dispatcher_context_t *dc) {
-    stream_merkleized_map_value_state_t *state = (stream_merkleized_map_value_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    // all done
-    state->value_len = state->subcontext.stream_merkle_leaf_element.element_len;
+                                    callback);
 }

@@ -46,11 +46,6 @@ typedef struct {
     uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
 
     union {
-        check_merkle_tree_sorted_state_t check_merkle_tree_sorted;
-        stream_merkle_leaf_element_state_t stream_merkle_leaf_element;
-        get_merkleized_map_state_t get_merkleized_map;
-        get_merkleized_map_value_state_t get_merkleized_map_value;
-        stream_merkleized_map_value_state_t stream_merkleized_map_value;
         psbt_parse_rawtx_state_t psbt_parse_rawtx;
         psbt_process_redeemScript_state_t psbt_process_redeemScript;
     } subcontext;

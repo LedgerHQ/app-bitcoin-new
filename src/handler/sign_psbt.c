@@ -40,9 +40,7 @@
 
 static void process_next_input(dispatcher_context_t *dc);
 static void receive_global_tx_info(dispatcher_context_t *dc);
-static void request_next_input_map(dispatcher_context_t *dc);
 static void process_input_map(dispatcher_context_t *dc);
-static void receive_sighash_type(dispatcher_context_t *dc);
 static void request_non_witness_utxo(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
 
@@ -135,11 +133,12 @@ void handler_sign_psbt(
 
 
     // Check integrity of the global map
-    call_check_merkle_tree_sorted(dc,
-                                  &state->subcontext.check_merkle_tree_sorted,
-                                  process_next_input,
-                                  state->global_map.keys_root,
-                                  (size_t)state->global_map.size);
+    if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+    } else {
+        dc->next(process_next_input);
+    }
+
 }
 
 
@@ -192,7 +191,7 @@ static void receive_global_tx_info(dispatcher_context_t *dc) {
     }
 
     state->cur_input_index = 0;
-    dc->next(request_next_input_map);
+    dc->next(process_input_map);
 }
 
 
@@ -215,52 +214,47 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
     }
 }
 
-static void request_next_input_map(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    state->cur_input_has_witnessUtxo = false;
-    state->cur_input_has_redeemScript = false;
-    call_get_merkleized_map_with_callback(dc,
-                                          &state->subcontext.get_merkleized_map,
-                                          process_input_map,
-                                          state->inputs_root,
-                                          state->n_inputs,
-                                          state->cur_input_index,
-                                          make_callback(state, (dispatcher_callback_t)input_keys_callback),
-                                          &state->cur_input_map);
-}
-
 static void process_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->cur_input_has_sighash_type) {
-        // Get sighash type
-        state->tmp[0] = PSBT_IN_SIGHASH_TYPE;
-        call_get_merkleized_map_value(dc, &state->subcontext.get_merkleized_map_value, receive_sighash_type,
-                                      &state->cur_input_map,
-                                      state->tmp,
-                                      1,
-                                      state->cur_input_sighash_type_le,
-                                      sizeof(state->cur_input_sighash_type_le));
-    } else {
+
+    state->cur_input_has_witnessUtxo = false;
+    state->cur_input_has_redeemScript = false;
+    state->cur_input_has_sighash_type = false;
+    int res = call_get_merkleized_map_with_callback(dc,
+                                                    state->inputs_root,
+                                                    state->n_inputs,
+                                                    state->cur_input_index,
+                                                    make_callback(state, (dispatcher_callback_t)input_keys_callback),
+                                                    &state->cur_input_map);
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (!state->cur_input_has_sighash_type) {
         // PSBT_IN_SIGHASH_TYPE is compulsory
         PRINTF("Missing SIGHASH TYPE for input %d\n", state->cur_input_index);
         dc->send_sw(SW_INCORRECT_DATA);
+        return;
     }
-}
 
-
-static void receive_sighash_type(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    state->cur_input_sighash_type = read_u32_le(state->cur_input_sighash_type_le, 0);
-    dc->next(request_non_witness_utxo);
+    // Get sighash type
+    uint8_t tmp = PSBT_IN_SIGHASH_TYPE;
+    res = call_get_merkleized_map_value(dc,
+                                        &state->cur_input_map,
+                                        &tmp,
+                                        1,
+                                        state->cur_input_sighash_type_le,
+                                        sizeof(state->cur_input_sighash_type_le));
+    if (res < 0) {
+        state->cur_input_sighash_type = read_u32_le(state->cur_input_sighash_type_le, 0);
+        dc->next(request_non_witness_utxo);
+    } else {
+        dc->next(request_non_witness_utxo);
+    }
 }
 
 

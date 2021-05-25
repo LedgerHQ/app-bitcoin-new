@@ -38,7 +38,6 @@
 #include "wallet.h"
 
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
-static void request_next_cosigner_info(dispatcher_context_t *dc);
 static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
 
@@ -139,27 +138,9 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
     if (!accept) {
         dc->send_sw(SW_DENY);
     } else {
-        dc->next(request_next_cosigner_info);
+        dc->next(process_next_cosigner_info);
     }
     dc->run();
-}
-
-/**
- * Interrupts the command, asking the host for the next pubkey (in signing order).
- */
-static void request_next_cosigner_info(dispatcher_context_t *dc) {
-    register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    call_get_merkle_leaf_element(dc,
-                                 &state->subcontext.get_merkle_leaf_element,
-                                 process_next_cosigner_info,
-                                 state->wallet_header.keys_info_merkle_root,
-                                 state->wallet_header.multisig_policy.n_keys,
-                                 state->next_pubkey_index,
-                                 state->next_pubkey_info,
-                                 sizeof(state->next_pubkey_info));
 }
 
 /**
@@ -171,8 +152,21 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+
+    int pubkey_len = call_get_merkle_leaf_element(dc,
+                                                  state->wallet_header.keys_info_merkle_root,
+                                                  state->wallet_header.multisig_policy.n_keys,
+                                                  state->next_pubkey_index,
+                                                  state->next_pubkey_info,
+                                                  sizeof(state->next_pubkey_info));
+
+    if (pubkey_len < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
     // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, state->subcontext.get_merkle_leaf_element.element_len);
+    buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, pubkey_len);
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
@@ -209,7 +203,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
  
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        dc->next(request_next_cosigner_info);
+        dc->next(process_next_cosigner_info);
     } else {
 
         // TODO: validate wallet.

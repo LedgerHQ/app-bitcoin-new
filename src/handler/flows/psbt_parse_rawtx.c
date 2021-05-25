@@ -12,8 +12,6 @@
 #include "../../crypto.h"
 #include "../../constants.h"
 
-static void start_parsing(dispatcher_context_t *dc);
-
 /*   PARSER FOR A RAWTX INPUT */
 
 // parses the 32-bytes txid of an input in a rawtx
@@ -876,19 +874,6 @@ static const parsing_step_t parse_rawtx_steps[] = {
 const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps)/sizeof(parse_rawtx_steps[0]);
 
 
-void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
-    psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    call_get_merkleized_map_value_hash(dc, &state->subcontext.get_merkleized_map_value_hash, start_parsing,
-                                       state->map,
-                                       state->key,
-                                       state->key_len,
-                                       state->value_hash);
-}
-
-
 static void cb_process_data_firstpass(psbt_parse_rawtx_state_t *state, buffer_t *data) {
     buffer_t store_buf = buffer_create(state->store, state->store_data_length);
     buffer_t *buffers[] = { &store_buf, data };
@@ -904,10 +889,20 @@ static void cb_process_data_firstpass(psbt_parse_rawtx_state_t *state, buffer_t 
     }
 }
 
-static void start_parsing(dispatcher_context_t *dc) {
+void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    int res = call_get_merkleized_map_value_hash(dc,
+                                                 state->map,
+                                                 state->key,
+                                                 state->key_len,
+                                                 state->value_hash);
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
 
     // init the state of the parser (global)
     state->parser_state.hash_context = state->hash_context;
@@ -925,9 +920,9 @@ static void start_parsing(dispatcher_context_t *dc) {
         return;
     }
 
-    int res = call_stream_preimage(dc,
-                                   state->value_hash,
-                                   make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
+    res = call_stream_preimage(dc,
+                               state->value_hash,
+                               make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
     if (res < 0) {
         dc->send_sw(SW_INCORRECT_DATA);
         return;

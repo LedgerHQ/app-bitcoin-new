@@ -2,34 +2,30 @@
 
 #include "get_merkleized_map_value_hash.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-
-#include "../../common/buffer.h"
-#include "../../constants.h"
+#include "get_merkle_leaf_hash.h"
+#include "get_merkle_leaf_index.h"
 
 
-void flow_get_merkleized_map_value_hash(dispatcher_context_t *dc) {
-    get_merkleized_map_value_hash_state_t *state = (get_merkleized_map_value_hash_state_t *)dc->machine_context_ptr;
+int call_get_merkleized_map_value_hash(dispatcher_context_t *dispatcher_context,
+                                       const merkleized_map_commitment_t *map,
+                                       const uint8_t *key,
+                                       int key_len,
+                                       uint8_t out[static 20])
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    uint8_t key_merkle_hash[20];
+    merkle_compute_element_hash(key, key_len, key_merkle_hash);
 
-    merkle_compute_element_hash(state->key, state->key_len, state->key_merkle_hash);
-
-    int index = call_get_merkle_leaf_index(dc,
-                                           state->map->size,
-                                           state->map->keys_root,
-                                           state->key_merkle_hash);
-
+    int index = call_get_merkle_leaf_index(dispatcher_context, map->size, map->keys_root, key_merkle_hash);
     if (index < 0) {
         PRINTF("Key not found, or incorrect data.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -1;
     }
 
-    call_get_merkle_leaf_hash(dc,
-                              state->map->values_root,
-                              state->map->size,
-                              index,
-                              state->out);
+    return call_get_merkle_leaf_hash(dispatcher_context,
+                                     map->values_root,
+                                     map->size,
+                                     index,
+                                     out);
 }

@@ -12,24 +12,6 @@
 #include "../../crypto.h"
 #include "../../constants.h"
 
-static void process_redeem_script_callback(psbt_process_redeemScript_state_t *state, buffer_t *data);
-
-static void validate(dispatcher_context_t *dc);
-
-
-void flow_psbt_process_redeemScript(dispatcher_context_t *dc) {
-    psbt_process_redeemScript_state_t *state = (psbt_process_redeemScript_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    state->first_call_done = false;
-    call_stream_merkleized_map_value(dc, &state->subcontext.stream_merkleized_map_value, validate,
-                                     state->map,
-                                     state->key,
-                                     state->key_len,
-                                     make_callback(state, (dispatcher_callback_t)process_redeem_script_callback));
-}
-
 
 static void process_redeem_script_callback(psbt_process_redeemScript_state_t *state, buffer_t *data) {
     if (!state->first_call_done) {
@@ -49,10 +31,22 @@ static void process_redeem_script_callback(psbt_process_redeemScript_state_t *st
     }
 }
 
-static void validate(dispatcher_context_t *dc) {
+
+void flow_psbt_process_redeemScript(dispatcher_context_t *dc) {
     psbt_process_redeemScript_state_t *state = (psbt_process_redeemScript_state_t *)dc->machine_context_ptr;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    state->first_call_done = false; // initialize callback state
+    int res = call_stream_merkleized_map_value(dc,
+                                               state->map,
+                                               state->key,
+                                               state->key_len,
+                                               make_callback(state, (dispatcher_callback_t)process_redeem_script_callback));
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
 
     // verify that the computed scriptpubkey is the expected one
     uint8_t script_hash[32];

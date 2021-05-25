@@ -1,13 +1,12 @@
 #pragma once
 
 #include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
 
 /**
  * TODO: docs
  */
-void call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_context,
-                               const uint8_t merkle_root[static 20],
-                               uint32_t tree_size,
-                               uint32_t leaf_index,
-                               uint8_t out[static 20]);
+int call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_context,
+                              const uint8_t merkle_root[static 20],
+                              uint32_t tree_size,
+                              uint32_t leaf_index,
+                              uint8_t out[static 20]);

@@ -2,46 +2,35 @@
 
 #include "get_merkleized_map.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
+#include "get_merkle_leaf_element.h"
+#include "check_merkle_tree_sorted.h"
 
 #include "../../common/buffer.h"
-#include "../../constants.h"
-
-static void receive_and_check_preimage(dispatcher_context_t *dc);
 
 
-void flow_get_merkleized_map(dispatcher_context_t *dc) {
-    get_merkleized_map_state_t *state = (get_merkleized_map_state_t *)dc->machine_context_ptr;
+int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
+                                          const uint8_t root[static 20],
+                                          int size,
+                                          int index,
+                                          dispatcher_callback_descriptor_t keys_callback,
+                                          merkleized_map_commitment_t *out_ptr)
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    uint8_t raw_output[9 + 2*20]; // maximum size of serialized result (9 bytes for the varint, and the 2 Merkle roots)
 
-    call_get_merkle_leaf_element(dc, &state->subcontext.get_merkle_leaf_element, receive_and_check_preimage,
-                                state->root,
-                                state->size,
-                                state->index,
-                                state->raw_output,
-                                sizeof(state->raw_output));
-}
-
-
-static void receive_and_check_preimage(dispatcher_context_t *dc) {
-    get_merkleized_map_state_t *state = (get_merkleized_map_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    buffer_t buf = buffer_create(state->raw_output, state->subcontext.get_merkle_leaf_element.element_len);
-
-    if (!buffer_read_varint(&buf, &state->out_ptr->size)
-        || !buffer_read_bytes(&buf, state->out_ptr->keys_root, 20)
-        || !buffer_read_bytes(&buf, state->out_ptr->values_root, 20))
-    {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+    int el_len = call_get_merkle_leaf_element(dispatcher_context, root, size, index, raw_output, sizeof(raw_output));
+    if (el_len < 0) {
+        return -1;
     }
 
-    call_check_merkle_tree_sorted_with_callback(dc, &state->subcontext.check_merkle_tree_sorted, NULL,
-                                                state->out_ptr->keys_root,
-                                                state->out_ptr->size,
-                                                state->keys_callback);
+    buffer_t buf = buffer_create(raw_output, el_len);
+    if (!buffer_read_varint(&buf, &out_ptr->size)
+        || !buffer_read_bytes(&buf, out_ptr->keys_root, 20)
+        || !buffer_read_bytes(&buf, out_ptr->values_root, 20))
+    {
+        return -1;
+    }
+
+    return call_check_merkle_tree_sorted_with_callback(dispatcher_context, out_ptr->keys_root, out_ptr->size, keys_callback);
 }

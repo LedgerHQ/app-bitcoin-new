@@ -22,10 +22,6 @@ typedef struct {
 
     bool first_call_done;
     cx_sha256_t internal_hash_context;
-
-    union {
-        stream_merkleized_map_value_state_t stream_merkleized_map_value;
-    } subcontext;
 } psbt_process_redeemScript_state_t;
 
 

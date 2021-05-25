@@ -2,20 +2,17 @@
 
 #include "get_merkle_leaf_hash.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../crypto.h"
+#include "../../common/buffer.h"
+#include "../../common/write.h"
 #include "../../common/merkle.h"
-#include "../../constants.h"
 #include "../client_commands.h"
 
-
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
-void call_get_merkle_leaf_hash(dispatcher_context_t *dc,
-                               const uint8_t merkle_root[static 20],
-                               uint32_t tree_size,
-                               uint32_t leaf_index,
-                               uint8_t out[static 20]) {
+int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
+                              const uint8_t merkle_root[static 20],
+                              uint32_t tree_size,
+                              uint32_t leaf_index,
+                              uint8_t out[static 20]) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
@@ -35,7 +32,7 @@ void call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     write_u32_be(req, 1 + 20 + 4, leaf_index);
 
     if (dc->process_interruption(dc, req, sizeof(req)) < 0) {
-        return;
+        return -1;
     }
 
     uint8_t n_proof_elements;
@@ -43,29 +40,25 @@ void call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         || !buffer_read_u8(&dc->read_buffer, &proof_size)
         || !buffer_read_u8(&dc->read_buffer, &n_proof_elements))
     {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
+        return -2;
     }
 
     if (n_proof_elements > proof_size) {
         PRINTF("Received more proof data than expected.\n");
 
         // Wrong length of the Merkle proof.
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -3;
     }
 
     if (!buffer_can_read(&dc->read_buffer, 20 * (size_t)n_proof_elements)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
+        return -4;
     }
 
     // Initialize the directions array
     if (merkle_get_directions(tree_size, leaf_index, directions, sizeof(directions)) != proof_size) {
         PRINTF("Proof size is not correct.\n");
 
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        return -5;
     }
 
     // Copy leaf hash to output (although it is not verified yet)
@@ -94,7 +87,7 @@ void call_get_merkle_leaf_hash(dispatcher_context_t *dc,
 
         uint8_t req_more[] = { CCMD_GET_MORE_ELEMENTS };
         if (dc->process_interruption(dc, req_more, sizeof(req_more)) < 0) {
-            return;
+            return -6;
         }
 
         // Parse response to CCMD_GET_MORE_ELEMENTS
@@ -103,23 +96,23 @@ void call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             || !buffer_read_u8(&dc->read_buffer, &elements_len)
             || !buffer_can_read(&dc->read_buffer, (size_t)n_proof_elements * elements_len))
         {
-            dc->send_sw(SW_WRONG_DATA_LENGTH);
-            return;
+            return -7;
         }
 
         if (elements_len != 20) {
-            dc->send_sw(SW_INCORRECT_DATA);
-            return;
+            return -8;
         }
 
         if (cur_step + n_proof_elements > proof_size) {
             // Receiving more data then expected
-            dc->send_sw(SW_INCORRECT_DATA);
-            return;
+            return -9;
         }
     }
 
     if (memcmp(merkle_root, cur_hash, 20) != 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        PRINTF("Merkle root mismatch");
+        return -10;
     }
+
+    return 0;
 }

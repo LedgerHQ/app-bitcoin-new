@@ -39,7 +39,6 @@ extern global_context_t G_context;
 static void request_keys_order(dispatcher_context_t *dc);
 static void receive_keys_order(dispatcher_context_t *dc);
 
-static void request_next_cosigner(dispatcher_context_t *dc);
 static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void generate_address(dispatcher_context_t *dc);
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
@@ -169,7 +168,7 @@ void handler_get_wallet_address(
         for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
             state->shared.stage0.ordered_pubkeys[i] = i;
         }
-        dc->next(request_next_cosigner);
+        dc->next(process_next_cosigner_info);
     }
 }
 
@@ -237,28 +236,7 @@ static void receive_keys_order(dispatcher_context_t *dc) {
         state->shared.stage0.ordered_pubkeys[i] = k;
     }
 
-    dc->next(request_next_cosigner);
-}
-
-
-/**
- * Interrupts the command, asking the host for the next pubkey.
- */
-static void request_next_cosigner(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    // we request a key, in the order committed in state->ordered_pubkeys
-
-    call_get_merkle_leaf_element(dc,
-                                 &state->subcontext.get_merkle_leaf_element,
-                                 process_next_cosigner_info,
-                                 state->wallet_header.keys_info_merkle_root,
-                                 state->wallet_header.multisig_policy.n_keys,
-                                 state->shared.stage0.ordered_pubkeys[state->shared.stage0.next_pubkey_index],
-                                 state->shared.stage0.next_pubkey_info,
-                                 sizeof(state->shared.stage0.next_pubkey_info));
+    dc->next(process_next_cosigner_info);
 }
 
 
@@ -270,8 +248,20 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    int pubkey_len = call_get_merkle_leaf_element(dc,
+                                                  state->wallet_header.keys_info_merkle_root,
+                                                  state->wallet_header.multisig_policy.n_keys,
+                                                  state->shared.stage0.ordered_pubkeys[state->shared.stage0.next_pubkey_index],
+                                                  state->shared.stage0.next_pubkey_info,
+                                                  sizeof(state->shared.stage0.next_pubkey_info));
+
+    if (pubkey_len < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
     // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(&state->shared.stage0.next_pubkey_info, state->subcontext.get_merkle_leaf_element.element_len);
+    buffer_t key_info_buffer = buffer_create(&state->shared.stage0.next_pubkey_info, pubkey_len);
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
@@ -311,7 +301,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     // TODO: add push opcode to script hash (0x22<pubkey starting with 02 or 03>)
     ++state->shared.stage0.next_pubkey_index;
     if (state->shared.stage0.next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        dc->next(request_next_cosigner);
+        dc->next(process_next_cosigner_info);
     } else {
         dc->next(generate_address);
     }

@@ -1,35 +1,23 @@
-#include "string.h"
 
 #include "stream_merkle_leaf_element.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../crypto.h"
-#include "../../common/merkle.h"
-#include "../../constants.h"
-#include "../client_commands.h"
+#include "get_merkle_leaf_hash.h"
+#include "stream_preimage.h"
 
+int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
+                                    const uint8_t merkle_root[static 20],
+                                    uint32_t tree_size,
+                                    uint32_t leaf_index,
+                                    dispatcher_callback_descriptor_t callback)
+{
 
-/**
- * This flow requests a leaf hash from the Merkle tree, then it requests and verifies its preimage
- */
-void flow_stream_merkle_leaf_element(dispatcher_context_t *dc) {
-    stream_merkle_leaf_element_state_t *state = (stream_merkle_leaf_element_state_t *)dc->machine_context_ptr;
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    call_get_merkle_leaf_hash(dc,
-                              state->merkle_root,
-                              state->tree_size,
-                              state->leaf_index,
-                              state->leaf_hash);
-
-    int preimage_len = call_stream_preimage(dc, state->leaf_hash, state->callback);
-
-    if (preimage_len < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+    uint8_t leaf_hash[20];
+    int res = call_get_merkle_leaf_hash(dispatcher_context, merkle_root, tree_size, leaf_index, leaf_hash);
+    if (res < 0) {
+        return -1;
     }
 
-    state->element_len = preimage_len;
+    return call_stream_preimage(dispatcher_context, leaf_hash, callback);
 }

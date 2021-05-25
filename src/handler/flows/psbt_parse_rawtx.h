@@ -137,10 +137,6 @@ typedef struct psbt_parse_rawtx_state_s {
 
     parse_rawtx_state_t parser_state;
     parser_context_t parser_context;
-
-    union {
-        get_merkleized_map_value_hash_state_t get_merkleized_map_value_hash;
-    } subcontext;
 } psbt_parse_rawtx_state_t;
 
 

@@ -1,43 +1,24 @@
-#include "string.h"
 
 #include "get_merkle_leaf_element.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../crypto.h"
-#include "../../common/merkle.h"
-#include "../../constants.h"
-#include "../client_commands.h"
+#include "get_merkle_leaf_hash.h"
+#include "get_merkle_preimage.h"
 
 
+int call_get_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
+                                 const uint8_t merkle_root[static 20],
+                                 uint32_t tree_size,
+                                 uint32_t leaf_index,
+                                 uint8_t *out_ptr,
+                                 size_t out_ptr_len)
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-static void finalize_output(dispatcher_context_t *dc);
+    uint8_t leaf_hash[20];
 
-/**
- * This flow requests a leaf hash from the Merkle tree, then it requests and verifies its preimage
- */
-void flow_get_merkle_leaf_element(dispatcher_context_t *dc) {
-    get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    call_get_merkle_leaf_hash(dc,
-                              state->merkle_root,
-                              state->tree_size,
-                              state->leaf_index,
-                              state->leaf_hash);
-
-    call_get_merkle_preimage(dc, &state->subcontext.get_merkle_preimage, finalize_output,
-                             state->leaf_hash,
-                             state->out_ptr,
-                             state->out_ptr_len);
-}
-
-
-static void finalize_output(dispatcher_context_t *dc) {
-    get_merkle_leaf_element_state_t *state = (get_merkle_leaf_element_state_t *)dc->machine_context_ptr;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    state->element_len = state->subcontext.get_merkle_preimage.preimage_len;
+    int res = call_get_merkle_leaf_hash(dispatcher_context, merkle_root, tree_size, leaf_index, leaf_hash);
+    if (res < 0) {
+        return res;
+    }
+    return call_get_merkle_preimage(dispatcher_context, leaf_hash, out_ptr, out_ptr_len);
 }

@@ -36,10 +36,6 @@ typedef struct {
     } shared;
 
     cx_sha256_t script_hash_context; // 108 bytes
-
-    union {
-        get_merkle_leaf_element_state_t get_merkle_leaf_element;
-    } subcontext;
 } get_wallet_address_state_t;
 
 

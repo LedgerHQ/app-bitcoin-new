@@ -1,85 +1,53 @@
 #include "string.h"
 
 #include "check_merkle_tree_sorted.h"
+#include "get_merkle_leaf_element.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../common/merkle.h"
-#include "../../crypto.h"
-#include "../../constants.h"
-#include "../client_commands.h"
-
-// processors
-static void receive_element(dispatcher_context_t *dc);
-static void request_element(dispatcher_context_t *dc);
-
-
-// other utility functions
 static int compare_byte_arrays(const uint8_t array1[], size_t array1_len, const uint8_t array2[], size_t array2_len);
 
 
-void flow_check_merkle_tree_sorted(dispatcher_context_t *dc) {
-    check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
+                                                const uint8_t root[static 20],
+                                                size_t size,
+                                                dispatcher_callback_descriptor_t callback)
+{
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    state->cur_el_idx = 0;
-    state->prev_el_len = 0;
+    int prev_el_len = 0;
+    uint8_t prev_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
 
-    dc->next(request_element);
-}
+    for (size_t cur_el_idx = 0; cur_el_idx < size; cur_el_idx++) {
+        uint8_t cur_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
+        int cur_el_len = call_get_merkle_leaf_element(dispatcher_context, root, size, cur_el_idx, cur_el, sizeof(cur_el));
 
-static void request_element(dispatcher_context_t *dc) {
-    check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+        if (cur_el_len < 0) {
+            return -1;
+        }
 
-    call_get_merkle_leaf_element(dc,
-                                 &state->subcontext.get_merkle_leaf_element,
-                                 receive_element,
-                                 state->root,
-                                 state->size,
-                                 state->cur_el_idx,
-                                 state->cur_el,
-                                 sizeof(state->cur_el));
-}
+        if (cur_el_idx > 0 && compare_byte_arrays(prev_el, prev_el_len, cur_el, cur_el_len) >= 0) {
+            // elements are not in (strict) lexicographical order
+            PRINTF("Keys not in order\n");
+            return -1;
+        }
 
-// Receives an element; checks if lexicographical order is correct 
-static void receive_element(dispatcher_context_t *dc) {
-    check_merkle_tree_sorted_state_t *state = (check_merkle_tree_sorted_state_t *)dc->machine_context_ptr;
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+        memcpy(prev_el, cur_el, cur_el_len);
+        prev_el_len = cur_el_len;
 
-    state->cur_el_len = state->subcontext.get_merkle_leaf_element.element_len;
-
-
-    if (state->cur_el_idx > 0
-        && compare_byte_arrays(state->prev_el, state->prev_el_len, state->cur_el, state->cur_el_len) >= 0)
-    {
-        // elements are not in (strict) lexicographical order
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
+        if (callback.fn != NULL) {
+            // call callback with data
+            buffer_t buf = buffer_create(cur_el, cur_el_len);
+            dispatcher_context->run_callback(callback, &buf);
+        }
     }
-
-    memcpy(state->prev_el, state->cur_el, state->cur_el_len);
-    state->prev_el_len = state->cur_el_len;
-
-    if (state->callback.fn != NULL) {
-        // call callback with data
-        buffer_t buf = buffer_create(state->cur_el, state->cur_el_len);
-        dc->run_callback(state->callback, &buf);
-    }
-
-    ++state->cur_el_idx;
-
-    // repeat if there are more keys
-    if (state->cur_el_idx < state->size) {
-        dc->next(request_element);
-    }
+    return 0;
 }
 
 
 
 // Returns a negative number, 0 or a positive number if the first array is (respectively) lexicographically smaller,
 // equal, or larger than the second.
-// If one array is prefix than the other, then the shorter ones comes first in lexicographical order. 
+// If one array is prefix than the other, then the shorter ones comes first in lexicographical order.
+// TODO: move this to a common utility file, and add tests
 static int compare_byte_arrays(const uint8_t array1[], size_t array1_len, const uint8_t array2[], size_t array2_len) {
     size_t min_len = array1_len < array2_len ? array1_len : array2_len;
 

@@ -1,11 +1,7 @@
 #include "string.h"
 
-#include "get_merkle_leaf_index.h"
+#include "get_merkle_leaf_hash.h"
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-#include "../../common/merkle.h"
-#include "../../constants.h"
 #include "../client_commands.h"
 
 
@@ -31,7 +27,7 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
     if (!buffer_read_u8(&dispatcher_context->read_buffer, &found)
         || !buffer_read_varint(&dispatcher_context->read_buffer, &index))
     {
-        return -2;
+        return -1;
     }
 
     if (found != 0 && found != 1) {
@@ -39,15 +35,18 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
     }
 
     if (!found) {
-        return -1;
+        return -3;
     }
 
     // Ask the host for the leaf hash with that index
     uint8_t returned_merkle_leaf_hash[20];
-    call_get_merkle_leaf_hash(dispatcher_context, root, size, index, returned_merkle_leaf_hash);
+    int res = call_get_merkle_leaf_hash(dispatcher_context, root, size, index, returned_merkle_leaf_hash);
+    if (res < 0) {
+        return -4;
+    }
 
     if (memcmp(leaf_hash, returned_merkle_leaf_hash, 20) != 0){
-        return -2;
+        return -5;
     }
 
     return index;
