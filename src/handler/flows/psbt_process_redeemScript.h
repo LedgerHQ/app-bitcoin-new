@@ -18,7 +18,7 @@ typedef struct {
     const uint8_t *key;
     size_t key_len;
     cx_sha256_t *external_hash_context;
-    uint8_t p2sh_script[1 + 20 + 1];
+    uint8_t p2sh_script[2 + 20 + 1];
 
     bool first_call_done;
     cx_sha256_t internal_hash_context;

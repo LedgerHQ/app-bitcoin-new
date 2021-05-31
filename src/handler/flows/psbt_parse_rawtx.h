@@ -41,11 +41,13 @@ typedef union {
         uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
         int prevout_n;                 // will contain tx.input[input_index].prevout.n
         uint64_t prevout_value;        // will contain tx.input[input_index].prevout.value
+        int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
 
         int output_index;              // index of queried output, or -1
         // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
         uint8_t vout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
         int vout_scriptpubkey_len;     // will contain the len of the above scriptPubKey
+        uint32_t nLocktime;            // will contain the nLocktime of the stransaction
     } compute_txid;
 
     struct {
@@ -57,6 +59,7 @@ typedef union {
         uint32_t sighash_type;
         size_t input_index;
         uint32_t nVersion;
+
         uint8_t hashPrevouts[32];
         uint8_t hashSequence[32];
         // outpoint already known
@@ -152,7 +155,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context);
  * - Parse the transaction as-is to compute txid
  * - Parse the transaction sighash as described here: https://en.bitcoin.it/wiki/OP_CHECKSIG
  *   - might take the script_code from  
- * 
+ *  TODO:
  **/
 
 

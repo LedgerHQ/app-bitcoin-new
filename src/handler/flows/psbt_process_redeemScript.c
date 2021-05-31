@@ -52,9 +52,9 @@ void flow_psbt_process_redeemScript(dispatcher_context_t *dc) {
     uint8_t script_hash[32];
 
     crypto_hash_digest(&state->internal_hash_context.header, script_hash, 32);
-    crypto_ripemd160(script_hash, 32, state->p2sh_script + 1);
 
     state->p2sh_script[0] = 0xa9; // OP_HASH160
-
-    state->p2sh_script[1 + 20] = 0xa9; // OP_EQUAL
+    state->p2sh_script[1] = 0x14; // push 20 bytes
+    crypto_ripemd160(script_hash, 32, state->p2sh_script + 2);
+    state->p2sh_script[2 + 20] = 0x87; // OP_EQUAL
 }

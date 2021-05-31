@@ -11,6 +11,7 @@
 #include "flows/psbt_parse_rawtx.h"
 #include "flows/psbt_process_redeemScript.h"
 
+
 typedef struct {
     machine_context_t ctx;
 
@@ -25,23 +26,22 @@ typedef struct {
 
     int cur_input_index;
     merkleized_map_commitment_t cur_input_map;
-    uint8_t cur_prevout_hash[32];    // stores the prevout_hash of the current input
-    int cur_prevout_n;               // stores the prevout index of the current input
-    uint64_t cur_prevout_amount;     // stores the value of the prevout of the current input
+    uint8_t cur_prevout_hash[32];    // the prevout_hash of the current input
+    int cur_prevout_n;               // the prevout index of the current input
+    int cur_prevout_nSequence;       // the nSequence of the current input
+    uint64_t cur_prevout_amount;     // the value of the prevout of the current input
+    int nLocktime;                   // the nLocktime of the transaction
+
     bool cur_input_has_witnessUtxo;
     bool cur_input_has_redeemScript;
     bool cur_input_has_sighash_type;
-
 
     uint8_t cur_input_prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int cur_input_prevout_scriptpubkey_len;
 
     cx_sha256_t hash_context;
 
-    union {
-        uint8_t cur_input_sighash_type_le[4]; // little-endian sighash type for the current input
-        uint32_t cur_input_sighash_type;
-    };
+    uint32_t cur_input_sighash_type;
 
     uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
 

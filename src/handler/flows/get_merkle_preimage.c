@@ -42,7 +42,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
         return -3;
     }
 
-    if (preimage_len > out_ptr_len) {
+    if (preimage_len - 1 > out_ptr_len) {
         PRINTF("Output buffer too short\n");
         return -4;
     }

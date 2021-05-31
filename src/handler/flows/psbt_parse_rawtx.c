@@ -21,7 +21,6 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
     if (result) {
-        bool must_add_to_hash = true;
         ParseMode_t parse_mode = state->parent_state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
             // if this is the input index requested in the parameter, store its prevout hash
@@ -31,10 +30,13 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
                 // copy the txid
                 memcpy(state->parent_state->program_state->compute_txid.prevout_hash, txid, 32);
             }
+
+            crypto_hash_update(&state->parent_state->hash_context->header, txid, 32);
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
 
+            bool must_add_to_hash = true;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 // must not add for inputs different than the current transaction (which becomes the only one)
                 if (state->parent_state->in_counter != input_index) {
@@ -46,10 +48,16 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
                     must_add_to_hash = false;
                 }
             }
+
+            if (must_add_to_hash) {
+                crypto_hash_update(&state->parent_state->hash_context->header, txid, 32);
+            }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
             // only add for inputs up to the current transactions (the other are in pass 2)
+
+            bool must_add_to_hash = true;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 must_add_to_hash = false; // always done in pass 1, for the only input where it matters
             } else {
@@ -58,15 +66,15 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
                     must_add_to_hash = false;
                 }                
             }
+
+            if (must_add_to_hash) {
+                crypto_hash_update(&state->parent_state->hash_context->header, txid, 32);
+            }
         } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
             crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, txid, 32);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
-        }
-
-        if (must_add_to_hash) {
-            crypto_hash_update(&state->parent_state->hash_context->header, txid, 32);
         }
     }
     return result;
@@ -79,11 +87,11 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
-        bool must_add_to_hash = true;
         ParseMode_t parse_mode = state->parent_state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
-            // if this is the input index requested in the parameters, store its prevout.n
+            crypto_hash_update(&state->parent_state->hash_context->header, vout_bytes, 4);
 
+            // if this is the input index requested in the parameters, store its prevout.n
             int relevant_input_index = state->parent_state->program_state->compute_txid.input_index;
             if (state->parent_state->in_counter == relevant_input_index) {
                 state->parent_state->program_state->compute_txid.prevout_n = read_u32_le(vout_bytes, 0);
@@ -92,6 +100,7 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
 
+            bool must_add_to_hash = true;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 // must not add for inputs different than the current transaction (which becomes the only one)
                 if (state->parent_state->in_counter != input_index) {
@@ -103,27 +112,32 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
                     must_add_to_hash = false;
                 }
             }
+
+            if (must_add_to_hash) {
+                crypto_hash_update(&state->parent_state->hash_context->header, vout_bytes, 4);
+            }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
             // only add for inputs up to the current transactions (the other are in pass 2)
+            bool must_add_to_hash = true;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 must_add_to_hash = false; // always done in pass 1, for the only input where it matters
             } else {
                 // only add for inputs strictly after the current transactions (the other are in pass 1)
                 if (state->parent_state->in_counter <= input_index) {
                     must_add_to_hash = false;
-                }                
+                }
+            }
+
+            if (must_add_to_hash) {
+                crypto_hash_update(&state->parent_state->hash_context->header, vout_bytes, 4);
             }
         } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
             crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, vout_bytes, 4);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
-        }
-
-        if (must_add_to_hash) {
-            crypto_hash_update(&state->parent_state->hash_context->header, vout_bytes, 4);
         }
     }
     return result;
@@ -223,15 +237,19 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
 
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
     if (result) {
-        bool must_add_to_hash = true;
-        bool must_replace_with_zeros = false; // used for SIGHASH_NONE and SIGHASH_SINGLE
-
         ParseMode_t parse_mode = state->parent_state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
-            // nothing to do
+            crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
+
+            // if this is the input index requested in the parameters, store its prevout.nSequence
+            int relevant_input_index = state->parent_state->program_state->compute_txid.input_index;
+            if (state->parent_state->in_counter == relevant_input_index) {
+                state->parent_state->program_state->compute_txid.prevout_nSequence = read_u32_le(sequence_bytes, 0);
+            }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
+            bool must_add_to_hash = true, must_replace_with_zeros = false;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 // nothing to do, only add in pass 2
                 must_add_to_hash = false;
@@ -243,9 +261,17 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
                 // add for inputs strictly less than the current input
                 must_add_to_hash = state->parent_state->in_counter < input_index;
             }
+            if (must_add_to_hash) {
+                if (!must_replace_with_zeros) {
+                    crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
+                } else {
+                    crypto_hash_update_u32(&state->parent_state->hash_context->header, 0x00000000);
+                }
+            }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
             uint32_t sighash_type = state->parent_state->program_state->compute_sighash_legacy.sighash_type;
             int input_index = (int)state->parent_state->program_state->compute_sighash_legacy.input_index;
+            bool must_add_to_hash = true, must_replace_with_zeros = false;
             if (sighash_type & SIGHASH_ANYONECANPAY) {
                 // only add for the current input
                 must_add_to_hash = state->parent_state->in_counter == input_index;
@@ -257,19 +283,20 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
                 // add for inputs greater than or equal to the current input
                 must_add_to_hash = state->parent_state->in_counter >= input_index;
             }
+            if (must_add_to_hash) {
+                if (!must_replace_with_zeros) {
+                    crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
+                } else {
+                    crypto_hash_update_u32(&state->parent_state->hash_context->header, 0x00000000);
+                }
+            }
         } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
-            crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
+            crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashSequence_context.header,
+                               sequence_bytes,
+                               4);
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
-        }
-
-        if (must_add_to_hash) {
-            if (!must_replace_with_zeros) {
-                crypto_hash_update(&state->parent_state->hash_context->header, sequence_bytes, 4);
-            } else {
-                crypto_hash_update_u32(&state->parent_state->hash_context->header, 0x00000000);
-            }
         }
     }
     return result;
@@ -679,6 +706,8 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
                 // SIGHASH_ALL
                 crypto_hash_update_varint(&state->hash_context->header, n_outputs);
             }
+        } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
+            // nothing to do
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -828,6 +857,8 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
         ParseMode_t parse_mode = state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
             crypto_hash_update(&state->hash_context->header, locktime_bytes, 4);
+
+            state->program_state->compute_txid.nLocktime = read_u32_le(locktime_bytes, 0);
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             // nothing to do, as we are past the script_code
         } else if (parse_mode == PARSEMODE_LEGACY_PASS2) {
