@@ -293,6 +293,8 @@ UX_FLOW(ux_display_wallet_name_address_flow,
 
 
 int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
+    (void)(context);
+
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *)&g_ui_state;
 
     strncpy(state->bip32_path, bip32_path, sizeof(state->bip32_path));
@@ -307,6 +309,8 @@ int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pub
 
 
 int ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, char *path_str, action_validate_cb callback) {
+    (void)(context);
+
     ui_path_and_address_state_t *state = (ui_path_and_address_state_t *)&g_ui_state;
 
     strncpy(state->address, address, sizeof(state->address));
@@ -324,6 +328,8 @@ int ui_display_address(dispatcher_context_t *context, char *address, bool is_pat
 
 
 int ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
+    (void)(context);
+
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
 
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
@@ -337,6 +343,8 @@ int ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name,
 
 
 int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
+    (void)(context);
+
     ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
 
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
@@ -350,6 +358,8 @@ int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pub
 
 
 int ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, char *address, action_validate_cb callback) {
+    (void)(context);
+
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
 
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));

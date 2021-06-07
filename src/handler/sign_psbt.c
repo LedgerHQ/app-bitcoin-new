@@ -64,6 +64,8 @@ void handler_sign_psbt(
     uint8_t lc,
     dispatcher_context_t *dc
 ) {
+    (void)lc;
+
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     if (p1 != 0 || p2 != 0) {

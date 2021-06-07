@@ -87,4 +87,4 @@ int parser_run(const parsing_step_t *parsing_steps,
                size_t n_steps,
                parser_context_t *parser_context,
                buffer_t *buffers[2],
-               unsigned int (*pic_fn)(unsigned int));
+               void *(*pic_fn)(void *));

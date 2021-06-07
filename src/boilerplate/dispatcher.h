@@ -99,15 +99,13 @@ typedef struct {
  *
  * TODO: update docs with new params
  *
- * @return zero or positive integer if success, negative integer otherwise.
- *
  */
-int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
-                    int n_descriptors,
-                    machine_context_t *top_context,
-                    size_t top_context_size,
-                    void (*termination_cb)(void),
-                    const command_t *cmd);
+void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
+                     int n_descriptors,
+                     machine_context_t *top_context,
+                     size_t top_context_size,
+                     void (*termination_cb)(void),
+                     const command_t *cmd);
 
 
 // Debug utilities
@@ -115,6 +113,9 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 // Print current filename, line number and function name.
 // Indents according to the nesting depth for subprocessors. 
 static inline void print_dispatcher_info(dispatcher_context_t *dc, const char *file, int line, const char *func) {
+    // prevent warnings when DEBUG is 0
+    (void)file, (void)line, (void)func;
+
     machine_context_t *ctx = dc->machine_context_ptr;
     while (ctx->parent_context != NULL) {
         PRINTF("----");

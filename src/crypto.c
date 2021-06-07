@@ -156,11 +156,15 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
     // BEGIN_TRY {
     //     TRY {
             // derive the seed with bip32_path
+
+
             os_perso_derive_node_bip32(CX_CURVE_256K1,
                                        bip32_path,
                                        bip32_path_len,
                                        raw_private_key,
                                        chain_code);
+
+
             // new private_key from raw
             cx_ecfp_init_private_key(CX_CURVE_256K1,
                                      raw_private_key,
@@ -202,15 +206,15 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
         return -2; // maximum derivation depth reached
     }
 
-    cx_hmac_t hmac_context;
+    cx_hmac_sha512_t hmac_context;
     uint8_t I[64];
 
     cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
-    cx_hmac(&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
+    cx_hmac((cx_hmac_t *)&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
 
     uint8_t index_be[4];
     write_u32_be(index_be, 0, index);
-    cx_hmac(&hmac_context, CX_LAST, index_be, 4, I, 64);
+    cx_hmac((cx_hmac_t *)&hmac_context, CX_LAST, index_be, 4, I, 64);
 
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
@@ -354,7 +358,7 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     uint8_t buffer[32];
     cx_hash_sha256(in, in_len, buffer, 32);
     cx_hash_sha256(buffer, 32, buffer, 32);
-    os_memmove(out, buffer, 4);
+    memmove(out, buffer, 4);
 }
 
 

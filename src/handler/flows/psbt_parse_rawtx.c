@@ -186,6 +186,8 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
 
 // Does not read any bytes; only initializing the state before the next step
 static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     state->scriptsig_counter = 0;
@@ -421,6 +423,8 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
 
 // Does not read any bytes; only initializing the state before the next step
 static int parse_rawtxoutput_scriptpubkey_init(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->scriptpubkey_counter = 0;
     return 1;
@@ -506,6 +510,8 @@ const int n_parse_rawtxoutput_steps = sizeof(parse_rawtxoutput_steps)/sizeof(par
 /*   PARSER FOR A FULL RAWTX */
 
 static int parse_rawtx_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)state;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     // skip the initial 0x00 byte for Merkle leafs
@@ -608,6 +614,8 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
 }
 
 static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->in_counter = 0;
 
@@ -646,6 +654,8 @@ static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) 
 }
 
 static int parse_rawtx_inputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
@@ -717,6 +727,8 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
 }
 
 static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     state->out_counter = 0;
@@ -754,6 +766,8 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
 }
 
 static int parse_rawtx_outputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
@@ -874,6 +888,8 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
 }
 
 static int parse_rawtx_add_sighash(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    (void)buffers;
+
     PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     ParseMode_t parse_mode = state->parse_mode;

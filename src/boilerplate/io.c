@@ -39,6 +39,8 @@ void io_seproxyhal_display(const bagl_element_t *element) {
 }
 
 uint8_t io_event(uint8_t channel) {
+    (void)channel;
+
     switch (G_io_seproxyhal_spi_buffer[0]) {
         case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
             UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
@@ -91,28 +93,6 @@ uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len) {
     return 0;
 }
 
-int io_recv_command() {
-    int ret;
-
-    switch (G_io_state) {
-        case READY:
-            G_io_state = RECEIVED;
-            ret = io_exchange(CHANNEL_APDU, G_output_len);
-            break;
-        case RECEIVED:
-            G_io_state = WAITING;
-            ret = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, G_output_len);
-            G_io_state = RECEIVED;
-            ret = 0;
-            break;
-        case WAITING:
-            G_io_state = READY;
-            ret = -1;
-            break;
-    }
-
-    return ret;
-}
 
 void io_set_response(void *rdata, size_t rdata_len, uint16_t sw) {
     if (rdata == NULL) {
@@ -135,22 +115,8 @@ void io_set_response(void *rdata, size_t rdata_len, uint16_t sw) {
 int io_confirm_response() {
     int ret;
 
-    switch (G_io_state) {
-        case READY:
-            ret = -1;
-            break;
-        case RECEIVED:
-            // TODO: what is this? Check if still needed for some reason; it currently breaks the inner loop for interruptions
-
-            G_io_state = READY;
-            ret = 0;
-            break;
-        case WAITING:
-            ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
-            G_output_len = 0;
-            G_io_state = READY;
-            break;
-    }
+    ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
+    G_output_len = 0;
 
     return ret;
 }

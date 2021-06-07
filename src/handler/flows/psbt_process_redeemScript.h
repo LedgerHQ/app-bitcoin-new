@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cx.h"
+
 #include "../../boilerplate/dispatcher.h"
 
 #include "../../common/parser.h"

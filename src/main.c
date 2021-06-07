@@ -27,6 +27,7 @@
 #include "sw.h"
 #include "ui/menu.h"
 #include "boilerplate/apdu_parser.h"
+#include "boilerplate/constants.h"
 #include "boilerplate/dispatcher.h"
 
 #include "handler/get_pubkey.h"
@@ -71,6 +72,7 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     },
 };
 
+unsigned int req_number;
 
 /**
  * Handle APDU command received and send back APDU response using handlers.
@@ -113,18 +115,27 @@ void app_main() {
                 memset(&cmd, 0, sizeof(cmd));
 
                 // Receive command bytes in G_io_apdu_buffer
+                input_len = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
 
-                if ((input_len = io_recv_command()) < 0) {
+                if (input_len < 0) {
+                    PRINTF("=> io_exchange error\n");
                     return;
-                } else if (input_len == 0) {
-                    // TODO: workaround for async responses not working properly. Figure out the more appropriate way.
-                    continue;
                 }
+
 
                 // Parse APDU command from G_io_apdu_buffer
                 if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
                     PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
                     io_send_sw(SW_WRONG_DATA_LENGTH);
+                    continue;
+                }
+
+                if (cmd.cla == CLA_FRAMEWORK && cmd.ins == INS_CONTINUE) {
+                    // TODO: when flows have interruptions, io_exchange above is unexpectedly
+                    // receiving some APDUs that were already processes in the dispatcher inside
+                    // process_interruption. This is a workaround for that, but we should figure
+                    // out why it's happening.
+                    PRINTF("Unexpected continuation in main.\n");
                     continue;
                 }
 
@@ -137,28 +148,6 @@ void app_main() {
                        cmd.lc,
                        cmd.data);
 
-
-                PRINTF("total command state size: %d\n", sizeof(command_state_t));
-
-
-                // PRINTF("handler_get_address: %d\n", sizeof(get_address_state_t));
-                // PRINTF("handler_get_pubkey: %d\n", sizeof(get_pubkey_state_t));
-                // PRINTF("handler_get_wallet_address: %d\n", sizeof(get_wallet_address_state_t));
-                // PRINTF("handler_register_wallet: %d\n", sizeof(register_wallet_state_t));
-                // PRINTF("handler_sign_psbt: %d\n", sizeof(sign_psbt_state_t));
-
-                // PRINTF("\npsbt_parse_rawtx_state_t: %d\n", sizeof(psbt_parse_rawtx_state_t));
-                // PRINTF("parse_rawtx_state_s: %d\n", sizeof(parse_rawtx_state_t));
-
-                // PRINTF("check_merkle_tree_sorted     : %d\n", sizeof(check_merkle_tree_sorted_state_t));
-                // PRINTF("get_merkle_leaf_element      : %d\n", sizeof(get_merkle_leaf_element_state_t));
-                // PRINTF("get_merkle_preimage          : %d\n", sizeof(get_merkle_preimage_state_t));
-                // PRINTF("get_merkleized_map_value_hash: %d\n", sizeof(get_merkleized_map_value_hash_state_t));
-                // PRINTF("get_merkleized_map           : %d\n", sizeof(get_merkleized_map_state_t));
-                // PRINTF("psbt_parse_rawtx             : %d\n", sizeof(psbt_parse_rawtx_state_t));
-                // PRINTF("psbt_process_redeemScript    : %d\n", sizeof(psbt_process_redeemScript_state_t));
-                // PRINTF("stream_merkle_leaf_element   : %d\n", sizeof(stream_merkle_leaf_element_state_t));
-                // PRINTF("stream_merkleized_map_value  : %d\n", sizeof(stream_merkleized_map_value_state_t));
 
                 // Dispatch structured APDU command to handler
                 apdu_dispatcher(COMMAND_DESCRIPTORS,

@@ -119,7 +119,7 @@ void handler_get_address(
         dc->pause();
         ui_display_address(dc, state->address, is_path_suspicious, path_str, ui_action_validate_address);
     } else {
-        ui_action_validate_address(dc, true);
+        dc->send_response(state->address, state->address_len, SW_OK);
     }
 }
 

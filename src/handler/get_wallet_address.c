@@ -37,7 +37,6 @@
 extern global_context_t G_context;
 
 static void request_keys_order(dispatcher_context_t *dc);
-static void receive_keys_order(dispatcher_context_t *dc);
 
 static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void generate_address(dispatcher_context_t *dc);
@@ -49,6 +48,10 @@ void handler_get_wallet_address(
     uint8_t lc,
     dispatcher_context_t *dc
 ) {
+    (void)lc;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
     if (p1 != 0 && p1 != 1) {
         dc->send_sw(SW_WRONG_P1P2);
@@ -136,7 +139,6 @@ void handler_get_wallet_address(
         return;
     }
 
-
     // Compute the wallet id (sha256 of the serialization)
     uint8_t computed_wallet_id[32];
     get_policy_wallet_id(&state->wallet_header,
@@ -199,14 +201,10 @@ static void request_keys_order(dispatcher_context_t *dc) {
         request[pos++] = i;
     }
 
-    dc->send_response(request, pos, SW_INTERRUPTED_EXECUTION);
-    dc->next(receive_keys_order);
-}
-
-static void receive_keys_order(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    if (dc->process_interruption(dc, request, pos) < 0) {
+        dc->send_sw(SW_BAD_STATE);
+        return;
+    }
 
     uint8_t n_key_indexes;
     if (!buffer_read_u8(&dc->read_buffer, &n_key_indexes) || !buffer_can_read(&dc->read_buffer, n_key_indexes)) {

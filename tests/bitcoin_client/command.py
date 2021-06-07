@@ -142,6 +142,7 @@ class BitcoinCommand:
         return response.decode()
 
     def sign_psbt(self, psbt: PSBT) -> str:
+        print(psbt.serialize())
         psbt_bytes = base64.b64decode(psbt.serialize())
         f = BytesIO(psbt_bytes)
 

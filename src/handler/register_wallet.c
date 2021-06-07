@@ -51,6 +51,8 @@ void handler_register_wallet(
     uint8_t lc,
     dispatcher_context_t *dc
 ) {
+    (void)lc;
+
     register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);

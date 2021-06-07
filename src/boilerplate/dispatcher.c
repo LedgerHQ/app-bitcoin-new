@@ -89,19 +89,22 @@ static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rd
     // Reset structured APDU command
     memset(&cmd, 0, sizeof(cmd));
 
-    io_send_response(rdata, rdata_len, SW_INTERRUPTED_EXECUTION);
+    io_set_response(rdata, rdata_len, SW_INTERRUPTED_EXECUTION);
 
     // Receive command bytes in G_io_apdu_buffer
-    if ((input_len = io_recv_command()) < 0) {
+    if ((input_len = io_exchange(CHANNEL_APDU, G_output_len)) < 0) {
         return -1;
     }
+    G_output_len = 0;
 
     // Parse APDU command from G_io_apdu_buffer
     if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
-        PRINTF("=> (INT) /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return -1;
     }
+
+    // TODO: INS_CONTINUE is the only valid apdu here; should fail for anything else,
+    // or abort and go back to main somehow.
 
     PRINTF("=> (INT) CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=%.*H\n",
             cmd.cla,
@@ -118,12 +121,12 @@ static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rd
 }
 
 
-int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
-                    int n_descriptors,
-                    machine_context_t *top_context,
-                    size_t top_context_size,
-                    void (*termination_cb)(void),
-                    const command_t *cmd) {
+void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
+                     int n_descriptors,
+                     machine_context_t *top_context,
+                     size_t top_context_size,
+                     void (*termination_cb)(void),
+                     const command_t *cmd) {
 
 
     // TODO: decide what to do if a command is sent while something was still running
@@ -146,12 +149,14 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
     if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (cmd->p1 != 0 || cmd->p2 != 0) {
-            return io_send_sw(SW_WRONG_P1P2);
+            io_send_sw(SW_WRONG_P1P2);
+            return;
         }
 
         if (G_dispatcher_context.machine_context_ptr == NULL || G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
             PRINTF("Unexpected INS_CONTINUE.\n");
-            return io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
+            io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
+            return;
         }
     } else {
         // If a previous command was interrupted but any command other than INS_CONTINUE is received,
@@ -177,16 +182,17 @@ int apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         }
 
         if (!cla_found) {
-            return io_send_sw(SW_CLA_NOT_SUPPORTED);
+            io_send_sw(SW_CLA_NOT_SUPPORTED);
+            return;
         } else if (!ins_found) {
-            return io_send_sw(SW_INS_NOT_SUPPORTED);
+            io_send_sw(SW_INS_NOT_SUPPORTED);
+            return;
         }
 
         handler(cmd->p1, cmd->p2, cmd->lc, &G_dispatcher_context);
     }
 
     dispatcher_loop();
-    return 0;
 }
 
 static void dispatcher_loop() {
