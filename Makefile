@@ -124,13 +124,21 @@ DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
 endif
 
+
 # Enabling debug PRINTF
-DEBUG:=1
+DEBUG:=10
 ifneq ($(DEBUG),0)
-        ifeq ($(TARGET_NAME),TARGET_NANOX)
-                DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
+        ifeq ($(DEBUG),10)
+                $(warning Using semihosted PRINTF. Only run with speculos!)
+                CFLAGS    += -include debug-helpers/debug.h
+                DEFINES   += HAVE_PRINTF PRINTF=semihosted_printf
         else
-                DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+                ifeq ($(TARGET_NAME),TARGET_NANOX)
+                        DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
+                else
+                        DEFINES   += HAVE_PRINTF PRINTF=screen_printf
+                endif
+
         endif
 else
         DEFINES   += PRINTF\(...\)=
