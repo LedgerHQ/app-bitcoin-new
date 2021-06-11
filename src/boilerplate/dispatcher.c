@@ -97,6 +97,12 @@ static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rd
     }
     G_output_len = 0;
 
+    // As we are not yet returning anything here, we communicate to io_exchange that the apdu
+    // is consumed. Otherwise the io_exchange call in main.c might receive an unexpected duplicate
+    // APDU that was already processed (this would happen if this is the latest interruption in the
+    // caller processor, for example if the dispatcher is paused because of a UX interaction).
+    G_io_app.apdu_length = 0;
+
     // Parse APDU command from G_io_apdu_buffer
     if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
         dc->send_sw(SW_WRONG_DATA_LENGTH);

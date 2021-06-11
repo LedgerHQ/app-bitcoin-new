@@ -72,7 +72,6 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     },
 };
 
-unsigned int req_number;
 
 /**
  * Handle APDU command received and send back APDU response using handlers.
@@ -127,15 +126,6 @@ void app_main() {
                 if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
                     PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
                     io_send_sw(SW_WRONG_DATA_LENGTH);
-                    continue;
-                }
-
-                if (cmd.cla == CLA_FRAMEWORK && cmd.ins == INS_CONTINUE) {
-                    // TODO: when flows have interruptions, io_exchange above is unexpectedly
-                    // receiving some APDUs that were already processes in the dispatcher inside
-                    // process_interruption. This is a workaround for that, but we should figure
-                    // out why it's happening.
-                    PRINTF("Unexpected continuation in main.\n");
                     continue;
                 }
 
