@@ -7,44 +7,57 @@ from typing import List
 
 import pytest
 
-def get_wallet(addr_type: AddressType) -> MultisigWallet:
-    return MultisigWallet(
-        name="Cold storage",
-        address_type=addr_type,
-        threshold=2,
-        keys_info=[
-            "[61e4f658]xpub6Dk2M8SzqzeRyuYuSJ1Vy5uRBvKfV7625LoME3KsDYRuEL8dww4MSQWMEkLLuJF9UK86hZUtRmqx1LSd1c6boq24dyq4E8UEPypQsSxupQ2",
-            "[acc1fe38]xpub6EZ2Bt4cGEhrYbtgzPgZjaC9c8v5edBRYPXHZhNux5muupbeygXB8WnJg9W9nCPRQQJSwPCTJznsmygJ94ojRYgnFPQFP4Zu4TJxz1adFXy",
-            "[ba16e65d]xpub6DqTtMuqBiBsHirAP1Tfm7w6ASuGqWTpn9A7efDwmYZd5bMfCuxtmBgMmVufK49sKpXgyxMhb7jYwMDa6nSzRjWry5xgDzjqrDxDqcPteqo"
-        ]
-    )
-
 
 def test_get_wallet_address_legacy(cmd):
     # test for a legacy p2sh wallet
 
-    wallet = get_wallet(AddressType.LEGACY)
-    wallet_sig = bytes.fromhex("3045022100bdb23a0fb16b96ac6fca8250ddbf70eb02a7efcc27185a172776ced25a4da693022050b513e1530ac852bf07b2d430d862a9a2adfd9669eed41ae13b45eb84a15cee")
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.LEGACY,
+        threshold=2,
+        keys_info=[
+            f"[76223a6e/48'/1'/0'/0']tpubDE7NQymr4AFtZwx94XxPNFpTduLxQB4JhTFC52AC213kND6dahQ6eznZeWcsZ5wEgZ2cVrZqdEWDB6Tvt82BYEmaia8pgFJGAj9ijtSfbxD/**",
+            f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY/**"
+        ]
+    )
+    wallet_sig = bytes.fromhex("304502210097f74242cb29540e77c1ef52ac9daa6b6bda80ec6f3851db2061345d3cbf44f402206630675c8c20491beb1ae090e8b32508899215a21ba6b92389598d84c2a08812")
 
     res = cmd.get_wallet_address(wallet, wallet_sig, 0)
-    assert res == "35p3H79foYUXBKGjm6ux2pFReiHHbkWszu"
-
-
-def test_get_wallet_address_wit(cmd):
-    # test for a native segwit wallet (bech32 address)
-
-    wallet = get_wallet(AddressType.WIT)
-    wallet_sig = bytes.fromhex("3045022100aeeeeaeb409f419c8a362cc1ccd3f84c559863e9b2612756424810e38bad0d6402203d797b529da758d0c5cf5a51bba470521cf3a10838e53c7936320f3aa17c64a1")
-
-    res = cmd.get_wallet_address(wallet, wallet_sig, 0)
-    assert res == "bc1qj9y4fj9vq50qkr8xg3lz6tzvj53t87n36d095z2v6fp98zmedw3sakcau0"
+    print(res)
+    assert res == "2N5wnrGZ99eGEvULVwXMCVUTbQ4RvocG4nU"
 
 
 def test_get_wallet_address_sh_wit(cmd):
     # test for a wrapped segwit wallet
 
-    wallet = get_wallet(AddressType.SH_WIT)
-    wallet_sig = bytes.fromhex("30440220132c93855e9c27ec20398eb7ee22db20b1cae0f472db32a1e24d9d2e3e44f7a302207ac7a3aa734bf286fabb70e8aed28fadcee59053bbc58d9ecb64bcdd46c917fc")
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.SH_WIT,
+        threshold=2,
+        keys_info=[
+            f"[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g/**",
+            f"[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY/**"
+        ]
+    )
+    wallet_sig = bytes.fromhex("304402202a0bacd2d28b8c05938cef721b30341ac9a40f48a081415df9099a19af11c33e02203e9ca45976a5c38517aec49878d8566b2acfe196f6e372ee390288020bf1f1d3")
 
     res = cmd.get_wallet_address(wallet, wallet_sig, 0)
-    assert res == "3H9iJzyiN996WcfojAmnxbFcbguBBzSSBQ"
+    assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
+
+
+def test_get_wallet_address_wit(cmd):
+    # test for a native segwit wallet (bech32 address)
+
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**"
+        ]
+    )
+    wallet_sig = bytes.fromhex("304502210090e90ad5940e919cd1db5cfdac8190e1c28385d29aeda19f6de7e3d81d9b9f6d0220706051aa04a707f73608247ca2ec8c1af66b3aea3474e85d66912da87c835248")
+
+    res = cmd.get_wallet_address(wallet, wallet_sig, 0)
+    assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"

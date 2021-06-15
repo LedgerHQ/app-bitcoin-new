@@ -172,7 +172,24 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
-        PRINTF("Incorrect policy map\n");
+        PRINTF("Incorrect policy map.\n");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    // We refuse to register wallets without key origin information, or whose keys don't end with the wildcard ('/**').
+    // The key origin information is necessary when signing to identify which one is our key.
+    // Using addresses without a wildcard could potentially be supported, but disabled for now (question to address:
+    // can only _some_ of the keys have a wildcard?).
+
+    if (!key_info.has_key_origin) {
+        PRINTF("Key info without origin unsupported.\n");
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (!key_info.has_wildcard) {
+        PRINTF("Key info without wildcard unsupported.\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
@@ -208,8 +225,9 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
         dc->next(process_next_cosigner_info);
     } else {
 
-        // TODO: validate wallet.
-        // - is one of the xpubs ours? (exactly one? How to check?)
+        // TODO: We should use key origin information to verify which one is our key.
+        //       We should either reject to register the wallet, or shaw a warning if none of the keys is ours.
+        //       Edge case to consider: can more than one key be ours? Should that be allowed?
 
         struct {
             uint8_t wallet_id[32];

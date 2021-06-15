@@ -277,10 +277,14 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialize_extended_pubkey;
 
-    // we derive the /0/i child of this pubkey
-    // we reuse the same memory of ext_pubkey to save RAM
-    bip32_CKDpub(ext_pubkey, 0, ext_pubkey);
-    bip32_CKDpub(ext_pubkey, state->address_index, ext_pubkey);
+    // Currently, only keys with a wildcard are supported, but we check the flag for possible future extensions.
+    // TODO: do we need to also show the change address? Would need a new param for the apdu, in that case.
+    if (key_info.has_wildcard) {
+        // we derive the /0/i child of this pubkey
+        // we reuse the same memory of ext_pubkey to save RAM
+        bip32_CKDpub(ext_pubkey, 0, ext_pubkey);
+        bip32_CKDpub(ext_pubkey, state->address_index, ext_pubkey);
+    }
 
     // check lexicographic sorting if appropriate
     if (state->wallet_header.multisig_policy.sorted && state->shared.stage0.next_pubkey_index > 0) {

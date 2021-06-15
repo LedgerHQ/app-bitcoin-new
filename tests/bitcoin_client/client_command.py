@@ -189,8 +189,11 @@ class GetPubkeysInDerivationOrder(ClientCommand):
         def derived_pk(pubkey_info: str) -> int:
 
             # Remove the key origin info (if present) by looking for the ']' character
-            pos = pubkey_info.find(']')
-            pubkey_str = pubkey_info if pos == -1 else pubkey_info[pos+1:]
+            origin_end_pos = pubkey_info.find(']')
+            pubkey_and_wildcard = pubkey_info if origin_end_pos == -1 else pubkey_info[origin_end_pos+1:]
+
+            wildcard_pos = pubkey_and_wildcard.find('/')
+            pubkey_str = pubkey_and_wildcard if wildcard_pos == -1 else pubkey_and_wildcard[:wildcard_pos]
 
             ext_pubkey = ExtendedKey.deserialize(pubkey_str)
             ext_pubkey = ext_pubkey.derive_pub_path(bip32_path)

@@ -45,6 +45,7 @@ Currently supported wallet policies for multisig:
 
 #define MAX_TOKEN_LENGTH (sizeof("sortedmulti") - 1)
 
+// TODO: refactor this using the parser framework
 
 int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header) {
     if (!buffer_read_u8(buffer, &header->type)){
@@ -86,6 +87,10 @@ static bool is_digit(char c) {
 
 static bool is_alpha(char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+}
+
+static bool is_alphanumeric(char c) {
+    return is_alpha(c) || is_digit(c);
 }
 
 static bool is_lowercase_hex(char c) {
@@ -303,6 +308,7 @@ int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *
 static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
     uint32_t der_step;
     if (parse_unsigned_decimal(buffer, &der_step) == -1 || der_step >= BIP32_FIRST_HARDENED_CHILD) {
+        PRINTF("Failed reading derivation step\n");
         return -1;
     }
 
@@ -344,12 +350,13 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         // read all the given derivation steps
         out->master_key_derivation_len = 0;
         while (buffer->ptr[buffer->offset] == '/') {
+            buffer_seek_cur(buffer, 1); // skip the '/' character
             ++out->master_key_derivation_len;
             if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
                 return -1;
             }
 
-            if (!buffer_read_derivation_step(buffer, &out->master_key_derivation[out->master_key_derivation_len])) {
+            if (buffer_read_derivation_step(buffer, &out->master_key_derivation[out->master_key_derivation_len]) == -1) {
                 return -1;
             };
         }
@@ -361,17 +368,34 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         }
     }
 
-    // consume the rest of the buffer into the xpub
-    // TODO: should we check if bytes are correct, or at least in the right alphabet?
-    int ext_pubkey_len = 0;
-    while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_can_read(buffer, 1)) {
+    // consume the rest of the buffer into the pubkey, except possibly the final "/**"
+    unsigned int ext_pubkey_len = 0;
+    while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH
+           && buffer_can_read(buffer, 1)
+           && is_alphanumeric(buffer->ptr[buffer->offset]))
+    {
         buffer_read_u8(buffer, (uint8_t *)&out->ext_pubkey[ext_pubkey_len]);
         ++ext_pubkey_len;
     }
     out->ext_pubkey[ext_pubkey_len] = '\0';
 
+    // either the string terminates now, or it has a final "/**" suffix for the wildcard.
+    if (!buffer_can_read(buffer, 1)) {
+        // no wildcard
+        return 0;
+    }
+
+    out->has_wildcard = 1;
+
+    // Only the final "/**" suffix should be left
+    uint8_t wildcard[3];
     // Make sure that the buffer is indeed exhausted
-    if (buffer_can_read(buffer, 1)) {
+    if (   !buffer_read_bytes(buffer, wildcard, 3) // should be able to read 3 characters
+        || buffer_can_read(buffer, 1)              // but nothing more
+        || wildcard[0] != '/'                      // suffix should be exactly "/**"
+        || wildcard[1] != '*'
+        || wildcard[2] != '*')
+    {
         return -1;
     }
 

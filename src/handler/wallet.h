@@ -29,6 +29,7 @@ typedef struct {
     uint8_t master_key_derivation_len;
     uint8_t master_key_fingerprint[4];
     uint8_t has_key_origin;
+    uint8_t has_wildcard; // true iff the keys ends with the /** wildcard
     char ext_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 } policy_map_key_info_t;
 

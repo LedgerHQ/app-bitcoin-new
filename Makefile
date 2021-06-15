@@ -35,6 +35,9 @@ ifndef COIN
 COIN=bitcoin
 endif
 
+# TODO: remove, only for pre-release development
+COIN=bitcoin_testnet
+
 ifeq ($(COIN),bitcoin_testnet)
 # Bitcoin testnet
 DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
