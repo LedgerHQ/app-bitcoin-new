@@ -22,6 +22,9 @@ typedef struct {
     int n_outputs;
     uint8_t outputs_root[20];
 
+    bool signing_with_wallet;
+    uint8_t wallet_id[32];
+
     uint32_t master_key_fingerprint;
 
     int cur_input_index;

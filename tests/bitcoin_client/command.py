@@ -1,5 +1,5 @@
 import struct
-from typing import Tuple, List, Mapping
+from typing import Tuple, List, Mapping, Optional
 from collections import deque
 import base64
 from io import BytesIO, BufferedReader
@@ -141,8 +141,12 @@ class BitcoinCommand:
 
         return response.decode()
 
-    def sign_psbt(self, psbt: PSBT) -> str:
+    def sign_psbt(self, psbt: PSBT, wallet: Optional[Wallet] = None, wallet_sig: Optional[bytes] = None) -> str:
         print(psbt.serialize())
+
+        if not wallet is None and wallet_sig is None:
+            raise ValueError("The wallet signature was not provided")
+
         psbt_bytes = base64.b64decode(psbt.serialize())
         f = BytesIO(psbt_bytes)
 
@@ -182,7 +186,7 @@ class BitcoinCommand:
         client_intepreter.add_known_list(output_commitments)
 
         sw, response = self.make_request(
-            self.builder.sign_psbt(global_map, input_maps, output_maps),
+            self.builder.sign_psbt(global_map, input_maps, output_maps, wallet, wallet_sig),
             client_intepreter
         )
 

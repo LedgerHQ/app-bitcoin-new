@@ -125,6 +125,31 @@ void handler_sign_psbt(
     }
     state->n_outputs = (size_t)n_outputs;
 
+    uint8_t signing_with_wallet;
+
+    if (!buffer_read_u8(&dc->read_buffer, &signing_with_wallet)) {
+        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    state->signing_with_wallet = (signing_with_wallet != 0);
+
+    if (signing_with_wallet) {
+        uint8_t wallet_sig_len;
+        uint8_t wallet_sig[MAX_DER_SIG_LEN];
+        if (   !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32)
+            || !buffer_read_u8(&dc->read_buffer, &wallet_sig_len)
+            || !buffer_read_bytes(&dc->read_buffer, wallet_sig, wallet_sig_len))
+        {
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            return;
+        }
+
+        // Verify signature
+        if (!crypto_verify_sha256_hash(state->wallet_id, wallet_sig, wallet_sig_len)) {
+            dc->send_sw(SW_SIGNATURE_FAIL);
+            return;
+        }
+    }
 
     // Get the master's key fingerprint
     uint8_t master_pub_key[33];
@@ -139,7 +164,6 @@ void handler_sign_psbt(
     } else {
         dc->next(process_next_input);
     }
-
 }
 
 

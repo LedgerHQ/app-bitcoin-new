@@ -1,7 +1,7 @@
 import enum
 import logging
 import struct
-from typing import List, Tuple, Mapping, Union, Iterator, cast
+from typing import List, Tuple, Mapping, Union, Iterator, Optional, cast
 
 from bitcoin_client.common import bip32_path_from_string, AddressType
 
@@ -156,7 +156,12 @@ class BitcoinCommandBuilder:
 
     def sign_psbt(self, global_mapping: Mapping[bytes, bytes],
                   input_mappings: List[Mapping[bytes, bytes]],
-                  output_mappings: List[Mapping[bytes, bytes]]):
+                  output_mappings: List[Mapping[bytes, bytes]],
+                  wallet: Optional[Wallet],
+                  wallet_sig: Optional[bytes]):
+
+        if not wallet is None and wallet_sig is None:
+            raise ValueError("The wallet signature was not provided")
 
         cdata = bytearray()
         cdata += get_merkleized_map_commitment(global_mapping)
@@ -166,6 +171,13 @@ class BitcoinCommandBuilder:
 
         cdata += write_varint(len(output_mappings))
         cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_out)) for m_out in output_mappings]).root
+
+        if wallet is None:
+            cdata += b'\0'
+        else:
+            cdata += b'\x01'
+            cdata += wallet.id
+            cdata += len(wallet_sig).to_bytes(1, byteorder="big"),
 
         return self.serialize(cla=self.CLA_BITCOIN,
                         ins=BitcoinInsType.SIGN_PSBT,
