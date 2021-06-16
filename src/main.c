@@ -103,6 +103,9 @@ void app_main() {
     coin_config->native_segwit_prefix = 0;
 #endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
 
+#   ifdef HAVE_SEMIHOSTED_PRINTF
+        PRINTF("APDU State size: %d\n", sizeof(command_state_t));
+#   endif
 
     // Reset dispatcher state
     explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));

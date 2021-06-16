@@ -134,7 +134,7 @@ ifneq ($(DEBUG),0)
         ifeq ($(DEBUG),10)
                 $(warning Using semihosted PRINTF. Only run with speculos!)
                 CFLAGS    += -include debug-helpers/debug.h
-                DEFINES   += HAVE_PRINTF PRINTF=semihosted_printf
+                DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
         else
                 ifeq ($(TARGET_NAME),TARGET_NANOX)
                         DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
