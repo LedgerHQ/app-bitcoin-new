@@ -239,6 +239,14 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
 
         // TODO: HMAC should be good enough in this case, and much faster; also, shorter than sigs
 
+        // TODO: we might want to add external info to be committed with the signature (e.g.: app version).
+        //       This would allow newer versions of the app to invalidate an old signature if desired, for example if
+        //       a vulnerability is discovered in the registration flow of a previous app.
+        //       The response would be changed to:
+        //         <metadata len> <metadata> <sig_len> <sig>
+        //       And the signature would be on the concatenation of the wallet id and the metadata.
+        //       The client must persist the metadata, together with the signature.
+
         // sign wallet id and produce response
         int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
         response.signature_len = (uint8_t)signature_len;
