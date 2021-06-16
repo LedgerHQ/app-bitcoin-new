@@ -11,6 +11,9 @@
 #include "flows/psbt_parse_rawtx.h"
 #include "flows/psbt_process_redeemScript.h"
 
+#define MAX_N_INPUTS_CAN_SIGN 16
+#define MAX_N_OUTPUTS_CAN_SIGN 16
+
 typedef struct {
     merkleized_map_commitment_t map;
 
@@ -54,6 +57,7 @@ typedef struct {
     uint64_t outputs_total_value;
     uint64_t inputs_total_value;
 
+    
 
     uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
 

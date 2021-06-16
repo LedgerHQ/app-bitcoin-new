@@ -36,11 +36,18 @@
 #include "sign_psbt.h"
 
 
+static void process_input_map(dispatcher_context_t *dc);
 static void process_global_tx(dispatcher_context_t *dc);
 static void receive_global_tx_info(dispatcher_context_t *dc);
-static void process_input_map(dispatcher_context_t *dc);
 static void request_non_witness_utxo(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
+
+
+static void verify_outputs_init(dispatcher_context_t *dc);
+
+
+static void sign_init(dispatcher_context_t *dc);
+static void sign_process_input_map(dispatcher_context_t *dc);
 
 static void sign_legacy(dispatcher_context_t *dc);
 static void sign_legacy_first_pass_completed(dispatcher_context_t *dc);
@@ -107,7 +114,8 @@ void handler_sign_psbt(
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (n_inputs > 252) {
+    if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
+        PRINTF("At most %d inputs are supported", MAX_N_INPUTS_CAN_SIGN);
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
@@ -121,7 +129,8 @@ void handler_sign_psbt(
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (n_outputs > 252) {
+    if (n_outputs > MAX_N_OUTPUTS_CAN_SIGN) {
+        PRINTF("At most %d outputs are supported", MAX_N_OUTPUTS_CAN_SIGN);
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
@@ -165,10 +174,47 @@ void handler_sign_psbt(
     if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
         dc->send_sw(SW_INCORRECT_DATA);
     } else {
-        dc->next(process_global_tx);
+        state->cur_input_index = 0;
+        dc->next(process_input_map);
     }
 }
 
+
+/** Inputs verification flow
+ *
+ *  Go though all the inputs:
+ *  - verify the non_witness_utxo
+ *  - compute value spent
+ *  - detect internal inputs that should be signed, and external inputs that shouldn't
+ */
+
+
+static void process_input_map(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->cur_input_index >= state->n_inputs) {
+        // all inputs already processed
+        dc->next(verify_outputs_init);
+        return;
+    }
+
+    // Reset cur_input struct
+    memset(&state->cur_input, 0, sizeof(state->cur_input));
+
+    int res = call_get_merkleized_map(dc,
+                                     state->inputs_root,
+                                     state->n_inputs,
+                                     state->cur_input_index,
+                                     &state->cur_input.map);
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    dc->next(process_global_tx);
+}
 
 static void process_global_tx(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
@@ -222,87 +268,9 @@ static void receive_global_tx_info(dispatcher_context_t *dc) {
         return;
     }
 
-    state->cur_input_index = 0;
-    dc->next(process_input_map);
+    dc->next(request_non_witness_utxo);
 }
 
-
-/**
- * Callback to process all the keys of the current input map.
- * Keeps track if the current input has a witness_utxo and/or a redeemScript.
- */
-static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
-    size_t data_len = data->size - data->offset;
-    if (data_len >= 1) {
-        uint8_t key_type;
-        buffer_read_u8(data, &key_type);
-        if (key_type == PSBT_IN_WITNESS_UTXO) {
-            state->cur_input.has_witnessUtxo = true;
-        } else if (key_type == PSBT_IN_REDEEM_SCRIPT) {
-            state->cur_input.has_redeemScript = true;
-        } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
-            state->cur_input.has_sighash_type = true;
-        }
-    }
-}
-
-static void process_input_map(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (state->cur_input_index >= state->n_inputs) {
-        // all inputs already processed
-        dc->next(finalize);
-        return;
-    }
-
-    // Reset cur_input struct
-    memset(&state->cur_input, 0, sizeof(state->cur_input));
-
-    int res = call_get_merkleized_map_with_callback(dc,
-                                                    state->inputs_root,
-                                                    state->n_inputs,
-                                                    state->cur_input_index,
-                                                    make_callback(state, (dispatcher_callback_t)input_keys_callback),
-                                                    &state->cur_input.map);
-    if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (!state->cur_input.has_sighash_type) {
-        // PSBT_IN_SIGHASH_TYPE is compulsory
-        PRINTF("Missing SIGHASH TYPE for input %d\n", state->cur_input_index);
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    // Get sighash type
-    uint8_t tmp[] = { PSBT_IN_SIGHASH_TYPE };
-    uint8_t result[4];
-    res = call_get_merkleized_map_value(dc,
-                                        &state->cur_input.map,
-                                        tmp,
-                                        1,
-                                        result,
-                                        sizeof(result));
-
-    if (res != 4) {
-        PRINTF("Malformed PSBT_IN_SIGHASH_TYPE.\n");
-
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    } else {
-        state->cur_input.sighash_type = read_u32_le(result, 0);
-
-        // TODO: check acceptable sighash types. Might want to limit to SIGHASH_ALL for now.
-
-        // TODO: the non_witness_utxo check will no longer be necessary when signing taproot inputs.
-
-        dc->next(request_non_witness_utxo);
-    }
-}
 
 
 static void request_non_witness_utxo(dispatcher_context_t *dc) {
@@ -338,7 +306,7 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     cx_hash_sha256(txhash, 32, txhash, 32);
 
     if (memcmp(txhash, state->cur_input.prevout_hash, 32) != 0) {
-        PRINTF("Prevout hash did not match non-witness-utxo transaction hash.\n");
+        PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
 
         dc->send_sw(SW_INCORRECT_DATA);
         return;
@@ -362,14 +330,126 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
            state->subcontext.psbt_parse_rawtx.program_state.compute_txid.vout_scriptpubkey,
            state->cur_input.prevout_scriptpubkey_len);
 
+    ++state->cur_input_index;
+    dc->next(process_input_map);    
+}
+
+
+/** OUTPUTS VERIFICATION FLOW
+ *
+ *  For each output, check if it's a change address.
+ *  Show each output that is not a change address to the user for verification.
+ */
+
+// TODO
+
+// entry point for the outputs verification flow
+static void verify_outputs_init(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    // TODO: remove
+    PRINTF("######## TOTAL INPUTS VALUE: %llu\n", state->inputs_total_value);
+
+    // TODO
+    dc->next(sign_init);
+}
+
+
+/** SIGNING FLOW
+ *
+ * Iterate over all inputs. For each input that should be signed, compute and sign sighash.
+ */
+
+
+// entry point for the signing flow
+static void sign_init(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+
+    state->cur_input_index = 0;
+    dc->next(sign_process_input_map);
+
+}
+
+
+/**
+ * Callback to process all the keys of the current input map.
+ * Keeps track if the current input has a witness_utxo and/or a redeemScript.
+ */
+static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
+    size_t data_len = data->size - data->offset;
+    if (data_len >= 1) {
+        uint8_t key_type;
+        buffer_read_u8(data, &key_type);
+        if (key_type == PSBT_IN_WITNESS_UTXO) {
+            state->cur_input.has_witnessUtxo = true;
+        } else if (key_type == PSBT_IN_REDEEM_SCRIPT) {
+            state->cur_input.has_redeemScript = true;
+        } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
+            state->cur_input.has_sighash_type = true;
+        }
+    }
+}
+
+static void sign_process_input_map(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->cur_input_index >= state->n_inputs) {
+        // all inputs already processed
+        dc->next(finalize);
+        return;
+    }
+
+    int res = call_get_merkleized_map_with_callback(dc,
+                                                    state->inputs_root,
+                                                    state->n_inputs,
+                                                    state->cur_input_index,
+                                                    make_callback(state, (dispatcher_callback_t)input_keys_callback),
+                                                    &state->cur_input.map);
+    if (res < 0) {
+        dc->send_sw(SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (!state->cur_input.has_sighash_type) {
+        state->cur_input.sighash_type = SIGHASH_ALL;
+    } else {
+        // Get sighash type
+        uint8_t result[4];
+        if (4 != call_get_merkleized_map_value(dc, &state->cur_input.map,
+                                               (uint8_t []){ PSBT_IN_SIGHASH_TYPE },
+                                               1,
+                                               result,
+                                               sizeof(result)))
+        {
+            PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", state->cur_input_index);
+
+            dc->send_sw(SW_INCORRECT_DATA);
+            return;
+        }
+
+        state->cur_input.sighash_type = read_u32_le(result, 0);
+    }
+
+    // TODO: add support for other sighash flags
+    if (state->cur_input.sighash_type != SIGHASH_ALL) {
+        dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific SW
+        return;
+    }
+
+    // Sign as segwit input iff it has a witness utxo
     if (!state->cur_input.has_witnessUtxo) {
         dc->next(sign_legacy);
     } else {
         dc->next(sign_segwit);
     }
 }
-
-
 
 static void sign_legacy(dispatcher_context_t *dc) {
     // sign legacy P2PKH or P2SH
@@ -404,6 +484,10 @@ static void sign_legacy_first_pass_completed(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+
+    // TODO: for legacy, we need the prevout_scriptpubkey from the non_witness_utxo.
+    //       therefore, we need to process the non_witness_utxo again
+    //       BROKEN: currently using cur_input.prevout_scriptpubkey without initializing it.
 
     if (!state->cur_input.has_redeemScript) {
         // P2PKH, the script_code is the prevout's scriptPubKey
@@ -528,13 +612,14 @@ static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc) {
 
 
     // TODO: send signature for this input
-    PRINTF("signature for input %d: ", state->cur_input_index);
+    PRINTF("######## signature for input %d: ", state->cur_input_index);
     for (int i = 0; i < sig_len; i++)
         PRINTF("%02x", sig[i]);
     PRINTF("\n");
 
-    ++state->cur_input_index;
-    dc->next(process_input_map);
+    // ++state->cur_input_index;
+    // dc->next(process_input_map);
+    // TODO
 }
 
 
@@ -792,13 +877,13 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
     END_TRY;
 
     // TODO: send signture for this input
-    PRINTF("signature for input %d: ", state->cur_input_index);
+    PRINTF("######## signature for input %d: ", state->cur_input_index);
     for (int i = 0; i < sig_len; i++)
         PRINTF("%02x", sig[i]);
     PRINTF("\n");
 
     ++state->cur_input_index;
-    dc->next(process_input_map);
+    dc->next(sign_process_input_map);
 }
 
 

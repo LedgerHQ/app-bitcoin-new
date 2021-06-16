@@ -10,8 +10,23 @@ from bitcoin_client.exception import IncorrectDataError
 def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
     # legacy address
-    # PSBT for a legacy 1-input 1-output spend
+    # PSBT for a legacy 1-input 2-output spend (1 change address)
     filename = "./psbt/singlesig/wpkh-1to2.psbt"
+    raw_psbt_base64 = open(filename, "r").read()
+
+    psbt = PSBT()
+    psbt.deserialize(raw_psbt_base64)
+
+    result = cmd.sign_psbt(psbt)
+
+    print(result)
+
+
+def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
+
+    # legacy address
+    # PSBT for a legacy 2-input 2-output spend (1 change address)
+    filename = "./psbt/singlesig/wpkh-2to2.psbt"
     raw_psbt_base64 = open(filename, "r").read()
 
     psbt = PSBT()
