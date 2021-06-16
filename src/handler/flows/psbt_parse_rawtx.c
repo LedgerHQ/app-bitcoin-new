@@ -16,7 +16,7 @@
 
 // parses the 32-bytes txid of an input in a rawtx
 static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
@@ -83,7 +83,7 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
 // parses the 4-bytes vout of an input in a rawtx
 // TODO: shares logic with the previous method; try to factor out the shared code
 static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
@@ -144,7 +144,7 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
 }
 
 static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint64_t scriptsig_size;
     bool result = dbuffer_read_varint(buffers, &scriptsig_size);
 
@@ -188,7 +188,7 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
 static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     state->scriptsig_counter = 0;
 
@@ -199,7 +199,7 @@ static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buff
 }
 
 static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t data[32];
 
     while (true) {
@@ -234,7 +234,7 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
 }
 
 static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t sequence_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
@@ -319,7 +319,7 @@ const int n_parse_rawtxinput_steps = sizeof(parse_rawtxinput_steps)/sizeof(parse
 /*   PARSER FOR A RAWTX OUTPUT */
 
 static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
@@ -373,7 +373,7 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
 }
 
 static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint64_t scriptpubkey_size;
     bool result = dbuffer_read_varint(buffers, &scriptpubkey_size);
     if (result) {
@@ -429,13 +429,13 @@ static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
 static int parse_rawtxoutput_scriptpubkey_init(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->scriptpubkey_counter = 0;
     return 1;
 }
 
 static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t data[32];
 
     while (true) {
@@ -516,7 +516,7 @@ const int n_parse_rawtxoutput_steps = sizeof(parse_rawtxoutput_steps)/sizeof(par
 static int parse_rawtx_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)state;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     // skip the initial 0x00 byte for Merkle leafs
     uint8_t first_byte;
@@ -528,7 +528,7 @@ static int parse_rawtx_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
 }
 
 static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t version_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, version_bytes, 4);
@@ -586,7 +586,7 @@ static int parse_rawtx_check_segwit(parse_rawtx_state_t *state, buffer_t *buffer
 }
 
 static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
 
     uint64_t n_inputs; 
@@ -620,7 +620,7 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
 static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->in_counter = 0;
 
     if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
@@ -636,7 +636,7 @@ static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers
 }
 
 static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     while (state->in_counter < state->n_inputs) {
         while (true) {
             bool result = parser_run(parse_rawtxinput_steps,
@@ -660,7 +660,7 @@ static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) 
 static int parse_rawtx_inputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
         uint32_t sighash_type = state->program_state->compute_sighash_segwit_v0.sighash_type;
@@ -733,7 +733,7 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
 static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     state->out_counter = 0;
     parser_init_context(&state->output_parser_context, &state->output_parser_state);
@@ -750,7 +750,7 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
 }
 
 static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     while (state->out_counter < state->n_outputs) {
         while (true) {
             bool result = parser_run(parse_rawtxoutput_steps,
@@ -774,7 +774,7 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
 static int parse_rawtx_outputs_finalize(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
         uint32_t sighash_type = state->program_state->compute_sighash_segwit_v0.sighash_type;
@@ -803,7 +803,7 @@ static int parse_rawtx_outputs_finalize(parse_rawtx_state_t *state, buffer_t *bu
 }
 
 static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (!state->is_segwit) {
         state->n_witnesses = 0;
@@ -824,7 +824,7 @@ static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffe
 
 // Parses the witness data; currently, no use is made of that data.
 static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     if (!state->is_segwit) {
         return 1; // no witnesses to parse
@@ -867,7 +867,7 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
 
 
 static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     uint8_t locktime_bytes[4];
     bool result = dbuffer_read_bytes(buffers, locktime_bytes, 4);
@@ -896,7 +896,7 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
 static int parse_rawtx_add_sighash(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void)buffers;
 
-    PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
+    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
 
     ParseMode_t parse_mode = state->parse_mode;
     if (parse_mode == PARSEMODE_LEGACY_PASS2) {

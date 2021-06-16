@@ -18,10 +18,17 @@ static const char *KNOWN_TOKENS[] = {
 };
 
 /*
+Currently supported policies for singlesig:
+
+- pkh(key/**) where `key` follows `BIP44`       (legacy)
+- wpkh(key/**) where `key` follows `BIP 84`     (native segwit)
+- sh(wpkh(key/**)) where `key` follows `BIP 49` (nested segwit)
+
+
 Currently supported wallet policies for multisig:
 
    LEGACY
-  sh(multi(k,...)))
+  sh(multi(...)))
   sh(sortedmulti(...)))
   
    NATIVE SEGWIT

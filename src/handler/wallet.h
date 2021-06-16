@@ -43,7 +43,7 @@ typedef struct {
 
 
 typedef struct {
-    uint8_t type; // Currently only the only supported value is WALLET_TYPE_MULTISIG
+    uint8_t type; // Currently the only supported value is WALLET_TYPE_MULTISIG
     uint8_t name_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
 
