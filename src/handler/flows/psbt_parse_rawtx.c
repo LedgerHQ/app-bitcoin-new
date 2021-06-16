@@ -325,11 +325,15 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
     if (result) {
         ParseMode_t parse_mode = state->parent_state->parse_mode;
         if (parse_mode == PARSEMODE_TXID) {
+            uint64_t value = read_u64_le(value_bytes, 0);
+
+            state->parent_state->program_state->compute_txid.outputs_total_value += value;
+
             crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
 
             int relevant_output_index = state->parent_state->program_state->compute_txid.output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
-                state->parent_state->program_state->compute_txid.prevout_value = read_u64_le(value_bytes, 0);
+                state->parent_state->program_state->compute_txid.prevout_value = value;
             }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             // nothing to do, all outputs are past the script_code, therefore handled in pass 2
@@ -734,7 +738,9 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
     state->out_counter = 0;
     parser_init_context(&state->output_parser_context, &state->output_parser_state);
 
-    if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
+    if (state->parse_mode == PARSEMODE_TXID) {
+        state->program_state->compute_txid.outputs_total_value = 0;
+    } else if (state->parse_mode == PARSEMODE_SEGWIT_V0) {
         // init hash context related to the outputs
         cx_sha256_init(&state->program_state->compute_sighash_segwit_v0.hashOutputs_context);
     }

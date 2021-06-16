@@ -1,8 +1,26 @@
 import pytest
 
+from bitcoin_client.command import BitcoinCommand
+
 from bitcoin_client.common import AddressType
 from bitcoin_client.psbt import PSBT
 from bitcoin_client.exception import IncorrectDataError
+
+
+def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
+
+    # legacy address
+    # PSBT for a legacy 1-input 1-output spend
+    filename = "./psbt/singlesig/wpkh-1to2.psbt"
+    raw_psbt_base64 = open(filename, "r").read()
+
+    psbt = PSBT()
+    psbt.deserialize(raw_psbt_base64)
+
+    result = cmd.sign_psbt(psbt)
+
+    print(result)
+
 
 # def test_sign_psbt_legacy(cmd):
 #     # legacy address
@@ -17,21 +35,21 @@ from bitcoin_client.exception import IncorrectDataError
 #     print(result)
 
 
-def test_sign_psbt_legacy_p2pkh(cmd):
-    # test from app-bitcoin
+# def test_sign_psbt_legacy_p2pkh(cmd):
+#     # test from app-bitcoin
 
-    # legacy address
-    # PSBT for a legacy 1-input, 1-output + 1-change address spend
-    unsigned_raw_psbt_base64 = 'cHNidP8BAHcBAAAAAVf4kTUeYOlEcY8d8StPd7ZCzGMUYYS+3Gx7xkoMCzneAAAAAAAAAAAAAqCGAQAAAAAAGXapFHrmeHmDxejS4X7xcPdZBWw2A6fYiKygfAEAAAAAABl2qRQYm4Or/V0O+Y+/NZTJXMU7RJdK6oisAAAAAAABAOICAAAAAV33ueIMUtHaJwGiRKSXVCFSZvAW9r139kClIAzR+340AQAAAGtIMEUCIQDIBpV0KZNcXWH1SCI8NTbcc5/jUYFLzp7cFpTlpcJavwIgE+MHsLSIWstkzP+vX0eU8gUEAyXrw2wlh4fEiLA4wrsBIQOLpGLX3WWRfs5FQUKQO7NioLQS0YQdUgh62IFka2zcz/3///8CFAwDAAAAAAAZdqkUs+F8Te+KORSO1vrX3G/r4w3TJMuIrDBXBQAAAAAAGXapFOCok4BjXxi37glUbZYyMry5kkEriKz+BB0AAQMEAQAAAAAAAA=='
+#     # legacy address
+#     # PSBT for a legacy 1-input, 1-output + 1-change address spend
+#     unsigned_raw_psbt_base64 = 'cHNidP8BAHcBAAAAAVf4kTUeYOlEcY8d8StPd7ZCzGMUYYS+3Gx7xkoMCzneAAAAAAAAAAAAAqCGAQAAAAAAGXapFHrmeHmDxejS4X7xcPdZBWw2A6fYiKygfAEAAAAAABl2qRQYm4Or/V0O+Y+/NZTJXMU7RJdK6oisAAAAAAABAOICAAAAAV33ueIMUtHaJwGiRKSXVCFSZvAW9r139kClIAzR+340AQAAAGtIMEUCIQDIBpV0KZNcXWH1SCI8NTbcc5/jUYFLzp7cFpTlpcJavwIgE+MHsLSIWstkzP+vX0eU8gUEAyXrw2wlh4fEiLA4wrsBIQOLpGLX3WWRfs5FQUKQO7NioLQS0YQdUgh62IFka2zcz/3///8CFAwDAAAAAAAZdqkUs+F8Te+KORSO1vrX3G/r4w3TJMuIrDBXBQAAAAAAGXapFOCok4BjXxi37glUbZYyMry5kkEriKz+BB0AAQMEAQAAAAAAAA=='
 
-    # expected sig: 3044022012f6a643d1d1a558912e0935dbd6a9694fe87c841e0f699c7cbb7c818503c115022064585f9b69c3452183a74ee7f00ae0452139e2c73b156dfd6ac835bea4fdf975
+#     # expected sig: 3044022012f6a643d1d1a558912e0935dbd6a9694fe87c841e0f699c7cbb7c818503c115022064585f9b69c3452183a74ee7f00ae0452139e2c73b156dfd6ac835bea4fdf975
 
-    psbt = PSBT()
-    psbt.deserialize(unsigned_raw_psbt_base64)
+#     psbt = PSBT()
+#     psbt.deserialize(unsigned_raw_psbt_base64)
 
-    result = cmd.sign_psbt(psbt)
+#     result = cmd.sign_psbt(psbt)
 
-    print(result)
+#     print(result)
 
 
 

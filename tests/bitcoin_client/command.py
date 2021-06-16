@@ -185,6 +185,8 @@ class BitcoinCommand:
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
 
+        # TODO: this will receive one ore more signatures from the device and must update the PSBT
+
         sw, response = self.make_request(
             self.builder.sign_psbt(global_map, input_maps, output_maps, wallet, wallet_sig),
             client_intepreter

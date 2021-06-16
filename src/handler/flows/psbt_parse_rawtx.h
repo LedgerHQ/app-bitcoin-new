@@ -45,6 +45,8 @@ typedef union {
         uint64_t prevout_value;        // will contain tx.input[input_index].prevout.value
         int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
 
+        uint64_t outputs_total_value;  // will contain the sum of the values of all the prevouts
+
         int output_index;              // index of queried output, or -1
         // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
         uint8_t vout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
