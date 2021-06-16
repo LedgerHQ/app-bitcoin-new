@@ -3,11 +3,11 @@
 #include "../boilerplate/dispatcher.h"
 #include "../common/merkle.h"
 
-#include "flows/check_merkle_tree_sorted.h"
-#include "flows/stream_merkle_leaf_element.h"
-#include "flows/get_merkleized_map.h"
-#include "flows/get_merkleized_map_value.h"
-#include "flows/stream_merkleized_map_value.h"
+#include "lib/check_merkle_tree_sorted.h"
+#include "lib/stream_merkle_leaf_element.h"
+#include "lib/get_merkleized_map.h"
+#include "lib/get_merkleized_map_value.h"
+#include "lib/stream_merkleized_map_value.h"
 #include "flows/psbt_parse_rawtx.h"
 #include "flows/psbt_process_redeemScript.h"
 

@@ -8,7 +8,7 @@
 
 #include "../../constants.h"
 
-#include "stream_merkleized_map_value.h"
+#include "../lib/stream_merkleized_map_value.h"
 
 
 

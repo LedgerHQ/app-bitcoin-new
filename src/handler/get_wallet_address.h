@@ -6,7 +6,7 @@
 
 #include "wallet.h"
 
-#include "flows/get_merkle_leaf_element.h"
+#include "lib/get_merkle_leaf_element.h"
 
 typedef struct {
     machine_context_t ctx;

@@ -8,8 +8,8 @@
 
 #include "../../constants.h"
 
-#include "get_merkleized_map_value_hash.h"
-#include "stream_preimage.h"
+#include "../lib/get_merkleized_map_value_hash.h"
+#include "../lib/stream_preimage.h"
 
 struct parse_rawtx_state_s; // forward declaration
 
