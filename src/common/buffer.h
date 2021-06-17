@@ -272,3 +272,10 @@ static inline buffer_t buffer_create(void *ptr, size_t size) {
         .offset = 0
     };
 }
+
+
+/**
+ * Returns a pointer to the current position in the buffer if at least `size` bytes are available in the buffer,
+ * or NULL otherwise. On success, the buffer is advanced by `size` bytes.
+ */
+void *buffer_alloc(buffer_t *buffer, size_t size);

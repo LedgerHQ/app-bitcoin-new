@@ -235,3 +235,14 @@ bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n) {
     buffer_seek_cur(buffer, n);
     return true;
 }
+
+// TODO: write unit tests
+void *buffer_alloc(buffer_t *buffer, size_t size) {
+    if (!buffer_can_read(buffer, size)) {
+        return NULL;
+    }
+
+    void *result = buffer->ptr + buffer->offset; 
+    buffer_seek_cur(buffer, size);
+    return result;
+}
