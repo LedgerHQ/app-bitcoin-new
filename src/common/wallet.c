@@ -1,0 +1,650 @@
+#include <stdint.h>
+#include <limits.h>
+
+#include "../common/bip32.h"
+#include "../common/buffer.h"
+#include "../common/wallet.h"
+#include "../boilerplate/sw.h"
+
+#ifndef SKIP_FOR_CMOCKA
+#include "../crypto.h"
+#else
+// disable problematic macros when compiling unit tests with CMOCKA
+#define PRINTF(...)
+#define PIC(x) (x)
+#endif
+
+
+/*
+Currently supported policies for singlesig:
+
+- pkh(key/**) where `key` follows `BIP44`       (legacy)
+- wpkh(key/**) where `key` follows `BIP 84`     (native segwit)
+- sh(wpkh(key/**)) where `key` follows `BIP 49` (nested segwit)
+
+
+Currently supported wallet policies for multisig:
+
+   LEGACY
+  sh(multi(...)))
+  sh(sortedmulti(...)))
+  
+   NATIVE SEGWIT
+  wsh(multi(...))
+  wsh(sortedmulti(...))
+  
+   WRAPPED SEGWIT
+  sh(wsh(multi(...)))
+  sh(wsh(sortedmulti(...)))
+*/
+
+
+// TODO: add unit tests to this module
+
+
+
+typedef struct {
+    PolicyNodeType type;
+    const char *name;
+} token_descriptor_t;
+
+static const token_descriptor_t KNOWN_TOKENS[] = {
+    {
+        .type = TOKEN_SH,
+        .name = "sh"
+    },
+    {
+        .type = TOKEN_WSH,
+        .name = "wsh"
+    },
+    {
+        .type = TOKEN_PK,
+        .name = "pk"
+    },
+    {
+        .type = TOKEN_PKH,
+        .name = "pkh"
+    },
+    {
+        .type = TOKEN_WPKH,
+        .name = "wpkh"
+    },
+    {
+        .type = TOKEN_MULTI,
+        .name = "multi"
+    },
+    {
+        .type = TOKEN_SORTEDMULTI,
+        .name = "sortedmulti"
+    }
+};
+
+typedef enum {
+	SINGLESIG = 0,
+	MULTISIG_UNSORTED = 1,
+	MULTISIG_SORTED = 2,
+} KnownPolicyType;
+
+// TODO: rewrite parser to support all the policies above
+
+#define MAX_TOKEN_LENGTH (sizeof("sortedmulti") - 1)
+
+// TODO: refactor this using the parser framework
+
+int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header) {
+    if (!buffer_read_u8(buffer, &header->type)){
+        return -1;
+    }
+
+    if (header->type != WALLET_TYPE_MULTISIG) {
+        return -2;
+    }
+
+    // The remaining code assumes that the wallet's type is WALLET_TYPE_MULTISIG, currently the only supported one.
+
+    if (!buffer_read_u8(buffer, &header->name_len)) {
+        return -3;
+    }
+
+    if (header->name_len > MAX_WALLET_NAME_LENGTH) {
+        return -4;
+    }
+
+    if (!buffer_read_bytes(buffer, (uint8_t *)header->name, header->name_len)) {
+        return -5;
+    }
+    header->name[header->name_len] = '\0';
+    return 0;
+}
+
+
+static bool is_digit(char c) {
+    return '0' <= c && c <= '9';
+}
+
+static bool is_alpha(char c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+}
+
+static bool is_alphanumeric(char c) {
+    return is_alpha(c) || is_digit(c);
+}
+
+static bool is_lowercase_hex(char c) {
+    return is_digit(c) || ('a' <= c && c <= 'f');
+}
+
+static uint8_t lowercase_hex_to_int(char c) {
+    return (uint8_t)(is_digit(c) ? c - '0' : c - 'a' + 10);
+}
+
+/**
+ * Read up to out_len characters from buffer, until either:
+ * - the buffer is exhausted
+ * - out_len characters are read
+ * - the next character is _not_ in [a-zAZ]
+ */
+static size_t read_word(buffer_t *buffer, char *out, size_t out_len) {
+    size_t word_len = 0;
+    while (word_len < out_len && buffer_can_read(buffer, 1)) {
+        char c = buffer->ptr[buffer->offset];
+        if (!is_alpha(c)) {
+            break;
+        }
+        out[word_len++] = c;
+        buffer_seek_cur(buffer, 1);
+    }
+    return word_len;
+}
+
+
+/**
+ * Read the next word from buffer (or up to MAX_TOKEN_LENGTH characters), and
+ * returns the index of this word in KNOWN_TOKENS if found; -1 otherwise.
+ */
+static int parse_token(buffer_t *buffer) {
+    char word[MAX_TOKEN_LENGTH+1];
+
+    size_t word_len = read_word(buffer, word, MAX_TOKEN_LENGTH);
+    word[word_len] = '\0';
+
+    for (unsigned int i = 0; i < sizeof(KNOWN_TOKENS)/sizeof(KNOWN_TOKENS[0]); i++) {
+        if (strncmp((const char *)PIC(KNOWN_TOKENS[i].name), word, MAX_TOKEN_LENGTH) == 0) {
+            return (int)PIC(KNOWN_TOKENS[i].type);
+        }
+    }
+
+    return -1;
+}
+
+
+/**
+ * Parses an unsigned decimal number from buffer, stopping when either the buffer ends, the next
+ * character is not a number, or the number is already too big. Leading zeros are allowed.
+ * Returns a valid 0 on success, -1 on failure.
+ * The read number is saved into *out on success.
+ */
+// TODO: disallow non-standard (e.g. extra leading zeros)
+static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
+    if (!buffer_can_read(buffer, 1) || !is_digit(buffer->ptr[buffer->offset])) {
+        PRINTF("parse_unsigned_decimal: couldn't read byte, or not a digit: %d\n", buffer->ptr[buffer->offset]);
+        return -1;
+    }
+
+    size_t result = 0;
+    int digits_read = 0;
+    while ((buffer_can_read(buffer, 1) && is_digit(buffer->ptr[buffer->offset]))) {
+        ++digits_read;
+        uint8_t next_digit = buffer->ptr[buffer->offset] - '0';
+        if (10 * result + next_digit < result) {
+            PRINTF("parse_unsigned_decimal: overflow. Current: %d. Next digit: %d\n", result, next_digit);
+            return -1; // overflow, integer too large
+        }
+
+        result = 10 * result + next_digit;
+
+        buffer_seek_cur(buffer, 1);
+    }
+    *out = result;
+
+    if (digits_read == 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+
+// Reads a derivation step expressed in decimal, with the symbol ' to mark if hardened (h is not supported)
+// Returns 0 on success, -1 on error.
+static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
+    uint32_t der_step;
+    if (parse_unsigned_decimal(buffer, &der_step) == -1 || der_step >= BIP32_FIRST_HARDENED_CHILD) {
+        PRINTF("Failed reading derivation step\n");
+        return -1;
+    }
+
+    *out = der_step;
+
+    // Check if hardened
+    if (buffer_can_read(buffer, 1) || buffer->ptr[buffer->offset] == '\'') {
+        *out |= BIP32_FIRST_HARDENED_CHILD;
+        buffer_seek_cur(buffer, 1); // skip the ' character
+    }
+    return 0;
+}
+
+// TODO: we are currently enforcing that the master key fingerprint (if present) is in lowercase hexadecimal digits,
+//       and that the symbol for "hardened derivation" is "'".
+//       This implies descriptors should be normalized on the client side.
+int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
+    if (!buffer_can_read(buffer, 1)) {
+        return -1;
+    }
+
+    if (buffer->ptr[buffer->offset] == '[') {
+        out->has_key_origin = 1;
+
+        buffer_seek_cur(buffer, 1); // skip 1 byte
+        if (!buffer_can_read(buffer, 9)) { // at least 8 bytes + (closing parenthesis or '\')
+            return -1;
+        }
+        for (int i = 0; i < 4; i++) {
+            char num[2];
+            buffer_read_bytes(buffer, (uint8_t *)num, 2);
+            if (!is_lowercase_hex(num[0]) || !is_lowercase_hex(num[1])) {
+                return -1;
+            }
+            out->master_key_fingerprint[i] = 16*lowercase_hex_to_int(num[0]) + lowercase_hex_to_int(num[1]);
+        }
+
+        // read all the given derivation steps
+        out->master_key_derivation_len = 0;
+        while (buffer->ptr[buffer->offset] == '/') {
+            buffer_seek_cur(buffer, 1); // skip the '/' character
+            ++out->master_key_derivation_len;
+            if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
+                return -1;
+            }
+
+            if (buffer_read_derivation_step(buffer, &out->master_key_derivation[out->master_key_derivation_len]) == -1) {
+                return -1;
+            };
+        }
+
+        // the next character must be ']'
+        uint8_t c;
+        if (!buffer_read_u8(buffer, &c) || c != ']') {
+            return -1;
+        }
+    }
+
+    // consume the rest of the buffer into the pubkey, except possibly the final "/**"
+    unsigned int ext_pubkey_len = 0;
+    while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH
+           && buffer_can_read(buffer, 1)
+           && is_alphanumeric(buffer->ptr[buffer->offset]))
+    {
+        buffer_read_u8(buffer, (uint8_t *)&out->ext_pubkey[ext_pubkey_len]);
+        ++ext_pubkey_len;
+    }
+    out->ext_pubkey[ext_pubkey_len] = '\0';
+
+    // either the string terminates now, or it has a final "/**" suffix for the wildcard.
+    if (!buffer_can_read(buffer, 1)) {
+        // no wildcard
+        return 0;
+    }
+
+    out->has_wildcard = 1;
+
+    // Only the final "/**" suffix should be left
+    uint8_t wildcard[3];
+    // Make sure that the buffer is indeed exhausted
+    if (   !buffer_read_bytes(buffer, wildcard, 3) // should be able to read 3 characters
+        || buffer_can_read(buffer, 1)              // but nothing more
+        || wildcard[0] != '/'                      // suffix should be exactly "/**"
+        || wildcard[1] != '*'
+        || wildcard[2] != '*')
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+static size_t parse_key_index(buffer_t *in_buf) {
+    char c;
+    if (!buffer_read_u8(in_buf, (uint8_t *)&c) || c != '@') {
+        return -1;
+    }
+
+    size_t k;
+    if (parse_unsigned_decimal(in_buf, &k) == -1) {
+        return -1;
+    }
+    return k;
+}
+
+#define CONTEXT_WITHIN_SH 1
+
+/**
+ * Parses a SCRIPT expression from the in_buf buffer, allocating the nodes and variables in out_buf.
+ * The initial pointer in out_buf will contain the root node of the SCRIPT.
+ */
+static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsigned long context_flags) {
+    // We read the token, we'll do different parsing based on what token we find
+    int token = parse_token(in_buf);
+    char c;
+
+    // Opening '('
+    if (!buffer_read_u8(in_buf, (uint8_t *)&c) && c != '(') {
+        return -1;
+    }
+
+    switch (token) {
+        case TOKEN_SH:
+        case TOKEN_WSH:
+        {
+            if (token == TOKEN_SH) {
+                if (depth != 0) {
+                    return -2; // can only be top-level
+                }
+
+            } else if (token == TOKEN_WSH) {
+                if (depth != 0 && (context_flags & CONTEXT_WITHIN_SH) == 0) {
+                    return -3; // only top-level or inside sh
+                }
+            }
+
+            script_node_with_script_t *node = (script_node_with_script_t *)buffer_alloc(out_buf, sizeof(script_node_with_script_t));
+            if (node == NULL) {
+                return -4;
+            }
+            node->type = token;
+
+            unsigned int inner_context_flags = context_flags;
+
+            if (token == TOKEN_SH) {
+                inner_context_flags |= CONTEXT_WITHIN_SH;
+            }
+
+            // the internal script is recursively parsed (if successful) in the current location of the output buffer 
+            node->script = (script_node_t *)(out_buf->ptr + out_buf->offset);
+
+            int res2;
+            if ((res2 = parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) < 0) {
+                // failed while parsing internal script
+                return res2*100 - 5;
+            }
+
+            break;
+        }
+        case TOKEN_PK:
+        case TOKEN_PKH:
+        case TOKEN_WPKH:
+        {
+            script_node_with_key_t *node = (script_node_with_key_t *)buffer_alloc(out_buf, sizeof(script_node_with_key_t));
+            if (node == NULL) {
+                return -6;
+            }
+            node->type = token;
+
+            int key_index = parse_key_index(in_buf);
+            if (key_index == -1) {
+                return -7;
+            }
+            node->key_index = (size_t)key_index;
+    
+            break;
+        }
+        case TOKEN_MULTI:
+        case TOKEN_SORTEDMULTI:
+        {
+            script_node_multisig_t *node = (script_node_multisig_t *)buffer_alloc(out_buf, sizeof(script_node_multisig_t));
+
+            if (node == NULL) {
+                return -8;
+            }
+            node->type = token;
+
+            if (parse_unsigned_decimal(in_buf, &node->k) == -1) {
+                PRINTF("Error parsing threshold\n");
+                return -9;
+            }
+
+            // We allocate the array of key indices at the current position in the output buffer (on success)
+            node->key_indexes = (size_t *)(out_buf->ptr + out_buf->offset);
+
+            node->n = 0;
+            while (true) {
+                // If the next character is a ')', we exit and leave it in the buffer
+                if (buffer_can_read(in_buf, 1) && in_buf->ptr[in_buf->offset] == ')') {
+                    break;
+                }
+
+                // otherwise, there must be a comma
+                if (!buffer_read_u8(in_buf, (uint8_t *)&c) || c != ',') {
+                    PRINTF("Unexpected char: %c. Was expecting: ,\n", c);
+                    return -10;
+                }
+
+                int key_index = parse_key_index(in_buf);
+                if (key_index == -1) {
+                    return -11;
+                }
+
+                size_t *key_index_out = (size_t *)buffer_alloc(out_buf, sizeof(size_t));
+                if (key_index_out == NULL) {
+                    return -12;
+                }
+                *key_index_out = (size_t)key_index;
+
+                ++node->n;
+            }
+
+            // check integrity of k and n
+            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_MULTISIG_COSIGNERS)) {
+                return -13;
+            }
+
+            break;
+        }
+        default:
+            PRINTF("Unknown token\n");
+            return -14;
+    }
+
+
+    if (!buffer_read_u8(in_buf, (uint8_t *)&c) && c != ')') {
+        return -15;
+    }
+
+    if (depth == 0 && buffer_can_read(in_buf, 1)) {
+        PRINTF("Input buffer too long");
+        return -16;
+    }
+
+    return 0;
+}
+
+int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len) {
+    if ((unsigned long)out % 4 != 0) {
+        PRINTF("Unaligned pointer");
+        return -1;
+    }
+
+    buffer_t out_buf = buffer_create(out, out_len);
+
+    return parse_script(in_buf, &out_buf, 0, 0);
+}
+
+
+
+
+#ifndef SKIP_FOR_CMOCKA
+
+
+void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header) {
+    crypto_hash_update(hash_context, &header->type, 1);
+    crypto_hash_update(hash_context, &header->name_len, 1);
+    crypto_hash_update(hash_context, &header->name, header->name_len);
+}
+
+
+// TODO: legacy code, switch to the new parser
+int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out) {
+    int depth = 0;      // how many parentheses have been opened and not yet closed
+
+    uint32_t n_keys = 0; // will be computed during parsing
+    uint32_t threshold;
+
+    bool sh_found = false;
+    bool wsh_found = false;
+    bool sorted = false;
+
+    bool exit = false; // set to true once we finish parsing a 'multi' or 'sortedmulti'
+    while (!exit) {
+        // PARSING A FUNCTION HERE
+
+        // We read the token, we'll do different parsing based on what token we find
+        int token = parse_token(buffer);
+        if (token == -1) {
+            PRINTF("Exited while parsing token at offset %d\n", buffer->offset);
+            return -1;
+        }
+
+
+        // the next caracter must be a '('
+        if (!buffer_can_read(buffer, 1) || buffer->ptr[buffer->offset] != '(') {
+            PRINTF("EXPECTED: (\n", token);
+            return -1;
+        } else {
+            buffer_seek_cur(buffer, 1); // skip character
+        }
+
+        char c;
+        switch (token) {
+            case TOKEN_SH:
+                if (depth != 0) {
+                    return -1; // can only be top-level
+                }
+                sh_found = true;
+                break;
+
+            case TOKEN_WSH:
+                if (wsh_found) {
+                    return -1; // wsh cannot be inside another wsh
+                }
+                wsh_found = true;
+                break;
+
+            case TOKEN_MULTI:
+            case TOKEN_SORTEDMULTI:
+                sorted = token == TOKEN_SORTEDMULTI;
+
+                if (parse_unsigned_decimal(buffer, &threshold) == -1) {
+                    PRINTF("Error parsing threshold\n");
+                    return -1; // failed to parse number
+                }
+
+                while (true) {
+                    // If the next character is a ')', we exit leaving it in the buffer
+                    if (buffer_can_read(buffer, 1) && buffer->ptr[buffer->offset] == ')') {
+                        break;
+                    }
+
+                    if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != ',') {
+                        PRINTF("Unexpected char: %c. Was expecting: ,\n", c);
+                        return -1;
+                    }
+
+                    // the next character must be '\t', followed by a decimal number equal to
+                    // the current value of n_keys
+                    if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != '@') {
+                        PRINTF("Unexpected char: %c. Was expecting: @\n", c);
+                        return -1;
+                    }
+                    uint32_t key_number;
+                    if (parse_unsigned_decimal(buffer, &key_number) == -1 || key_number != n_keys) {
+                        PRINTF("Failed parsing key number, or unexpected index. %u %u\n", key_number, n_keys);
+                        return -1;
+                    }
+
+                    ++n_keys;
+                }
+
+                if (!(0 < threshold && threshold <= n_keys && n_keys <= MAX_MULTISIG_COSIGNERS)) {
+                    return -1;
+                }
+
+                // Once we parsed a multi/sortedmulti, we only expect closing parentheses to be the rest of the
+                // string being parsed. This will change once support to more general descriptors is added.
+                exit = true;
+                break;
+
+            default:
+                PRINTF("Uknown token\n"); // this should never happen
+                return -1;
+        }
+
+        ++depth;
+    }
+
+    // We should now be left with exactly depth closing parentheses
+    for (int i = 0; i < depth; i++) {
+        char c;
+        if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != ')') {
+            return -1;
+        }
+    }
+
+    // Make sure we exhausted the buffer
+    if (buffer_can_read(buffer, 1)) {
+        return -1;
+    }
+
+    out->n_keys = n_keys;
+    out->threshold = threshold;
+    out->sorted = sorted;
+
+    if (sh_found) {
+        if (!wsh_found) {
+            out->address_type = ADDRESS_TYPE_LEGACY;
+        } else {
+            out->address_type = ADDRESS_TYPE_SH_WIT;
+        }
+    } else if (wsh_found) {
+        out->address_type = ADDRESS_TYPE_WIT;
+    } else {
+        PRINTF("Unexpected address type\n"); // should never happen
+        return -1;
+    }
+
+    return 0;
+}
+
+
+void get_policy_wallet_id(multisig_wallet_header_t *wallet_header,
+                          uint16_t policy_map_len,
+                          const char policy_map[],
+                          uint16_t n_keys,
+                          const uint8_t keys_info_merkle_root[static 20],
+                          uint8_t out[static 32])
+{
+    cx_sha256_t wallet_hash_context;
+    cx_sha256_init(&wallet_hash_context);
+
+    hash_update_append_wallet_header(&wallet_hash_context.header, wallet_header);
+
+    crypto_hash_update_u16(&wallet_hash_context.header, policy_map_len);
+    crypto_hash_update(&wallet_hash_context.header, policy_map, policy_map_len);
+
+    crypto_hash_update_u16(&wallet_hash_context.header, n_keys);
+
+    crypto_hash_update(&wallet_hash_context.header, keys_info_merkle_root, 20);
+    crypto_hash_digest(&wallet_hash_context.header, out, 32);
+}
+
+
+#endif

@@ -20,7 +20,7 @@ def test_get_wallet_address_legacy(cmd):
             f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY/**"
         ]
     )
-    wallet_sig = bytes.fromhex("304502210097f74242cb29540e77c1ef52ac9daa6b6bda80ec6f3851db2061345d3cbf44f402206630675c8c20491beb1ae090e8b32508899215a21ba6b92389598d84c2a08812")
+    wallet_sig = bytes.fromhex("3045022100f13adb6acd4bf8c4ce679ee2d491aad8493f23f73745feab4b2cb587add3ee43022018f585080fb6b455dacea9d34053f5dcd40a9a9ac75c86ef15262bda8361dcd9")
 
     res = cmd.get_wallet_address(wallet, wallet_sig, 0)
     print(res)
@@ -39,7 +39,7 @@ def test_get_wallet_address_sh_wit(cmd):
             f"[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY/**"
         ]
     )
-    wallet_sig = bytes.fromhex("304402202a0bacd2d28b8c05938cef721b30341ac9a40f48a081415df9099a19af11c33e02203e9ca45976a5c38517aec49878d8566b2acfe196f6e372ee390288020bf1f1d3")
+    wallet_sig = bytes.fromhex("3045022100b2808b37a3a493a77432b45471dc6e1b9aed236cf3c589e6dae8b0c85d6e9e8d02203119e905dfb037433512b19185bf0e07b86ce569d5c8852d36ac6f0182f369d5")
 
     res = cmd.get_wallet_address(wallet, wallet_sig, 0)
     assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
@@ -57,7 +57,7 @@ def test_get_wallet_address_wit(cmd):
             f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**"
         ]
     )
-    wallet_sig = bytes.fromhex("304502210090e90ad5940e919cd1db5cfdac8190e1c28385d29aeda19f6de7e3d81d9b9f6d0220706051aa04a707f73608247ca2ec8c1af66b3aea3474e85d66912da87c835248")
+    wallet_sig = bytes.fromhex("30440220564c14c281594221a3309b5acd11a427a32b9fc85b8d883564004f325fb0071b02201404316adb5127b7918ecf48e3ebceea41963898b26a4643e834baa0c72a5ea2")
 
     res = cmd.get_wallet_address(wallet, wallet_sig, 0)
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"

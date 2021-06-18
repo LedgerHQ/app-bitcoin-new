@@ -2,9 +2,9 @@
 
 #include "../crypto.h"
 #include "../common/bip32.h"
+#include "../common/wallet.h"
 #include "../boilerplate/dispatcher.h"
 
-#include "wallet.h"
 
 #include "lib/get_merkle_leaf_element.h"
 

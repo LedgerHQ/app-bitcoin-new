@@ -24,10 +24,6 @@
 #include "base58.h"
 #include "read.h"
 #include "write.h"
-#include "../crypto.h"
-
-#include "os.h"
-#include "cx.h"
 
 
 // shortcut for convenience

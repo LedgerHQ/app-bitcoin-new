@@ -2,17 +2,31 @@
 
 #include <stdint.h>
 
+#include "common/bip32.h"
 #include "common/buffer.h"
 #include "../constants.h"
 
+#ifndef SKIP_FOR_CMOCKA
 #include "os.h"
 #include "cx.h"
+#endif
+
 
 #define WALLET_TYPE_MULTISIG 1
 
+
+/**
+ * Maximum supported number of keys for multi or sortedmulti.
+ */
 #define MAX_MULTISIG_COSIGNERS 15
 
-// Enough to store "sh(wsh(sortedmulti(15,\t0,\t1,\t2,\t3,\t4,\t5,\t6,\t7,\t8,\t9,\t10,\t11,\t12,\t13,\t14)))"
+/**
+ * Maximum supported number of keys for a policy map.
+ */
+#define MAX_POLICY_MAP_KEYS 15
+
+
+// Enough to store "sh(wsh(sortedmulti(15,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))"
 #define MAX_MULTISIG_POLICY_MAP_LENGTH 74
 
 // The string describing a pubkey can contain:
@@ -54,24 +68,55 @@ typedef struct {
 
 
 
+typedef enum {
+	TOKEN_SH,
+ 	TOKEN_WSH,
+	TOKEN_PK,
+	TOKEN_PKH,
+	TOKEN_WPKH,
+    // TOKEN_COMBO     // disabled, does not mix well with the script policy language
+	TOKEN_MULTI,
+	TOKEN_SORTEDMULTI,
+    // TOKEN_TR,       // currently unsupported
+	// TOKEN_ADDR,     // unsupported
+	// TOKEN_RAW,      // unsupported
+} PolicyNodeType;
+
+
+// TODO: the following structures are using size_t for all integers to avoid alignment problems;
+//       if memory is an issue, we could use a packed version instead, but care needs to be taken when
+//       accessing pointers, since they would be unaligned.
+
+// abstract type for all nodes
+typedef struct {
+    PolicyNodeType type;
+    void *node_data;      // subtypes will redefine this
+} script_node_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_SH, == TOKEN_WSH
+    script_node_t *script;
+} script_node_with_script_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_PK, == TOKEN_PKH, == TOKEN_WPKH
+    size_t key_index;     // index of the key
+} script_node_with_key_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_MULTI, == TOKEN_SORTEDMULTI
+    size_t k;             // threshold
+    size_t n;             // number of keys
+    size_t *key_indexes;  // pointer to array of exactly n key indexes
+} script_node_multisig_t;
+
+
+
 /**
  * TODO: docs 
  */
 int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header);
 
-
-/**
- * TODO: docs 
- */
-void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header);
-
-
-/**
- * Parses a policy map for the supported wallet types, filling the 'out' buffer.
- * Fails if any parsing error occurs, or if the buffer is not exhausted exactly.
- * Returns -1 on failure
- */
-int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out);
 
 /**
  * 
@@ -88,9 +133,31 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
 /**
  * TODO: docs
  */
+int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
+
+
+
+#ifndef SKIP_FOR_CMOCKA
+/**
+ * TODO: docs 
+ */
+void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header);
+
+/**
+ * Parses a policy map for the supported wallet types, filling the 'out' buffer.
+ * Fails if any parsing error occurs, or if the buffer is not exhausted exactly.
+ * Returns -1 on failure
+ */
+int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out);
+
+/**
+ * TODO: docs
+ */
 void get_policy_wallet_id(multisig_wallet_header_t *wallet_header,
                           uint16_t policy_map_len,
                           const char policy_map[],
                           uint16_t n_keys,
                           const uint8_t keys_info_merkle_root[static 20],
                           uint8_t out[static 32]);
+
+#endif

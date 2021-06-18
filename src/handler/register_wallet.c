@@ -23,8 +23,9 @@
 
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
-#include "../common/write.h"
 #include "../common/merkle.h"
+#include "../common/wallet.h"
+#include "../common/write.h"
 
 #include "../constants.h"
 #include "../types.h"
@@ -35,7 +36,6 @@
 #include "client_commands.h"
 
 #include "register_wallet.h"
-#include "wallet.h"
 
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
 static void process_next_cosigner_info(dispatcher_context_t *dc);

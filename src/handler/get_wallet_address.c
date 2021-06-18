@@ -24,6 +24,7 @@
 #include "../common/buffer.h"
 #include "../common/merkle.h"
 #include "../common/segwit_addr.h"
+#include "../common/wallet.h"
 #include "../constants.h"
 #include "../types.h"
 #include "../crypto.h"
@@ -31,7 +32,6 @@
 #include "../ui/menu.h"
 
 #include "get_wallet_address.h"
-#include "wallet.h"
 #include "client_commands.h"
 
 extern global_context_t G_context;

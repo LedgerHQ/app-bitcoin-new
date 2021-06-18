@@ -86,7 +86,7 @@ class MultisigWallet(PolicyMapWallet):
         policy_map = "".join([
             policy_prefix,
             str(threshold) + ",",
-            ",".join("\t" + str(l) for l in range(n_keys)),
+            ",".join("@" + str(l) for l in range(n_keys)),
             policy_suffix
         ])
 
