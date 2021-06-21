@@ -25,6 +25,13 @@
  */
 #define MAX_POLICY_MAP_KEYS 15
 
+// The string describing a pubkey can contain:
+// - (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 3*12 = 46 bytes)
+// - the xpub itself (up to 113 characters)
+// - optional, the "/**" suffix.
+// Therefore, the total length of the key info string is at most 162 bytes.
+#define MAX_POLICY_KEY_INFO_LEN (46 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
+
 
 // Enough to store "sh(wsh(sortedmulti(15,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))"
 #define MAX_MULTISIG_POLICY_MAP_LENGTH 74
@@ -91,24 +98,24 @@ typedef enum {
 typedef struct {
     PolicyNodeType type;
     void *node_data;      // subtypes will redefine this
-} script_node_t;
+} policy_node_t;
 
 typedef struct {
     PolicyNodeType type;  // == TOKEN_SH, == TOKEN_WSH
-    script_node_t *script;
-} script_node_with_script_t;
+    policy_node_t *script;
+} policy_node_with_script_t;
 
 typedef struct {
     PolicyNodeType type;  // == TOKEN_PK, == TOKEN_PKH, == TOKEN_WPKH
     size_t key_index;     // index of the key
-} script_node_with_key_t;
+} policy_node_with_key_t;
 
 typedef struct {
     PolicyNodeType type;  // == TOKEN_MULTI, == TOKEN_SORTEDMULTI
     size_t k;             // threshold
     size_t n;             // number of keys
     size_t *key_indexes;  // pointer to array of exactly n key indexes
-} script_node_multisig_t;
+} policy_node_multisig_t;
 
 
 

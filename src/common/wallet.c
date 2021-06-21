@@ -357,7 +357,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
                 }
             }
 
-            script_node_with_script_t *node = (script_node_with_script_t *)buffer_alloc(out_buf, sizeof(script_node_with_script_t));
+            policy_node_with_script_t *node = (policy_node_with_script_t *)buffer_alloc(out_buf, sizeof(policy_node_with_script_t));
             if (node == NULL) {
                 return -4;
             }
@@ -370,7 +370,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
             }
 
             // the internal script is recursively parsed (if successful) in the current location of the output buffer 
-            node->script = (script_node_t *)(out_buf->ptr + out_buf->offset);
+            node->script = (policy_node_t *)(out_buf->ptr + out_buf->offset);
 
             int res2;
             if ((res2 = parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) < 0) {
@@ -384,7 +384,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
         case TOKEN_PKH:
         case TOKEN_WPKH:
         {
-            script_node_with_key_t *node = (script_node_with_key_t *)buffer_alloc(out_buf, sizeof(script_node_with_key_t));
+            policy_node_with_key_t *node = (policy_node_with_key_t *)buffer_alloc(out_buf, sizeof(policy_node_with_key_t));
             if (node == NULL) {
                 return -6;
             }
@@ -401,7 +401,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
         case TOKEN_MULTI:
         case TOKEN_SORTEDMULTI:
         {
-            script_node_multisig_t *node = (script_node_multisig_t *)buffer_alloc(out_buf, sizeof(script_node_multisig_t));
+            policy_node_multisig_t *node = (policy_node_multisig_t *)buffer_alloc(out_buf, sizeof(policy_node_multisig_t));
 
             if (node == NULL) {
                 return -8;
