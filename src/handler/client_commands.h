@@ -1,11 +1,6 @@
+#pragma once
+
 // TODO: for all these commands, we could make some macros or helper functions to create the requests and responses.
-
-
-/* WALLETS/SCRIPTS */
-
-// Request : <CCMD_GET_PUBKEYS_IN_DERIVATION_ORDER : 1> <merkle_root : 20> <tree_size: 4> <steps (max 10) : 1> <der_1 : 4> <der_2 : 4> ... <der_steps : 4> <n_key_indexes : 1> <index_1 : 1> ... <index_n : 1>
-// Response: <n_key_indexes : 1> <sorted_index_1 : 1> ... <sorted_index_n : 1>
-#define CCMD_GET_PUBKEYS_IN_DERIVATION_ORDER 0x20
 
 
 /* MERKLE PROOFS */

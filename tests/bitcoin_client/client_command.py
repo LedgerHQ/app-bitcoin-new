@@ -14,7 +14,6 @@ from .merkle import MerkleTree, element_hash
 
 class ClientCommandCode(IntEnum):
     GET_PUBKEY_INFO = 0x01
-    GET_PUBKEYS_IN_DERIVATION_ORDER = 0x20
     GET_PREIMAGE = 0x40
     GET_MERKLE_LEAF_PROOF = 0x41
     GET_MERKLE_LEAF_INDEX = 0x42
@@ -140,76 +139,6 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         return found.to_bytes(1, byteorder="big") + write_varint(leaf_index)
 
 
-class GetPubkeysInDerivationOrder(ClientCommand):
-    def __init__(self, known_keylists: Mapping[bytes, List[str]]):
-        self.known_keylists = known_keylists
-
-    @property
-    def code(self) -> int:
-        return ClientCommandCode.GET_PUBKEYS_IN_DERIVATION_ORDER
-
-    def execute(self, request: bytes) -> bytes:
-        req = ByteStreamParser(request[1:])
-
-        root = req.read_bytes(20)
-
-        if root not in self.known_keylists:
-            raise ValueError(f"Unknown Merkle root: {root.hex()}")
-
-        keys_info = self.known_keylists[root]
-
-        tree_size = req.read_uint(4)
-        if tree_size != len(keys_info):
-            raise ValueError(f"Invalid tree size: expected {len(keys_info)}, not {tree_size}")
-
-        bip32_path_len = req.read_uint(1)
-
-        if not (0 <= bip32_path_len <= 10):
-            raise RuntimeError(f"Invalid derivation len: {bip32_path_len}")
-
-        bip32_path = []
-        for _ in range(bip32_path_len):
-            bip32_path.append(req.read_uint(4))
-
-        if any(bip32_step >= 0x80000000 for bip32_step in bip32_path):
-            raise ValueError("Only unhardened derivation steps are allowed.")
-
-        n_key_indexes = req.read_uint(1)
-
-        key_indexes = []
-        for _ in range(n_key_indexes):
-            key_indexes.append(req.read_uint(1))
-
-        if any(not 0 <= i < tree_size for i in key_indexes):
-            raise ValueError("Key index out of range.")
-
-        req.assert_empty()
-
-        # function to sort keys by the corresponding derived pubkey
-        def derived_pk(pubkey_info: str) -> int:
-
-            # Remove the key origin info (if present) by looking for the ']' character
-            origin_end_pos = pubkey_info.find(']')
-            pubkey_and_wildcard = pubkey_info if origin_end_pos == -1 else pubkey_info[origin_end_pos+1:]
-
-            wildcard_pos = pubkey_and_wildcard.find('/')
-            pubkey_str = pubkey_and_wildcard if wildcard_pos == -1 else pubkey_and_wildcard[:wildcard_pos]
-
-            ext_pubkey = ExtendedKey.deserialize(pubkey_str)
-            ext_pubkey = ext_pubkey.derive_pub_path(bip32_path)
-
-            return ext_pubkey.pubkey
-
-        # attach its index to every key
-        used_keys = [(i, keys_info[i]) for i in key_indexes]
-        # sort according to the derived pubkey
-        sorted_keys = sorted(used_keys, key=lambda index_key: derived_pk(index_key[1]))
-
-        result = bytearray([n_key_indexes])
-        result.extend(idx_key[0] for idx_key in sorted_keys)
-        return bytes(result)
-
-
 class GetMoreElementsCommand(ClientCommand):
     def __init__(self, queue: "deque[bytes]"):
         self.queue = queue
@@ -259,8 +188,7 @@ class ClientCommandInterpreter:
             GetPreimageCommand(self.known_preimages, queue),
             GetMerkleLeafIndexCommand(self.known_trees),
             GetMerkleLeafHashCommand(self.known_trees, queue),
-            GetMoreElementsCommand(queue),
-            GetPubkeysInDerivationOrder(self.known_keylists)
+            GetMoreElementsCommand(queue)
         ]
 
         self.commands = {cmd.code: cmd for cmd in commands}
