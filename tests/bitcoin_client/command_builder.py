@@ -141,12 +141,13 @@ class BitcoinCommandBuilder:
                         ins=BitcoinInsType.REGISTER_WALLET,
                         cdata=wallet.serialize())
 
-    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False):
+    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, change: bool, display: bool = False):
         cdata: bytes = b"".join([
             wallet.id,
             len(signature).to_bytes(1, byteorder="big"),
             signature,
             wallet.serialize(),
+            b'\1' if change else b'\0',
             address_index.to_bytes(4, byteorder="big")
         ])
         return self.serialize(cla=self.CLA_BITCOIN,

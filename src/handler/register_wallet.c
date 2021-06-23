@@ -68,57 +68,25 @@ void handler_register_wallet(
         return;
     }
 
-    int res;
-    if ((res = read_wallet_header(&dc->read_buffer, &state->wallet_header)) < 0) {
+    if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
+        PRINTF("Failed reading policy map\n");
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    uint16_t policy_map_len;
-    if (!buffer_read_u16(&dc->read_buffer, &policy_map_len, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (policy_map_len > MAX_POLICY_MAP_LEN) {
+    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    if (parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0) {
         dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-    char policy_map[MAX_POLICY_MAP_LEN];
-    if (!buffer_read_bytes(&dc->read_buffer, (uint8_t *)policy_map, policy_map_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    buffer_t policy_map_buffer = buffer_create(&policy_map, policy_map_len);
-    if (buffer_read_multisig_policy_map(&policy_map_buffer, &state->wallet_header.multisig_policy) == -1) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    uint16_t n_policy_keys;
-    if (!buffer_read_u16(&dc->read_buffer, &n_policy_keys, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (n_policy_keys != state->wallet_header.multisig_policy.n_keys) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    if (!buffer_read_bytes(&dc->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
 
     // Compute the wallet id (sha256 of the serialization)
-    get_policy_wallet_id(&state->wallet_header,
-                         policy_map_len,
-                         policy_map,
-                         state->wallet_header.multisig_policy.n_keys,
-                         state->wallet_header.keys_info_merkle_root,
-                         state->wallet_id);
+    get_policy_wallet_id(&state->wallet_header, state->wallet_id);
 
     state->next_pubkey_index = 0;
+
+    // TODO: check if policy is acceptable; only multisig should be accepted at this time,
+    //       and it should be one of the accepted patterns.
 
     dc->pause();
     // TODO: this does not show address type and if it's sorted. Is it a problem?
@@ -126,8 +94,8 @@ void handler_register_wallet(
     //       Funds wouldn't be lost, but the user might think they are and fall victim of ransom nonetheless.
     ui_display_multisig_header(dc,
                                (char *)state->wallet_header.name,
-                               state->wallet_header.multisig_policy.threshold,
-                               state->wallet_header.multisig_policy.n_keys,
+                               2, // TODO: need to compute this from the policy
+                               state->wallet_header.n_keys,
                                ui_action_validate_header);
 }
 
@@ -157,7 +125,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     int pubkey_len = call_get_merkle_leaf_element(dc,
                                                   state->wallet_header.keys_info_merkle_root,
-                                                  state->wallet_header.multisig_policy.n_keys,
+                                                  state->wallet_header.n_keys,
                                                   state->next_pubkey_index,
                                                   state->next_pubkey_info,
                                                   sizeof(state->next_pubkey_info));
@@ -201,7 +169,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     ui_display_multisig_cosigner_pubkey(dc,
                                         key_info.ext_pubkey,
                                         state->next_pubkey_index, // 1-indexed for the UI
-                                        state->wallet_header.multisig_policy.n_keys,
+                                        state->wallet_header.n_keys,
                                         ui_action_validate_cosigner);
 }
 
@@ -221,7 +189,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     }
  
     ++state->next_pubkey_index;
-    if (state->next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
+    if (state->next_pubkey_index < state->wallet_header.n_keys) {
         dc->next(process_next_cosigner_info);
     } else {
 

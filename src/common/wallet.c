@@ -58,10 +58,6 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
         .name = "wsh"
     },
     {
-        .type = TOKEN_PK,
-        .name = "pk"
-    },
-    {
         .type = TOKEN_PKH,
         .name = "pkh"
     },
@@ -79,28 +75,23 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
     }
 };
 
-typedef enum {
-	SINGLESIG = 0,
-	MULTISIG_UNSORTED = 1,
-	MULTISIG_SORTED = 2,
-} KnownPolicyType;
 
 // TODO: rewrite parser to support all the policies above
 
+/**
+ * Length of the longest token in the policy wallet descriptor language (not including the terminating \0 byte).
+ */
 #define MAX_TOKEN_LENGTH (sizeof("sortedmulti") - 1)
 
-// TODO: refactor this using the parser framework
 
-int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header) {
+int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header) {
     if (!buffer_read_u8(buffer, &header->type)){
         return -1;
     }
 
-    if (header->type != WALLET_TYPE_MULTISIG) {
+    if (header->type != WALLET_TYPE_POLICYMAP) {
         return -2;
     }
-
-    // The remaining code assumes that the wallet's type is WALLET_TYPE_MULTISIG, currently the only supported one.
 
     if (!buffer_read_u8(buffer, &header->name_len)) {
         return -3;
@@ -114,6 +105,29 @@ int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header) {
         return -5;
     }
     header->name[header->name_len] = '\0';
+
+    if (!buffer_read_u16(buffer, &header->policy_map_len, BE)) {
+        return -6;
+    }
+
+    if (header->name_len > MAX_POLICY_MAP_LEN) {
+        return -7;
+    }
+
+    if (!buffer_read_bytes(buffer, (uint8_t *)header->policy_map, header->policy_map_len)) {
+        return -8;
+    }
+
+    uint16_t n_keys;
+    if (!buffer_read_u16(buffer, &n_keys, BE)) {
+        return -9;
+    }
+    header->n_keys = n_keys;
+
+    if (!buffer_read_bytes(buffer, (uint8_t *)header->keys_info_merkle_root, 20)) {
+        return -10;
+    }
+
     return 0;
 }
 
@@ -380,7 +394,6 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
 
             break;
         }
-        case TOKEN_PK:
         case TOKEN_PKH:
         case TOKEN_WPKH:
         {
@@ -461,16 +474,17 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
     }
 
     if (depth == 0 && buffer_can_read(in_buf, 1)) {
-        PRINTF("Input buffer too long");
+        PRINTF("Input buffer too long\n");
         return -16;
     }
 
     return 0;
 }
 
+
 int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len) {
     if ((unsigned long)out % 4 != 0) {
-        PRINTF("Unaligned pointer");
+        PRINTF("Unaligned pointer\n");
         return -1;
     }
 
@@ -480,169 +494,23 @@ int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len) {
 }
 
 
-
-
 #ifndef SKIP_FOR_CMOCKA
 
-
-void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header) {
-    crypto_hash_update(hash_context, &header->type, 1);
-    crypto_hash_update(hash_context, &header->name_len, 1);
-    crypto_hash_update(hash_context, &header->name, header->name_len);
-}
-
-
-// TODO: legacy code, switch to the new parser
-int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out) {
-    int depth = 0;      // how many parentheses have been opened and not yet closed
-
-    uint32_t n_keys = 0; // will be computed during parsing
-    uint32_t threshold;
-
-    bool sh_found = false;
-    bool wsh_found = false;
-    bool sorted = false;
-
-    bool exit = false; // set to true once we finish parsing a 'multi' or 'sortedmulti'
-    while (!exit) {
-        // PARSING A FUNCTION HERE
-
-        // We read the token, we'll do different parsing based on what token we find
-        int token = parse_token(buffer);
-        if (token == -1) {
-            PRINTF("Exited while parsing token at offset %d\n", buffer->offset);
-            return -1;
-        }
-
-
-        // the next caracter must be a '('
-        if (!buffer_can_read(buffer, 1) || buffer->ptr[buffer->offset] != '(') {
-            PRINTF("EXPECTED: (\n", token);
-            return -1;
-        } else {
-            buffer_seek_cur(buffer, 1); // skip character
-        }
-
-        char c;
-        switch (token) {
-            case TOKEN_SH:
-                if (depth != 0) {
-                    return -1; // can only be top-level
-                }
-                sh_found = true;
-                break;
-
-            case TOKEN_WSH:
-                if (wsh_found) {
-                    return -1; // wsh cannot be inside another wsh
-                }
-                wsh_found = true;
-                break;
-
-            case TOKEN_MULTI:
-            case TOKEN_SORTEDMULTI:
-                sorted = token == TOKEN_SORTEDMULTI;
-
-                if (parse_unsigned_decimal(buffer, &threshold) == -1) {
-                    PRINTF("Error parsing threshold\n");
-                    return -1; // failed to parse number
-                }
-
-                while (true) {
-                    // If the next character is a ')', we exit leaving it in the buffer
-                    if (buffer_can_read(buffer, 1) && buffer->ptr[buffer->offset] == ')') {
-                        break;
-                    }
-
-                    if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != ',') {
-                        PRINTF("Unexpected char: %c. Was expecting: ,\n", c);
-                        return -1;
-                    }
-
-                    // the next character must be '\t', followed by a decimal number equal to
-                    // the current value of n_keys
-                    if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != '@') {
-                        PRINTF("Unexpected char: %c. Was expecting: @\n", c);
-                        return -1;
-                    }
-                    uint32_t key_number;
-                    if (parse_unsigned_decimal(buffer, &key_number) == -1 || key_number != n_keys) {
-                        PRINTF("Failed parsing key number, or unexpected index. %u %u\n", key_number, n_keys);
-                        return -1;
-                    }
-
-                    ++n_keys;
-                }
-
-                if (!(0 < threshold && threshold <= n_keys && n_keys <= MAX_MULTISIG_COSIGNERS)) {
-                    return -1;
-                }
-
-                // Once we parsed a multi/sortedmulti, we only expect closing parentheses to be the rest of the
-                // string being parsed. This will change once support to more general descriptors is added.
-                exit = true;
-                break;
-
-            default:
-                PRINTF("Uknown token\n"); // this should never happen
-                return -1;
-        }
-
-        ++depth;
-    }
-
-    // We should now be left with exactly depth closing parentheses
-    for (int i = 0; i < depth; i++) {
-        char c;
-        if (!buffer_read_u8(buffer, (uint8_t *)&c) || c != ')') {
-            return -1;
-        }
-    }
-
-    // Make sure we exhausted the buffer
-    if (buffer_can_read(buffer, 1)) {
-        return -1;
-    }
-
-    out->n_keys = n_keys;
-    out->threshold = threshold;
-    out->sorted = sorted;
-
-    if (sh_found) {
-        if (!wsh_found) {
-            out->address_type = ADDRESS_TYPE_LEGACY;
-        } else {
-            out->address_type = ADDRESS_TYPE_SH_WIT;
-        }
-    } else if (wsh_found) {
-        out->address_type = ADDRESS_TYPE_WIT;
-    } else {
-        PRINTF("Unexpected address type\n"); // should never happen
-        return -1;
-    }
-
-    return 0;
-}
-
-
-void get_policy_wallet_id(multisig_wallet_header_t *wallet_header,
-                          uint16_t policy_map_len,
-                          const char policy_map[],
-                          uint16_t n_keys,
-                          const uint8_t keys_info_merkle_root[static 20],
-                          uint8_t out[static 32])
-{
+void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]) {
     cx_sha256_t wallet_hash_context;
     cx_sha256_init(&wallet_hash_context);
 
-    hash_update_append_wallet_header(&wallet_hash_context.header, wallet_header);
+    crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->type);
+    crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->name_len);
+    crypto_hash_update(&wallet_hash_context.header, wallet_header->name, wallet_header->name_len);
 
-    crypto_hash_update_u16(&wallet_hash_context.header, policy_map_len);
-    crypto_hash_update(&wallet_hash_context.header, policy_map, policy_map_len);
+    crypto_hash_update_u16(&wallet_hash_context.header, wallet_header->policy_map_len);
+    crypto_hash_update(&wallet_hash_context.header, wallet_header->policy_map, wallet_header->policy_map_len);
 
-    crypto_hash_update_u16(&wallet_hash_context.header, n_keys);
+    crypto_hash_update_u16(&wallet_hash_context.header, wallet_header->n_keys);
 
-    crypto_hash_update(&wallet_hash_context.header, keys_info_merkle_root, 20);
+    crypto_hash_update(&wallet_hash_context.header, wallet_header->keys_info_merkle_root, 20);
+
     crypto_hash_digest(&wallet_hash_context.header, out, 32);
 }
 

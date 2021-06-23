@@ -49,6 +49,8 @@ static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
                               uint8_t out[static 33])
 {
     char key_info_str[MAX_POLICY_KEY_INFO_LEN];
+
+
     int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
                                                     keys_merkle_root,
                                                     n_keys,
@@ -59,6 +61,7 @@ static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
         return -1;
     }
 
+
     // Make a sub-buffer for the pubkey info
     buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
@@ -66,6 +69,7 @@ static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
         return -1;
     }
+
 
     // decode pubkey
     serialized_extended_pubkey_check_t decoded_pubkey_check;
@@ -119,7 +123,6 @@ int call_get_wallet_address(dispatcher_context_t *dispatcher_context,
     }
 
 
-
     switch (policy->type) {
         case TOKEN_PKH:
         {
@@ -141,7 +144,7 @@ int call_get_wallet_address(dispatcher_context_t *dispatcher_context,
             int hash_length = (policy->type == TOKEN_WPKH ? 20 : 32);
 
             // make sure that the output buffer is long enough
-            if (out_ptr_len < 73 + strlen(G_context.native_segwit_prefix)) {
+            if (out_ptr_len < 72 + strlen(G_context.native_segwit_prefix)) {
                 return -1;
             }
 
@@ -193,12 +196,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
         case TOKEN_PKH:
         case TOKEN_WPKH:
         {
-            // TODO
             policy_node_with_key_t *root = (policy_node_with_key_t *)policy;
-
-            if (n_keys != 1) {
-                return -1;
-            }
 
             unsigned int out_len = 3 + 20 + 2;
             if (out_ptr != NULL && out_ptr_len < out_len) {
@@ -245,6 +243,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
             }
         }
         case TOKEN_SH:
+        case TOKEN_WSH:
         {
             policy_node_with_script_t *root = (policy_node_with_script_t *)policy;
 
@@ -335,6 +334,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
         {
             policy_node_multisig_t *root = (policy_node_multisig_t *)policy;
 
+
             // TODO: replace with the maximum we can afford
             if (root->n >= 5) {
                 return -1;
@@ -351,8 +351,10 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
             uint8_t tmp = 0x50 + root->k; // OP_k
             update_output(out_buf_ptr, hash_context, &tmp, 1);
 
+
             uint8_t compressed_pubkeys[5][33];
             for (unsigned int i = 0; i < root->n; i++) {
+
                 if (-1 == get_derived_pubkey(dispatcher_context,
                                              keys_merkle_root,
                                              n_keys,
@@ -365,6 +367,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                 }
             }
 
+
             // sort the pubkeys
             qsort(compressed_pubkeys, root->n, 33, cmp_compressed_pubkeys);
 
@@ -374,10 +377,12 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                 update_output(out_buf_ptr, hash_context, compressed_pubkeys[i], 33);
             }
 
+
             tmp = 0x50 + root->n;         // OP_n
             update_output(out_buf_ptr, hash_context, &tmp, 1);
             tmp = 0xae;                   // OP_CHECKMULTISIG
             update_output(out_buf_ptr, hash_context, &tmp, 1);
+
 
             return out_len;
         }

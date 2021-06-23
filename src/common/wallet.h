@@ -12,7 +12,7 @@
 #endif
 
 
-#define WALLET_TYPE_MULTISIG 1
+#define WALLET_TYPE_POLICYMAP 1
 
 
 /**
@@ -36,11 +36,9 @@
 // Enough to store "sh(wsh(sortedmulti(15,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))"
 #define MAX_MULTISIG_POLICY_MAP_LENGTH 74
 
-// The string describing a pubkey can contain:
-// (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 3*12 = 46 bytes)
-// the xpub itself (up to 113 characters)
-// Therefore, the total length of the key info string is 159 bytes.
-#define MAX_MULTISIG_SIGNER_INFO_LEN (46 + MAX_SERIALIZED_PUBKEY_LENGTH)
+// Maximum size of a parsed policy map in memory
+#define MAX_POLICY_MAP_BYTES 128
+
 
 // Currently only multisig is supported
 #define MAX_POLICY_MAP_LEN MAX_MULTISIG_POLICY_MAP_LENGTH
@@ -56,29 +54,20 @@ typedef struct {
 
 
 typedef struct {
-    uint8_t address_type;
-    uint8_t threshold;
-    uint8_t n_keys;
-    uint8_t sorted; // 0 for multi, 1 for sortedmulti
-} multisig_wallet_policy_t;
-
-
-typedef struct {
-    uint8_t type; // Currently the only supported value is WALLET_TYPE_MULTISIG
+    uint8_t type;  // Currently the only supported value is WALLET_TYPE_POLICYMAP
     uint8_t name_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
-
-    /* The remaining fields are specific to multisig wallets */
-    multisig_wallet_policy_t multisig_policy;
+    uint16_t policy_map_len;
+    char policy_map[MAX_POLICY_MAP_LEN];
+    size_t n_keys;
     uint8_t keys_info_merkle_root[20];        // root of the Merkle tree of the keys information
-} multisig_wallet_header_t;
-
+} policy_map_wallet_header_t;
 
 
 typedef enum {
 	TOKEN_SH,
  	TOKEN_WSH,
-	TOKEN_PK,
+	// TOKEN_PK,       // disabled, but it will be needed for taproot
 	TOKEN_PKH,
 	TOKEN_WPKH,
     // TOKEN_COMBO     // disabled, does not mix well with the script policy language
@@ -122,7 +111,7 @@ typedef struct {
 /**
  * TODO: docs 
  */
-int read_wallet_header(buffer_t *buffer, multisig_wallet_header_t *header);
+int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header);
 
 
 /**
@@ -145,26 +134,21 @@ int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
 
 
 #ifndef SKIP_FOR_CMOCKA
-/**
- * TODO: docs 
- */
-void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header);
+// /**
+//  * TODO: docs 
+//  */
+// void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header);
 
-/**
- * Parses a policy map for the supported wallet types, filling the 'out' buffer.
- * Fails if any parsing error occurs, or if the buffer is not exhausted exactly.
- * Returns -1 on failure
- */
-int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out);
+// /**
+//  * Parses a policy map for the supported wallet types, filling the 'out' buffer.
+//  * Fails if any parsing error occurs, or if the buffer is not exhausted exactly.
+//  * Returns -1 on failure
+//  */
+// int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out);
 
 /**
  * TODO: docs
  */
-void get_policy_wallet_id(multisig_wallet_header_t *wallet_header,
-                          uint16_t policy_map_len,
-                          const char policy_map[],
-                          uint16_t n_keys,
-                          const uint8_t keys_info_merkle_root[static 20],
-                          uint8_t out[static 32]);
+void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]);
 
 #endif

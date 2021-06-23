@@ -31,15 +31,14 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+#include "lib/policy.h"
+
 #include "get_wallet_address.h"
 #include "client_commands.h"
 
+
 extern global_context_t G_context;
 
-static void request_keys_order(dispatcher_context_t *dc);
-
-static void process_next_cosigner_info(dispatcher_context_t *dc);
-static void generate_address(dispatcher_context_t *dc);
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
 void handler_get_wallet_address(
@@ -92,48 +91,34 @@ void handler_get_wallet_address(
         return;
     }
 
-    if (read_wallet_header(&dc->read_buffer, &state->wallet_header) < 0) {
+    if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    uint16_t policy_map_len;
-    if (!buffer_read_u16(&dc->read_buffer, &policy_map_len, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (policy_map_len > MAX_POLICY_MAP_LEN) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-    char policy_map[MAX_POLICY_MAP_LEN];
-    if (!buffer_read_bytes(&dc->read_buffer, (uint8_t *)policy_map, policy_map_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
+    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
 
-    buffer_t policy_map_buffer = buffer_create(&policy_map, policy_map_len);
-    if (buffer_read_multisig_policy_map(&policy_map_buffer, &state->wallet_header.multisig_policy) == -1) {
+
+    PRINTF("%s\n", state->wallet_header.policy_map);
+    int tmp;
+    if ((tmp = parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0)) {
+        PRINTF("Failed parsing policy map\n");
+        PRINTF("%d\n", tmp);
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    uint16_t n_policy_keys;
-    if (!buffer_read_u16(&dc->read_buffer, &n_policy_keys, BE)) {
+    // change
+    if (!buffer_read_u8(&dc->read_buffer, &state->is_change)) {
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (n_policy_keys != state->wallet_header.multisig_policy.n_keys) {
+    if (state->is_change != 0 && state->is_change != 1) {
         dc->send_sw(SW_INCORRECT_DATA);
         return;
     }
 
-    if (!buffer_read_bytes(&dc->read_buffer, state->wallet_header.keys_info_merkle_root, 20)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-
+    // address index
     if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
         dc->send_sw(SW_WRONG_DATA_LENGTH);
         return;
@@ -141,257 +126,33 @@ void handler_get_wallet_address(
 
     // Compute the wallet id (sha256 of the serialization)
     uint8_t computed_wallet_id[32];
-    get_policy_wallet_id(&state->wallet_header,
-                         policy_map_len,
-                         policy_map,
-                         state->wallet_header.multisig_policy.n_keys,
-                         state->wallet_header.keys_info_merkle_root,
-                         computed_wallet_id);
+    get_policy_wallet_id(&state->wallet_header, computed_wallet_id);
 
     if (memcmp(wallet_id, computed_wallet_id, sizeof(wallet_id)) != 0) {
         dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific error code
         return;
     }
 
-    /* STAGE 0 STARTS HERE */
-
-    // Init command state
-    state->shared.stage0.next_pubkey_index = 0;
-
-    cx_sha256_init(&state->script_hash_context);
-
-    uint8_t threshold = state->wallet_header.multisig_policy.threshold;
-    crypto_hash_update_u8(&state->script_hash_context.header, 0x50 + threshold); // OP_m
-
-    if (state->wallet_header.multisig_policy.sorted) {
-        dc->next(request_keys_order);
-    } else {
-        // Keep the canonical order for multi()
-        for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
-            state->shared.stage0.ordered_pubkeys[i] = i;
-        }
-        dc->next(process_next_cosigner_info);
-    }
-}
-
-// TODO: this processor and the next could be outsourced to a flow
-static void request_keys_order(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    uint8_t request[1 + 20 + 4 + 1 + 4*10 + 1 + 15]; // max size
-    request[0] = CCMD_GET_PUBKEYS_IN_DERIVATION_ORDER;
-    memcpy(request + 1, state->wallet_header.keys_info_merkle_root, 20);
-
-    int pos = 1 + 20;
-
-    write_u32_be(request, pos, state->wallet_header.multisig_policy.n_keys);
-    pos += 4;
-
-    request[pos++] = 2; // 2 derivation steps
-    write_u32_be(request, pos, 0);
-    pos += 4;
-    write_u32_be(request, pos, state->address_index);
-    pos += 4;
-
-    request[pos++] = state->wallet_header.multisig_policy.n_keys;
-
-    for (uint8_t i = 0; i < state->wallet_header.multisig_policy.n_keys; i++) {
-        request[pos++] = i;
-    }
-
-    if (dc->process_interruption(dc, request, pos) < 0) {
-        dc->send_sw(SW_BAD_STATE);
+    int res = call_get_wallet_address(dc,
+                                      &state->policy_map,
+                                      state->wallet_header.keys_info_merkle_root,
+                                      state->wallet_header.n_keys,
+                                      state->is_change,
+                                      state->address_index,
+                                      state->address,
+                                      sizeof(state->address));
+    if (res < 0) {
+        PRINTF("Response to get_wallet_address: %d\n", res);
+        dc->send_sw(SW_BAD_STATE); // unexpected
         return;
     }
-
-    uint8_t n_key_indexes;
-    if (!buffer_read_u8(&dc->read_buffer, &n_key_indexes) || !buffer_can_read(&dc->read_buffer, n_key_indexes)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    if (n_key_indexes == 0 || n_key_indexes > 15) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    uint8_t seen_pubkeys[15];
-    memset(seen_pubkeys, 0, sizeof(seen_pubkeys));
-
-    // read the result, and make sure it is a permutation of [0, 1, ..., n_key_indexes - 1]
-    for (int i = 0; i < n_key_indexes; i++) {
-        uint8_t k;
-        buffer_read_u8(&dc->read_buffer, &k);
-
-        if (k >= n_key_indexes || seen_pubkeys[k] > 0) {
-            dc->send_sw(SW_INCORRECT_DATA);
-            return;
-        }
-        seen_pubkeys[k] = 1;
-
-        state->shared.stage0.ordered_pubkeys[i] = k;
-    }
-
-    dc->next(process_next_cosigner_info);
-}
-
-
-/**
- * Receives the next pubkey, accumulates it in the hash context, derives the appropriate child key.
- */
-static void process_next_cosigner_info(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    int pubkey_len = call_get_merkle_leaf_element(dc,
-                                                  state->wallet_header.keys_info_merkle_root,
-                                                  state->wallet_header.multisig_policy.n_keys,
-                                                  state->shared.stage0.ordered_pubkeys[state->shared.stage0.next_pubkey_index],
-                                                  state->shared.stage0.next_pubkey_info,
-                                                  sizeof(state->shared.stage0.next_pubkey_info));
-
-    if (pubkey_len < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(&state->shared.stage0.next_pubkey_info, pubkey_len);
-
-    policy_map_key_info_t key_info;
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-
-    // decode pubkey
-    serialized_extended_pubkey_check_t decoded_pubkey_check;
-    if (base58_decode(key_info.ext_pubkey, strlen(key_info.ext_pubkey), (uint8_t *)&decoded_pubkey_check, sizeof(decoded_pubkey_check)) == -1) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
-    // TODO: validate checksum
-
-    serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialize_extended_pubkey;
-
-    // Currently, only keys with a wildcard are supported, but we check the flag for possible future extensions.
-    // TODO: do we need to also show the change address? Would need a new param for the apdu, in that case.
-    if (key_info.has_wildcard) {
-        // we derive the /0/i child of this pubkey
-        // we reuse the same memory of ext_pubkey to save RAM
-        bip32_CKDpub(ext_pubkey, 0, ext_pubkey);
-        bip32_CKDpub(ext_pubkey, state->address_index, ext_pubkey);
-    }
-
-    // check lexicographic sorting if appropriate
-    if (state->wallet_header.multisig_policy.sorted && state->shared.stage0.next_pubkey_index > 0) {
-        if (memcmp(state->shared.stage0.prev_compressed_pubkey, ext_pubkey->compressed_pubkey, 33) >= 0) {
-            dc->send_sw(SW_INCORRECT_DATA);
-            return;
-        }
-    }
-
-    memcpy(state->shared.stage0.prev_compressed_pubkey, ext_pubkey->compressed_pubkey, 33);
-
-    // update script hash with PUSH opcode for this pubkey
-    crypto_hash_update_u8(&state->script_hash_context.header, 0x21); // PUSH 33 bytes
-    crypto_hash_update(&state->script_hash_context.header, ext_pubkey->compressed_pubkey, 33);
-
-    // TODO: add push opcode to script hash (0x22<pubkey starting with 02 or 03>)
-    ++state->shared.stage0.next_pubkey_index;
-    if (state->shared.stage0.next_pubkey_index < state->wallet_header.multisig_policy.n_keys) {
-        dc->next(process_next_cosigner_info);
-    } else {
-        dc->next(generate_address);
-    }
-}
-
-/* STAGE 0 ENDS HERE */
-
-/* STAGE 1 STARTS HERE */
-
-static void generate_address(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    uint8_t n_keys = state->wallet_header.multisig_policy.n_keys;
-    crypto_hash_update_u8(&state->script_hash_context.header, 0x50 + n_keys); // OP_n
-    crypto_hash_update_u8(&state->script_hash_context.header, 0xae);          // OP_CHECKMULTISIG
-
-    uint8_t script_sha256[32];
-    crypto_hash_digest(&state->script_hash_context.header, script_sha256, 32);
-
-    uint8_t script_rip[20];
-    crypto_ripemd160(script_sha256, 32, script_rip);
-
-
-    uint8_t redeem_script[34];
-    uint8_t redeem_script_rip[20];
-
-    int address_len;
-
-    // TODO: extract address generation function from the script_sha256
-
-    // Compute address
-    int address_type = state->wallet_header.multisig_policy.address_type;
-    switch (address_type) {
-        case ADDRESS_TYPE_LEGACY:
-            address_len = base58_encode_address(script_rip, G_context.p2sh_version, state->shared.stage1.address, sizeof(state->shared.stage1.address));
-            if (address_len == -1) {
-                dc->send_sw(SW_BAD_STATE); // should never happen
-                return;
-            } else {
-                state->shared.stage1.address_len = (unsigned int)address_len;
-            }
-
-            break;
-        case ADDRESS_TYPE_WIT:    // wrapped segwit
-        case ADDRESS_TYPE_SH_WIT: // native segwit
-            redeem_script[0] = 0x00; // OP_0
-            redeem_script[1] = 0x20; // PUSH 32 bytes
-            memcpy(&redeem_script[2], script_sha256, 32);
-
-            crypto_hash160(redeem_script, 2 + 32, redeem_script_rip);
-            if (address_type == ADDRESS_TYPE_SH_WIT) {
-                int address_len = base58_encode_address(redeem_script_rip,
-                                                        G_context.p2sh_version,
-                                                        state->shared.stage1.address,
-                                                        sizeof(state->shared.stage1.address));
-                if (address_len == -1) {
-                    dc->send_sw(SW_BAD_STATE); // should never happen
-                    return;
-                } else {
-                    state->shared.stage1.address_len = (unsigned int)address_len;
-                }
-            } else { // address_type == ADDRESS_TYPE_WIT
-                int ret = segwit_addr_encode(
-                    state->shared.stage1.address,
-                    G_context.native_segwit_prefix,
-                    0, redeem_script + 2, 32
-                );
-
-                if (ret != 1) {
-                    dc->send_sw(SW_BAD_STATE); // should never happen
-                    return;
-                }
-
-                state->shared.stage1.address_len = strlen(state->shared.stage1.address);
-            }
-            break;
-        default:
-            dc->send_sw(SW_BAD_STATE);
-            return; // this can never happen
-    }
-    state->shared.stage1.address[state->shared.stage1.address_len] = '\0';
+    state->address_len = res;
 
     if (state->display_address == 0) {
-        ui_action_validate_address(dc, true);
+        dc->send_response(state->address, state->address_len, SW_OK);
     } else {
-        ui_display_wallet_address(dc, state->wallet_header.name, state->shared.stage1.address, ui_action_validate_address);
+        dc->pause();
+        ui_display_wallet_address(dc, state->wallet_header.name, state->address, ui_action_validate_address);
     }
 }
 
@@ -400,12 +161,10 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
 
     if (accepted) {
-        dc->send_response(state->shared.stage1.address, state->shared.stage1.address_len, SW_OK);
+        dc->send_response(state->address, state->address_len, SW_OK);
     } else {
         dc->send_sw(SW_DENY);
     }
 
     dc->run();
 }
-
-/* STAGE 1 ENDS HERE */

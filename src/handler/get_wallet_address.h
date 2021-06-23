@@ -11,30 +11,19 @@ typedef struct {
     machine_context_t ctx;
 
     uint32_t address_index;
-    multisig_wallet_header_t wallet_header;
-
+    uint8_t is_change;
     uint8_t display_address;
 
-    // As this flow is complex, we reuse the same space in memory for different purposes
+    policy_map_wallet_header_t wallet_header;
+
+    uint8_t wallet_id[32];
     union {
-        struct {
-            uint8_t next_pubkey_index;
-            uint8_t next_pubkey_info[MAX_MULTISIG_SIGNER_INFO_LEN];
+        uint8_t policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        policy_node_t policy_map;
+    };
 
-            // the index of the pubkeys, ranked in the correct order for the script
-            // This is necessary to handle sortedmulti() correctly
-            uint8_t ordered_pubkeys[15];
-
-            // previous compressed pubkey, to validate lexicographic sorting in multisig
-            uint8_t prev_compressed_pubkey[33];
-        } stage0;
-        struct {
-            char address[MAX_ADDRESS_LENGTH_STR + 1];
-            size_t address_len;
-        } stage1;
-    } shared;
-
-    cx_sha256_t script_hash_context; // 108 bytes
+    int address_len;
+    char address[MAX_ADDRESS_LENGTH_STR];
 } get_wallet_address_state_t;
 
 
