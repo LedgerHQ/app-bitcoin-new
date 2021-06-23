@@ -14,7 +14,6 @@ extern global_context_t G_context;
 static int cmp_compressed_pubkeys(const void *a, const void *b) {
     const uint8_t *key_a = (const uint8_t *)a;
     const uint8_t *key_b = (const uint8_t *)b;
-
     for (int i = 0; i < 33; i++) {
         int diff = key_a[i] - key_b[i];
         if (diff != 0) {
@@ -23,6 +22,7 @@ static int cmp_compressed_pubkeys(const void *a, const void *b) {
     }
     return 0;
 }
+
 
 static void update_output(buffer_t *out_buf_ptr, cx_hash_t *hash_context, const uint8_t *data, size_t data_len) {
     if (out_buf_ptr != NULL) {
@@ -35,41 +35,48 @@ static void update_output(buffer_t *out_buf_ptr, cx_hash_t *hash_context, const 
 }
 
 
+// Returns true iff the type corresponds to a script that is known to be at most 34 bytes.
+// Used for some memory optimizations when computing script hashes (e.g. for `sh(wsh(...))` policies).
+static bool is_script_type_short(PolicyNodeType type) {
+    return (   type == TOKEN_PKH
+            || type == TOKEN_WPKH
+            || type == TOKEN_SH
+            || type == TOKEN_WSH);
+}
+
 // p2pkh                     ==> legacy address (start with 1 on mainnet, m or n on testnet)
 // p2sh (also nested segwit) ==> legacy script  (start with 3 on mainnet, 2 on testnet)
 // p2wpkh or p2wsh           ==> bech32         (sart with bc1 on mainnet, tb1 on testnet)
 
 
-static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
-                              const uint8_t keys_merkle_root[static 20],
-                              uint32_t n_keys,
+static int get_derived_pubkey(_policy_parser_args_t *args,
                               int key_index,
-                              bool change,
-                              size_t address_index,
                               uint8_t out[static 33])
 {
-    char key_info_str[MAX_POLICY_KEY_INFO_LEN];
-
-
-    int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
-                                                    keys_merkle_root,
-                                                    n_keys,
-                                                    key_index,
-                                                    (uint8_t *)key_info_str,
-                                                    sizeof(key_info_str));
-    if (key_info_len == -1){
-        return -1;
-    }
-
-
-    // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
-
     policy_map_key_info_t key_info;
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
-        return -1;
-    }
 
+    { // make sure memory is freed as soon as possible
+        char key_info_str[MAX_POLICY_KEY_INFO_LEN];
+
+
+        int key_info_len = call_get_merkle_leaf_element(args->dispatcher_context,
+                                                        args->keys_merkle_root,
+                                                        args->n_keys,
+                                                        key_index,
+                                                        (uint8_t *)key_info_str,
+                                                        sizeof(key_info_str));
+        if (key_info_len == -1){
+            return -1;
+        }
+
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+            return -1;
+        }
+    }
 
     // decode pubkey
     serialized_extended_pubkey_check_t decoded_pubkey_check;
@@ -83,8 +90,8 @@ static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
     if (key_info.has_wildcard) {
         // we derive the /0/i child of this pubkey
         // we reuse the same memory of ext_pubkey to save memory
-        bip32_CKDpub(ext_pubkey, change, ext_pubkey);
-        bip32_CKDpub(ext_pubkey, address_index, ext_pubkey);
+        bip32_CKDpub(ext_pubkey, args->change, ext_pubkey);
+        bip32_CKDpub(ext_pubkey, args->address_index, ext_pubkey);
     }
 
     memcpy(out, ext_pubkey->compressed_pubkey, 33);
@@ -93,30 +100,14 @@ static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
 }
 
 
-int call_get_wallet_address(dispatcher_context_t *dispatcher_context,
-                            policy_node_t *policy,
-                            const uint8_t keys_merkle_root[static 20],
-                            uint32_t n_keys,
-                            bool change,
-                            size_t address_index,
-                            char *out_ptr,
-                            size_t out_ptr_len)
-{
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+int _call_get_wallet_address(_policy_parser_args_t *args, policy_node_t *policy, char *out_ptr, size_t out_ptr_len) {
+    LOG_PROCESSOR(args->dispatcher_context, __FILE__, __LINE__, __func__);
 
     int addr_len;
 
     uint8_t script[34]; // the longest script for supported addresses is P2WSH
 
-    int script_len = call_get_wallet_script(dispatcher_context,
-                                            policy,
-                                            keys_merkle_root,
-                                            n_keys,
-                                            change,
-                                            address_index,
-                                            script,
-                                            sizeof(script),
-                                            NULL);
+    int script_len = _call_get_wallet_script(args, policy, script, sizeof(script), NULL);
 
     if (script_len < 0) {
         return -1;
@@ -126,7 +117,7 @@ int call_get_wallet_address(dispatcher_context_t *dispatcher_context,
     switch (policy->type) {
         case TOKEN_PKH:
         {
-            if (n_keys != 1) {
+            if (args->n_keys != 1) {
                 return -1;
             }
 
@@ -172,18 +163,13 @@ int call_get_wallet_address(dispatcher_context_t *dispatcher_context,
     return addr_len;
 }
 
-
-int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
-                           policy_node_t *policy,
-                           const uint8_t keys_merkle_root[static 20],
-                           uint32_t n_keys,
-                           bool change,
-                           size_t address_index,
-                           uint8_t *out_ptr,
-                           size_t out_ptr_len,
-                           cx_hash_t *hash_context)
+int _call_get_wallet_script(_policy_parser_args_t *args,
+                            policy_node_t *policy,
+                            uint8_t *out_ptr,
+                            size_t out_ptr_len,
+                            cx_hash_t *hash_context)
 {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(args->dispatcher_context, __FILE__, __LINE__, __func__);
 
     buffer_t out_buf;
     buffer_t *out_buf_ptr = NULL;
@@ -206,14 +192,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
             uint8_t compressed_pubkey[33];
 
-            if (-1 == get_derived_pubkey(dispatcher_context,
-                                         keys_merkle_root,
-                                         n_keys,
-                                         root->key_index,
-                                         change,
-                                         address_index,
-                                         compressed_pubkey))
-            {
+            if (-1 == get_derived_pubkey(args, root->key_index, compressed_pubkey)) {
                 return -1;
             }
 
@@ -247,24 +226,32 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
         {
             policy_node_with_script_t *root = (policy_node_with_script_t *)policy;
 
-            cx_sha256_t script_hash_context;
-            cx_sha256_init(&script_hash_context);
-
-            int res = call_get_wallet_script(dispatcher_context,
-                                             root->script,
-                                             keys_merkle_root,
-                                             n_keys,
-                                             change,
-                                             address_index,
-                                             NULL,
-                                             0,
-                                             &script_hash_context.header);
-            if (res == -1) {
-                return -1;
-            }
-
             uint8_t script_hash[32]; //sha256 of the script
-            crypto_hash_digest(&script_hash_context.header, script_hash, 32);
+
+            // Memory optimization: as the script_hash_context is expensive (>100 bytes), if we know that the internal
+            // script is short, we are better off computing the full internal script (rather than its hash).
+            if (is_script_type_short(root->script->type)) {
+                uint8_t internal_script[34];
+                int internal_script_len = _call_get_wallet_script(args,
+                                                                  root->script,
+                                                                  internal_script,
+                                                                  sizeof(internal_script),
+                                                                  NULL);
+                if (internal_script_len == -1) {
+                    return -1;
+                }
+                cx_hash_sha256(internal_script, internal_script_len, script_hash, 32);
+            } else {
+                cx_sha256_t script_hash_context;
+                cx_sha256_init(&script_hash_context);
+
+                int res = _call_get_wallet_script(args, root->script, NULL, 0, &script_hash_context.header);
+                if (res == -1) {
+                    return -1;
+                }
+
+                crypto_hash_digest(&script_hash_context.header, script_hash, 32);
+            }
 
 
             if (policy->type == TOKEN_SH) {
@@ -307,14 +294,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
             for (unsigned int i = 0; i < root->n; i++) {
                 uint8_t compressed_pubkey[33];
 
-                if (-1 == get_derived_pubkey(dispatcher_context,
-                                             keys_merkle_root,
-                                             n_keys,
-                                             root->key_indexes[i],
-                                             change,
-                                             address_index,
-                                             compressed_pubkey))
-                {
+                if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkey)) {
                     return -1;
                 }
 
@@ -354,14 +334,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
             uint8_t compressed_pubkeys[5][33];
             for (unsigned int i = 0; i < root->n; i++) {
-
-                if (-1 == get_derived_pubkey(dispatcher_context,
-                                             keys_merkle_root,
-                                             n_keys,
-                                             root->key_indexes[i],
-                                             change,
-                                             address_index,
-                                             compressed_pubkeys[i]))
+                if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkeys[i]))
                 {
                     return -1;
                 }

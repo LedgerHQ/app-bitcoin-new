@@ -21,18 +21,18 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     uint8_t proof_size;
     int cur_step;         // counter for the proof steps
 
-    uint8_t directions[MAX_MERKLE_TREE_DEPTH];
+    { // make sure memory is deallocated as soon as possible
+        uint8_t req[1 + 20 + 4 + 4];
+        req[0] = CCMD_GET_MERKLE_LEAF_PROOF;
 
-    uint8_t req[1 + 20 + 4 + 4];
-    req[0] = CCMD_GET_MERKLE_LEAF_PROOF;
+        memcpy(&req[1], merkle_root, 20);
 
-    memcpy(&req[1], merkle_root, 20);
+        write_u32_be(req, 1 + 20, tree_size);
+        write_u32_be(req, 1 + 20 + 4, leaf_index);
 
-    write_u32_be(req, 1 + 20, tree_size);
-    write_u32_be(req, 1 + 20 + 4, leaf_index);
-
-    if (dc->process_interruption(dc, req, sizeof(req)) < 0) {
-        return -1;
+        if (dc->process_interruption(dc, req, sizeof(req)) < 0) {
+            return -1;
+        }
     }
 
     uint8_t n_proof_elements;
@@ -54,6 +54,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         return -4;
     }
 
+    uint8_t directions[MAX_MERKLE_TREE_DEPTH];
     // Initialize the directions array
     if (merkle_get_directions(tree_size, leaf_index, directions, sizeof(directions)) != proof_size) {
         PRINTF("Proof size is not correct.\n");

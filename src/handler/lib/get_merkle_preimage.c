@@ -19,12 +19,14 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
 
     cx_ripemd160_init(&hash_context);
 
-    uint8_t get_preimage_req[1 + 20];
-    get_preimage_req[0] = CCMD_GET_PREIMAGE;
-    memcpy(&get_preimage_req[1], hash, 20);
+    { // free memory as soon as possible
+        uint8_t get_preimage_req[1 + 20];
+        get_preimage_req[0] = CCMD_GET_PREIMAGE;
+        memcpy(&get_preimage_req[1], hash, 20);
 
-    if (dispatcher_context->process_interruption(dispatcher_context, get_preimage_req, sizeof(get_preimage_req)) < 0) {
-        return -1;
+        if (dispatcher_context->process_interruption(dispatcher_context, get_preimage_req, sizeof(get_preimage_req)) < 0) {
+            return -1;
+        }
     }
 
     uint64_t preimage_len;

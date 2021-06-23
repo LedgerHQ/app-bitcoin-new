@@ -70,67 +70,65 @@ void handler_get_wallet_address(
         return;
     }
 
-    uint8_t wallet_id[32];
-    if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
+    { // scope to make stack variable deallocation explicit
+        uint8_t wallet_id[32];
+        if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32)) {
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            return;
+        }
 
-    uint8_t sig_len;
-    uint8_t sig[MAX_DER_SIG_LEN];
-    if (!buffer_read_u8(&dc->read_buffer, &sig_len) ||
-        !buffer_read_bytes(&dc->read_buffer, sig, sig_len)
-    ) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
+        uint8_t sig_len;
+        uint8_t sig[MAX_DER_SIG_LEN];
+        if (!buffer_read_u8(&dc->read_buffer, &sig_len) ||
+            !buffer_read_bytes(&dc->read_buffer, sig, sig_len)
+        ) {
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            return;
+        }
 
-    // Verify signature
-    if (!crypto_verify_sha256_hash(wallet_id, sig, sig_len)) {
-        dc->send_sw(SW_SIGNATURE_FAIL);
-        return;
-    }
+        // Verify signature
+        if (!crypto_verify_sha256_hash(wallet_id, sig, sig_len)) {
+            dc->send_sw(SW_SIGNATURE_FAIL);
+            return;
+        }
 
-    if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
+        if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
+            dc->send_sw(SW_INCORRECT_DATA);
+            return;
+        }
 
-    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+        buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
 
+        int tmp;
+        if ((tmp = parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0)) {
+            dc->send_sw(SW_INCORRECT_DATA);
+            return;
+        }
 
-    PRINTF("%s\n", state->wallet_header.policy_map);
-    int tmp;
-    if ((tmp = parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0)) {
-        PRINTF("Failed parsing policy map\n");
-        PRINTF("%d\n", tmp);
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
+        // change
+        if (!buffer_read_u8(&dc->read_buffer, &state->is_change)) {
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            return;
+        }
+        if (state->is_change != 0 && state->is_change != 1) {
+            dc->send_sw(SW_INCORRECT_DATA);
+            return;
+        }
 
-    // change
-    if (!buffer_read_u8(&dc->read_buffer, &state->is_change)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (state->is_change != 0 && state->is_change != 1) {
-        dc->send_sw(SW_INCORRECT_DATA);
-        return;
-    }
+        // address index
+        if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
+            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            return;
+        }
 
-    // address index
-    if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
-        return;
-    }
+        // Compute the wallet id (sha256 of the serialization)
+        uint8_t computed_wallet_id[32];
+        get_policy_wallet_id(&state->wallet_header, computed_wallet_id);
 
-    // Compute the wallet id (sha256 of the serialization)
-    uint8_t computed_wallet_id[32];
-    get_policy_wallet_id(&state->wallet_header, computed_wallet_id);
-
-    if (memcmp(wallet_id, computed_wallet_id, sizeof(wallet_id)) != 0) {
-        dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific error code
-        return;
+        if (memcmp(wallet_id, computed_wallet_id, sizeof(wallet_id)) != 0) {
+            dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific error code
+            return;
+        }
     }
 
     int res = call_get_wallet_address(dc,
@@ -142,7 +140,6 @@ void handler_get_wallet_address(
                                       state->address,
                                       sizeof(state->address));
     if (res < 0) {
-        PRINTF("Response to get_wallet_address: %d\n", res);
         dc->send_sw(SW_BAD_STATE); // unexpected
         return;
     }
