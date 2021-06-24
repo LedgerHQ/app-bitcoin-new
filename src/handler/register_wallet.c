@@ -109,8 +109,8 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
         dc->send_sw(SW_DENY);
     } else {
         dc->next(process_next_cosigner_info);
+        dc->run();
     }
-    dc->run();
 }
 
 /**
@@ -184,13 +184,13 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
 
     if (!accept) {
         dc->send_sw(SW_DENY);
-        dc->run();
         return;
     }
  
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.n_keys) {
         dc->next(process_next_cosigner_info);
+        dc->run();
     } else {
 
         // TODO: We should use key origin information to verify which one is our key.
@@ -221,6 +221,4 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
 
         dc->send_response(&response, 32 + 1 + signature_len, SW_OK);
     }
-
-    dc->run();
 }

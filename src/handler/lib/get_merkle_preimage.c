@@ -1,7 +1,8 @@
-#include "string.h"
+#include <string.h>
 
 #include "get_merkle_preimage.h"
 
+#include "../../boilerplate/sw.h"
 #include "../../common/buffer.h"
 #include "../../crypto.h"
 #include "../client_commands.h"
@@ -24,9 +25,11 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
         get_preimage_req[0] = CCMD_GET_PREIMAGE;
         memcpy(&get_preimage_req[1], hash, 20);
 
-        if (dispatcher_context->process_interruption(dispatcher_context, get_preimage_req, sizeof(get_preimage_req)) < 0) {
-            return -1;
-        }
+        dispatcher_context->set_response(get_preimage_req, sizeof(get_preimage_req), SW_INTERRUPTED_EXECUTION);
+    }
+
+    if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
+        return -1;
     }
 
     uint64_t preimage_len;
@@ -67,7 +70,8 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
 
     while (bytes_remaining > 0) {
         uint8_t get_more_elements_req[] = { CCMD_GET_MORE_ELEMENTS };
-        if (dispatcher_context->process_interruption(dispatcher_context, get_more_elements_req, 1) < 0) {
+        dispatcher_context->set_response(get_more_elements_req, 1, SW_INTERRUPTED_EXECUTION);
+        if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
             return -6;
         }
 

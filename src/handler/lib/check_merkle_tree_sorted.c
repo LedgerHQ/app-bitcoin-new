@@ -1,4 +1,4 @@
-#include "string.h"
+#include <string.h>
 
 #include "check_merkle_tree_sorted.h"
 #include "get_merkle_leaf_element.h"

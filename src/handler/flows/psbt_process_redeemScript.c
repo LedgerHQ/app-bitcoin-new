@@ -1,5 +1,5 @@
-#include "stdlib.h"
-#include "string.h"
+#include <stdlib.h>
+#include <string.h>
 
 #include "psbt_process_redeemScript.h"
 

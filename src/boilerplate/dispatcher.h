@@ -61,11 +61,12 @@ struct dispatcher_context_s {
     void (*pause)();
     void (*run)();
     void (*next)(command_processor_t next_processor);
+    void (*set_response)(void *rdata, size_t rdata_len, uint16_t sw);
     void (*send_response)(void *rdata, size_t rdata_len, uint16_t sw);
     void (*send_sw)(uint16_t sw);
     void (*start_flow)(command_processor_t first_processor, machine_context_t *subcontext, command_processor_t return_processor);
     void (*run_callback)(dispatcher_callback_descriptor_t callback_descriptor, buffer_t *calldata);
-    int (*process_interruption)(dispatcher_context_t *dispatcher_context, void *rdata, size_t rdata_len);
+    int (*process_interruption)(dispatcher_context_t *dispatcher_context);
 };
 
 // TODO: instead of exposing a method like send_response, it might be more efficient to expose the response buffer,

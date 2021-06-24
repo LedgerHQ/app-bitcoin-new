@@ -44,10 +44,14 @@ static void next(command_processor_t next_processor) {
 }
 
 
-static void send_response(void *rdata, size_t rdata_len, uint16_t sw) {
+static void set_response(void *rdata, size_t rdata_len, uint16_t sw) {
     G_dispatcher_state.sw = sw;
 
     io_set_response(rdata, rdata_len, sw);
+}
+
+static void send_response(void *rdata, size_t rdata_len, uint16_t sw) {
+    set_response(rdata, rdata_len, sw);
     io_confirm_response();
 }
 
@@ -82,14 +86,12 @@ static void run_callback(dispatcher_callback_descriptor_t cb, buffer_t *calldata
 
 
 // TODO: refactor code in common with the main apdu loop
-static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rdata_len) {
+static int process_interruption(dispatcher_context_t *dc) {
     command_t cmd;
     int input_len;
 
     // Reset structured APDU command
     memset(&cmd, 0, sizeof(cmd));
-
-    io_set_response(rdata, rdata_len, SW_INTERRUPTED_EXECUTION);
 
     // Receive command bytes in G_io_apdu_buffer
     if ((input_len = io_exchange(CHANNEL_APDU, G_output_len)) < 0) {
@@ -102,6 +104,8 @@ static int process_interruption(dispatcher_context_t *dc, void *rdata, size_t rd
     // APDU that was already processed (this would happen if this is the latest interruption in the
     // caller processor, for example if the dispatcher is paused because of a UX interaction).
     G_io_app.apdu_length = 0;
+
+    G_dispatcher_state.sw = 0;
 
     // Parse APDU command from G_io_apdu_buffer
     if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
@@ -143,6 +147,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_state.sw = 0;
 
     G_dispatcher_context.next = next;
+    G_dispatcher_context.set_response = set_response;
     G_dispatcher_context.send_response = send_response;
     G_dispatcher_context.send_sw = send_sw;
     G_dispatcher_context.pause = pause;

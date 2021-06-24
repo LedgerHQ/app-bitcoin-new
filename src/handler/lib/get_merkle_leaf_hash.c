@@ -1,10 +1,11 @@
-#include "string.h"
+#include <string.h>
 
 #include "get_merkle_leaf_hash.h"
 
 #include "../../common/buffer.h"
 #include "../../common/write.h"
 #include "../../common/merkle.h"
+#include "../../boilerplate/sw.h"
 #include "../client_commands.h"
 
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
@@ -30,9 +31,11 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         write_u32_be(req, 1 + 20, tree_size);
         write_u32_be(req, 1 + 20 + 4, leaf_index);
 
-        if (dc->process_interruption(dc, req, sizeof(req)) < 0) {
-            return -1;
-        }
+        dc->set_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
+    }
+
+    if (dc->process_interruption(dc) < 0) {
+        return -1;
     }
 
     uint8_t n_proof_elements;
@@ -87,7 +90,8 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         }
 
         uint8_t req_more[] = { CCMD_GET_MORE_ELEMENTS };
-        if (dc->process_interruption(dc, req_more, sizeof(req_more)) < 0) {
+        dc->set_response(req_more, sizeof(req_more), SW_INTERRUPTED_EXECUTION);
+        if (dc->process_interruption(dc) < 0) {
             return -6;
         }
 
