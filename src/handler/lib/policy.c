@@ -35,6 +35,11 @@ static void update_output(buffer_t *out_buf_ptr, cx_hash_t *hash_context, const 
 }
 
 
+static void update_output_u8(buffer_t *out_buf_ptr, cx_hash_t *hash_context, const uint8_t data) {
+    update_output(out_buf_ptr, hash_context, &data, 1);
+}
+
+
 // Returns true iff the type corresponds to a script that is known to be at most 34 bytes.
 // Used for some memory optimizations when computing script hashes (e.g. for `sh(wsh(...))` policies).
 static bool is_script_type_short(PolicyNodeType type) {
@@ -57,7 +62,6 @@ static int get_derived_pubkey(_policy_parser_args_t *args,
 
     { // make sure memory is freed as soon as possible
         char key_info_str[MAX_POLICY_KEY_INFO_LEN];
-
 
         int key_info_len = call_get_merkle_leaf_element(args->dispatcher_context,
                                                         args->keys_merkle_root,
@@ -85,11 +89,11 @@ static int get_derived_pubkey(_policy_parser_args_t *args,
     }
     // TODO: validate checksum
 
-    serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialize_extended_pubkey;
+    serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialized_extended_pubkey;
 
     if (key_info.has_wildcard) {
         // we derive the /0/i child of this pubkey
-        // we reuse the same memory of ext_pubkey to save memory
+        // we reuse the same memory of ext_pubkey
         bip32_CKDpub(ext_pubkey, args->change, ext_pubkey);
         bip32_CKDpub(ext_pubkey, args->address_index, ext_pubkey);
     }
@@ -106,8 +110,8 @@ int _call_get_wallet_address(_policy_parser_args_t *args, policy_node_t *policy,
     int addr_len;
 
     uint8_t script[34]; // the longest script for supported addresses is P2WSH
-
-    int script_len = _call_get_wallet_script(args, policy, script, sizeof(script), NULL);
+    buffer_t script_buf = buffer_create(script, sizeof(script));
+    int script_len = _call_get_wallet_script(args, policy, &script_buf, NULL);
 
     if (script_len < 0) {
         return -1;
@@ -165,18 +169,10 @@ int _call_get_wallet_address(_policy_parser_args_t *args, policy_node_t *policy,
 
 int _call_get_wallet_script(_policy_parser_args_t *args,
                             policy_node_t *policy,
-                            uint8_t *out_ptr,
-                            size_t out_ptr_len,
+                            buffer_t *out_buf,
                             cx_hash_t *hash_context)
 {
     LOG_PROCESSOR(args->dispatcher_context, __FILE__, __LINE__, __func__);
-
-    buffer_t out_buf;
-    buffer_t *out_buf_ptr = NULL;
-    if (out_ptr != NULL) {
-        out_buf = buffer_create(out_ptr, out_ptr_len);
-        out_buf_ptr = &out_buf;
-    }
 
     switch (policy->type) {
         case TOKEN_PKH:
@@ -185,7 +181,7 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             policy_node_with_key_t *root = (policy_node_with_key_t *)policy;
 
             unsigned int out_len = 3 + 20 + 2;
-            if (out_ptr != NULL && out_ptr_len < out_len) {
+            if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
                 return -1;
             }
 
@@ -197,28 +193,25 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             }
 
            if (policy->type == TOKEN_PKH) {
-                uint8_t out[25];
+                update_output_u8(out_buf, hash_context, 0x76);
+                update_output_u8(out_buf, hash_context, 0xa9);
+                update_output_u8(out_buf, hash_context, 0x14);
 
-                out[0] = 0x76;
-                out[1] = 0xa9;
-                out[2] = 0x14;
-                crypto_hash160(compressed_pubkey, 33, out + 3);
-                out[23] = 0x88;
-                out[24] = 0xac;
+                crypto_hash160(compressed_pubkey, 33, compressed_pubkey); // reuse memory
+                update_output(out_buf, hash_context, compressed_pubkey, 20);
 
-                update_output(out_buf_ptr, hash_context, out, sizeof(out));
+                update_output_u8(out_buf, hash_context, 0x88);
+                update_output_u8(out_buf, hash_context, 0xac);
 
-                return sizeof(out);
+                return 3 + 20 + 2;
             } else { // policy->type == TOKEN_PKH
-                uint8_t out[22];
+                update_output_u8(out_buf, hash_context, 0x00);
+                update_output_u8(out_buf, hash_context, 0x14);
 
-                out[0] = 0x00;
-                out[1] = 0x14;
-                crypto_hash160(compressed_pubkey, 33, out + 2);
+                crypto_hash160(compressed_pubkey, 33, compressed_pubkey); // reuse memory
+                update_output(out_buf, hash_context, compressed_pubkey, 20);
 
-                update_output(out_buf_ptr, hash_context, out, sizeof(out));
-
-                return sizeof(out);
+                return 2 + 20;
             }
         }
         case TOKEN_SH:
@@ -232,10 +225,10 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             // script is short, we are better off computing the full internal script (rather than its hash).
             if (is_script_type_short(root->script->type)) {
                 uint8_t internal_script[34];
+                buffer_t internal_script_buf = buffer_create(internal_script, sizeof(internal_script));
                 int internal_script_len = _call_get_wallet_script(args,
                                                                   root->script,
-                                                                  internal_script,
-                                                                  sizeof(internal_script),
+                                                                  &internal_script_buf,
                                                                   NULL);
                 if (internal_script_len == -1) {
                     return -1;
@@ -245,7 +238,7 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
                 cx_sha256_t script_hash_context;
                 cx_sha256_init(&script_hash_context);
 
-                int res = _call_get_wallet_script(args, root->script, NULL, 0, &script_hash_context.header);
+                int res = _call_get_wallet_script(args, root->script, NULL, &script_hash_context.header);
                 if (res == -1) {
                     return -1;
                 }
@@ -255,26 +248,22 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
 
 
             if (policy->type == TOKEN_SH) {
-                uint8_t out[23];
+                update_output_u8(out_buf, hash_context, 0xa9);
+                update_output_u8(out_buf, hash_context, 0x14);
 
-                out[0] = 0xa9;
-                out[1] = 0x14;
-                crypto_ripemd160(script_hash, 32, out + 2);
-                out[22] = 0x87;
+                crypto_ripemd160(script_hash, 32, script_hash); // reuse memory
+                update_output(out_buf, hash_context, script_hash, 20);
 
-                update_output(out_buf_ptr, hash_context, out, sizeof(out));
+                update_output_u8(out_buf, hash_context, 0x87);
 
-                return sizeof(out);
+                return 2 + 20 + 1;
             } else { // policy->type == TOKEN_WSH
-                uint8_t out[34];
+                update_output_u8(out_buf, hash_context, 0x00);
+                update_output_u8(out_buf, hash_context, 0x20);
 
-                out[0] = 0x00;
-                out[1] = 0x20;
-                memcpy(out + 2, script_hash, 32);
+                update_output(out_buf, hash_context, script_hash, 32);
 
-                update_output(out_buf_ptr, hash_context, out, sizeof(out));
-
-                return sizeof(out);
+                return 2 + 32;
             }
         }
         case TOKEN_MULTI:
@@ -284,12 +273,11 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
             unsigned int out_len = 1 + 34 * root->n + 1 + 1;
 
-            if (out_ptr != NULL && out_ptr_len < out_len) {
+            if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
                 return -1;
             }
 
-            uint8_t tmp = 0x50 + root->k; // OP_k
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
+            update_output_u8(out_buf, hash_context, 0x50 + root->k); // OP_k
 
             for (unsigned int i = 0; i < root->n; i++) {
                 uint8_t compressed_pubkey[33];
@@ -298,15 +286,13 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
                     return -1;
                 }
 
-                tmp = 0x21;              // push <i-th pubkey>
-                update_output(out_buf_ptr, hash_context, &tmp, 1);
-                update_output(out_buf_ptr, hash_context, compressed_pubkey, 33);
+                // push <i-th pubkey> (33 = 0x21 bytes)
+                update_output_u8(out_buf, hash_context, 0x21);
+                update_output(out_buf, hash_context, compressed_pubkey, 33);
             }
 
-            tmp = 0x50 + root->n;         // OP_n
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
-            tmp = 0xae;                   // OP_CHECKMULTISIG
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
+            update_output_u8(out_buf, hash_context, 0x50 + root->n); // OP_n
+            update_output_u8(out_buf, hash_context, 0xae);           // OP_CHECKMULTISIG
 
             return out_len;
         }
@@ -323,39 +309,30 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
             unsigned int out_len = 1 + 34 * root->n + 1 + 1;
 
-            if (out_ptr != NULL && out_ptr_len < out_len) {
+            if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
                 return -1;
             }
 
-
-            uint8_t tmp = 0x50 + root->k; // OP_k
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
-
+            update_output_u8(out_buf, hash_context, 0x50 + root->k); // OP_k
 
             uint8_t compressed_pubkeys[5][33];
             for (unsigned int i = 0; i < root->n; i++) {
-                if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkeys[i]))
-                {
+                if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkeys[i])) {
                     return -1;
                 }
             }
-
 
             // sort the pubkeys
             qsort(compressed_pubkeys, root->n, 33, cmp_compressed_pubkeys);
 
             for (unsigned int i = 0; i < root->n; i++) {
-                tmp = 0x21;              // push <i-th pubkey>
-                update_output(out_buf_ptr, hash_context, &tmp, 1);
-                update_output(out_buf_ptr, hash_context, compressed_pubkeys[i], 33);
+                // push <i-th pubkey> (33 = 0x21 bytes)
+                update_output_u8(out_buf, hash_context, 0x21);
+                update_output(out_buf, hash_context, compressed_pubkeys[i], 33);
             }
 
-
-            tmp = 0x50 + root->n;         // OP_n
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
-            tmp = 0xae;                   // OP_CHECKMULTISIG
-            update_output(out_buf_ptr, hash_context, &tmp, 1);
-
+            update_output_u8(out_buf, hash_context, 0x50 + root->n); // OP_n
+            update_output_u8(out_buf, hash_context, 0xae);           // OP_CHECKMULTISIG
 
             return out_len;
         }

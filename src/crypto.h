@@ -42,7 +42,7 @@ typedef struct serialized_extended_pubkey_s {
 } serialized_extended_pubkey_t;
 
 typedef struct {
-    serialized_extended_pubkey_t serialize_extended_pubkey;
+    serialized_extended_pubkey_t serialized_extended_pubkey;
     uint8_t checksum[4];
 } serialized_extended_pubkey_check_t;
 

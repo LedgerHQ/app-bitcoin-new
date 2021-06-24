@@ -18,7 +18,6 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
 
-    uint8_t cur_hash[20]; // temporary buffer for intermediate hashes
     uint8_t proof_size;
     int cur_step;         // counter for the proof steps
 
@@ -38,6 +37,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         return -1;
     }
 
+    uint8_t cur_hash[20]; // temporary buffer for intermediate hashes
     uint8_t n_proof_elements;
     if (!buffer_read_bytes(&dc->read_buffer, cur_hash, 20)
         || !buffer_read_u8(&dc->read_buffer, &proof_size)
@@ -74,8 +74,8 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     while (true) {
         int end_step = cur_step + n_proof_elements;
         for ( ; cur_step < end_step; cur_step++) {
-            uint8_t sibling_hash[20];
-            buffer_read_bytes(&dc->read_buffer, sibling_hash, 20);
+            // we use the memory in the buffer directly, to avoid copying the hash unnecessarily
+            const uint8_t *sibling_hash = dc->read_buffer.ptr + dc->read_buffer.offset;
 
             int i = proof_size - cur_step - 1;
             if (directions[i] == 0) {
@@ -83,6 +83,8 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             } else {
                 merkle_combine_hashes(sibling_hash, cur_hash, cur_hash);
             }
+
+            buffer_seek_cur(&dc->read_buffer, 20); // consume the bytes of the sibling hash
         }
 
         if (cur_step == proof_size) {

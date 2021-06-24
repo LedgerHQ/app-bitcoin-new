@@ -39,7 +39,9 @@
 
 extern global_context_t G_context;
 
+static void get_address(dispatcher_context_t *dc);
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
+
 
 void handler_get_wallet_address(
     uint8_t p1,
@@ -131,6 +133,18 @@ void handler_get_wallet_address(
         }
     }
 
+    dc->next(get_address);
+}
+
+
+static void get_address(dispatcher_context_t *dc) {
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    // No special need to split this from the previous function, but debugging showed that the compiler wasn't being
+    // smart with optimizing the memory used for locals, not freeing the stack before this call, which is an
+    // expensive one. Splitting it into its own processor makes sure the stack is cleaned up.
     int res = call_get_wallet_address(dc,
                                       &state->policy_map,
                                       state->wallet_header.keys_info_merkle_root,
@@ -156,6 +170,8 @@ void handler_get_wallet_address(
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (accepted) {
         dc->send_response(state->address, state->address_len, SW_OK);

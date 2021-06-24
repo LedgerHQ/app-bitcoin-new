@@ -26,8 +26,7 @@ int _call_get_wallet_address(_policy_parser_args_t *args, policy_node_t *policy,
  */
 int _call_get_wallet_script(_policy_parser_args_t *args,
                             policy_node_t *policy,
-                            uint8_t *out_ptr,
-                            size_t out_ptr_len,
+                            buffer_t *out_buf,
                             cx_hash_t *hash_context);
 
 
@@ -63,8 +62,7 @@ static inline int call_get_wallet_script(dispatcher_context_t *dispatcher_contex
                                          uint32_t n_keys,
                                          bool change,
                                          size_t address_index,
-                                         uint8_t *out_ptr,
-                                         size_t out_ptr_len,
+                                         buffer_t *out_buf,
                                          cx_hash_t *hash_context)
 {
     _policy_parser_args_t args = {
@@ -74,6 +72,6 @@ static inline int call_get_wallet_script(dispatcher_context_t *dispatcher_contex
         .change = change,
         .address_index = address_index
     };
-    return _call_get_wallet_script(&args, policy, out_ptr, out_ptr_len, hash_context);
+    return _call_get_wallet_script(&args, policy, out_buf, hash_context);
 }
 

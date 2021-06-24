@@ -16,10 +16,6 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
 
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    cx_ripemd160_t hash_context;
-
-    cx_ripemd160_init(&hash_context);
-
     { // free memory as soon as possible
         uint8_t get_preimage_req[1 + 20];
         get_preimage_req[0] = CCMD_GET_PREIMAGE;
@@ -57,6 +53,10 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+
+    cx_ripemd160_t hash_context;
+
+    cx_ripemd160_init(&hash_context);
 
     // update hash
     crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
@@ -105,11 +105,11 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
         bytes_remaining -= n_bytes;
     }
 
-    uint8_t computed_hash[20];
+    // hack: we pass the address of the final accumulator inside cx_ripemd160_t, so we don't need
+    // an additional variable in the stack to store the final hash.
+    crypto_hash_digest(&hash_context.header, (uint8_t *)&hash_context.acc, 20);
 
-    crypto_hash_digest(&hash_context.header, computed_hash, 20);
-
-    if (memcmp(computed_hash, hash, 20) != 0) {
+    if (memcmp(hash_context.acc, hash, 20) != 0) {
         PRINTF("Hash mismatch.\n");
         return -10;
     }
