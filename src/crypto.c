@@ -137,33 +137,38 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
         return -2; // maximum derivation depth reached
     }
 
-    cx_hmac_sha512_t hmac_context;
     uint8_t I[64];
 
-    cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
-    cx_hmac((cx_hmac_t *)&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
+    { // make sure that heavy memory allocations are freed as soon as possible
+        cx_hmac_sha512_t hmac_context;
 
-    uint8_t index_be[4];
-    write_u32_be(index_be, 0, index);
-    cx_hmac((cx_hmac_t *)&hmac_context, CX_LAST, index_be, 4, I, 64);
+        cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
+        cx_hmac((cx_hmac_t *)&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
+
+        uint8_t index_be[4];
+        write_u32_be(index_be, 0, index);
+        cx_hmac((cx_hmac_t *)&hmac_context, CX_LAST, index_be, 4, I, 64);
+    }
 
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
 
     // TODO: should fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
 
-    // compute point(I_L)
-    uint8_t P[65];
-    secp256k1_point(I_L, P);
-
-    uint8_t K_par[65];
-    crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
-
-    // add K_par
     uint8_t child_uncompressed_pubkey[65];
 
-    if (cx_ecfp_add_point(CX_CURVE_SECP256K1, child_uncompressed_pubkey, P, K_par, sizeof(child_uncompressed_pubkey)) == 0) {
-        return -3; // the point at infinity is not a valid child pubkey (should never happen in practice)
+    { // make sure that heavy memory allocations are freed as soon as possible
+        // compute point(I_L)
+        uint8_t P[65];
+        secp256k1_point(I_L, P);
+
+        uint8_t K_par[65];
+        crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
+
+        // add K_par
+        if (cx_ecfp_add_point(CX_CURVE_SECP256K1, child_uncompressed_pubkey, P, K_par, sizeof(child_uncompressed_pubkey)) == 0) {
+            return -3; // the point at infinity is not a valid child pubkey (should never happen in practice)
+        }
     }
 
     memmove(child->version, parent->version, 4);
@@ -263,20 +268,18 @@ int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33], uint
 
     memmove(x, compressed_key + 1, 32); // copy x
 
-    uint8_t scalar[32] = {0};
-    uint8_t tmp1[32], tmp2[32]; // buffers for intermediate results
+    // we use y for intermediate results, in order to save memory
 
-    scalar[31] = 3;
-    cx_math_powm(tmp1, x, scalar, 32, secp256k1_p, 32);                    // tmp1 = x^3 (mod p)
+    uint8_t e = 3;
+    cx_math_powm(y, x, &e, 1, secp256k1_p, 32);                      // tmp = x^3 (mod p)
+    uint8_t scalar[32] = {0};
     scalar[31] = 7;
-    cx_math_addm(tmp2, tmp1, scalar, secp256k1_p, 32);                     // tmp2 = x^3 + 7 (mod p)
-    cx_math_powm(tmp1, tmp2, secp256k1_sqr_exponent, 32, secp256k1_p, 32); // tmp1 = sqrt(x^3 + 7) (mod p)
+    cx_math_addm(y, y, scalar, secp256k1_p, 32);                     // tmp = x^3 + 7 (mod p)
+    cx_math_powm(y, y, secp256k1_sqr_exponent, 32, secp256k1_p, 32); // tmp = sqrt(x^3 + 7) (mod p)
 
     // if the prefix and y don't have the same parity, take the opposite root (mod p)
-    if (((prefix ^ tmp1[31]) & 1) != 0) {
-        cx_math_sub(y, secp256k1_p, tmp1, 32);
-    } else {
-        memcpy(y, tmp1, 32);
+    if (((prefix ^ y[31]) & 1) != 0) {
+        cx_math_sub(y, secp256k1_p, y, 32);
     }
 
     out[0] = 0x04;
