@@ -24,17 +24,6 @@
 
 #include "merkle.h"
 
-static uint8_t ceil_lg(uint32_t n) {
-    uint8_t r = 0;
-    uint32_t t = 1;
-    while (t < n) {
-        t = 2 * t;
-        ++r;
-    }
-    return r;
-}
-
-
 void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static 20]) {
     cx_ripemd160_t rip_context;
     cx_ripemd160_init(&rip_context);
@@ -99,41 +88,3 @@ void merkle_combine_hashes(const uint8_t left[static 20], const uint8_t right[st
 
 //     return n_directions;
 // }
-
-
-// Returns the ith member of the directions array for the leaf with the given index in a Merkle tree of the given size.
-// Returns -1 on error.
-// TODO: make this O(log n), or possibly O(1). Currently O(log^2 n).
-int merkle_get_ith_direction(size_t size, size_t index, size_t i) {
-    if (size <= 1 || index >= size) {
-        return -1;
-    }
-
-    uint8_t n_directions = 0;
-    while (size > 1) {
-        uint8_t depth = ceil_lg(size);
-
-        // bitmask of the direction from the current node, where 0 = left, 1 = right;
-        // also the number of leaves of the left subtree
-        uint32_t mask = 1 << (depth - 1);
-
-        uint8_t is_right_child = (index & mask) != 0 ? 1 : 0;
-
-        if (n_directions == i) {
-            return is_right_child;
-        }
-
-        ++n_directions;
-
-        if (is_right_child) {
-            size -= mask;
-            index -= mask;
-        } else {
-            size = mask;
-        }
-
-        mask /= 2;
-    }
-
-    return -1;
-}

@@ -39,9 +39,9 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     }
 
     {
-        uint8_t proof_size;
         int cur_step;         // counter for the proof steps
         uint8_t cur_hash[20]; // temporary buffer for intermediate hashes
+        uint8_t proof_size;
         uint8_t n_proof_elements;
         if (!buffer_read_bytes(&dc->read_buffer, cur_hash, 20)
             || !buffer_read_u8(&dc->read_buffer, &proof_size)
