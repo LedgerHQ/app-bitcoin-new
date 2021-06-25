@@ -93,23 +93,40 @@ uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len) {
     return 0;
 }
 
-
-void io_set_response(void *rdata, size_t rdata_len, uint16_t sw) {
-    if (rdata == NULL) {
-        rdata_len = 0;
+void io_add_to_response(const void *rdata, size_t rdata_len){
+    if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
+        G_output_len = IO_APDU_BUFFER_SIZE;
+        write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
+    } else if (G_output_len + rdata_len > IO_APDU_BUFFER_SIZE - 2) {
+        io_add_to_response(rdata, IO_APDU_BUFFER_SIZE - 2 - rdata_len);
+        io_finalize_response(SW_WRONG_RESPONSE_LENGTH);
+    } else {
+        memmove(G_io_apdu_buffer + G_output_len, rdata, rdata_len);
+        G_output_len += rdata_len;
     }
+}
 
-    if (rdata_len > IO_APDU_BUFFER_SIZE - 2) {
-        rdata_len = IO_APDU_BUFFER_SIZE - 2;
-        sw = SW_WRONG_RESPONSE_LENGTH;
+void io_finalize_response(uint16_t sw) {
+    if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
+        G_output_len = IO_APDU_BUFFER_SIZE;
+        write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
+    } else {
+        write_u16_be(G_io_apdu_buffer, G_output_len, sw);
+        G_output_len += 2;
     }
+}
 
-    if (rdata_len > 0) {
-        memmove(G_io_apdu_buffer, rdata, rdata_len);
+
+void io_reset_response() {
+    G_output_len = 0;
+}
+
+void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw) {
+    io_reset_response();
+    if (rdata != NULL) {
+        io_add_to_response(rdata, rdata_len);
     }
-
-    write_u16_be(G_io_apdu_buffer, rdata_len, sw);
-    G_output_len = rdata_len + 2;
+    io_finalize_response(sw);
 }
 
 int io_confirm_response() {

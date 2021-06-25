@@ -58,25 +58,25 @@ void handler_register_wallet(
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (p1 != 0 || p2 != 0) {
-        dc->send_sw(SW_WRONG_P1P2);
+        SEND_SW(dc, SW_WRONG_P1P2);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
         PRINTF("Failed reading policy map\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
     if (parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -106,7 +106,7 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (!accept) {
-        dc->send_sw(SW_DENY);
+        SEND_SW(dc, SW_DENY);
     } else {
         dc->next(process_next_cosigner_info);
         dc->run();
@@ -131,7 +131,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
                                                   sizeof(state->next_pubkey_info));
 
     if (pubkey_len < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -141,7 +141,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
         PRINTF("Incorrect policy map.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -152,13 +152,13 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     if (!key_info.has_key_origin) {
         PRINTF("Key info without origin unsupported.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     if (!key_info.has_wildcard) {
         PRINTF("Key info without wildcard unsupported.\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -183,7 +183,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (!accept) {
-        dc->send_sw(SW_DENY);
+        SEND_SW(dc, SW_DENY);
         return;
     }
  
@@ -219,6 +219,6 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
         int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
         response.signature_len = (uint8_t)signature_len;
 
-        dc->send_response(&response, 32 + 1 + signature_len, SW_OK);
+        SEND_RESPONSE(dc, &response, 32 + 1 + signature_len, SW_OK);
     }
 }

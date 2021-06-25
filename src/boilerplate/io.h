@@ -21,16 +21,25 @@ uint8_t io_event(uint8_t channel);
 
 uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len);
 
+
 /**
- * Receive APDU command in G_io_apdu_buffer and update G_output_len.
- *
- * @return zero or positive integer if success, -1 otherwise.
- *
+ * TODO: docs
  */
-int io_recv_command(void);
+void io_reset_response();
+
+/**
+ * TODO: docs
+ */
+void io_add_to_response(const void *rdata, size_t rdata_len);
+
+/**
+ * TODO: docs
+ */
+void io_finalize_response(uint16_t sw);
+
 
 /* TODO: docs */
-void io_set_response(void *rdata, size_t rdata_len, uint16_t sw);
+void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw);
 
 /* TODO: docs */
 int io_confirm_response(void);

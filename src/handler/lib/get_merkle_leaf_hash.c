@@ -17,16 +17,21 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+
     { // make sure memory is deallocated as soon as possible
-        uint8_t req[1 + 20 + 4 + 4];
-        req[0] = CCMD_GET_MERKLE_LEAF_PROOF;
+        uint8_t tmp[4];
+        tmp[0] = CCMD_GET_MERKLE_LEAF_PROOF;
+        dc->add_to_response(tmp, 1);
 
-        memcpy(&req[1], merkle_root, 20);
+        dc->add_to_response(merkle_root, 20);
 
-        write_u32_be(req, 1 + 20, tree_size);
-        write_u32_be(req, 1 + 20 + 4, leaf_index);
+        write_u32_be(tmp, 0, tree_size);
+        dc->add_to_response(tmp, 4);
 
-        dc->set_response(req, sizeof(req), SW_INTERRUPTED_EXECUTION);
+        write_u32_be(tmp, 0, leaf_index);
+        dc->add_to_response(tmp, 4);
+
+        dc->finalize_response(SW_INTERRUPTED_EXECUTION);
     }
 
     if (dc->process_interruption(dc) < 0) {
@@ -87,7 +92,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             }
 
             uint8_t req_more[] = { CCMD_GET_MORE_ELEMENTS };
-            dc->set_response(req_more, sizeof(req_more), SW_INTERRUPTED_EXECUTION);
+            SET_RESPONSE(dc, req_more, sizeof(req_more), SW_INTERRUPTED_EXECUTION);
             if (dc->process_interruption(dc) < 0) {
                 return -6;
             }

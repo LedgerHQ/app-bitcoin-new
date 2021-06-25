@@ -953,7 +953,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
                                                  state->key_len,
                                                  state->value_hash);
     if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -969,7 +969,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
         state->parse_mode != PARSEMODE_SEGWIT_V0
     ) {
         PRINTF("Illegal parse mode.\n");
-        dc->send_sw(SW_BAD_STATE);
+        SEND_SW(dc, SW_BAD_STATE);
         return;
     }
 
@@ -977,7 +977,7 @@ void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
                                state->value_hash,
                                make_callback(state, (dispatcher_callback_t)cb_process_data_firstpass));
     if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 

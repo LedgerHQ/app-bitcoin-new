@@ -44,19 +44,17 @@ static void next(command_processor_t next_processor) {
 }
 
 
-static void set_response(void *rdata, size_t rdata_len, uint16_t sw) {
+static void add_to_response(const void *rdata, size_t rdata_len) {
+    io_add_to_response(rdata, rdata_len);
+}
+
+static void finalize_response(uint16_t sw) {
     G_dispatcher_state.sw = sw;
-
-    io_set_response(rdata, rdata_len, sw);
+    io_finalize_response(sw);
 }
 
-static void send_response(void *rdata, size_t rdata_len, uint16_t sw) {
-    set_response(rdata, rdata_len, sw);
+static void send_response() {
     io_confirm_response();
-}
-
-static void send_sw(uint16_t sw) {
-    send_response(NULL, 0, sw);
 }
 
 static void pause() {
@@ -109,7 +107,7 @@ static int process_interruption(dispatcher_context_t *dc) {
 
     // Parse APDU command from G_io_apdu_buffer
     if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return -1;
     }
 
@@ -147,9 +145,9 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_state.sw = 0;
 
     G_dispatcher_context.next = next;
-    G_dispatcher_context.set_response = set_response;
+    G_dispatcher_context.add_to_response = add_to_response;
+    G_dispatcher_context.finalize_response = finalize_response;
     G_dispatcher_context.send_response = send_response;
-    G_dispatcher_context.send_sw = send_sw;
     G_dispatcher_context.pause = pause;
     G_dispatcher_context.run = run;
     G_dispatcher_context.start_flow = start_flow;

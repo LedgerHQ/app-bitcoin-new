@@ -13,12 +13,10 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
 
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    { // free memory as soon as possible
-        uint8_t get_preimage_req[1 + 20];
-        get_preimage_req[0] = CCMD_GET_PREIMAGE;
-        memcpy(&get_preimage_req[1], hash, 20);
-        dispatcher_context->set_response(get_preimage_req, sizeof(get_preimage_req), SW_INTERRUPTED_EXECUTION);
-    }
+    uint8_t cmd = CCMD_GET_PREIMAGE;
+    dispatcher_context->add_to_response(&cmd, 1);
+    dispatcher_context->add_to_response(hash, 20);
+    dispatcher_context->finalize_response(SW_INTERRUPTED_EXECUTION);
 
     if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
         return -1;
@@ -57,7 +55,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
 
     while (bytes_remaining > 0) {
         uint8_t get_more_elements_req[] = { CCMD_GET_MORE_ELEMENTS };
-        dispatcher_context->set_response(get_more_elements_req, sizeof(get_more_elements_req), SW_INTERRUPTED_EXECUTION);
+        SET_RESPONSE(dispatcher_context, get_more_elements_req, sizeof(get_more_elements_req), SW_INTERRUPTED_EXECUTION);
         if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
             return -4;
         }

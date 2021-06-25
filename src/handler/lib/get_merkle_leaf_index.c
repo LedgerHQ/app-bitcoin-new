@@ -19,7 +19,7 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
         memcpy(request + 1, root, 20);
         memcpy(request + 1 + 20, leaf_hash, 20);
 
-        dispatcher_context->set_response(request, sizeof(request), SW_INTERRUPTED_EXECUTION);
+        SET_RESPONSE(dispatcher_context, request, sizeof(request), SW_INTERRUPTED_EXECUTION);
     }
     if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
         return -3;

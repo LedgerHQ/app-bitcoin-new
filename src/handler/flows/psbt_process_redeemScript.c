@@ -44,7 +44,7 @@ void flow_psbt_process_redeemScript(dispatcher_context_t *dc) {
                                                state->key_len,
                                                make_callback(state, (dispatcher_callback_t)process_redeem_script_callback));
     if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 

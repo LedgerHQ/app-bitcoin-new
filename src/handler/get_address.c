@@ -47,11 +47,11 @@ void handler_get_address(
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (p1 > 1) {
-        dc->send_sw(SW_WRONG_P1P2);
+        SEND_SW(dc, SW_WRONG_P1P2);
         return;
     }
     if (p2 != ADDRESS_TYPE_LEGACY && p2 != ADDRESS_TYPE_WIT && p2 != ADDRESS_TYPE_SH_WIT) {
-        dc->send_sw(SW_WRONG_P1P2);
+        SEND_SW(dc, SW_WRONG_P1P2);
         return;
     }
 
@@ -67,18 +67,18 @@ void handler_get_address(
             purpose = 49;
             break;
         default:
-            dc->send_sw(SW_WRONG_P1P2);
+            SEND_SW(dc, SW_WRONG_P1P2);
             return;
     }
 
     if (lc < 1) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
@@ -86,13 +86,13 @@ void handler_get_address(
     buffer_read_u8(&dc->read_buffer, &bip32_path_len);
 
     if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
     if (!buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -110,7 +110,7 @@ void handler_get_address(
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
     if (ret < 0) {
-        dc->send_sw(SW_BAD_STATE);
+        SEND_SW(dc, SW_BAD_STATE);
         return;
     }
     state->address_len = (size_t)ret;
@@ -119,7 +119,7 @@ void handler_get_address(
         dc->pause();
         ui_display_address(dc, state->address, is_path_suspicious, path_str, ui_action_validate_address);
     } else {
-        dc->send_response(state->address, state->address_len, SW_OK);
+        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
     }
 }
 
@@ -127,9 +127,9 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
     if (accepted) {
-        dc->send_response(state->address, state->address_len, SW_OK);
+        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
     } else {
-        dc->send_sw(SW_DENY);
+        SEND_SW(dc, SW_DENY);
     }
 
     dc->run();

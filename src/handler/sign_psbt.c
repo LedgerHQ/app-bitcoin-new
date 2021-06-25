@@ -78,22 +78,22 @@ void handler_sign_psbt(
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     if (p1 != 0 || p2 != 0) {
-        dc->send_sw(SW_WRONG_P1P2);
+        SEND_SW(dc, SW_WRONG_P1P2);
         return;
     }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        dc->send_sw(SW_SECURITY_STATUS_NOT_SATISFIED);
+        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
     if (!buffer_read_varint(&dc->read_buffer, &state->global_map.size)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
     if (state->global_map.size > 252) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -102,7 +102,7 @@ void handler_sign_psbt(
         || !buffer_read_bytes(&dc->read_buffer, state->global_map.values_root, 20))
     {
         LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
@@ -111,12 +111,12 @@ void handler_sign_psbt(
     if (!buffer_read_varint(&dc->read_buffer, &n_inputs)
         || !buffer_read_bytes(&dc->read_buffer, state->inputs_root, 20))
     {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
     if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
         PRINTF("At most %d inputs are supported", MAX_N_INPUTS_CAN_SIGN);
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
     state->n_inputs = (size_t)n_inputs;
@@ -126,12 +126,12 @@ void handler_sign_psbt(
     if (!buffer_read_varint(&dc->read_buffer, &n_outputs)
         || !buffer_read_bytes(&dc->read_buffer, state->outputs_root, 20))
     {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
     if (n_outputs > MAX_N_OUTPUTS_CAN_SIGN) {
         PRINTF("At most %d outputs are supported", MAX_N_OUTPUTS_CAN_SIGN);
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
     state->n_outputs = (size_t)n_outputs;
@@ -139,7 +139,7 @@ void handler_sign_psbt(
     uint8_t signing_with_wallet;
 
     if (!buffer_read_u8(&dc->read_buffer, &signing_with_wallet)) {
-        dc->send_sw(SW_WRONG_DATA_LENGTH);
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
     state->signing_with_wallet = (signing_with_wallet != 0);
@@ -151,13 +151,13 @@ void handler_sign_psbt(
             || !buffer_read_u8(&dc->read_buffer, &wallet_sig_len)
             || !buffer_read_bytes(&dc->read_buffer, wallet_sig, wallet_sig_len))
         {
-            dc->send_sw(SW_WRONG_DATA_LENGTH);
+            SEND_SW(dc, SW_WRONG_DATA_LENGTH);
             return;
         }
 
         // Verify signature
         if (!crypto_verify_sha256_hash(state->wallet_id, wallet_sig, wallet_sig_len)) {
-            dc->send_sw(SW_SIGNATURE_FAIL);
+            SEND_SW(dc, SW_SIGNATURE_FAIL);
             return;
         }
     }
@@ -172,7 +172,7 @@ void handler_sign_psbt(
 
     // Check integrity of the global map
     if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
     } else {
         state->cur_input_index = 0;
         dc->next(process_input_map);
@@ -209,7 +209,7 @@ static void process_input_map(dispatcher_context_t *dc) {
                                      state->cur_input_index,
                                      &state->cur_input.map);
     if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -258,13 +258,13 @@ static void receive_global_tx_info(dispatcher_context_t *dc) {
 
     if (state->n_inputs != state->subcontext.psbt_parse_rawtx.n_inputs) {
         PRINTF("Mismatching n_inputs.");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     if (state->n_outputs != state->subcontext.psbt_parse_rawtx.n_outputs) {
         PRINTF("Mismatching n_outputs.");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -308,7 +308,7 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     if (memcmp(txhash, state->cur_input.prevout_hash, 32) != 0) {
         PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
 
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -322,7 +322,7 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
 
     if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
         PRINTF("Prevout's scriptPubKey too long: %d\n", state->cur_input.prevout_scriptpubkey_len);
-        dc->send_sw(SW_SIGNATURE_FAIL);
+        SEND_SW(dc, SW_SIGNATURE_FAIL);
         return;
     }
 
@@ -413,7 +413,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
                                                     make_callback(state, (dispatcher_callback_t)input_keys_callback),
                                                     &state->cur_input.map);
     if (res < 0) {
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -430,7 +430,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", state->cur_input_index);
 
-            dc->send_sw(SW_INCORRECT_DATA);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
@@ -439,7 +439,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
 
     // TODO: add support for other sighash flags
     if (state->cur_input.sighash_type != SIGHASH_ALL) {
-        dc->send_sw(SW_INCORRECT_DATA); // TODO: more specific SW
+        SEND_SW(dc, SW_INCORRECT_DATA); // TODO: more specific SW
         return;
     }
 
@@ -516,13 +516,13 @@ static void sign_legacy_validate_redeemScript(dispatcher_context_t *dc) {
 
     if (state->cur_input.prevout_scriptpubkey_len != 2 + 20 + 1) {
         PRINTF("P2SH's scriptPubKey should be exactly 23 bytes\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     if (memcmp(state->cur_input.prevout_scriptpubkey, state->subcontext.psbt_process_redeemScript.p2sh_script, 23) != 0) {
         PRINTF("redeemScript does not match prevout's scriptPubKey\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -664,7 +664,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
                                                      sizeof(raw_witnessUtxo));
     if (wit_utxo_len < 0) {
         PRINTF("Error fetching witness utxo\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -678,7 +678,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
 
     if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
         PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -696,7 +696,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
                                                                  sizeof(redeemScript));
         if (redeemScript_length < 0) {
             PRINTF("Error fetching redeem script\n");
-            dc->send_sw(SW_INCORRECT_DATA);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
@@ -714,7 +714,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
 
         if (wit_utxo_scriptPubkey_len != 23 || memcmp(wit_utxo_scriptPubkey, p2sh_redeemscript, 23) != 0) {
             PRINTF("witnessUtxo's scriptPubKey does not match redeemScript\n");
-            dc->send_sw(SW_INCORRECT_DATA);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
@@ -774,7 +774,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
 
         if (witnessScript_len < 0) {
             PRINTF("Error fetching witnessScript\n");
-            dc->send_sw(SW_INCORRECT_DATA);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
@@ -788,7 +788,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
             || memcmp(script + 2, witnessScript_hash, 32) != 0
         ) {
             PRINTF("Mismatching witnessScript\n");
-            dc->send_sw(SW_INCORRECT_DATA);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
@@ -796,7 +796,7 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
         crypto_hash_update(&state->hash_context.header, witnessScript, witnessScript_len);
     } else {
         PRINTF("Invalid or unsupported script in segwit transaction\n");
-        dc->send_sw(SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -890,5 +890,5 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
 static void finalize(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    dc->send_sw(SW_OK);
+    SEND_SW(dc, SW_OK);
 }
