@@ -76,8 +76,13 @@ void merkle_combine_hashes(const uint8_t left[static 20], const uint8_t right[st
  * @return the length of the Merkle proof (number of hashes) on success; a negative number on failure, that is if
  *         either size is 0, index is larger than size - 1, or out_len is smaller than the proof size.
  */
-int merkle_get_directions(size_t size, size_t index, uint8_t out[], size_t out_len);
+//int merkle_get_directions(size_t size, size_t index, uint8_t out[], size_t out_len);
 
+
+/**
+ * TODO: docs and tests
+ */
+int merkle_get_ith_direction(size_t size, size_t index, size_t i);
 
 /**
  * Represents the Merkleized version of a key-value map, holding the number of elements, the root of the Merkle tree of the
