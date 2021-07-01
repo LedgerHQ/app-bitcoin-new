@@ -1,6 +1,4 @@
-import struct
-from typing import Tuple, List, Mapping, Optional
-from collections import deque
+from typing import Tuple, List, Mapping
 import base64
 from io import BytesIO, BufferedReader
 
@@ -15,11 +13,11 @@ from bitcoin_client.exception import DeviceException
 
 from .client_command import ClientCommandInterpreter
 
-from .common import ripemd160
-from .merkle import element_hash, get_merkleized_map_commitment, MerkleTree
-from .wallet import Wallet, WalletType, MultisigWallet
+from .merkle import get_merkleized_map_commitment
+from .wallet import Wallet, WalletType, PolicyMapWallet
 from .psbt import PSBT, deser_string
 from .tx import CTransaction
+
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     result = {}
@@ -57,7 +55,8 @@ class BitcoinCommand:
                 raise RuntimeError("Unexpected SW_INTERRUPTED_EXECUTION received.")
 
             command_response = client_intepreter.execute(response)
-            sw, response = self.transport.exchange_raw(self.builder.continue_interrupted(command_response))
+            sw, response = self.transport.exchange_raw(
+                self.builder.continue_interrupted(command_response))
 
         return sw, response
 
@@ -101,15 +100,15 @@ class BitcoinCommand:
         return response.decode()
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
-        if wallet.type != WalletType.MULTISIG:
-            raise ValueError("wallet type must be MULTISIG")
+        if wallet.type != WalletType.POLICYMAP:
+            raise ValueError("wallet type must be POLICYMAP")
 
-        cmd_interpreter = ClientCommandInterpreter()
-        cmd_interpreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.register_wallet(wallet),
-            cmd_interpreter
+            client_intepreter
         )
 
         if sw != 0x9000:
@@ -125,15 +124,15 @@ class BitcoinCommand:
         return wallet_id, sig
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
-        if wallet.type != WalletType.MULTISIG or not isinstance(wallet, MultisigWallet):
-            raise ValueError("wallet type must be MULTISIG")
+        if wallet.type != WalletType.POLICYMAP or not isinstance(wallet, PolicyMapWallet):
+            raise ValueError("wallet type must be POLICYMAP")
 
-        cmd_interpreter = ClientCommandInterpreter()
-        cmd_interpreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(wallet, signature, address_index, display),
-            cmd_interpreter
+            client_intepreter
         )
 
         if sw != 0x9000:
@@ -141,11 +140,8 @@ class BitcoinCommand:
 
         return response.decode()
 
-    def sign_psbt(self, psbt: PSBT, wallet: Optional[Wallet] = None, wallet_sig: Optional[bytes] = None) -> str:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_sig: bytes = b'') -> str:
         print(psbt.serialize())
-
-        if not wallet is None and wallet_sig is None:
-            raise ValueError("The wallet signature was not provided")
 
         psbt_bytes = base64.b64decode(psbt.serialize())
         f = BytesIO(psbt_bytes)
@@ -153,6 +149,7 @@ class BitcoinCommand:
         assert f.read(5) == b"psbt\xff"
 
         client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
         client_intepreter.add_known_mapping(global_map)
@@ -180,7 +177,8 @@ class BitcoinCommand:
 
         # We also add the Merkle tree of the (resp. output) input map commitments as a known tree
         input_commitments = [get_merkleized_map_commitment(m_in) for m_in in input_maps]
-        output_commitments = [get_merkleized_map_commitment(m_out) for m_out in output_maps]
+        output_commitments = [get_merkleized_map_commitment(
+            m_out) for m_out in output_maps]
 
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
@@ -188,7 +186,8 @@ class BitcoinCommand:
         # TODO: this will receive one ore more signatures from the device and must update the PSBT
 
         sw, response = self.make_request(
-            self.builder.sign_psbt(global_map, input_maps, output_maps, wallet, wallet_sig),
+            self.builder.sign_psbt(global_map, input_maps,
+                                   output_maps, wallet, wallet_sig),
             client_intepreter
         )
 

@@ -180,7 +180,12 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
         {
             policy_node_with_key_t *root = (policy_node_with_key_t *)policy;
 
-            unsigned int out_len = 3 + 20 + 2;
+            unsigned int out_len;
+            if (policy->type == TOKEN_PKH) {
+                out_len = 3 + 20 + 2;
+            } else {
+                out_len = 2 + 20;
+            }
             if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
                 return -1;
             }
@@ -204,7 +209,7 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
                 update_output_u8(out_buf, hash_context, 0xac);
 
                 return 3 + 20 + 2;
-            } else { // policy->type == TOKEN_PKH
+            } else { // policy->type == TOKEN_WPKH
                 update_output_u8(out_buf, hash_context, 0x00);
                 update_output_u8(out_buf, hash_context, 0x14);
 

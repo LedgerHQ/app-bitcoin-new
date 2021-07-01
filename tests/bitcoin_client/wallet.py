@@ -7,7 +7,7 @@ from .common import serialize_str, AddressType
 from .merkle import MerkleTree, element_hash
 
 class WalletType(IntEnum):
-    MULTISIG = 1
+    POLICYMAP = 1
 
 
 # should not be instantiated directly
@@ -46,8 +46,8 @@ class PolicyMapWallet(Wallet):
     The specific format of the keys is deferred to subclasses.
     """
 
-    def __init__(self, name: str, wallet_type: WalletType, policy_map: str, keys_info: List[str]):
-        super().__init__(name, wallet_type)
+    def __init__(self, name: str, policy_map: str, keys_info: List[str]):
+        super().__init__(name, WalletType.POLICYMAP)
         self.policy_map = policy_map
         self.keys_info = keys_info
 
@@ -95,6 +95,6 @@ class MultisigWallet(PolicyMapWallet):
             policy_suffix
         ])
 
-        super().__init__(name, WalletType.MULTISIG, policy_map, keys_info)
+        super().__init__(name, policy_map, keys_info)
 
         self.threshold = threshold

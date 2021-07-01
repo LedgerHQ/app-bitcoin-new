@@ -72,6 +72,12 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
             }
         } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
             crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, txid, 32);
+
+            int relevant_input_index = state->parent_state->program_state->compute_sighash_segwit_v0.input_index;
+            if (state->parent_state->in_counter == relevant_input_index) {
+                // copy the txid
+                memcpy(state->parent_state->program_state->compute_sighash_segwit_v0.prevout_hash, txid, 32);
+            }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -135,6 +141,12 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
             }
         } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
             crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashPrevouts_context.header, vout_bytes, 4);
+
+            // if this is the input index requested in the parameters, store its prevout.n
+            int relevant_input_index = state->parent_state->program_state->compute_sighash_segwit_v0.input_index;
+            if (state->parent_state->in_counter == relevant_input_index) {
+                state->parent_state->program_state->compute_sighash_segwit_v0.prevout_n = read_u32_le(vout_bytes, 0);
+            }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -296,6 +308,11 @@ static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *
             crypto_hash_update(&state->parent_state->program_state->compute_sighash_segwit_v0.hashSequence_context.header,
                                sequence_bytes,
                                4);
+            // if this is the input index requested in the parameters, store its prevout.nSequence
+            int relevant_input_index = state->parent_state->program_state->compute_sighash_segwit_v0.input_index;
+            if (state->parent_state->in_counter == relevant_input_index) {
+                state->parent_state->program_state->compute_sighash_segwit_v0.prevout_nSequence = read_u32_le(sequence_bytes, 0);
+            }
         } else {
             PRINTF("NOT IMPLEMENTED (%d)\n", __LINE__);
             return -1;
@@ -333,7 +350,7 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
 
             int relevant_output_index = state->parent_state->program_state->compute_txid.output_index;
             if (state->parent_state->out_counter == relevant_output_index) {
-                state->parent_state->program_state->compute_txid.prevout_value = value;
+                state->parent_state->program_state->compute_txid.vout_value = value;
             }
         } else if (parse_mode == PARSEMODE_LEGACY_PASS1) {
             // nothing to do, all outputs are past the script_code, therefore handled in pass 2

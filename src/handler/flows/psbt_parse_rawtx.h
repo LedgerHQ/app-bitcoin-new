@@ -42,7 +42,6 @@ typedef union {
         int input_index;               // index of queried input, or -1
         uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
         int prevout_n;                 // will contain tx.input[input_index].prevout.n
-        uint64_t prevout_value;        // will contain tx.input[input_index].prevout.value
         int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
 
         uint64_t outputs_total_value;  // will contain the sum of the values of all the prevouts
@@ -51,7 +50,8 @@ typedef union {
         // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
         uint8_t vout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
         int vout_scriptpubkey_len;     // will contain the len of the above scriptPubKey
-        uint32_t nLocktime;            // will contain the nLocktime of the stransaction
+        uint64_t vout_value;           // will contain the value of this output
+        uint32_t nLocktime;            // will contain the nLocktime of the transaction
     } compute_txid;
 
     struct {
@@ -63,6 +63,10 @@ typedef union {
         uint32_t sighash_type;
         size_t input_index;
         uint32_t nVersion;
+
+        uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
+        int prevout_n;                 // will contain tx.input[input_index].prevout.n
+        int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
 
         uint8_t hashPrevouts[32];
         uint8_t hashSequence[32];

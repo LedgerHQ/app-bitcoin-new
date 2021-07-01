@@ -116,6 +116,7 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
 
 
 // TODO: missing unit tests
+// TODO: get rid of this function, it doesn't make much sense
 int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
                            cx_ecfp_public_key_t *public_key,
                            uint8_t raw_public_key[static 64]) {

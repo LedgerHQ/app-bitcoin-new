@@ -21,6 +21,10 @@ typedef struct {
     bool has_redeemScript;
     bool has_sighash_type;
 
+    bool has_bip32_derivation;
+    uint8_t bip32_derivation_pubkey[33]; // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
+    bool unexpected_pubkey_error; // set to true if the pubkey in the keydata of PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+
     uint8_t prevout_hash[32];    // the prevout_hash of the current input
     int prevout_n;               // the prevout index of the current input
     int prevout_nSequence;       // the nSequence of the current input
@@ -30,7 +34,24 @@ typedef struct {
     int prevout_scriptpubkey_len;
 
     uint32_t sighash_type;
+
+    int change;
+    int address_index;
 } cur_input_info_t;
+
+typedef struct {
+    merkleized_map_commitment_t map;
+
+    bool has_bip32_derivation;
+    uint8_t bip32_derivation_pubkey[33]; // the pubkey of the first PSBT_OUT_BIP32_DERIVATION seen key
+    bool unexpected_pubkey_error; // set to true if the pubkey in the keydata of PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+
+    uint64_t value;
+    uint8_t scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    int scriptpubkey_len;
+
+} cur_output_info_t;
+
 
 typedef struct {
     machine_context_t ctx;
@@ -42,24 +63,43 @@ typedef struct {
     int n_outputs;
     uint8_t outputs_root[20]; // merkle root of the vector of output maps commitments
 
-    bool signing_with_wallet;
-    uint8_t wallet_id[32];
+    policy_map_wallet_header_t wallet_header;
+    union {
+        uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        policy_node_t wallet_policy_map;
+    };
 
     uint32_t master_key_fingerprint;
 
-    int cur_input_index;
-    cur_input_info_t cur_input;
+    uint32_t prevouts_n[MAX_N_INPUTS_CAN_SIGN];     // the prevout_n fields for each input; TODO: remove after rewrite
+    uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN]; // TODO: use a bitvector
+    uint8_t internal_outputs[MAX_N_OUTPUTS_CAN_SIGN]; // TODO: use a bitvector
+
+    union {
+        struct {
+            int cur_input_index;
+            cur_input_info_t cur_input;
+        };
+        struct {
+            int cur_output_index;
+            cur_output_info_t cur_output;
+        };
+    };
 
     cx_sha256_t hash_context;
 
     int nLocktime;                   // the nLocktime of the transaction
 
-    uint64_t outputs_total_value;
     uint64_t inputs_total_value;
+    uint64_t outputs_total_value;
 
+    uint64_t internal_inputs_total_value;
+    uint64_t internal_outputs_total_value;
     
 
     uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
+
+    policy_map_key_info_t our_key_info;
 
     union {
         psbt_parse_rawtx_state_t psbt_parse_rawtx;

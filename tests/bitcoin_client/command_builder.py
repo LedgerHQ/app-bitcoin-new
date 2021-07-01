@@ -39,6 +39,7 @@ class BitcoinInsType(enum.IntEnum):
     SIGN_PSBT = 0x04
     GET_SUM_OF_SQUARES = 0xF0
 
+
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
 
@@ -106,7 +107,6 @@ class BitcoinCommandBuilder:
 
         return header + cdata
 
-
     def get_pubkey(self, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
@@ -116,9 +116,9 @@ class BitcoinCommandBuilder:
         ])
 
         return self.serialize(cla=self.CLA_BITCOIN,
-                        ins=BitcoinInsType.GET_PUBKEY,
-                        p1=1 if display else 0,
-                        cdata=cdata)
+                              ins=BitcoinInsType.GET_PUBKEY,
+                              p1=1 if display else 0,
+                              cdata=cdata)
 
     def get_address(self, address_type: AddressType, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
@@ -129,17 +129,17 @@ class BitcoinCommandBuilder:
         ])
 
         return self.serialize(cla=self.CLA_BITCOIN,
-                        p1=1 if display else 0,
-                        p2=address_type,
-                        ins=BitcoinInsType.GET_ADDRESS,
-                        cdata=cdata)
+                              p1=1 if display else 0,
+                              p2=address_type,
+                              ins=BitcoinInsType.GET_ADDRESS,
+                              cdata=cdata)
 
     def register_wallet(self, wallet: Wallet):
         return self.serialize(cla=self.CLA_BITCOIN,
-                        p1=0,
-                        p2=0,
-                        ins=BitcoinInsType.REGISTER_WALLET,
-                        cdata=wallet.serialize())
+                              p1=0,
+                              p2=0,
+                              ins=BitcoinInsType.REGISTER_WALLET,
+                              cdata=wallet.serialize())
 
     def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, change: bool, display: bool = False):
         cdata: bytes = b"".join([
@@ -151,15 +151,15 @@ class BitcoinCommandBuilder:
             address_index.to_bytes(4, byteorder="big")
         ])
         return self.serialize(cla=self.CLA_BITCOIN,
-                        p1=1 if display else 0,
-                        ins=BitcoinInsType.GET_WALLET_ADDRESS,
-                        cdata=cdata)
+                              p1=1 if display else 0,
+                              ins=BitcoinInsType.GET_WALLET_ADDRESS,
+                              cdata=cdata)
 
     def sign_psbt(self, global_mapping: Mapping[bytes, bytes],
                   input_mappings: List[Mapping[bytes, bytes]],
                   output_mappings: List[Mapping[bytes, bytes]],
-                  wallet: Optional[Wallet],
-                  wallet_sig: Optional[bytes]):
+                  wallet: Wallet,
+                  wallet_sig: bytes):
 
         if not wallet is None and wallet_sig is None:
             raise ValueError("The wallet signature was not provided")
@@ -168,22 +168,21 @@ class BitcoinCommandBuilder:
         cdata += get_merkleized_map_commitment(global_mapping)
 
         cdata += write_varint(len(input_mappings))
-        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_in)) for m_in in input_mappings]).root
+        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_in))
+                            for m_in in input_mappings]).root
 
         cdata += write_varint(len(output_mappings))
-        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_out)) for m_out in output_mappings]).root
+        cdata += MerkleTree([element_hash(get_merkleized_map_commitment(m_out))
+                            for m_out in output_mappings]).root
 
-        if wallet is None:
-            cdata += b'\0'
-        else:
-            cdata += b'\x01'
-            cdata += wallet.id
-            cdata += len(wallet_sig).to_bytes(1, byteorder="big"),
+        cdata += wallet.id
+        cdata += len(wallet_sig).to_bytes(1, byteorder="big")
+        cdata += wallet_sig
+        cdata += wallet.serialize()
 
         return self.serialize(cla=self.CLA_BITCOIN,
-                        ins=BitcoinInsType.SIGN_PSBT,
-                        cdata=bytes(cdata))
-
+                              ins=BitcoinInsType.SIGN_PSBT,
+                              cdata=bytes(cdata))
 
     def continue_interrupted(self, cdata: bytes):
         """Command builder for CONTINUE.
@@ -195,5 +194,5 @@ class BitcoinCommandBuilder:
 
         """
         return self.serialize(cla=self.CLA_FRAMEWORK,
-                        ins=FrameworkInsType.CONTINUE_INTERRUPTED,
-                        cdata=cdata)
+                              ins=FrameworkInsType.CONTINUE_INTERRUPTED,
+                              cdata=cdata)

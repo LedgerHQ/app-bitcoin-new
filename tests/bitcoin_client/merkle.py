@@ -3,9 +3,10 @@ from typing import List, Iterable, Mapping, Tuple
 
 from .common import write_varint
 
-# TODO: a class to represent Markle proofs in a more structured way (including size and leaf index)
+# TODO: a class to represent Merkle proofs in a more structured way (including size and leaf index)
 
-NIL = bytes([0] * 32)
+NIL = bytes([0] * 20)
+
 
 def floor_lg(n: int) -> int:
     """Return floor(log_2(n))."""
@@ -122,6 +123,7 @@ class MerkleTree:
     - If a subtree has n > 1 leaves, then the left subchild is a complete subtree with p leaves, where p is the largest
       power of 2 smaller than n.
     """
+
     def __init__(self, elements: Iterable[bytes] = []):
         self.leaves = [Node(None, None, None, el) for el in elements]
         if len(self.leaves) > 0:
@@ -162,7 +164,8 @@ class MerkleTree:
         if self.depth == 0:
             ltree_size = 0
         else:
-            ltree_size = 1 << (self.depth - 1)  # number of leaves of the left subtree of cur_root
+            # number of leaves of the left subtree of cur_root
+            ltree_size = 1 << (self.depth - 1)
 
         cur_root = self.root_node
         cur_root_size = len(self.leaves) - 1
@@ -172,7 +175,8 @@ class MerkleTree:
             cur_root_size -= ltree_size
             ltree_size /= 2
 
-        new_node = Node(cur_root, new_leaf, cur_root.parent, None)  # node value will be computed later
+        # node value will be computed later
+        new_node = Node(cur_root, new_leaf, cur_root.parent, None)
         if cur_root.parent is None:
             # replacing the root
             self.depth += 1
@@ -195,7 +199,8 @@ class MerkleTree:
         assert 0 <= index <= len(self.leaves)
 
         if not (0 <= index <= len(self.leaves)):
-            raise ValueError("The index must be at least 0, and at most the current number of leaves.")
+            raise ValueError(
+                "The index must be at least 0, and at most the current number of leaves.")
 
         if len(x) != 20:
             raise ValueError("Inserted elements must be exactly 20 bytes long.")
@@ -242,5 +247,5 @@ class MerkleTree:
 def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> bytes:
     items_sorted = list(sorted(mapping.items()))
     keys_hashes = [element_hash(i[0]) for i in items_sorted]
-    values_hahses = [element_hash(i[1]) for i in items_sorted]
-    return write_varint(len(mapping)) + MerkleTree(keys_hashes).root + MerkleTree(values_hahses).root
+    values_hashes = [element_hash(i[1]) for i in items_sorted]
+    return write_varint(len(mapping)) + MerkleTree(keys_hashes).root + MerkleTree(values_hashes).root

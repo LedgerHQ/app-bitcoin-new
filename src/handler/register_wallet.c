@@ -194,8 +194,9 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     } else {
 
         // TODO: We should use key origin information to verify which one is our key.
-        //       We should either reject to register the wallet, or shaw a warning if none of the keys is ours.
-        //       Edge case to consider: can more than one key be ours? Should that be allowed?
+        //       We should either reject to register the wallet, or show a warning if none of the keys is ours.
+        //       Should only accept if exactly one is our key.
+        //       If zero keys are ours, we could still allow to register to verify receive addresses, but can't sign.
 
         struct {
             uint8_t wallet_id[32];

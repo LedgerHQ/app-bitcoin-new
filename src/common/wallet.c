@@ -276,7 +276,6 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         out->master_key_derivation_len = 0;
         while (buffer->ptr[buffer->offset] == '/') {
             buffer_seek_cur(buffer, 1); // skip the '/' character
-            ++out->master_key_derivation_len;
             if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
                 return -1;
             }
@@ -284,6 +283,8 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
             if (buffer_read_derivation_step(buffer, &out->master_key_derivation[out->master_key_derivation_len]) == -1) {
                 return -1;
             };
+
+            ++out->master_key_derivation_len;
         }
 
         // the next character must be ']'
