@@ -196,7 +196,7 @@ UX_STEP_NOCB(
 
 
 // Step with icon and text with name of a wallet being registered
-UX_STEP_NOCB(ux_display_wallet_name_step,
+UX_STEP_NOCB(ux_display_receive_in_wallet_step,
              pnn,
              {
                &C_icon_wallet,
@@ -210,6 +210,16 @@ UX_STEP_NOCB(ux_display_wallet_address_step,
              {
                  .title = "Address",
                  .text = g_ui_state.wallet.address,
+             });
+
+
+// Step with icon and text with name of a wallet to spend from
+UX_STEP_NOCB(ux_display_spend_from_wallet_step,
+             pnn,
+             {
+               &C_icon_wallet,
+               "Spend from:",
+               g_ui_state.wallet.wallet_name,
              });
 
 
@@ -286,8 +296,20 @@ UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
 // #2 screen: approve button
 // #3 screen: reject button
 UX_FLOW(ux_display_wallet_name_address_flow,
-        &ux_display_wallet_name_step,
+        &ux_display_receive_in_wallet_step,
         &ux_display_wallet_address_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+
+// FLOW to display a registered wallet and authorize spending:
+// #1 screen: wallet name
+// #2 screen: wallet description
+// #3 screen: approve button
+// #4 screen: reject button
+UX_FLOW(ux_display_wallet_for_spending,
+        &ux_display_spend_from_wallet_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -368,5 +390,19 @@ int ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, 
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
+    return 0;
+}
+
+
+int ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback) {
+    (void)(context);
+
+    ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
+
+    strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_display_wallet_for_spending, NULL);
     return 0;
 }

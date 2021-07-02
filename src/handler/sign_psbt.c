@@ -37,6 +37,8 @@
 #include "sign_psbt.h"
 
 
+// Pre-approval
+static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept);
 
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
@@ -220,11 +222,29 @@ void handler_sign_psbt(
     if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
     } else {
-        state->cur_input_index = 0;
-        dc->next(process_input_map);
+        // TODO: check if wallet is canonical, skip wallet authorization if so
+
+        dc->pause();
+        ui_authorize_wallet_spend(dc,
+                                  state->wallet_header.name,
+                                  ui_action_validate_wallet_authorized);
     }
 }
 
+static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (!accept) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    state->cur_input_index = 0;
+    dc->next(process_input_map);
+    dc->run();
+}
 
 
 

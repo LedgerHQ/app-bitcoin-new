@@ -42,3 +42,9 @@ int ui_display_wallet_address(dispatcher_context_t *context,
                               char *wallet_name,
                               char *address,
                               action_validate_cb callback);
+
+int ui_authorize_wallet_spend(dispatcher_context_t
+                              *context,
+                              char
+                              *wallet_name,
+                              action_validate_cb callback);
