@@ -3,7 +3,7 @@
 /**
  * APDU instruction class for command defined by the framework.
  */
-#define CLA_FRAMEWORK 0xFE
+#define CLA_FRAMEWORK 0xF8
 
 
 /**
