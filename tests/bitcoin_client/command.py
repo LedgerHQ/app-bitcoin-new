@@ -140,6 +140,7 @@ class BitcoinCommand:
 
         return response.decode()
 
+    # TODO: should we return an updated PSBT with signatures, instead?
     def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_sig: bytes = b'') -> str:
         print(psbt.serialize())
 
@@ -183,9 +184,7 @@ class BitcoinCommand:
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
 
-        # TODO: this will receive one ore more signatures from the device and must update the PSBT
-
-        sw, response = self.make_request(
+        sw, _ = self.make_request(
             self.builder.sign_psbt(global_map, input_maps,
                                    output_maps, wallet, wallet_sig),
             client_intepreter
@@ -194,4 +193,12 @@ class BitcoinCommand:
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_PSBT)
 
-        return response
+        # parse results and return a structured version instead
+        results = client_intepreter.yielded
+
+        if any(len(x) <= 1 for x in results):
+            raise RuntimeError("Invalid response")
+
+        return {
+            int(res[0]): res[1:] for res in results
+        }

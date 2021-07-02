@@ -12,8 +12,9 @@ from .merkle import MerkleTree, element_hash
 #       instead have a ClientCommandInterpreter that is aware of all the client commands, and has utility functions
 #       to manage the client side state (e.g.: the known hashes and Merkle trees).
 
+
 class ClientCommandCode(IntEnum):
-    GET_PUBKEY_INFO = 0x01
+    YIELD = 0x10
     GET_PREIMAGE = 0x40
     GET_MERKLE_LEAF_PROOF = 0x41
     GET_MERKLE_LEAF_INDEX = 0x42
@@ -27,6 +28,19 @@ class ClientCommand:
     @property
     def code(self) -> int:
         raise NotImplementedError("Subclasses should implement this method.")
+
+
+class YieldCommand(ClientCommand):
+    def __init__(self, results: List[bytes]):
+        self.results = results
+
+    @property
+    def code(self) -> int:
+        return ClientCommandCode.YIELD
+
+    def execute(self, request: bytes) -> bytes:
+        self.results.append(request[1:])  # only skip the first byte (command code)
+        return b''
 
 
 class GetPreimageCommand(ClientCommand):
@@ -56,8 +70,10 @@ class GetPreimageCommand(ClientCommand):
 
                 if (payload_size < len(known_preimage)):
                     # split into list of length-1 bytes elements
-                    extra_elements = [known_preimage[i:i+1] for i in range(payload_size, len(known_preimage))]
-                    self.queue.extend(extra_elements)  # add to the queue any remaining extra bytes
+                    extra_elements = [known_preimage[i:i+1]
+                                      for i in range(payload_size, len(known_preimage))]
+                    # add to the queue any remaining extra bytes
+                    self.queue.extend(extra_elements)
 
                 return preimage_len_out + payload_size.to_bytes(1, byteorder="big") + known_preimage[:payload_size]
 
@@ -91,7 +107,8 @@ class GetMerkleLeafHashCommand(ClientCommand):
             raise ValueError(f"Invalid index or tree size.")
 
         if len(self.queue) != 0:
-            raise RuntimeError("This command should not execute when the queue is not empty.")
+            raise RuntimeError(
+                "This command should not execute when the queue is not empty.")
 
         proof = mt.prove_leaf(leaf_index)
         n_proof_elements = len(proof)//20
@@ -156,7 +173,8 @@ class GetMoreElementsCommand(ClientCommand):
 
         element_len = len(self.queue[0])
         if any(len(el) != element_len for el in self.queue):
-            raise ValueError("The queue contains elements of different byte length, which is not expected.")
+            raise ValueError(
+                "The queue contains elements of different byte length, which is not expected.")
 
         # pop from the queue, keeping the total response length at most 255
 
@@ -174,7 +192,6 @@ class GetMoreElementsCommand(ClientCommand):
         ])
 
 
-
 class ClientCommandInterpreter:
     # TODO: should we enable a constructor to only pass a subset of the commands?
     def __init__(self):
@@ -182,9 +199,12 @@ class ClientCommandInterpreter:
         self.known_trees: Mapping[bytes, MerkleTree] = {}
         self.known_keylists: Mapping[bytes, List[str]] = {}
 
+        self.yielded: List[bytes] = []
+
         queue = deque()
 
         commands = [
+            YieldCommand(self.yielded),
             GetPreimageCommand(self.known_preimages, queue),
             GetMerkleLeafIndexCommand(self.known_trees),
             GetMerkleLeafHashCommand(self.known_trees, queue),
@@ -195,16 +215,19 @@ class ClientCommandInterpreter:
 
     def execute(self, hw_response: bytes) -> bytes:
         if len(hw_response) == 0:
-            raise RuntimeError("Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet.")
+            raise RuntimeError(
+                "Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet.")
 
         cmd_code = hw_response[0]
         if cmd_code not in self.commands:
-            raise RuntimeError("Unexpected command code: 0x{:02X}".format(cmd_code))  # TODO: more precise Error type
+            raise RuntimeError("Unexpected command code: 0x{:02X}".format(
+                cmd_code))  # TODO: more precise Error type
 
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
-        print(f"Known preimage for {ripemd160(element).hex()}: {element.hex()}")  # TODO: remove
+        # TODO: remove
+        print(f"Known preimage for {ripemd160(element).hex()}: {element.hex()}")
         self.known_preimages[ripemd160(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
@@ -229,7 +252,7 @@ class ClientCommandInterpreter:
 
         print("Added known mapping:")  # TODO: remove
         for key, value in items_sorted:
-            print(f"  {key.hex()}:{value.hex()}") 
+            print(f"  {key.hex()}:{value.hex()}")
 
         keys = [i[0] for i in items_sorted]
         values = [i[1] for i in items_sorted]

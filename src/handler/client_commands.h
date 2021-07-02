@@ -3,6 +3,12 @@
 // TODO: for all these commands, we could make some macros or helper functions to create the requests and responses.
 
 
+// Used to send results to the host while processing a command
+// Request : context specific
+// Response: empty
+#define CCMD_YIELD 0x10
+
+
 /* MERKLE PROOFS */
 
 // Request : <GET_PREIMAGE : 1> <hash : 20>

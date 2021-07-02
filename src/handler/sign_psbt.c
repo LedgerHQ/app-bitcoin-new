@@ -37,6 +37,8 @@
 #include "sign_psbt.h"
 
 
+
+// Input validation
 static void process_input_map(dispatcher_context_t *dc);
 static void process_global_tx_for_input(dispatcher_context_t *dc);
 static void receive_global_tx_info_for_input(dispatcher_context_t *dc);
@@ -44,7 +46,7 @@ static void request_non_witness_utxo(dispatcher_context_t *dc);
 static void receive_non_witness_utxo(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
 
-
+// Output validation
 static void verify_outputs_init(dispatcher_context_t *dc);
 static void process_output_map(dispatcher_context_t *dc);
 static void process_global_tx_for_output(dispatcher_context_t *dc);
@@ -52,11 +54,14 @@ static void receive_global_tx_info_for_output(dispatcher_context_t *dc);
 static void check_output_owned(dispatcher_context_t *dc);
 
 
+// Signing process (all)
 static void sign_init(dispatcher_context_t *dc);
 static void sign_process_input_map(dispatcher_context_t *dc);
 static void request_non_witness_utxo_for_signing(dispatcher_context_t *dc);
 static void receive_non_witness_utxo_for_signing(dispatcher_context_t *dc);
 
+
+// Legacy signing (P2PKH and P2SH)
 static void sign_legacy(dispatcher_context_t *dc);
 static void sign_legacy_first_pass_completed(dispatcher_context_t *dc);
 
@@ -66,9 +71,12 @@ static void sign_legacy_start_second_pass(dispatcher_context_t *dc);
 
 static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc);
 
+
+// Segwit signing (P2WPKH and P2WSH)
 static void sign_segwit(dispatcher_context_t *dc);
 static void sign_segwit_tx_parsed(dispatcher_context_t *dc);
 
+// End point end return
 static void finalize(dispatcher_context_t *dc);
 
 
@@ -216,6 +224,8 @@ void handler_sign_psbt(
         dc->next(process_input_map);
     }
 }
+
+
 
 
 /** Inputs verification flow
@@ -1036,11 +1046,27 @@ static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc) {
     END_TRY;
 
 
+
     // TODO: send signature for this input
     PRINTF("######## signature for input %d: ", state->cur_input_index);
     for (int i = 0; i < sig_len; i++)
         PRINTF("%02x", sig[i]);
     PRINTF("\n");
+
+    // yield signature
+    uint8_t cmd = CCMD_YIELD;
+    dc->add_to_response(&cmd, 1);
+    uint8_t input_index = (uint8_t)state->cur_input_index;
+    dc->add_to_response(&input_index, 1);
+    dc->add_to_response(&sig, sig_len);
+    uint8_t sighash_byte = (uint8_t)(state->cur_input.sighash_type & 0xFF);
+    dc->add_to_response(&sighash_byte, 1);
+    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
+
+    if (dc->process_interruption(dc) < 0) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
 
     ++state->cur_input_index;
     dc->next(sign_process_input_map);
@@ -1335,6 +1361,22 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
     for (int i = 0; i < sig_len; i++)
         PRINTF("%02x", sig[i]);
     PRINTF("\n");
+
+
+    // yield signature
+    uint8_t cmd = CCMD_YIELD;
+    dc->add_to_response(&cmd, 1);
+    uint8_t input_index = (uint8_t)state->cur_input_index;
+    dc->add_to_response(&input_index, 1);
+    dc->add_to_response(&sig, sig_len);
+    uint8_t sighash_byte = (uint8_t)(state->cur_input.sighash_type & 0xFF);
+    dc->add_to_response(&sighash_byte, 1);
+    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
+
+    if (dc->process_interruption(dc) < 0) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
 
     ++state->cur_input_index;
     dc->next(sign_process_input_map);
