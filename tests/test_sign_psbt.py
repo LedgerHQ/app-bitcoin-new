@@ -1,20 +1,24 @@
-import pytest
-
 from bitcoin_client.command import BitcoinCommand
 
+from utils import automation
 from bitcoin_client.psbt import PSBT
-from bitcoin_client.wallet import PolicyMapWallet
+from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
 
 
-def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
-
-    # legacy address
-    # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
-    filename = "./psbt/singlesig/sh-wpkh-1to2.psbt"
+def open_psbt_from_file(filename: str) -> PSBT:
     raw_psbt_base64 = open(filename, "r").read()
 
     psbt = PSBT()
     psbt.deserialize(raw_psbt_base64)
+    return psbt
+
+
+@automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
+
+    # legacy address
+    # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
+    psbt = open_psbt_from_file("./psbt/singlesig/sh-wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "sh(wpkh(@0))", ["[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"])
@@ -25,18 +29,17 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
     result = cmd.sign_psbt(psbt, wallet)
 
-    print(result)
+    assert(result == {
+        0: bytes.fromhex("30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201")
+    })
 
 
+@automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
     # legacy address
     # PSBT for a legacy 1-input 2-output spend (1 change address)
-    filename = "./psbt/singlesig/wpkh-1to2.psbt"
-    raw_psbt_base64 = open(filename, "r").read()
-
-    psbt = PSBT()
-    psbt.deserialize(raw_psbt_base64)
+    psbt = open_psbt_from_file("./psbt/singlesig/wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "wpkh(@0)", ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"])
@@ -48,18 +51,17 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
     #   "pubkey" : "03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068",
     #   "signature" : "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
 
-    print(result)
+    assert(result == {
+        0: bytes.fromhex("3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01")
+    })
 
 
+@automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
-
     # legacy address
     # PSBT for a legacy 2-input 2-output spend (1 change address)
-    filename = "./psbt/singlesig/wpkh-2to2.psbt"
-    raw_psbt_base64 = open(filename, "r").read()
 
-    psbt = PSBT()
-    psbt.deserialize(raw_psbt_base64)
+    psbt = open_psbt_from_file("./psbt/singlesig/wpkh-2to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "wpkh(@0)", ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"])
@@ -74,7 +76,10 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
     #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
     #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
 
-    print(result)
+    assert(result == {
+        0: bytes.fromhex("304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"),
+        1: bytes.fromhex("3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001")
+    })
 
 
 # def test_sign_psbt_legacy(cmd):
@@ -107,16 +112,28 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 #     print(result)
 
 
-# def test_sign_psbt_multisig(cmd):
-#     # legacy address
+def test_sign_psbt_multisig_wsh(cmd):
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**"
+        ]
+    )
+    wallet_sig = bytes.fromhex(
+        "30440220564c14c281594221a3309b5acd11a427a32b9fc85b8d883564004f325fb0071b02201404316adb5127b7918ecf48e3ebceea41963898b26a4643e834baa0c72a5ea2")
 
-#     unsigned_raw_psbt_base64 = "cHNidP8BAH0CAAAAAQ5HHvTpLBrLUe/IZg+NP2mTbqnJsr/3L/m8gcUe/PRkAQAAAAD9////ArmoOwAAAAAAFgAUNcbg3W08hLFrqIXcpzrIY9C1k+xwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3AAAAAAABAIgCAAAAAZXf7wah/zeZl5w2fzI91OWHTXbYoKMhQy721zey6JUvAAAAABcWABSPsnHXGKDY3oyXy+y9qkU7T0ui6/7///8CEPdqqQEAAAAWABRO796NdCbgG+W8qJf2alrndA2/ZsO6PAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JrEGB4AAQEfw7o8AAAAAAAWABQTR+gqA3tduzjPjEdZ8kKx9cfgmiIGAny3XTSwBcTrn2K78sRX12OOgT51fvzsj6aGd9lQtjZiGPWswv1UAACAAQAAgAAAAIAAAAAAAAAAAAAiAgJxtbd5rYcIOFh3l7z28MeuxavnanCdck9I0uJs+HTwoBj1rML9VAAAgAEAAIAAAACAAQAAAAAAAAAAAA=="
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
+    psbt = open_psbt_from_file("./psbt/multisig/wsh-2of2.psbt")
 
-#     result = cmd.sign_psbt(psbt)
+    result = cmd.sign_psbt(psbt, wallet, wallet_sig)
 
-#     print(result)
+    assert(result == {
+        0: bytes.fromhex("304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301")
+    })
+
+    print(result)
 
 
 # def test_sign_psbt_legacy_wrong_non_witness_utxo(cmd):

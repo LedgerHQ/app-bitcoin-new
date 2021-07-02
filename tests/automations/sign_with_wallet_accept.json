@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "regexp": "Spend from",
+      "actions": [
+        ["button", 2, true],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "text": "Approve",
+      "actions": [
+        [ "button", 2, true ],
+        [ "button", 2, false ],
+        [ "button", 1, false ]
+      ]
+    }
+  ]
+}

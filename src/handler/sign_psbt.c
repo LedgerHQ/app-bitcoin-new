@@ -1255,11 +1255,11 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
         uint8_t witnessScript[128]; // TODO: we need to support arbitrary length witnessScripts
 
         int witnessScript_len = call_get_merkleized_map_value(dc,
-                                                &state->cur_input.map,
-                                                tmp,
-                                                1,
-                                                (uint8_t []){ PSBT_IN_WITNESS_SCRIPT },
-                                                sizeof(witnessScript));
+                                                              &state->cur_input.map,
+                                                              (uint8_t []){ PSBT_IN_WITNESS_SCRIPT },
+                                                              1,
+                                                              witnessScript,
+                                                              sizeof(witnessScript));
 
         if (witnessScript_len < 0) {
             PRINTF("Error fetching witnessScript\n");
@@ -1277,9 +1277,14 @@ static void sign_segwit_tx_parsed(dispatcher_context_t *dc) {
             || memcmp(script + 2, witnessScript_hash, 32) != 0
         ) {
             PRINTF("Mismatching witnessScript\n");
+
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
+
+        PRINTF("SIGHASH: witnessScript: ");
+        for (int i = 0; i < witnessScript_len; i++) PRINTF("%02X", witnessScript[i]);
+        PRINTF("\n");
 
         // add witnessScript to hash
         crypto_hash_update(&state->hash_context.header, witnessScript, witnessScript_len);
