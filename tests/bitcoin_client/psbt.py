@@ -688,7 +688,21 @@ class PSBT(object):
             if self.tx.is_null():
                 raise PSBTSerializationError("No unsigned trasaction was provided")
 
+            if self.tx_version is not None:
+                raise PSBTSerializationError("Tx version is not allowed in PSBTv0")
+            if self.fallback_locktime is not None:
+                raise PSBTSerializationError("Fallback locktime is not allowed in PSBTv0")
+            if self.input_count is not None:
+                raise PSBTSerializationError("Input count is not allowed in PSBTv0")
+            if self.output_count is not None:
+                raise PSBTSerializationError("Output count is not allowed in PSBTv0")
+            if self.tx_modifiable is not None:
+                raise PSBTSerializationError("Transaction modifiable flags not allowed in PSBTv0")
+
         else:
+            if not self.tx.is_null():
+                raise PSBTSerializationError("Global transaction is not allowed in PSBTv2")
+
             if self.tx_version is None:
                 raise PSBTSerializationError("Tx version is required in PSBTv2")
             if self.input_count is None:
