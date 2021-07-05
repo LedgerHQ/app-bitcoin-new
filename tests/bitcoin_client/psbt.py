@@ -55,6 +55,7 @@ from ._serialize import (
     Readable,
     ser_compact_size,
     ser_string,
+    ser_uint256
 )
 
 def DeserializeHDKeypath(
@@ -712,6 +713,9 @@ class PSBT(object):
                     raise PSBTSerializationError("Non-witness UTXO does not match outpoint hash")
 
         if psbt_version == 0 and (len(self.inputs) != input_count):
+            print(len(self.inputs))
+            print(input_count)
+
             raise PSBTSerializationError("Inputs provided does not match the number of inputs in transaction")
 
         # Read output data
@@ -796,3 +800,33 @@ class PSBT(object):
 
         # return hex string
         return base64.b64encode(r).decode()
+
+    def to_psbt_v2(self) -> None:
+        """
+        Converts a valid psbt from version 0 to version 2.
+        """
+
+        if not (self.version is None or self.version == 0):
+            raise ValueError("Can only convert from version 0 to version 2")
+
+        tx = self.tx
+
+        self.tx = CTransaction()
+
+        self.tx_version = tx.nVersion
+        self.input_count = len(tx.vin)
+        self.output_count = len(tx.vout)
+
+        for input_idx in range(len(tx.vin)):
+            self.inputs[input_idx].previous_txid = ser_uint256(tx.vin[input_idx].prevout.hash)
+            self.inputs[input_idx].output_index = tx.vin[input_idx].prevout.n
+            self.inputs[input_idx].sequence = tx.vin[input_idx].nSequence
+
+            if tx.nLockTime >= 500_000_000:
+                self.inputs[input_idx].required_time_locktime = tx.nLockTime
+            else:
+                self.inputs[input_idx].required_height_locktime = tx.nLockTime
+
+        for output_idx in range(len(tx.vout)):
+            self.outputs[output_idx].amount = tx.vout[output_idx].nValue
+            self.outputs[output_idx].script = tx.vout[output_idx].scriptPubKey

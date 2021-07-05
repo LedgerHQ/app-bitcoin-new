@@ -144,7 +144,14 @@ class BitcoinCommand:
     def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_sig: bytes = b'') -> str:
         print(psbt.serialize())
 
-        psbt_bytes = base64.b64decode(psbt.serialize())
+        if psbt.version != 2:
+            psbt_v2 = PSBT()
+            psbt_v2.deserialize(psbt.serialize()) # clone psbt
+            psbt_v2.to_psbt_v2()
+        else:
+            psbt_v2 = psbt
+
+        psbt_bytes = base64.b64decode(psbt_v2.serialize())
         f = BytesIO(psbt_bytes)
 
         assert f.read(5) == b"psbt\xff"
@@ -155,23 +162,14 @@ class BitcoinCommand:
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
         client_intepreter.add_known_mapping(global_map)
 
-        if b'\x00' not in global_map:
-            raise ValueError("Invalid PSBT: missing PSBT_GLOBAL_UNSIGNED_TX")
-
-        # as the psbt format v1 does not specifies the number of inputs and outputs, we need to parse the
-        # PSBT_GLOBAL_UNSIGNED_TX = 0x00 field from the global map.
-
-        tx = CTransaction()
-        tx.deserialize(BytesIO(global_map[b'\x00']))
-
         input_maps: List[Mapping[bytes, bytes]] = []
-        for _ in tx.vin:
+        for _ in range(psbt_v2.input_count):
             input_maps.append(parse_stream_to_map(f))
         for m in input_maps:
             client_intepreter.add_known_mapping(m)
 
         output_maps: List[Mapping[bytes, bytes]] = []
-        for _ in tx.vout:
+        for _ in range(psbt_v2.output_count):
             output_maps.append(parse_stream_to_map(f))
         for m in output_maps:
             client_intepreter.add_known_mapping(m)
