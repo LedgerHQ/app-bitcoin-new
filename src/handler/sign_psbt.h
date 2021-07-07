@@ -8,8 +8,8 @@
 #include "lib/get_merkleized_map.h"
 #include "lib/get_merkleized_map_value.h"
 #include "lib/stream_merkleized_map_value.h"
+#include "lib/psbt_process_redeemScript.h"
 #include "flows/psbt_parse_rawtx.h"
-#include "flows/psbt_process_redeemScript.h"
 
 #define MAX_N_INPUTS_CAN_SIGN 16
 #define MAX_N_OUTPUTS_CAN_SIGN 16
@@ -25,9 +25,6 @@ typedef struct {
     uint8_t bip32_derivation_pubkey[33]; // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
     bool unexpected_pubkey_error; // set to true if the pubkey in the keydata of PSBT_IN_BIP32_DERIVATION is not 33 bytes long
 
-    uint8_t prevout_hash[32];    // the prevout_hash of the current input
-    int prevout_n;               // the prevout index of the current input
-    int prevout_nSequence;       // the nSequence of the current input
     uint64_t prevout_amount;     // the value of the prevout of the current input
 
     uint8_t prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
@@ -58,6 +55,9 @@ typedef struct {
 
     merkleized_map_commitment_t global_map; // 48 bytes
 
+    uint32_t tx_version;
+    uint32_t locktime;
+
     int n_inputs;
     uint8_t inputs_root[20];  // merkle root of the vector of input maps commitments
     int n_outputs;
@@ -71,9 +71,7 @@ typedef struct {
 
     uint32_t master_key_fingerprint;
 
-    uint32_t prevouts_n[MAX_N_INPUTS_CAN_SIGN];     // the prevout_n fields for each input; TODO: remove after rewrite
     uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN]; // TODO: use a bitvector
-    uint8_t internal_outputs[MAX_N_OUTPUTS_CAN_SIGN]; // TODO: use a bitvector
 
     union {
         struct {
@@ -97,13 +95,12 @@ typedef struct {
     uint64_t internal_outputs_total_value;
     
 
-    uint8_t tmp[1+33];  // temporary array to store keys requested in the PSBT maps (at most a pubkey, for now)
+    uint8_t tmp[1];  // temporary array for calls that need a param allocated in the state (call_psbt_parse_rawtx)
 
     policy_map_key_info_t our_key_info;
 
     union {
         psbt_parse_rawtx_state_t psbt_parse_rawtx;
-        psbt_process_redeemScript_state_t psbt_process_redeemScript;
     } subcontext;
 } sign_psbt_state_t;
 

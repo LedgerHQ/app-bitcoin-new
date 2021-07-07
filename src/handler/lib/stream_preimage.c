@@ -9,7 +9,8 @@
 
 int call_stream_preimage(dispatcher_context_t *dispatcher_context,
                          const uint8_t hash[static 20],
-                         dispatcher_callback_descriptor_t callback) {
+                         void (*callback)(buffer_t *, void *),
+                         void *callback_state) {
 
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
@@ -34,8 +35,13 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
     }
     uint32_t preimage_len = (uint32_t)preimage_len_u64;
 
-    if (partial_data_len > preimage_len) {
+    if (preimage_len < 1) {
+        // at least the initial 0x00 prefix should be there
         return -3;
+    }
+
+    if (partial_data_len > preimage_len) {
+        return -4;
     }
 
     uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
@@ -47,9 +53,8 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
     crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
 
     // call callback with data
-    // TODO: can we use a regular C-style callback here?
-    buffer_t buf = buffer_create(data_ptr, partial_data_len);
-    dispatcher_context->run_callback(callback, &buf);
+    buffer_t initial_buf = buffer_create(data_ptr + 1, partial_data_len - 1); // skip 0x00 prefix
+    callback(&initial_buf, callback_state);
 
     size_t bytes_remaining = (size_t)preimage_len - partial_data_len;
 
@@ -57,7 +62,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         uint8_t get_more_elements_req[] = { CCMD_GET_MORE_ELEMENTS };
         SET_RESPONSE(dispatcher_context, get_more_elements_req, sizeof(get_more_elements_req), SW_INTERRUPTED_EXECUTION);
         if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
-            return -4;
+            return -5;
         }
 
         // Parse response to CCMD_GET_MORE_ELEMENTS
@@ -66,17 +71,17 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
             || !buffer_read_u8(&dispatcher_context->read_buffer, &elements_len)
             || !buffer_can_read(&dispatcher_context->read_buffer, (size_t)n_bytes * elements_len))
         {
-            return -5;
+            return -6;
         }
 
         if (elements_len != 1) {
             PRINTF("Elements should be single bytes\n");
-            return -6;
+            return -7;
         }
 
         if (n_bytes > bytes_remaining) {
             PRINTF("Received more bytes than expected.\n");
-            return -7;
+            return -8;
         }
 
         uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
@@ -86,7 +91,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
 
         // call callback with data
         buffer_t buf = buffer_create(data_ptr, n_bytes);
-        dispatcher_context->run_callback(callback, &buf);
+        callback(&buf, callback_state);
 
         bytes_remaining -= n_bytes;
     }
@@ -97,10 +102,10 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
 
     if (memcmp(computed_hash, hash, 20) != 0) {
         PRINTF("Hash mismatch.\n");
-        return -5;
+        return -9;
     }
 
-    return (int)preimage_len;
+    return (int)preimage_len - 1;
 }
 
 

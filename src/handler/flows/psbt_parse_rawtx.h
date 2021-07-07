@@ -27,76 +27,19 @@ typedef struct {
 } parse_rawtxoutput_state_t;
 
 
-typedef enum {
-    PARSEMODE_TXID,
-    PARSEMODE_LEGACY_PASS1,
-    PARSEMODE_LEGACY_PASS2,
-    PARSEMODE_SEGWIT_V0
-} ParseMode_t;
-
-
-typedef union {
-    // We distinguish the state depending on the program, rather than the parse_mode,
-
-    struct {
-        int input_index;               // index of queried input, or -1
-        uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
-        int prevout_n;                 // will contain tx.input[input_index].prevout.n
-        int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
-
-        uint64_t outputs_total_value;  // will contain the sum of the values of all the prevouts
-
-        int output_index;              // index of queried output, or -1
-        // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
-        uint8_t vout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-        int vout_scriptpubkey_len;     // will contain the len of the above scriptPubKey
-        uint64_t vout_value;           // will contain the value of this output
-        uint32_t nLocktime;            // will contain the nLocktime of the transaction
-    } compute_txid;
-
-    struct {
-        uint32_t sighash_type;
-        size_t input_index;
-    } compute_sighash_legacy;
-
-    struct {
-        uint32_t sighash_type;
-        size_t input_index;
-        uint32_t nVersion;
-
-        uint8_t prevout_hash[32];      // will contain tx.input[input_index].prevout.hash
-        int prevout_n;                 // will contain tx.input[input_index].prevout.n
-        int prevout_nSequence;         // will contain tx.input[input_index].prevout.nSequence
-
-        uint8_t hashPrevouts[32];
-        uint8_t hashSequence[32];
-        // outpoint already known
-        // scriptCode not part of the parsing
-        uint8_t hashOutputs[32];
-        //sighash type
-
-
-        // We overlap hash contexts that are not used at the same time, in order to save memory
-        union {
-            struct {
-                cx_sha256_t hashPrevouts_context;
-                cx_sha256_t hashSequence_context;
-            };
-            cx_sha256_t hashOutputs_context;
-        };
-    } compute_sighash_segwit_v0;
-} program_state_t;
+typedef struct {
+    uint8_t vout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    int vout_scriptpubkey_len;     // will contain the len of the above scriptPubKey
+    uint64_t vout_value;           // will contain the value of this output
+} txid_parser_outputs_t;
 
 typedef struct parse_rawtx_state_s {
-    ParseMode_t parse_mode;
     cx_sha256_t *hash_context;
 
     bool is_segwit;
     int n_inputs;
     int n_outputs;
     int n_witnesses; // only for segwit tx, serialized according to bip-144
-    uint32_t locktime;
-
 
     union {
         // since the parsing stages of inputs and outputs and witnesses are disjoint, we reuse the same space in memory
@@ -117,7 +60,13 @@ typedef struct parse_rawtx_state_s {
         };
     };
 
-    program_state_t *program_state;
+    // parser state, including relevant outputs
+
+    int output_index;              // index of queried output, or -1
+    // will contain tx.voud[output_index].scriptPubKey (truncated to 84 bytes if longer)
+
+    txid_parser_outputs_t *parser_outputs;
+
 } parse_rawtx_state_t;
 
 
@@ -129,13 +78,10 @@ typedef struct psbt_parse_rawtx_state_s {
     const uint8_t *key;
     size_t key_len;
 
-    ParseMode_t parse_mode;
-
     cx_sha256_t *hash_context;
 
-    // inputs/outputs specific for the program
-    program_state_t program_state;
-
+    // outputs from parsing the transaction 
+    txid_parser_outputs_t outputs;
 
     // internal state
     uint8_t value_hash[20];
@@ -178,37 +124,19 @@ static inline void call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_contex
                                          const merkleized_map_commitment_t *map,
                                          const uint8_t *key,
                                          int key_len,
-                                         ParseMode_t parse_mode,
-                                         int input_index,
-                                         int output_index,
-                                         uint32_t sighash_type)
+                                         int output_index)
 {
     flow_state->hash_context = hash_context;
     flow_state->map = map;
     flow_state->key = key;
     flow_state->key_len = key_len;
 
-    flow_state->parse_mode = parse_mode;
-
     // init parser
 
     flow_state->store_data_length = 0;
     parser_init_context(&flow_state->parser_context, &flow_state->parser_state);
 
-    if (parse_mode == PARSEMODE_TXID) {
-        flow_state->program_state.compute_txid.input_index = input_index;
-        flow_state->program_state.compute_txid.output_index = output_index;
-    } else if (parse_mode == PARSEMODE_LEGACY_PASS1 || parse_mode == PARSEMODE_LEGACY_PASS2) {
-        flow_state->program_state.compute_sighash_legacy.input_index = input_index;
-        flow_state->program_state.compute_sighash_legacy.sighash_type = sighash_type;
-        // TODO
-    } else if (parse_mode == PARSEMODE_SEGWIT_V0) {
-        flow_state->program_state.compute_sighash_segwit_v0.input_index = input_index;
-        flow_state->program_state.compute_sighash_segwit_v0.sighash_type = sighash_type;
-        // TODO
-    } else {
-        PRINTF("Invoked with wrong program.\n");
-    }
+    flow_state->parser_state.output_index = output_index;
 
     dispatcher_context->start_flow(
         flow_psbt_parse_rawtx,

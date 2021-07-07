@@ -7,7 +7,8 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                      const merkleized_map_commitment_t *map,
                                      const uint8_t *key,
                                      int key_len,
-                                     dispatcher_callback_descriptor_t callback)
+                                     void (*callback)(buffer_t *, void *),
+                                     void *callback_state)
 {
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
@@ -25,5 +26,6 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                     map->values_root,
                                     map->size,
                                     index,
-                                    callback);
+                                    callback,
+                                    callback_state);
 }

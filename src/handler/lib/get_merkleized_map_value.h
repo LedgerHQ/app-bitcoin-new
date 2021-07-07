@@ -2,6 +2,7 @@
 
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
+#include "../../common/read.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow finds out the index of the element corresponding to the
@@ -19,3 +20,26 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   int key_len,
                                   uint8_t *out,
                                   int out_len);
+
+
+/**
+ * Convenience shortcut to read a little-endian unsigned 32-bit int.
+ * TODO: more docs
+ */
+static inline int call_get_merkleized_map_value_u32_le(dispatcher_context_t *dispatcher_context,
+                                                       const merkleized_map_commitment_t *map,
+                                                       const uint8_t *key,
+                                                       int key_len,
+                                                       uint32_t *out)
+{
+    uint8_t result_raw[4];
+
+    int res = call_get_merkleized_map_value(dispatcher_context, map, key, key_len, result_raw, 4);
+    if (res != 4) {
+        return -1;
+    }
+
+    *out = read_u32_le(result_raw, 0);
+
+    return 4;
+}
