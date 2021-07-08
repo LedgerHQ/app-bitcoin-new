@@ -5,6 +5,7 @@
 #include "common/bip32.h"
 #include "common/buffer.h"
 #include "../constants.h"
+#include "../context.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "os.h"
@@ -132,6 +133,9 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
 int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
 
 
+int get_script_type(const uint8_t script[], size_t script_len);
+
+int get_script_address(const uint8_t script[], size_t script_len, global_context_t network, char *out, size_t out_len);
 
 #ifndef SKIP_FOR_CMOCKA
 // /**

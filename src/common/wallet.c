@@ -3,7 +3,9 @@
 
 #include "../common/bip32.h"
 #include "../common/buffer.h"
+#include "../common/segwit_addr.h"
 #include "../common/wallet.h"
+
 #include "../boilerplate/sw.h"
 
 #ifndef SKIP_FOR_CMOCKA
@@ -14,6 +16,12 @@
 #define PIC(x) (x)
 #endif
 
+typedef enum {
+    SCRIPT_TYPE_P2PKH  = 0x00,
+    SCRIPT_TYPE_P2SH   = 0x01,
+    SCRIPT_TYPE_P2WPKH = 0x02,
+    SCRIPT_TYPE_P2WSH  = 0x03
+} script_type_e;
 
 /*
 Currently supported policies for singlesig:
@@ -494,6 +502,89 @@ int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len) {
     return parse_script(in_buf, &out_buf, 0, 0);
 }
 
+
+// TODO: add unit tests
+int get_script_type(const uint8_t script[], size_t script_len) {
+    if (   script_len == 25
+        && script[0] == 0x76
+        && script[1] == 0xa9
+        && script[2] == 0x14
+        && script[23] == 0x88
+        && script[24] == 0xac)
+    {
+        return SCRIPT_TYPE_P2PKH;
+    }
+
+    if (   script_len == 23
+        && script[0] == 0xa9
+        && script[1] == 0x14
+        && script[22] == 0x87)
+    {
+        return SCRIPT_TYPE_P2SH;
+    }
+
+    if (   script_len == 22
+        && script[0] == 0x00
+        && script[1] == 0x14)
+    {
+        return SCRIPT_TYPE_P2WPKH;
+    }
+
+    if (   script_len == 34
+        && script[0] == 0x00
+        && script[1] == 0x20)
+    {
+        return SCRIPT_TYPE_P2WSH;
+    }
+
+    // unknown
+    return -1;
+}
+
+// TODO: add unit tests
+int get_script_address(const uint8_t script[], size_t script_len, global_context_t network, char *out, size_t out_len) {
+    int script_type = get_script_type(script, script_len);
+    int addr_len;
+    switch (script_type) {
+        case SCRIPT_TYPE_P2PKH:
+            addr_len = base58_encode_address(script + 3, network.p2pkh_version, out, out_len - 1);
+            break;
+        case SCRIPT_TYPE_P2SH:
+            addr_len = base58_encode_address(script + 2, network.p2sh_version, out, out_len - 1);
+            break;
+        case SCRIPT_TYPE_P2WPKH:
+        case SCRIPT_TYPE_P2WSH:
+        {
+            // bech32 encoding
+
+            int hash_length = (script_type == SCRIPT_TYPE_P2PKH ? 20 : 32);
+
+            // make sure that the output buffer is long enough
+            if (out_len < 72 + strlen(network.native_segwit_prefix)) {
+                return -1;
+            }
+
+            int ret = segwit_addr_encode(
+                out,
+                network.native_segwit_prefix,
+                0,
+                script + 2,
+                hash_length // 20 for WPKH, 32 for WSH
+            );
+
+            if (ret != 1) {
+                return -1; // should never happen
+            }
+
+            addr_len = strlen(out);
+            break;
+        }
+        default:
+            return -1;
+    }
+    out[addr_len] = '\0';
+    return addr_len;
+}
 
 #ifndef SKIP_FOR_CMOCKA
 

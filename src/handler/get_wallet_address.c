@@ -139,22 +139,31 @@ static void get_address(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    buffer_t script_buf = buffer_create(script, sizeof(script));
+
     // No special need to split this from the previous function, but debugging showed that the compiler wasn't being
     // smart with optimizing the memory used for locals, not freeing the stack before this call, which is an
     // expensive one. Splitting it into its own processor makes sure the stack is cleaned up.
-    int res = call_get_wallet_address(dc,
-                                      &state->policy_map,
-                                      state->wallet_header.keys_info_merkle_root,
-                                      state->wallet_header.n_keys,
-                                      state->is_change,
-                                      state->address_index,
-                                      state->address,
-                                      sizeof(state->address));
-    if (res < 0) {
+    int script_len = call_get_wallet_script(dc,
+                                            &state->policy_map,
+                                            state->wallet_header.keys_info_merkle_root,
+                                            state->wallet_header.n_keys,
+                                            state->is_change,
+                                            state->address_index,
+                                            &script_buf,
+                                            NULL);
+    if (script_len < 0) {
         SEND_SW(dc, SW_BAD_STATE); // unexpected
         return;
     }
-    state->address_len = res;
+
+    state->address_len = get_script_address(script, script_len, G_context, state->address, sizeof(state->address));
+
+    if (state->address_len < 0) {
+        SEND_SW(dc, SW_BAD_STATE); // unexpected
+        return;
+    }
 
     if (state->display_address == 0) {
         SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);

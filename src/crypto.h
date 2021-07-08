@@ -11,17 +11,6 @@
 #include "./common/write.h"
 #include "./common/varint.h"
 
-// Single key address types
-#define ADDRESS_TYPE_PKH 0
-#define ADDRESS_TYPE_SH_WPKH 1
-#define ADDRESS_TYPE_WPKH 2
-
-// Script address types
-#define ADDRESS_TYPE_P2SH 0
-#define ADDRESS_TYPE_SH_WSH 1
-#define ADDRESS_TYPE_WSH 2
-
-
 // Address types as defined in Bitcoin Core's HWI
 #define ADDRESS_TYPE_LEGACY 1  // Legacy address. P2PKH for single sig, P2SH for scripts.
 #define ADDRESS_TYPE_WIT 2     // Native segwit. P2WPKH for single sig, P2WPSH for scripts.
