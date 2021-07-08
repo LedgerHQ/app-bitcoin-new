@@ -84,6 +84,8 @@ typedef struct {
         };
     };
 
+    uint8_t sighash[32];
+
     int nLocktime;                   // the nLocktime of the transaction
 
     uint64_t inputs_total_value;

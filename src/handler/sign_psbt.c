@@ -59,15 +59,19 @@ static void check_output_owned(dispatcher_context_t *dc);
 static void sign_init(dispatcher_context_t *dc);
 static void sign_process_input_map(dispatcher_context_t *dc);
 
-// Legacy signing (P2PKH and P2SH)
+// Legacy sighash computation (P2PKH and P2SH)
 static void sign_legacy(dispatcher_context_t *dc);
 static void sign_legacy_compute_sighash(dispatcher_context_t *dc);
 
 
-// Segwit signing (P2WPKH and P2WSH)
+// Segwit sighash computation (P2WPKH and P2WSH)
 static void sign_segwit(dispatcher_context_t *dc);
 
-// End point end return
+
+// Sign input and yield result
+static void sign_sighash(dispatcher_context_t *dc);
+
+// End point and return
 static void finalize(dispatcher_context_t *dc);
 
 
@@ -1059,87 +1063,17 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
-    uint8_t sighash[32];
-
     //compute sighash
-    crypto_hash_digest(&sighash_context.header, sighash, 32);
-    cx_hash_sha256(sighash, 32, sighash, 32);
+    crypto_hash_digest(&sighash_context.header, state->sighash, 32);
+    cx_hash_sha256(state->sighash, 32, state->sighash, 32);
 
     // TODO: remove
     PRINTF("sighash: ");
     for (int i = 0; i < 32; i++)
-        PRINTF("%02x", sighash[i]);
+        PRINTF("%02x", state->sighash[i]);
     PRINTF("\n");
 
-
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t chain_code[32] = {0};
-    uint32_t info = 0;
-
-    // TODO: should check the signing pubkey ant path matches in the PSBT
-    uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (unsigned int i = 0; i < state->our_key_info.master_key_derivation_len; i++) {
-        sign_path[i] = state->our_key_info.master_key_derivation[i];
-    }
-    sign_path[state->our_key_info.master_key_derivation_len] = state->cur_input.change;
-    sign_path[state->our_key_info.master_key_derivation_len+1] = state->cur_input.address_index;
-
-    // TODO: refactor the signing code elsewhere
-    int sign_path_len = state->our_key_info.master_key_derivation_len + 2;
-
-    PRINTF("Signing path for input %d: ", state->cur_input_index); // TODO: remove
-    PRINTF_BIP32_PATH(sign_path, sign_path_len);
-
-    crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
-
-    uint8_t sig[MAX_DER_SIG_LEN];
-
-    int sig_len = 0;
-    BEGIN_TRY {
-        TRY {
-            sig_len = cx_ecdsa_sign(&private_key,
-                                    CX_RND_RFC6979,
-                                    CX_SHA256,
-                                    sighash,
-                                    32,
-                                    sig,
-                                    MAX_DER_SIG_LEN,
-                                    &info);
-        }
-        CATCH_OTHER(e) {
-            return;
-        }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
-
-
-
-    // TODO: send signature for this input
-    PRINTF("######## signature for input %d: ", state->cur_input_index);
-    for (int i = 0; i < sig_len; i++)
-        PRINTF("%02x", sig[i]);
-    PRINTF("\n");
-
-    // yield signature
-    uint8_t cmd = CCMD_YIELD;
-    dc->add_to_response(&cmd, 1);
-    uint8_t input_index = (uint8_t)state->cur_input_index;
-    dc->add_to_response(&input_index, 1);
-    dc->add_to_response(&sig, sig_len);
-    uint8_t sighash_byte = (uint8_t)(state->cur_input.sighash_type & 0xFF);
-    dc->add_to_response(&sighash_byte, 1);
-    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
-
-    if (dc->process_interruption(dc) < 0) {
-        SEND_SW(dc, SW_BAD_STATE);
-        return;
-    }
-
-    ++state->cur_input_index;
-    dc->next(sign_process_input_map);
+    dc->next(sign_sighash);
 }
 
 static void sign_segwit(dispatcher_context_t *dc) {
@@ -1494,28 +1428,30 @@ static void sign_segwit(dispatcher_context_t *dc) {
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
-    uint8_t sighash[32];
-
     //compute sighash
-    crypto_hash_digest(&sighash_context.header, sighash, 32);
-    cx_hash_sha256(sighash, 32, sighash, 32);
+    crypto_hash_digest(&sighash_context.header, state->sighash, 32);
+    cx_hash_sha256(state->sighash, 32, state->sighash, 32);
 
     // TODO: remove
     PRINTF("sighash: ");
     for (int i = 0; i < 32; i++)
-        PRINTF("%02x", sighash[i]);
+        PRINTF("%02x", state->sighash[i]);
     PRINTF("\n");
 
-    // actually sign input
+    dc->next(sign_sighash);
+}
 
+// Common for all signing paths
+static void sign_sighash(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     cx_ecfp_private_key_t private_key = {0};
     uint8_t chain_code[32] = {0};
     uint32_t info = 0;
 
-
     // TODO: should check the signing pubkey and path matches in the PSBT
-    // TODO: duplicated code with the legacy path
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
     for (unsigned int i = 0; i < state->our_key_info.master_key_derivation_len; i++) {
         sign_path[i] = state->our_key_info.master_key_derivation[i];
@@ -1539,7 +1475,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
             sig_len = cx_ecdsa_sign(&private_key,
                                     CX_RND_RFC6979,
                                     CX_SHA256,
-                                    sighash,
+                                    state->sighash,
                                     32,
                                     sig,
                                     MAX_DER_SIG_LEN,
@@ -1579,7 +1515,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
     ++state->cur_input_index;
     dc->next(sign_process_input_map);
 }
-
 
 static void finalize(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
