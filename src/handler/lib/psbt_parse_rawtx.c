@@ -1,16 +1,82 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cx.h"
+
 #include "psbt_parse_rawtx.h"
+
+#include "get_merkleized_map_value_hash.h"
+#include "stream_preimage.h"
 
 #include "../../boilerplate/dispatcher.h"
 #include "../../boilerplate/sw.h"
 
 #include "../../common/buffer.h"
+#include "../../common/parser.h"
 #include "../../common/read.h"
 #include "../../common/varint.h"
 #include "../../crypto.h"
-#include "../../constants.h"
+
+
+struct parse_rawtx_state_s; // forward declaration
+
+typedef struct {
+    struct parse_rawtx_state_s *parent_state; // subparsers can access parent's state
+    int scriptsig_size;    // max 10_000 bytes
+    int scriptsig_counter; // counter of scriptsig bytes already received
+} parse_rawtxinput_state_t;
+
+
+typedef struct {
+    struct parse_rawtx_state_s *parent_state; 
+    int scriptpubkey_size;    // max 10_000 bytes
+    int scriptpubkey_counter; // counter of scriptpubkey bytes already received
+} parse_rawtxoutput_state_t;
+
+typedef struct parse_rawtx_state_s {
+    cx_sha256_t *hash_context;
+
+    bool is_segwit;
+    int n_inputs;
+    int n_outputs;
+    int n_witnesses; // only for segwit tx, serialized according to bip-144
+
+    union {
+        // since the parsing stages of inputs, outputs and witnesses are disjoint, we reuse the same space in memory
+        struct {
+            int in_counter;
+            parser_context_t input_parser_context;
+            parse_rawtxinput_state_t input_parser_state;
+        };
+        struct {
+            int out_counter;
+            parser_context_t output_parser_context;
+            parse_rawtxoutput_state_t output_parser_state;
+        };
+        struct {
+            int wit_counter;
+            int cur_witness_length;
+            int cur_witness_bytes_read;
+        };
+    };
+
+    int output_index;              // index of queried output, or -1
+
+    txid_parser_outputs_t *parser_outputs;
+
+} parse_rawtx_state_t;
+
+
+typedef struct psbt_parse_rawtx_state_s {
+    // internal state
+    uint8_t store[32]; // buffer for unparsed data
+    int store_data_length; // size of data currently in store
+
+    parse_rawtx_state_t parser_state;
+    parser_context_t parser_context;
+} psbt_parse_rawtx_state_t;
+
+
 
 /*   PARSER FOR A RAWTX INPUT */
 
@@ -431,7 +497,7 @@ static const parsing_step_t parse_rawtx_steps[] = {
 const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps)/sizeof(parse_rawtx_steps[0]);
 
 
-static void cb_process_data_firstpass(buffer_t *data, void *cb_state) {
+static void cb_process_data(buffer_t *data, void *cb_state) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)cb_state;
 
     buffer_t store_buf = buffer_create(state->store, state->store_data_length);
@@ -448,32 +514,50 @@ static void cb_process_data_firstpass(buffer_t *data, void *cb_state) {
     }
 }
 
-void flow_psbt_parse_rawtx(dispatcher_context_t *dc) {
-    psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *)dc->machine_context_ptr;
+int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
+                          const merkleized_map_commitment_t *map,
+                          const uint8_t *key,
+                          int key_len,
+                          int output_index,
+                          txid_parser_outputs_t *outputs)
+{
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
-    int res = call_get_merkleized_map_value_hash(dc,
-                                                 state->map,
-                                                 state->key,
-                                                 state->key_len,
-                                                 state->value_hash);
+    cx_sha256_t hash_context;
+    cx_sha256_init(&hash_context);
+
+    psbt_parse_rawtx_state_t flow_state;
+
+
+    // init parser
+
+    flow_state.store_data_length = 0;
+    parser_init_context(&flow_state.parser_context, &flow_state.parser_state);
+
+    flow_state.parser_state.output_index = output_index;
+
+    uint8_t value_hash[20];
+    int res = call_get_merkleized_map_value_hash(dispatcher_context,
+                                                 map,
+                                                 key,
+                                                 key_len,
+                                                 value_hash);
     if (res < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+        return -1;
     }
 
     // init the state of the parser (global)
-    state->parser_state.hash_context = state->hash_context;
+    flow_state.parser_state.hash_context = &hash_context;
 
-    state->parser_state.parser_outputs = &state->outputs;
+    flow_state.parser_state.parser_outputs = outputs;
 
-    res = call_stream_preimage(dc, state->value_hash, cb_process_data_firstpass, state);
+    res = call_stream_preimage(dispatcher_context, value_hash, cb_process_data, &flow_state);
     if (res < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+        return -1;
     }
 
-    state->n_inputs = state->parser_state.n_inputs;
-    state->n_outputs = state->parser_state.n_outputs;
+    crypto_hash_digest(&hash_context.header, outputs->txid, 32);
+    cx_hash_sha256(outputs->txid, 32, outputs->txid, 32);
+    return 0;
 }

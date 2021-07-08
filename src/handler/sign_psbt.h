@@ -9,7 +9,7 @@
 #include "lib/get_merkleized_map_value.h"
 #include "lib/stream_merkleized_map_value.h"
 #include "lib/psbt_process_redeemScript.h"
-#include "flows/psbt_parse_rawtx.h"
+#include "lib/psbt_parse_rawtx.h"
 
 #define MAX_N_INPUTS_CAN_SIGN 16
 #define MAX_N_OUTPUTS_CAN_SIGN 16
@@ -84,8 +84,6 @@ typedef struct {
         };
     };
 
-    cx_sha256_t hash_context;
-
     int nLocktime;                   // the nLocktime of the transaction
 
     uint64_t inputs_total_value;
@@ -93,15 +91,8 @@ typedef struct {
 
     uint64_t internal_inputs_total_value;
     uint64_t internal_outputs_total_value;
-    
-
-    uint8_t tmp[1];  // temporary array for calls that need a param allocated in the state (call_psbt_parse_rawtx)
 
     policy_map_key_info_t our_key_info;
-
-    union {
-        psbt_parse_rawtx_state_t psbt_parse_rawtx;
-    } subcontext;
 } sign_psbt_state_t;
 
 

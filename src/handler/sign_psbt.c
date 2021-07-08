@@ -47,7 +47,6 @@ static void process_global_map(dispatcher_context_t *dc);
 
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
-static void receive_non_witness_utxo(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
 
 // Output validation
@@ -62,10 +61,7 @@ static void sign_process_input_map(dispatcher_context_t *dc);
 
 // Legacy signing (P2PKH and P2SH)
 static void sign_legacy(dispatcher_context_t *dc);
-static void sign_legacy_receive_non_witness_utxo(dispatcher_context_t *dc);
 static void sign_legacy_compute_sighash(dispatcher_context_t *dc);
-
-static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc);
 
 
 // Segwit signing (P2WPKH and P2WSH)
@@ -422,57 +418,45 @@ static void process_input_map(dispatcher_context_t *dc) {
     }
 
 
+    txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
-    state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
-
-    cx_sha256_init(&state->hash_context);
-
-    call_psbt_parse_rawtx(dc,
-                          &state->subcontext.psbt_parse_rawtx,
-                          receive_non_witness_utxo,
-                          &state->hash_context,
-                          &state->cur_input.map,
-                          state->tmp,
-                          1,
-                          prevout_n);
-}
-
-static void receive_non_witness_utxo(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    uint8_t computed_prevout_hash[32];
-
-    crypto_hash_digest(&state->hash_context.header, computed_prevout_hash, 32);
-    cx_hash_sha256(computed_prevout_hash, 32, computed_prevout_hash, 32);
+    res = call_psbt_parse_rawtx(dc,
+                                &state->cur_input.map,
+                                (uint8_t []){ PSBT_IN_NON_WITNESS_UTXO },
+                                1,
+                                prevout_n,
+                                &parser_outputs);
+    if (res < 0) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
 
     uint8_t prevout_hash[32];
 
     // Read fallback locktime
     // TODO: should the client side do the processing for the lock-time, so that we just
     //       accept the fallback locktime as the correct value, and ignore the input's ones?
-    int res = call_get_merkleized_map_value(dc,
-                                            &state->cur_input.map,
-                                            (uint8_t []){ PSBT_IN_PREVIOUS_TXID },
-                                            1,
-                                            prevout_hash,
-                                            sizeof(prevout_hash));
+    res = call_get_merkleized_map_value(dc,
+                                        &state->cur_input.map,
+                                        (uint8_t []){ PSBT_IN_PREVIOUS_TXID },
+                                        1,
+                                        prevout_hash,
+                                        sizeof(prevout_hash));
 
-    if (res == -1 || memcmp(computed_prevout_hash, prevout_hash, 32) != 0) {
+    if (res == -1 || memcmp(parser_outputs.txid, prevout_hash, 32) != 0) {
         PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
 
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    uint64_t prevout_value = state->subcontext.psbt_parse_rawtx.outputs.vout_value;
+    uint64_t prevout_value = parser_outputs.vout_value;
 
     state->inputs_total_value += prevout_value;
 
     state->cur_input.prevout_amount = prevout_value;
 
-    state->cur_input.prevout_scriptpubkey_len = state->subcontext.psbt_parse_rawtx.outputs.vout_scriptpubkey_len;
+    state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
 
     if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
         PRINTF("Prevout's scriptPubKey too long: %d\n", state->cur_input.prevout_scriptpubkey_len);
@@ -481,7 +465,7 @@ static void receive_non_witness_utxo(dispatcher_context_t *dc) {
     }
 
     memcpy(state->cur_input.prevout_scriptpubkey,
-           state->subcontext.psbt_parse_rawtx.outputs.vout_scriptpubkey,
+           parser_outputs.vout_scriptpubkey,
            state->cur_input.prevout_scriptpubkey_len);
 
     dc->next(check_input_owned);
@@ -921,9 +905,6 @@ static void sign_legacy(dispatcher_context_t *dc) {
 
     // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
 
-    cx_sha256_init(&state->hash_context);
-
-
     // Read the prevout index
     uint32_t prevout_n;
     if (4 != call_get_merkleized_map_value_u32_le(dc,
@@ -936,31 +917,23 @@ static void sign_legacy(dispatcher_context_t *dc) {
         return;
     }
 
+    txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
-    state->tmp[0] = PSBT_IN_NON_WITNESS_UTXO;
+    int res = call_psbt_parse_rawtx(dc,
+                                    &state->cur_input.map,
+                                    (uint8_t []){ PSBT_IN_NON_WITNESS_UTXO },
+                                    1,
+                                    prevout_n,
+                                    &parser_outputs);
+    if (res < 0) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
 
-    cx_sha256_init(&state->hash_context);
-
-    call_psbt_parse_rawtx(dc,
-                          &state->subcontext.psbt_parse_rawtx,
-                          sign_legacy_receive_non_witness_utxo,
-                          &state->hash_context,
-                          &state->cur_input.map,
-                          state->tmp,
-                          1,
-                          prevout_n);
-}
-
-static void sign_legacy_receive_non_witness_utxo(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    int len = state->subcontext.psbt_parse_rawtx.outputs.vout_scriptpubkey_len;
-    state->cur_input.prevout_scriptpubkey_len = len;
+    state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
     memcpy(state->cur_input.prevout_scriptpubkey,
-           state->subcontext.psbt_parse_rawtx.outputs.vout_scriptpubkey,
-           len);
+           parser_outputs.vout_scriptpubkey,
+           parser_outputs.vout_scriptpubkey_len);
 
     dc->next(sign_legacy_compute_sighash);
 }
@@ -970,11 +943,15 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+
+    cx_sha256_t sighash_context;
+    cx_sha256_init(&sighash_context);
+
     uint8_t tmp[4];
     write_u32_le(tmp, 0, state->tx_version);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
-    crypto_hash_update_varint(&state->hash_context.header, state->n_inputs);
+    crypto_hash_update_varint(&sighash_context.header, state->n_inputs);
 
     for (int i = 0; i < state->n_inputs; i++) {
         // get this input's map
@@ -1009,7 +986,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
             return;
         }
 
-        crypto_hash_update(&state->hash_context.header, ith_prevout_hash, 32);
+        crypto_hash_update(&sighash_context.header, ith_prevout_hash, 32);
 
         uint8_t ith_prevout_n_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
@@ -1023,23 +1000,23 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
             return;
         }
 
-        crypto_hash_update(&state->hash_context.header, ith_prevout_n_raw, 4);
+        crypto_hash_update(&sighash_context.header, ith_prevout_n_raw, 4);
 
         if (i != state->cur_input_index) {
             // empty scriptcode
-            crypto_hash_update_u8(&state->hash_context.header, 0x00);
+            crypto_hash_update_u8(&sighash_context.header, 0x00);
         } else {
             if (!state->cur_input.has_redeemScript) {
                 // P2PKH, the script_code is the prevout's scriptPubKey
-                crypto_hash_update_varint(&state->hash_context.header, state->cur_input.prevout_scriptpubkey_len);
-                crypto_hash_update(&state->hash_context.header,
+                crypto_hash_update_varint(&sighash_context.header, state->cur_input.prevout_scriptpubkey_len);
+                crypto_hash_update(&sighash_context.header,
                                 state->cur_input.prevout_scriptpubkey,
                                 state->cur_input.prevout_scriptpubkey_len);
             } else {
                 // P2SH, the script_code is the redeemScript
                 uint8_t p2sh_script[23];
                 int res = call_psbt_process_redeemScript(dc,
-                                                         &state->hash_context,
+                                                         &sighash_context,
                                                          &state->cur_input.map,
                                                          (uint8_t []){ PSBT_IN_OUTPUT_INDEX },
                                                          1,
@@ -1064,36 +1041,28 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
             memset(ith_nSequence_raw, 0xFF, 4);
         }
 
-        crypto_hash_update(&state->hash_context.header, ith_nSequence_raw, 4);
+        crypto_hash_update(&sighash_context.header, ith_nSequence_raw, 4);
     }
 
     // outputs
-    crypto_hash_update_varint(&state->hash_context.header, state->n_outputs);
-    hash_outputs(dc, &state->hash_context.header);
+    crypto_hash_update_varint(&sighash_context.header, state->n_outputs);
+    hash_outputs(dc, &sighash_context.header);
 
 
     // nLocktime
     PRINTF("SIGHASH: nLocktime: %d\n", state->nLocktime);
     write_u32_le(tmp, 0, state->nLocktime);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // hash type
     PRINTF("SIGHASH: sighash_type: %d\n", state->cur_input.sighash_type);
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
-
-    dc->next(compute_sighash_and_sign_legacy);
-}
-
-static void compute_sighash_and_sign_legacy(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
     uint8_t sighash[32];
 
     //compute sighash
-    crypto_hash_digest(&state->hash_context.header, sighash, 32);
+    crypto_hash_digest(&sighash_context.header, sighash, 32);
     cx_hash_sha256(sighash, 32, sighash, 32);
 
     // TODO: remove
@@ -1178,8 +1147,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    cx_sha256_init(&state->hash_context);
-
     uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int script_len;
 
@@ -1258,15 +1225,15 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     // Compute sighash
 
-
-    cx_sha256_init(&state->hash_context);
+    cx_sha256_t sighash_context;
+    cx_sha256_init(&sighash_context);
 
     uint8_t tmp[8];
 
     // nVersion
     PRINTF("SIGHASH: nVersion: %d\n", state->tx_version);
     write_u32_le(tmp, 0, state->tx_version);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
     {
         cx_sha256_t hashPrevout_context, hashSequence_context;
@@ -1357,13 +1324,13 @@ static void sign_segwit(dispatcher_context_t *dc) {
         PRINTF("SIGHASH: hashPrevouts: ");
         for (int i = 0; i < 32; i++) PRINTF("%02X", hashPrevout[i]);
         PRINTF("\n");
-        crypto_hash_update(&state->hash_context.header, hashPrevout, 32);
+        crypto_hash_update(&sighash_context.header, hashPrevout, 32);
 
         // add to hash: hashSequence
         PRINTF("SIGHASH: hashSequence: ");
         for (int i = 0; i < 32; i++) PRINTF("%02X", hashSequence[i]);
         PRINTF("\n");
-        crypto_hash_update(&state->hash_context.header, hashSequence, 32);
+        crypto_hash_update(&sighash_context.header, hashSequence, 32);
     }
 
     {
@@ -1382,7 +1349,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
             return;
         }
 
-        crypto_hash_update(&state->hash_context.header, prevout_hash, 32);
+        crypto_hash_update(&sighash_context.header, prevout_hash, 32);
 
         uint8_t prevout_n_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
@@ -1400,16 +1367,16 @@ static void sign_segwit(dispatcher_context_t *dc) {
         for (int i = 0; i < 32; i++) PRINTF("%02X", prevout_hash[i]);
         PRINTF(" - %d\n", read_u32_le(prevout_n_raw, 0));
 
-        crypto_hash_update(&state->hash_context.header, prevout_n_raw, 4);
+        crypto_hash_update(&sighash_context.header, prevout_n_raw, 4);
     }
 
     // scriptCode
     if (is_p2wpkh(script, script_len)) {
         PRINTF("P2WPKH spend\n"); // TODO: remove
         // P2WPKH(script[2:22])
-        crypto_hash_update_u32(&state->hash_context.header, 0x1976a914);
-        crypto_hash_update(&state->hash_context.header, script + 2, 20);
-        crypto_hash_update_u16(&state->hash_context.header, 0x88ac);
+        crypto_hash_update_u32(&sighash_context.header, 0x1976a914);
+        crypto_hash_update(&sighash_context.header, script + 2, 20);
+        crypto_hash_update_u16(&sighash_context.header, 0x88ac);
 
         PRINTF("SIGHASH: scriptcode: ");
         PRINTF("1976a914");
@@ -1454,7 +1421,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         PRINTF("\n");
 
         // add witnessScript to hash
-        crypto_hash_update(&state->hash_context.header, witnessScript, witnessScript_len);
+        crypto_hash_update(&sighash_context.header, witnessScript, witnessScript_len);
     } else {
         PRINTF("Invalid or unsupported script in segwit transaction\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1477,7 +1444,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         }
 
         PRINTF("SIGHASH: value: %llu\n", read_u64_le(witness_utxo, 0));
-        crypto_hash_update(&state->hash_context.header, witness_utxo, 8); // only the first 8 bytes (amount)
+        crypto_hash_update(&sighash_context.header, witness_utxo, 8); // only the first 8 bytes (amount)
     }
 
     // nSequence
@@ -1493,7 +1460,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
             // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
             memset(nSequence_raw, 0xFF, 4);
         }
-        crypto_hash_update(&state->hash_context.header, nSequence_raw, 4);
+        crypto_hash_update(&sighash_context.header, nSequence_raw, 4);
     }
 
 
@@ -1514,23 +1481,23 @@ static void sign_segwit(dispatcher_context_t *dc) {
         for (int i = 0; i < 32; i++) PRINTF("%02X", hashOutputs[i]);
         PRINTF("\n");
 
-        crypto_hash_update(&state->hash_context.header, hashOutputs, 32);
+        crypto_hash_update(&sighash_context.header, hashOutputs, 32);
     }
 
     // nLocktime
     PRINTF("SIGHASH: nLocktime: %d\n", state->nLocktime);
     write_u32_le(tmp, 0, state->nLocktime);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // sighash type
     PRINTF("SIGHASH: sighashtype: %d\n", state->cur_input.sighash_type);
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
-    crypto_hash_update(&state->hash_context.header, tmp, 4);
+    crypto_hash_update(&sighash_context.header, tmp, 4);
 
     uint8_t sighash[32];
 
     //compute sighash
-    crypto_hash_digest(&state->hash_context.header, sighash, 32);
+    crypto_hash_digest(&sighash_context.header, sighash, 32);
     cx_hash_sha256(sighash, 32, sighash, 32);
 
     // TODO: remove
