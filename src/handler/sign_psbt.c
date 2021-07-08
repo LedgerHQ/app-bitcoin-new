@@ -38,8 +38,10 @@
 #include "sign_psbt.h"
 
 
-// Pre-approval
+// UI callbacks
 static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept);
+static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept);
+
 
 // Read global map
 static void process_global_map(dispatcher_context_t *dc);
@@ -48,6 +50,8 @@ static void process_global_map(dispatcher_context_t *dc);
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
+
+static void alert_external_inputs(dispatcher_context_t *dc);
 
 // Output validation
 static void verify_outputs_init(dispatcher_context_t *dc);
@@ -261,6 +265,7 @@ void handler_sign_psbt(
 
     state->inputs_total_value = 0;
     state->internal_inputs_total_value = 0;
+    state->has_external_inputs = false;
     memset(state->internal_inputs, 0, sizeof state->internal_inputs);
 
     // Get the master's key fingerprint
@@ -385,7 +390,7 @@ static void process_input_map(dispatcher_context_t *dc) {
 
     if (state->cur_input_index >= state->n_inputs) {
         // all inputs already processed
-        dc->next(verify_outputs_init);
+        dc->next(alert_external_inputs);
         return;
     }
 
@@ -544,11 +549,40 @@ static void check_input_owned(dispatcher_context_t *dc) {
         state->internal_inputs_total_value += state->cur_input.prevout_amount;
     } else {
         PRINTF("Input %d is external\n", state->cur_input_index);
+        state->has_external_inputs = true;
     }
 
 
     ++state->cur_input_index;
     dc->next(process_input_map);
+}
+
+
+// If there are external inputs, it is unsafe to sign, therefore we warn the user
+static void alert_external_inputs(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (!state->has_external_inputs) {
+        dc->next(verify_outputs_init);
+    } else {
+
+        dc->pause();
+        ui_warn_external_inputs(dc, ui_alert_external_inputs_result);
+    }
+}
+
+static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (!accept) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(verify_outputs_init);
+    dc->run();
 }
 
 /** OUTPUTS VERIFICATION FLOW

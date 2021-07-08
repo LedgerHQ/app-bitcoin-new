@@ -95,25 +95,23 @@ UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public k
 UX_STEP_NOCB(ux_display_confirm_address_step, pn, {&C_icon_eye, "Confirm receive address"});
 
 // Step with icon and text for a suspicious address
-UX_STEP_NOCB(
-    ux_display_unusual_derivation_path_step,
-    pnn,
-    {
-      &C_icon_warning,
-      "The derivation",
-      "path is unusual!",
-    });
+UX_STEP_NOCB(ux_display_unusual_derivation_path_step,
+             pnn,
+             {
+                 &C_icon_warning,
+                 "The derivation",
+                 "path is unusual!",
+             });
 
 // Step with icon and text to caution the user to reject if unsure
-UX_STEP_CB(
-    ux_display_reject_if_not_sure_step,
-    pnn,
-    (*g_validate_callback)(&G_dispatcher_context, false),
-    {
-      &C_icon_crossmark,
-      "Reject if you're",
-      "not sure",
-    });
+UX_STEP_CB(ux_display_reject_if_not_sure_step,
+           pnn,
+           (*g_validate_callback)(&G_dispatcher_context, false),
+           {
+               &C_icon_crossmark,
+               "Reject if you're",
+               "not sure",
+           });
 
 // Step with approve button
 UX_STEP_CB(ux_display_approve_step,
@@ -170,28 +168,27 @@ UX_STEP_NOCB(ux_display_address_step,
 UX_STEP_NOCB(ux_display_wallet_header_name_step,
              pnn,
              {
-               &C_icon_wallet,
-               "Register wallet",
-               g_ui_state.wallet.wallet_name,
+                 &C_icon_wallet,
+                 "Register wallet",
+                 g_ui_state.wallet.wallet_name,
              });
 
 // Step with description of a m-of-n multisig wallet
 UX_STEP_NOCB(ux_display_wallet_multisig_type_step,
              nn,
              {
-               "Multisig wallet",
-               g_ui_state.wallet.multisig_type,
+                 "Multisig wallet",
+                 g_ui_state.wallet.multisig_type,
              });
 
 
 // Step with index and xpub of a cosigner of a multisig wallet
-UX_STEP_NOCB(
-    ux_display_wallet_multisig_cosigner_pubkey_step,
-    bnnn_paging,
-    {
-        .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
-        .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
-    });
+UX_STEP_NOCB(ux_display_wallet_multisig_cosigner_pubkey_step,
+             bnnn_paging,
+             {
+                 .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
+                 .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
+             });
 
 
 
@@ -199,9 +196,9 @@ UX_STEP_NOCB(
 UX_STEP_NOCB(ux_display_receive_in_wallet_step,
              pnn,
              {
-               &C_icon_wallet,
-               "Receive in:",
-               g_ui_state.wallet.wallet_name,
+                 &C_icon_wallet,
+                 "Receive in:",
+                 g_ui_state.wallet.wallet_name,
              });
 
 // Step with title/text for address, used when showing a wallet receive address
@@ -217,11 +214,20 @@ UX_STEP_NOCB(ux_display_wallet_address_step,
 UX_STEP_NOCB(ux_display_spend_from_wallet_step,
              pnn,
              {
-               &C_icon_wallet,
-               "Spend from:",
-               g_ui_state.wallet.wallet_name,
+                 &C_icon_wallet,
+                 "Spend from:",
+                 g_ui_state.wallet.wallet_name,
              });
 
+
+// Step with icon and text with name of a wallet to spend from
+UX_STEP_NOCB(ux_display_warning_external_inputs_step,
+             pnn,
+             {
+                 &C_icon_warning,
+                 "Transaction with",
+                 "external inputs!",
+             });
 
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
@@ -308,13 +314,26 @@ UX_FLOW(ux_display_wallet_name_address_flow,
 // #2 screen: wallet description
 // #3 screen: approve button
 // #4 screen: reject button
-UX_FLOW(ux_display_wallet_for_spending,
+UX_FLOW(ux_display_wallet_for_spending_flow,
         &ux_display_spend_from_wallet_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
 
-int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
+
+// FLOW to warn about external inputs
+// #1 screen: warning icon + "Transaction with external inputs!"
+// #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #3 screen: approve button
+// #4 screen: reject button
+
+UX_FLOW(ux_display_warning_external_inputs_flow,
+        &ux_display_spend_from_wallet_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+void ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
     (void)(context);
 
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *)&g_ui_state;
@@ -325,12 +344,10 @@ int ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pub
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_pubkey_flow, NULL);
-
-    return 0;
 }
 
 
-int ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, char *path_str, action_validate_cb callback) {
+void ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, char *path_str, action_validate_cb callback) {
     (void)(context);
 
     ui_path_and_address_state_t *state = (ui_path_and_address_state_t *)&g_ui_state;
@@ -345,11 +362,10 @@ int ui_display_address(dispatcher_context_t *context, char *address, bool is_pat
         strncpy(state->bip32_path, path_str, sizeof(state->bip32_path));
         ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
     }
-    return 0;
 }
 
 
-int ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
+void ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
     (void)(context);
 
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
@@ -360,11 +376,10 @@ int ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name,
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_multisig_header_flow, NULL);
-    return 0;
 }
 
 
-int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
+void ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
     (void)(context);
 
     ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
@@ -375,11 +390,10 @@ int ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pub
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_multisig_cosigner_pubkey_flow, NULL);
-    return 0;
 }
 
 
-int ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, char *address, action_validate_cb callback) {
+void ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, char *address, action_validate_cb callback) {
     (void)(context);
 
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
@@ -390,11 +404,10 @@ int ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, 
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
-    return 0;
 }
 
 
-int ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback) {
+void ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback) {
     (void)(context);
 
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
@@ -403,6 +416,14 @@ int ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, 
 
     g_validate_callback = callback;
 
-    ux_flow_init(0, ux_display_wallet_for_spending, NULL);
-    return 0;
+    ux_flow_init(0, ux_display_wallet_for_spending_flow, NULL);
+}
+
+
+void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb callback) {
+    (void)(context);
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_display_warning_external_inputs_flow, NULL);
 }
