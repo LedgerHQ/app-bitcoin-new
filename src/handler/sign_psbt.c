@@ -44,6 +44,7 @@ extern global_context_t G_context;
 static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept);
 static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept);
 static void ui_action_validate_output(dispatcher_context_t *dc, bool accept);
+static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept);
 
 
 // Read global map
@@ -62,6 +63,9 @@ static void process_output_map(dispatcher_context_t *dc);
 static void check_output_owned(dispatcher_context_t *dc);
 static void output_next(dispatcher_context_t *dc);
 
+
+// User confirmation (all)
+static void confirm_transaction(dispatcher_context_t *dc);
 
 // Signing process (all)
 static void sign_init(dispatcher_context_t *dc);
@@ -652,7 +656,7 @@ static void process_output_map(dispatcher_context_t *dc){
 
     if (state->cur_output_index >= state->n_outputs) {
         // all inputs already processed
-        dc->next(sign_init);
+        dc->next(confirm_transaction);
         return;
     }
 
@@ -853,6 +857,35 @@ static void output_next(dispatcher_context_t *dc) {
     dc->next(process_output_map);
 }
 
+// Show fees and confirm transaction with the user
+static void confirm_transaction(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->inputs_total_value < state->outputs_total_value) {
+        // negative fee transaction is invalid
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    uint64_t fee = state->inputs_total_value - state->outputs_total_value;
+
+    dc->pause();
+    ui_validate_transaction(dc, fee, ui_action_validate_transaction);
+}
+
+static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (!accept) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(sign_init);
+    dc->run();
+}
 
 /** SIGNING FLOW
  *

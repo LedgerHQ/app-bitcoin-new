@@ -74,6 +74,10 @@ typedef struct {
     char amount[sizeof("10000.00000000 BTC")];
 } ui_validate_output_state_t;
 
+typedef struct {
+    char fee[sizeof("10000.00000000 BTC")];
+} ui_validate_transaction_state_t;
+
 /**
  * Union of all the states for each of the UI screens, in order to save memory.
  */
@@ -83,6 +87,7 @@ typedef union {
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
+    ui_validate_transaction_state_t validate_transaction;
 } ui_state_t;
 
 static ui_state_t g_ui_state;
@@ -245,7 +250,7 @@ UX_STEP_NOCB(ux_review_step,
                  g_ui_state.validate_output.index,
              });
 
-
+// Step with "Amount" and an output amount
 UX_STEP_NOCB(ux_validate_amount_step,
              bnnn_paging,
              {
@@ -253,6 +258,7 @@ UX_STEP_NOCB(ux_validate_amount_step,
                  .text = g_ui_state.validate_output.amount,
              });
 
+// Step with "Address" and a paginated address
 UX_STEP_NOCB(ux_validate_address_step,
              bnnn_paging,
              {
@@ -260,6 +266,29 @@ UX_STEP_NOCB(ux_validate_address_step,
                  .text = g_ui_state.validate_output.address,
              });
 
+
+
+UX_STEP_NOCB(ux_confirm_transaction_step,
+             pnn,
+             {
+                 &C_icon_eye,
+                 "Confirm",
+                 "transaction"
+             });
+UX_STEP_NOCB(ux_confirm_transaction_fees_step,
+             bnnn_paging,
+             {
+                 .title = "Fees",
+                 .text = g_ui_state.validate_transaction.fee,
+             });
+UX_STEP_CB(ux_accept_and_send_step,
+           pbb,
+           (*g_validate_callback)(&G_dispatcher_context, true),
+           {
+               &C_icon_validate_14,
+               "Accept",
+               "and send"
+           });
 
 
 // FLOW to display BIP32 path and pubkey:
@@ -376,6 +405,18 @@ UX_FLOW(ux_display_output_address_amount_flow,
         &ux_validate_amount_step,
         &ux_validate_address_step,
         &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+// Finalize see the transaction fees and finally accept signing
+// #1 screen: eye icon + "Confirm Transaction"
+// #2 screen: fee amount
+// #3 screen: "Accept and send", with approve button
+// #4 screen: reject button
+UX_FLOW(ux_accept_transaction_flow,
+        &ux_confirm_transaction_step,
+        &ux_confirm_transaction_fees_step,
+        &ux_accept_and_send_step,
         &ux_display_reject_step);
 
 
@@ -497,4 +538,20 @@ void ui_validate_output(dispatcher_context_t *context,
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
+}
+
+
+void ui_validate_transaction(dispatcher_context_t *context, uint64_t fee, action_validate_cb callback) {
+    (void)(context);
+
+    int whole_part = (int)(fee / 100000000);
+    int fract_part = (int)(fee % 100000000);
+
+    ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *)&g_ui_state;
+
+    g_validate_callback = callback;
+
+    snprintf(state->fee, sizeof(state->fee), "%d.%08d", whole_part, fract_part);
+
+    ux_flow_init(0, ux_accept_transaction_flow, NULL);
 }

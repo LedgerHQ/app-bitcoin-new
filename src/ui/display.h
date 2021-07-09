@@ -52,3 +52,5 @@ void ui_validate_output(dispatcher_context_t *context,
                         char *address,
                         uint64_t amount,
                         action_validate_cb callback);
+
+void ui_validate_transaction(dispatcher_context_t *context, uint64_t fee, action_validate_cb callback);
