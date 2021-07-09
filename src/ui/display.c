@@ -53,7 +53,6 @@ typedef struct {
 } ui_path_and_pubkey_state_t;
 
 typedef struct {
-    // TODO: avoid hack: keep bip32_path in the same position in memory for ui_display_pubkey_state_t and ui_display_address_state_t.
     char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
 } ui_path_and_address_state_t;
@@ -69,6 +68,11 @@ typedef struct {
     char signer_index[sizeof("Signer 15 of 15")];
 } ui_cosigner_pubkey_and_index_state_t;
 
+typedef struct {
+    char index[sizeof("output #999")];
+    char address[MAX_ADDRESS_LENGTH_STR + 1];
+    char amount[sizeof("10000.00000000 BTC")];
+} ui_validate_output_state_t;
 
 /**
  * Union of all the states for each of the UI screens, in order to save memory.
@@ -78,6 +82,7 @@ typedef union {
     ui_path_and_address_state_t path_and_address;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
+    ui_validate_output_state_t validate_output;
 } ui_state_t;
 
 static ui_state_t g_ui_state;
@@ -220,7 +225,7 @@ UX_STEP_NOCB(ux_display_spend_from_wallet_step,
              });
 
 
-// Step with icon and text with name of a wallet to spend from
+// Step with warning icon and text explaining that there are external inputs
 UX_STEP_NOCB(ux_display_warning_external_inputs_step,
              pnn,
              {
@@ -228,6 +233,34 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
                  "Transaction with",
                  "external inputs!",
              });
+
+
+
+// Step with eye icon and "Review" and the output index
+UX_STEP_NOCB(ux_review_step,
+             pnn,
+             {
+                 &C_icon_eye,
+                 "Review",
+                 g_ui_state.validate_output.index,
+             });
+
+
+UX_STEP_NOCB(ux_validate_amount_step,
+             bnnn_paging,
+             {
+                 .title = "Amount",
+                 .text = g_ui_state.validate_output.amount,
+             });
+
+UX_STEP_NOCB(ux_validate_address_step,
+             bnnn_paging,
+             {
+                 .title = "Address",
+                 .text = g_ui_state.validate_output.address,
+             });
+
+
 
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
@@ -326,9 +359,22 @@ UX_FLOW(ux_display_wallet_for_spending_flow,
 // #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
 // #3 screen: approve button
 // #4 screen: reject button
-
 UX_FLOW(ux_display_warning_external_inputs_flow,
         &ux_display_spend_from_wallet_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+// FLOW to validate a single output
+// #1 screen: eye icon + "Review" + index of output to validate
+// #2 screen: output amount
+// #3 screen: output address (paginated)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_output_address_amount_flow,
+        &ux_review_step,
+        &ux_validate_amount_step,
+        &ux_validate_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -426,4 +472,29 @@ void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb c
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_warning_external_inputs_flow, NULL);
+}
+
+
+void ui_validate_output(dispatcher_context_t *context,
+                        int index,
+                        char *address,
+                        uint64_t amount,
+                        action_validate_cb callback)
+{
+    (void)(context);
+
+    ui_validate_output_state_t *state = (ui_validate_output_state_t *)&g_ui_state;
+
+    snprintf(state->index, sizeof(state->index), "output #%d", index);
+
+    strncpy(state->address, address, sizeof(state->address));
+
+    int whole_part = (int)(amount / 100000000);
+    int fract_part = (int)(amount % 100000000);
+
+    snprintf(state->amount, sizeof(state->amount), "%d.%08d", whole_part, fract_part);
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
 }

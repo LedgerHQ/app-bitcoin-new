@@ -86,15 +86,22 @@ typedef struct {
         };
     };
 
-    uint8_t sighash[32];
+    union { // used at different times, so we overlap them to save space
+        char output_address[MAX_ADDRESS_LENGTH_STR + 1];
+        uint8_t sighash[32];
+    };
 
-    int nLocktime;                   // the nLocktime of the transaction
+    int nLocktime;              // the nLocktime of the transaction
 
     uint64_t inputs_total_value;
     uint64_t outputs_total_value;
 
     uint64_t internal_inputs_total_value;
-    uint64_t internal_outputs_total_value;
+
+    uint64_t change_outputs_total_value;
+
+    int external_outputs_count; // count of external outputs that are shown to the user
+    int change_count;           // count of outputs compatible with change outputs
 
     policy_map_key_info_t our_key_info;
 } sign_psbt_state_t;

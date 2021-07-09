@@ -557,10 +557,10 @@ int get_script_address(const uint8_t script[], size_t script_len, global_context
         {
             // bech32 encoding
 
-            int hash_length = (script_type == SCRIPT_TYPE_P2PKH ? 20 : 32);
+            int hash_length = (script_type == SCRIPT_TYPE_P2WPKH ? 20 : 32);
 
             // make sure that the output buffer is long enough
-            if (out_len < 72 + strlen(network.native_segwit_prefix)) {
+            if (out_len < 73 + strlen(network.native_segwit_prefix)) {
                 return -1;
             }
 

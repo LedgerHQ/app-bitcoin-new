@@ -37,10 +37,13 @@
 #include "lib/policy.h"
 #include "sign_psbt.h"
 
+extern global_context_t G_context;
+
 
 // UI callbacks
 static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept);
 static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept);
+static void ui_action_validate_output(dispatcher_context_t *dc, bool accept);
 
 
 // Read global map
@@ -57,6 +60,7 @@ static void alert_external_inputs(dispatcher_context_t *dc);
 static void verify_outputs_init(dispatcher_context_t *dc);
 static void process_output_map(dispatcher_context_t *dc);
 static void check_output_owned(dispatcher_context_t *dc);
+static void output_next(dispatcher_context_t *dc);
 
 
 // Signing process (all)
@@ -605,9 +609,13 @@ static void verify_outputs_init(dispatcher_context_t *dc) {
     PRINTF("######## INTERNAL INPUTS VALUE: %llu\n", state->internal_inputs_total_value);
 
     state->outputs_total_value = 0;
-    state->internal_outputs_total_value = 0;
+    state->change_outputs_total_value = 0;
+    state->change_count = 0;
 
     state->cur_output_index = 0;
+
+    state->external_outputs_count = 0;
+
     dc->next(process_output_map);
 }
 
@@ -731,6 +739,14 @@ static void check_output_owned(dispatcher_context_t *dc) {
                                             fpt_der,
                                             sizeof(fpt_der));
 
+    bool is_output_internal = false;
+
+    if (len != -1 && len % 4 != 0) {
+        PRINTF("Invalid PSBT_OUT_BIP32_DERIVATION length: %d\n", len);
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
     if (len > 0) {
         // there must be at least 2 derivation steps (change and address_index),
         // so at least 12 bytes (the first 4 bytes are for the key's master fingerprint)
@@ -751,13 +767,13 @@ static void check_output_owned(dispatcher_context_t *dc) {
         buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
 
         int wallet_script_len = call_get_wallet_script(dc,
-                                                    &state->wallet_policy_map,
-                                                    state->wallet_header.keys_info_merkle_root,
-                                                    state->wallet_header.n_keys,
-                                                    change,
-                                                    address_index,
-                                                    &wallet_script_buf,
-                                                    NULL);
+                                                       &state->wallet_policy_map,
+                                                       state->wallet_header.keys_info_merkle_root,
+                                                       state->wallet_header.n_keys,
+                                                       change,
+                                                       address_index,
+                                                       &wallet_script_buf,
+                                                       NULL);
         if (wallet_script_len < 0) {
             PRINTF("Failed to get wallet script for output\n");
             SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
@@ -774,17 +790,64 @@ static void check_output_owned(dispatcher_context_t *dc) {
         PRINTF("\n");
 
         if (   wallet_script_len == state->cur_output.scriptpubkey_len
-            && memcmp(wallet_script, state->cur_output.scriptpubkey, wallet_script_len) == 0)
+            && memcmp(wallet_script, state->cur_output.scriptpubkey, wallet_script_len) == 0
+            && change == 1)
         {
             PRINTF("Output %d is internal\n", state->cur_output_index);
 
-            state->internal_outputs_total_value += state->cur_output.value;
-        } else {
-            PRINTF("Output %d is external\n", state->cur_output_index);
+            state->change_outputs_total_value += state->cur_output.value;
+            is_output_internal = true;
+            ++state->change_count;
+
+            if (address_index > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
+                // TODO: should warn the user and alert about the unusual path
+            }
+            dc->next(output_next);
+            return;
         }
-    } else {
-        PRINTF("Output %d is external\n", state->cur_output_index);
     }
+
+    PRINTF("Output %d is external\n", state->cur_output_index);
+
+    ++state->external_outputs_count;
+
+    // TODO: show this output
+
+    int address_len = get_script_address(state->cur_output.scriptpubkey,
+                                         state->cur_output.scriptpubkey_len,
+                                         G_context,
+                                         state->output_address,
+                                         sizeof(state->output_address));
+    if (address_len < 0) {
+        SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
+        return;
+    }
+
+    dc->pause();
+    ui_validate_output(dc,
+                       state->external_outputs_count,
+                       state->output_address,
+                       state->cur_output.value,
+                       ui_action_validate_output);
+}
+
+static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (!accept) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(output_next);
+    dc->run();
+}
+
+
+static void output_next(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     ++state->cur_output_index;
     dc->next(process_output_map);
@@ -900,7 +963,6 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    // TODO: get and validate signing path
     // get path, obtain change and address_index,
     uint8_t key[1+33];
     key[0] = PSBT_IN_BIP32_DERIVATION;
