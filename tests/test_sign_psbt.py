@@ -112,6 +112,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 #     print(result)
 
 
+@automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_multisig_wsh(cmd):
     wallet = MultisigWallet(
         name="Cold storage",
