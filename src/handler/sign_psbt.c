@@ -1183,12 +1183,10 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
 
     // nLocktime
-    PRINTF("SIGHASH: nLocktime: %d\n", state->nLocktime);
     write_u32_le(tmp, 0, state->nLocktime);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // hash type
-    PRINTF("SIGHASH: sighash_type: %d\n", state->cur_input.sighash_type);
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
@@ -1355,13 +1353,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
                 return;
             }
 
-            PRINTF("Adding to hashSequence: ");
-            for (int j = 0; j < 4; j++)
-                PRINTF("%02X", ith_prevout_n_raw[j]);
-            PRINTF("\n");
-
             crypto_hash_update(&hashPrevout_context.header, ith_prevout_n_raw, 4);
-
 
             uint8_t ith_nSequence_raw[4];
             if (4 != call_get_merkleized_map_value(dc,
@@ -1384,13 +1376,11 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
 
         // add to hash: hashPrevouts
-        PRINTF("SIGHASH: hashPrevouts: ");
         for (int i = 0; i < 32; i++) PRINTF("%02X", hashPrevout[i]);
         PRINTF("\n");
         crypto_hash_update(&sighash_context.header, hashPrevout, 32);
 
         // add to hash: hashSequence
-        PRINTF("SIGHASH: hashSequence: ");
         for (int i = 0; i < 32; i++) PRINTF("%02X", hashSequence[i]);
         PRINTF("\n");
         crypto_hash_update(&sighash_context.header, hashSequence, 32);
@@ -1426,9 +1416,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
             return;
         }
 
-        PRINTF("SIGHASH: outpoint: ");
-        for (int i = 0; i < 32; i++) PRINTF("%02X", prevout_hash[i]);
-        PRINTF(" - %d\n", read_u32_le(prevout_n_raw, 0));
 
         crypto_hash_update(&sighash_context.header, prevout_n_raw, 4);
     }
@@ -1440,11 +1427,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
         crypto_hash_update_u32(&sighash_context.header, 0x1976a914);
         crypto_hash_update(&sighash_context.header, script + 2, 20);
         crypto_hash_update_u16(&sighash_context.header, 0x88ac);
-
-        PRINTF("SIGHASH: scriptcode: ");
-        PRINTF("1976a914");
-        for (int i = 0; i < 20; i++) PRINTF("%02X", script[2 + i]);
-        PRINTF("88ac\n");
     } else if (is_p2wsh(script, script_len)) {
         PRINTF("P2WSH spend\n"); // TODO: remove
         // P2WSH
@@ -1468,7 +1450,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         cx_hash_sha256(witnessScript, witnessScript_len, witnessScript_hash, 32);
 
         // check that script == P2WSH(witnessScript), add witnessScript to hash
-        if (script_len != 2+32
+        if (   script_len != 2+32
             || script[0] != 0x00
             || script[1] != 0x20
             || memcmp(script + 2, witnessScript_hash, 32) != 0
@@ -1479,9 +1461,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
             return;
         }
 
-        PRINTF("SIGHASH: witnessScript: ");
-        for (int i = 0; i < witnessScript_len; i++) PRINTF("%02X", witnessScript[i]);
-        PRINTF("\n");
+        crypto_hash_update_varint(&sighash_context.header, witnessScript_len);
 
         // add witnessScript to hash
         crypto_hash_update(&sighash_context.header, witnessScript, witnessScript_len);
@@ -1506,7 +1486,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
             return;
         }
 
-        PRINTF("SIGHASH: value: %llu\n", read_u64_le(witness_utxo, 0));
         crypto_hash_update(&sighash_context.header, witness_utxo, 8); // only the first 8 bytes (amount)
     }
 
@@ -1540,20 +1519,14 @@ static void sign_segwit(dispatcher_context_t *dc) {
         crypto_hash_digest(&hashOutputs_context.header, hashOutputs, 32);
         cx_hash_sha256(hashOutputs, 32, hashOutputs, 32);
 
-        PRINTF("SIGHASH: hashOutputs: ");
-        for (int i = 0; i < 32; i++) PRINTF("%02X", hashOutputs[i]);
-        PRINTF("\n");
-
         crypto_hash_update(&sighash_context.header, hashOutputs, 32);
     }
 
     // nLocktime
-    PRINTF("SIGHASH: nLocktime: %d\n", state->nLocktime);
     write_u32_le(tmp, 0, state->nLocktime);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // sighash type
-    PRINTF("SIGHASH: sighashtype: %d\n", state->cur_input.sighash_type);
     write_u32_le(tmp, 0, state->cur_input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
@@ -1561,11 +1534,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
     crypto_hash_digest(&sighash_context.header, state->sighash, 32);
     cx_hash_sha256(state->sighash, 32, state->sighash, 32);
 
-    // TODO: remove
-    PRINTF("sighash: ");
-    for (int i = 0; i < 32; i++)
-        PRINTF("%02x", state->sighash[i]);
-    PRINTF("\n");
 
     dc->next(sign_sighash);
 }
