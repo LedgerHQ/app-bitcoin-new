@@ -23,7 +23,7 @@ typedef struct {
     };
 
     int address_len;
-    char address[MAX_ADDRESS_LENGTH_STR];
+    char address[MAX_ADDRESS_LENGTH_STR + 1]; // null-terminated string
 } get_wallet_address_state_t;
 
 
