@@ -3,13 +3,6 @@
 #include "../boilerplate/dispatcher.h"
 #include "../common/merkle.h"
 
-#include "lib/check_merkle_tree_sorted.h"
-#include "lib/stream_merkle_leaf_element.h"
-#include "lib/get_merkleized_map.h"
-#include "lib/get_merkleized_map_value.h"
-#include "lib/stream_merkleized_map_value.h"
-#include "lib/psbt_process_redeemScript.h"
-#include "lib/psbt_parse_rawtx.h"
 
 #define MAX_N_INPUTS_CAN_SIGN 16
 #define MAX_N_OUTPUTS_CAN_SIGN 16
