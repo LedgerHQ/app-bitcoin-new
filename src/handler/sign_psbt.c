@@ -265,12 +265,16 @@ void handler_sign_psbt(
         // TODO: verify that the wallet is a canonical one that does not require signature
     }
 
-    if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
+    policy_map_wallet_header_t wallet_header;
+    if ((read_policy_map_wallet(&dc->read_buffer, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    memcpy(state->wallet_header_keys_info_merkle_root, wallet_header.keys_info_merkle_root, sizeof(wallet_header.keys_info_merkle_root));
+    state->wallet_header_n_keys = wallet_header.n_keys;
+
+    buffer_t policy_map_buffer = buffer_create(&wallet_header.policy_map, wallet_header.policy_map_len);
 
     if (parse_policy_map(&policy_map_buffer, state->wallet_policy_map_bytes, sizeof(state->wallet_policy_map_bytes)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -291,14 +295,13 @@ void handler_sign_psbt(
     // Check integrity of the global map
     if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
-    } else {
-        // TODO: check if wallet is canonical, skip wallet authorization if so
-
-        dc->pause();
-        ui_authorize_wallet_spend(dc,
-                                  state->wallet_header.name,
-                                  ui_action_validate_wallet_authorized);
+        return;
     }
+
+    // TODO: check if wallet is canonical, skip wallet authorization if so
+
+    dc->pause();
+    ui_authorize_wallet_spend(dc, wallet_header.name, ui_action_validate_wallet_authorized);
 }
 
 static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept) {
@@ -349,8 +352,9 @@ static void process_global_map(dispatcher_context_t *dc) {
     } else if (result_len != 4) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
+    } else {
+        state->locktime = read_u32_le(raw_result, 0);
     }
-    state->locktime = read_u32_le(raw_result, 0);
 
     // we alredy know n_inputs and n_outputs, so we skip reading from the global map
 
@@ -456,9 +460,7 @@ static void process_input_map(dispatcher_context_t *dc) {
 
     uint8_t prevout_hash[32];
 
-    // Read fallback locktime
-    // TODO: should the client side do the processing for the lock-time, so that we just
-    //       accept the fallback locktime as the correct value, and ignore the input's ones?
+    // check if the prevout_hash of the transaction matches the computed one from the non-witness utxo
     res = call_get_merkleized_map_value(dc,
                                         &state->cur_input.map,
                                         (uint8_t []){ PSBT_IN_PREVIOUS_TXID },
@@ -533,8 +535,8 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
     int wallet_script_len = call_get_wallet_script(dc,
                                                    &state->wallet_policy_map,
-                                                   state->wallet_header.keys_info_merkle_root,
-                                                   state->wallet_header.n_keys,
+                                                   state->wallet_header_keys_info_merkle_root,
+                                                   state->wallet_header_n_keys,
                                                    change,
                                                    address_index,
                                                    &wallet_script_buf,
@@ -749,8 +751,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
                                             fpt_der,
                                             sizeof(fpt_der));
 
-    bool is_output_internal = false;
-
     if (len != -1 && len % 4 != 0) {
         PRINTF("Invalid PSBT_OUT_BIP32_DERIVATION length: %d\n", len);
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -778,8 +778,8 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
         int wallet_script_len = call_get_wallet_script(dc,
                                                        &state->wallet_policy_map,
-                                                       state->wallet_header.keys_info_merkle_root,
-                                                       state->wallet_header.n_keys,
+                                                       state->wallet_header_keys_info_merkle_root,
+                                                       state->wallet_header_n_keys,
                                                        change,
                                                        address_index,
                                                        &wallet_script_buf,
@@ -806,7 +806,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
             PRINTF("Output %d is internal\n", state->cur_output_index);
 
             state->change_outputs_total_value += state->cur_output.value;
-            is_output_internal = true;
             ++state->change_count;
 
             if (address_index > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
@@ -822,12 +821,12 @@ static void check_output_owned(dispatcher_context_t *dc) {
     ++state->external_outputs_count;
 
     // TODO: show this output
-
+    char output_address[MAX_ADDRESS_LENGTH_STR + 1];
     int address_len = get_script_address(state->cur_output.scriptpubkey,
                                          state->cur_output.scriptpubkey_len,
                                          G_context,
-                                         state->output_address,
-                                         sizeof(state->output_address));
+                                         output_address,
+                                         sizeof(output_address));
     if (address_len < 0) {
         SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
         return;
@@ -836,7 +835,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
     dc->pause();
     ui_validate_output(dc,
                        state->external_outputs_count,
-                       state->output_address,
+                       output_address,
                        state->cur_output.value,
                        ui_action_validate_output);
 }
@@ -907,12 +906,12 @@ static void sign_init(dispatcher_context_t *dc) {
 
     // find and parse our registered key info in the wallet
     bool our_key_found = false;
-    for (unsigned int i = 0; i < state->wallet_header.n_keys; i++) {
+    for (unsigned int i = 0; i < state->wallet_header_n_keys; i++) {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
         int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        state->wallet_header.keys_info_merkle_root,
-                                                        state->wallet_header.n_keys,
+                                                        state->wallet_header_keys_info_merkle_root,
+                                                        state->wallet_header_n_keys,
                                                         i,
                                                         key_info_str,
                                                         sizeof(key_info_str));
@@ -1195,7 +1194,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
 
     // nLocktime
-    write_u32_le(tmp, 0, state->nLocktime);
+    write_u32_le(tmp, 0, state->locktime);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // hash type
@@ -1534,7 +1533,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
     }
 
     // nLocktime
-    write_u32_le(tmp, 0, state->nLocktime);
+    write_u32_le(tmp, 0, state->locktime);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // sighash type

@@ -56,7 +56,8 @@ typedef struct {
     int n_outputs;
     uint8_t outputs_root[20]; // merkle root of the vector of output maps commitments
 
-    policy_map_wallet_header_t wallet_header;
+    uint8_t wallet_header_keys_info_merkle_root[20];
+    size_t wallet_header_n_keys;
     union {
         uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
         policy_node_t wallet_policy_map;
@@ -79,12 +80,7 @@ typedef struct {
         };
     };
 
-    union { // used at different times, so we overlap them to save space
-        char output_address[MAX_ADDRESS_LENGTH_STR + 1];
-        uint8_t sighash[32];
-    };
-
-    int nLocktime;              // the nLocktime of the transaction
+    uint8_t sighash[32];
 
     uint64_t inputs_total_value;
     uint64_t outputs_total_value;
