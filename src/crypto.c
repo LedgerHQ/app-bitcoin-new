@@ -141,14 +141,12 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, ser
     uint8_t I[64];
 
     { // make sure that heavy memory allocations are freed as soon as possible
-        cx_hmac_sha512_t hmac_context;
 
-        cx_hmac_sha512_init(&hmac_context, parent->chain_code, 32);
-        cx_hmac((cx_hmac_t *)&hmac_context, 0, parent->compressed_pubkey, 33, NULL, 0);
+        uint8_t tmp[33 + 4];
+        memcpy(tmp, parent->compressed_pubkey, 33);
+        write_u32_be(tmp, 33, index);
 
-        uint8_t index_be[4];
-        write_u32_be(index_be, 0, index);
-        cx_hmac((cx_hmac_t *)&hmac_context, CX_LAST, index_be, 4, I, 64);
+        cx_hmac_sha512(parent->chain_code, 32, tmp, sizeof(tmp), I, 64);
     }
 
     uint8_t *I_L = &I[0];
