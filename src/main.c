@@ -18,6 +18,8 @@
 #include <stdint.h>  // uint*_t
 #include <string.h>  // memset, explicit_bzero
 
+#include <assert.h>
+
 #include "os.h"
 #include "ux.h"
 
@@ -76,6 +78,10 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
  * Handle APDU command received and send back APDU response using handlers.
  */
 void app_main() {
+    // assumptions on the length of data structures
+    _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t is larger than expected");
+
+
     // Length of APDU command received in G_io_apdu_buffer
     int input_len = 0;
     // Structured APDU command

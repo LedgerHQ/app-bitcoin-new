@@ -12,6 +12,8 @@ typedef enum {
     LE   /// Little Endian
 } endianness_t;
 
+typedef size_t buffer_snapshot_t;
+
 /**
  * Struct for buffer with size and offset.
  */
@@ -279,3 +281,17 @@ static inline buffer_t buffer_create(void *ptr, size_t size) {
  * or NULL otherwise. On success, the buffer is advanced by `size` bytes.
  */
 void *buffer_alloc(buffer_t *buffer, size_t size);
+
+/**
+ * TODO: docs
+ */
+static inline buffer_snapshot_t buffer_snapshot(buffer_t *buffer) {
+    return buffer->offset;
+}
+
+/**
+ * TODO: docs
+ */
+static inline void buffer_restore(buffer_t *buffer, buffer_snapshot_t snapshot) {
+    buffer->offset = snapshot;
+}
