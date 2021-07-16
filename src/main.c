@@ -79,8 +79,8 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
  */
 void app_main() {
     // assumptions on the length of data structures
-    _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t is larger than expected");
-
+    _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
+    _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
     // Length of APDU command received in G_io_apdu_buffer
     int input_len = 0;

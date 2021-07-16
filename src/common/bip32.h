@@ -9,7 +9,7 @@
  * Maximum length of BIP32 path allowed.
  * Note: BIP32 allows up to 256 derivation steps - but generally only 5 are used.
  */
-#define MAX_BIP32_PATH_STEPS 10
+#define MAX_BIP32_PATH_STEPS 6
 
 
 /**

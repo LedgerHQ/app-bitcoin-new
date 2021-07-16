@@ -16,7 +16,6 @@ def open_psbt_from_file(filename: str) -> PSBT:
 @automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
 
-    # legacy address
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file("./psbt/singlesig/sh-wpkh-1to2.psbt")
 
@@ -37,7 +36,6 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
 @automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
-    # legacy address
     # PSBT for a legacy 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file("./psbt/singlesig/wpkh-1to2.psbt")
 
@@ -58,7 +56,6 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
 @automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
-    # legacy address
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file("./psbt/singlesig/wpkh-2to2.psbt")

@@ -46,8 +46,8 @@
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
-    uint8_t master_key_derivation_len;
     uint8_t master_key_fingerprint[4];
+    uint8_t master_key_derivation_len;
     uint8_t has_key_origin;
     uint8_t has_wildcard; // true iff the keys ends with the /** wildcard
     char ext_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
