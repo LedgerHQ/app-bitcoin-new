@@ -235,12 +235,6 @@ void handler_sign_psbt(
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (n_outputs > MAX_N_OUTPUTS_CAN_SIGN) {
-        // TODO: remove this limitation
-        PRINTF("At most %d outputs are supported", MAX_N_OUTPUTS_CAN_SIGN);
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
     state->n_outputs = (size_t)n_outputs;
 
     uint8_t wallet_id[32];

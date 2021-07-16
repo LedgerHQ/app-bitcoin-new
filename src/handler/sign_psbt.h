@@ -4,8 +4,7 @@
 #include "../common/merkle.h"
 
 
-#define MAX_N_INPUTS_CAN_SIGN 16
-#define MAX_N_OUTPUTS_CAN_SIGN 16
+#define MAX_N_INPUTS_CAN_SIGN 32
 
 typedef struct {
     merkleized_map_commitment_t map;
