@@ -57,7 +57,7 @@ void handler_get_address(
 
     uint32_t purpose; // the valid purpose depends on the requested address type
     switch(p2) {
-        case ADDRESS_TYPE_LEGACY:     //legacy
+        case ADDRESS_TYPE_LEGACY: //legacy
             purpose = 44;
             break;
         case ADDRESS_TYPE_WIT:    // native segwit

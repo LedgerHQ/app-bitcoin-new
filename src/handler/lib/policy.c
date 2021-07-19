@@ -438,3 +438,22 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
     };
     return _call_get_wallet_script(&args, policy, out_buf, hash_context);
 }
+
+int get_policy_address_type(policy_node_t *policy) {
+    // legacy, native segwit or wrapped segwit
+    switch (policy->type) {
+        case TOKEN_PKH:
+            return ADDRESS_TYPE_LEGACY;
+        case TOKEN_WPKH:
+            return ADDRESS_TYPE_WIT;
+        case TOKEN_SH:
+            // wrapped segwit
+            if (((policy_node_with_script_t *)policy)->script->type == TOKEN_WPKH) {
+                return ADDRESS_TYPE_SH_WIT;
+            }
+            return -1;
+    }
+
+    // unrecognized type
+    return -1;
+}

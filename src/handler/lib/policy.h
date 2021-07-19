@@ -14,3 +14,8 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            size_t address_index,
                            buffer_t *out_buf,
                            cx_hash_t *hash_context);
+
+/**
+ * TODO
+ */
+int get_policy_address_type(policy_node_t *policy);

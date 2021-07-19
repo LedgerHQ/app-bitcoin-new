@@ -144,6 +144,7 @@ bool is_pubkey_path_standard(const uint32_t *bip32_path,
     return true;
 }
 
+// TODO: change uint32_t expected_purpose param to address_type, perhaps
 bool is_address_path_standard(const uint32_t *bip32_path,
                       size_t bip32_path_len,
                       uint32_t expected_purpose,

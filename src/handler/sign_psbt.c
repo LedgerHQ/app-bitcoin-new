@@ -248,17 +248,6 @@ void handler_sign_psbt(
         return;
     }
 
-    if (wallet_sig_len != 0) {
-        PRINTF("Signature length: %d\n", wallet_sig_len);
-        // Verify signature
-        if (!crypto_verify_sha256_hash(wallet_id, wallet_sig, wallet_sig_len)) {
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return;
-        }
-    } else {
-        // TODO: verify that the wallet is a canonical one that does not require signature
-    }
-
     policy_map_wallet_header_t wallet_header;
     if ((read_policy_map_wallet(&dc->read_buffer, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -274,6 +263,26 @@ void handler_sign_psbt(
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
+
+    if (wallet_sig_len != 0) {
+        // Verify signature
+        if (!crypto_verify_sha256_hash(wallet_id, wallet_sig, wallet_sig_len)) {
+            SEND_SW(dc, SW_SIGNATURE_FAIL);
+            return;
+        }
+        state->is_wallet_canonical = false;
+    } else {
+        // No signature, verify that the policy is a canonical one that is allowed by default
+        state->address_type = get_policy_address_type(&state->wallet_policy_map);
+        if (state->address_type == -1) {
+            PRINTF("Non-standard policy, and no signature provided\n");
+            SEND_SW(dc, SW_SIGNATURE_FAIL);
+            return;
+        }
+
+        state->is_wallet_canonical = true;
+    }
+
 
     state->inputs_total_value = 0;
     state->internal_inputs_total_value = 0;
@@ -292,10 +301,14 @@ void handler_sign_psbt(
         return;
     }
 
-    // TODO: check if wallet is canonical, skip wallet authorization if so
-
-    dc->pause();
-    ui_authorize_wallet_spend(dc, wallet_header.name, ui_action_validate_wallet_authorized);
+    if (state->is_wallet_canonical) {
+        // Canonical wallet, we start processing the psbt directly
+        dc->next(process_global_map);
+    } else {
+        // Show screen to authorize spend from a registered wallet
+        dc->pause();
+        ui_authorize_wallet_spend(dc, wallet_header.name, ui_action_validate_wallet_authorized);
+    }
 }
 
 static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept) {
@@ -523,7 +536,7 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
     PRINTF("Change and address_index for input %d: %d, %d\n", state->cur_input_index, change, address_index);
 
-    // TODO: derive wallet's scriptPubKey, check if it matches the expected one
+    // derive wallet's scriptPubKey, check if it matches the expected one
     uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
 
@@ -539,16 +552,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
         PRINTF("Failed to get wallet script\n");
         SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
     }
-
-    PRINTF("Computed script: ");
-    for (int i = 0; i < wallet_script_len; i++)
-        PRINTF("%02X", wallet_script[i]);
-    PRINTF("\n");
-
-    PRINTF("Expected script: ");
-    for (int i = 0; i < state->cur_input.prevout_scriptpubkey_len; i++)
-        PRINTF("%02X", state->cur_input.prevout_scriptpubkey[i]);
-    PRINTF("\n");
 
     if (   wallet_script_len == state->cur_input.prevout_scriptpubkey_len
         && memcmp(wallet_script, state->cur_input.prevout_scriptpubkey, wallet_script_len) == 0)
@@ -600,8 +603,6 @@ static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accep
  *  For each output, check if it's a change address.
  *  Show each output that is not a change address to the user for verification.
  */
-
-// TODO
 
 // entry point for the outputs verification flow
 static void verify_outputs_init(dispatcher_context_t *dc) {
@@ -681,7 +682,7 @@ static void process_output_map(dispatcher_context_t *dc){
         return;
     }
 
-    // TODO: read output amount and scriptpubkey
+    // read output amount and scriptpubkey
 
     uint8_t raw_result[8];
 
@@ -760,13 +761,24 @@ static void check_output_owned(dispatcher_context_t *dc) {
             return;
         }
 
+        size_t bip32_path_len = (len - 4)/4;
+        uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
+
+        if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
+            PRINTF("Too many steps: %d\n", bip32_path_len);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        for (unsigned int i = 0; i < bip32_path_len; i++) {
+            bip32_path[i] = read_u32_le(fpt_der, 4 + 4*i);
+        }
+
         // we interpret the final 8 bytes as change and address_index
-        uint32_t change = read_u32_le(fpt_der, len - 8);
-        uint32_t address_index = read_u32_le(fpt_der, len - 4);
+        uint32_t change = bip32_path[bip32_path_len - 2];
+        uint32_t address_index = bip32_path[bip32_path_len - 1];
 
-        PRINTF("Change and address_index for output %d: %d, %d\n", state->cur_input_index, change, address_index);
-
-        // TODO: derive wallet's scriptPubKey, check if it matches the expected one
+        // derive wallet's scriptPubKey, check if it matches the expected one
         uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
         buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
 
@@ -783,16 +795,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
         }
 
-        PRINTF("Computed script: ");
-        for (int i = 0; i < wallet_script_len; i++)
-            PRINTF("%02X", wallet_script[i]);
-        PRINTF("\n");
-
-        PRINTF("Expected script: ");
-        for (int i = 0; i < state->cur_output.scriptpubkey_len; i++)
-            PRINTF("%02X", state->cur_output.scriptpubkey[i]);
-        PRINTF("\n");
-
         if (   wallet_script_len == state->cur_output.scriptpubkey_len
             && memcmp(wallet_script, state->cur_output.scriptpubkey, wallet_script_len) == 0
             && change == 1)
@@ -802,11 +804,50 @@ static void check_output_owned(dispatcher_context_t *dc) {
             state->change_outputs_total_value += state->cur_output.value;
             ++state->change_count;
 
-            if (address_index > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
-                // TODO: should warn the user and alert about the unusual path
+            bool is_path_unusual = false;
+
+            if (state->is_wallet_canonical) {
+                uint32_t purpose; // the valid purpose depends on the requested address type
+                switch(state->address_type) {
+                    case ADDRESS_TYPE_LEGACY: //legacy
+                        purpose = 44;
+                        break;
+                    case ADDRESS_TYPE_WIT:    // native segwit
+                        purpose = 84;
+                        break;
+                    case ADDRESS_TYPE_SH_WIT: // wrapped segwit
+                        purpose = 49;
+                        break;
+                    default:
+                        SEND_SW(dc, SW_BAD_STATE);
+                        return;
+                }
+
+                // check if change path is as expected
+                is_path_unusual = is_address_path_standard(bip32_path,
+                                                           bip32_path_len, 
+                                                           purpose,
+                                                           G_context.bip44_coin_types,
+                                                           G_context.bip44_coin_types_len,
+                                                           true);
             }
-            dc->next(output_next);
-            return;
+
+            if (is_path_unusual) {
+                // alert the user about the unusual path for a change address
+
+                char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+                if (bip32_path_len > 0) {
+                    bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
+                }
+
+                dc->pause();
+                ui_display_unusual_path(dc, path_str, ui_action_validate_output);
+                return;
+            } else {
+                // normal change address, all good
+                dc->next(output_next);
+                return;
+            }
         }
     }
 
@@ -814,7 +855,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
     ++state->external_outputs_count;
 
-    // TODO: show this output
+    // show this output's address
     char output_address[MAX_ADDRESS_LENGTH_STR + 1];
     int address_len = get_script_address(state->cur_output.scriptpubkey,
                                          state->cur_output.scriptpubkey_len,
@@ -845,7 +886,6 @@ static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
     dc->next(output_next);
     dc->run();
 }
-
 
 static void output_next(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;

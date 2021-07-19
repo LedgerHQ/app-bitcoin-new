@@ -14,12 +14,14 @@ typedef struct {
     uint8_t is_change;
     uint8_t display_address;
 
-    policy_map_wallet_header_t wallet_header;
+    bool is_wallet_canonical;
+    int address_type;
 
-    uint8_t wallet_id[32];
+    uint8_t wallet_header_keys_info_merkle_root[20];
+    size_t wallet_header_n_keys;
     union {
-        uint8_t policy_map_bytes[MAX_POLICY_MAP_BYTES];
-        policy_node_t policy_map;
+        uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        policy_node_t wallet_policy_map;
     };
 
     int address_len;

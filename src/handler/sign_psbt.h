@@ -55,6 +55,9 @@ typedef struct {
     int n_outputs;
     uint8_t outputs_root[20]; // merkle root of the vector of output maps commitments
 
+    bool is_wallet_canonical;
+    int address_type;
+
     uint8_t wallet_header_keys_info_merkle_root[20];
     size_t wallet_header_n_keys;
     union {

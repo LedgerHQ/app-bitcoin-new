@@ -49,6 +49,10 @@ extern dispatcher_context_t G_dispatcher_context;
 
 typedef struct {
     char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+} ui_path_state_t;
+
+typedef struct {
+    char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
     char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 } ui_path_and_pubkey_state_t;
 
@@ -335,6 +339,21 @@ UX_FLOW(ux_display_address_suspicious_flow,
         &ux_display_reject_step);
 
 
+// FLOW to warn the user if a change output has an unusual derivation path (account index or address index too large):
+// #1 screen: warning icon + "The derivation path is unusual!"
+// #2 screen: display BIP32 Path
+// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_unusual_derivation_path_flow,
+        &ux_display_unusual_derivation_path_step,
+        &ux_display_path_step,
+        &ux_display_reject_if_not_sure_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
+
+
 // FLOW to display the header of a multisig wallet:
 // #1 screen: eye icon + "Register multisig" and the wallet name
 // #2 screen: display multisig threshold and number of keys
@@ -357,18 +376,27 @@ UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
         &ux_display_reject_step);
 
 
-
-// FLOW to display the name and a receive address of a registered wallet:
+// FLOW to display the name and an address of a registered wallet:
 // #1 screen: wallet name
-// #1 screen: wallet address
-// #2 screen: approve button
-// #3 screen: reject button
+// #2 screen: wallet address
+// #3 screen: approve button
+// #4 screen: reject button
 UX_FLOW(ux_display_wallet_name_address_flow,
         &ux_display_receive_in_wallet_step,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
+
+// FLOW to display an address of a canonical wallet:
+// #1 screen: wallet address
+// #2 screen: approve button
+// #3 screen: reject button
+UX_FLOW(ux_display_canonical_wallet_address_flow,
+        &ux_display_receive_in_wallet_step,
+        &ux_display_wallet_address_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
 
 
 // FLOW to display a registered wallet and authorize spending:
@@ -485,14 +513,27 @@ void ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name,
 
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
 
-    strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
     strncpy(state->address, address, sizeof(state->address));
+    g_validate_callback = callback;
+
+    if (wallet_name == NULL) {
+        ux_flow_init(0, ux_display_canonical_wallet_address_flow, NULL);
+    } else {
+        strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+        ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
+    }
+}
+
+void ui_display_unusual_path(dispatcher_context_t *context, char *path_str, action_validate_cb callback) {
+    (void)(context);
+
+    ui_path_state_t *state = (ui_path_state_t *)&g_ui_state;
 
     g_validate_callback = callback;
 
-    ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
+    strncpy(state->bip32_path, path_str, sizeof(state->bip32_path));
+    ux_flow_init(0, ux_display_unusual_derivation_path_flow, NULL);
 }
-
 
 void ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback) {
     (void)(context);
