@@ -3,6 +3,8 @@
 #include <stdbool.h>  // bool
 #include "../boilerplate/dispatcher.h"
 
+#include "../common/wallet.h"
+
 /**
  * Callback to reuse action with approve/reject in step FLOW.
  */
@@ -26,17 +28,15 @@ void ui_display_address(dispatcher_context_t *dispatcher_context,
                         char *path_str,
                         action_validate_cb callback);
 
-void ui_display_multisig_header(dispatcher_context_t *dispatcher_context,
-                                char *wallet_name,
-                                uint8_t threshold,
-                                uint8_t n_keys,
-                                action_validate_cb callback);
+void ui_display_wallet_header(dispatcher_context_t *context,
+                              policy_map_wallet_header_t *wallet_header,
+                              action_validate_cb callback);
 
-void ui_display_multisig_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
-                                         char *pubkey,
-                                         uint8_t cosigner_index,
-                                         uint8_t n_keys,
-                                         action_validate_cb callback);
+void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
+                                           char *pubkey,
+                                           uint8_t cosigner_index,
+                                           uint8_t n_keys,
+                                           action_validate_cb callback);
 
 void ui_display_wallet_address(dispatcher_context_t *context,
                                char *wallet_name,

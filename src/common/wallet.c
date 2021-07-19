@@ -97,7 +97,7 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
         return -1;
     }
 
-    if (header->type != WALLET_TYPE_POLICYMAP) {
+    if (header->type != WALLET_TYPE_POLICY_MAP) {
         return -2;
     }
 
@@ -118,7 +118,7 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
         return -6;
     }
 
-    if (header->name_len > MAX_POLICY_MAP_LEN) {
+    if (header->name_len > MAX_POLICY_MAP_LENGTH) {
         return -7;
     }
 
@@ -466,7 +466,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
             }
 
             // check integrity of k and n
-            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_MULTISIG_COSIGNERS)) {
+            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_POLICY_MAP_COSIGNERS)) {
                 return -13;
             }
 

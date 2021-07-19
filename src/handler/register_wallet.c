@@ -89,14 +89,7 @@ void handler_register_wallet(
     //       and it should be one of the accepted patterns.
 
     dc->pause();
-    // TODO: this does not show address type and if it's sorted. Is it a problem?
-    //       a possible attack would be to show the user a different wallet rather than the correct one.
-    //       Funds wouldn't be lost, but the user might think they are and fall victim of ransom nonetheless.
-    ui_display_multisig_header(dc,
-                               (char *)state->wallet_header.name,
-                               2, // TODO: need to compute this from the policy
-                               state->wallet_header.n_keys,
-                               ui_action_validate_header);
+    ui_display_wallet_header(dc, &state->wallet_header, ui_action_validate_header);
 }
 
 /**
@@ -166,11 +159,11 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     //       Currently we are showing to the user whichever string is passed by the host.
 
     dc->pause();
-    ui_display_multisig_cosigner_pubkey(dc,
-                                        key_info.ext_pubkey,
-                                        state->next_pubkey_index, // 1-indexed for the UI
-                                        state->wallet_header.n_keys,
-                                        ui_action_validate_cosigner);
+    ui_display_policy_map_cosigner_pubkey(dc,
+                                          key_info.ext_pubkey,
+                                          state->next_pubkey_index, // 1-indexed for the UI
+                                          state->wallet_header.n_keys,
+                                          ui_action_validate_cosigner);
 }
 
 /**

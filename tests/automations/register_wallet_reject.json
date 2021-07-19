@@ -2,7 +2,7 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Register wallet|Multisig wallet|Signer|Approve",
+      "regexp": "Register wallet|Policy map|Signer|Approve",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]

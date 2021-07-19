@@ -63,7 +63,7 @@ typedef struct {
 
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
-    char multisig_type[sizeof("15 of 15")];
+    char policy_map[MAX_POLICY_MAP_LENGTH];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
 } ui_wallet_state_t;
 
@@ -187,17 +187,17 @@ UX_STEP_NOCB(ux_display_wallet_header_name_step,
                  g_ui_state.wallet.wallet_name,
              });
 
-// Step with description of a m-of-n multisig wallet
-UX_STEP_NOCB(ux_display_wallet_multisig_type_step,
-             nn,
+// Step with description of a policy wallet
+UX_STEP_NOCB(ux_display_wallet_policy_map_type_step,
+             bnnn_paging,
              {
-                 "Multisig wallet",
-                 g_ui_state.wallet.multisig_type,
+                 .title = "Policy map:", // TODO: simplify for known multisig policies
+                 .text = g_ui_state.wallet.policy_map,
              });
 
 
-// Step with index and xpub of a cosigner of a multisig wallet
-UX_STEP_NOCB(ux_display_wallet_multisig_cosigner_pubkey_step,
+// Step with index and xpub of a cosigner of a policy_map wallet
+UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
              bnnn_paging,
              {
                  .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
@@ -354,24 +354,24 @@ UX_FLOW(ux_display_unusual_derivation_path_flow,
 
 
 
-// FLOW to display the header of a multisig wallet:
-// #1 screen: eye icon + "Register multisig" and the wallet name
-// #2 screen: display multisig threshold and number of keys
+// FLOW to display the header of a policy map wallet:
+// #1 screen: eye icon + "Register wallet" and the wallet name
+// #2 screen: display policy map (paginated)
 // #3 screen: approve button
 // #4 screen: reject button
-UX_FLOW(ux_display_multisig_header_flow,
+UX_FLOW(ux_display_policy_map_header_flow,
         &ux_display_wallet_header_name_step,
-        &ux_display_wallet_multisig_type_step,
+        &ux_display_wallet_policy_map_type_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
 
-// FLOW to display the header of a multisig wallet:
+// FLOW to display the header of a policy_map wallet:
 // #1 screen: Cosigner index and pubkey (paginated)
 // #2 screen: approve button
 // #3 screen: reject button
-UX_FLOW(ux_display_multisig_cosigner_pubkey_flow,
-        &ux_display_wallet_multisig_cosigner_pubkey_step,
+UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
+        &ux_display_wallet_policy_map_cosigner_pubkey_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -480,21 +480,29 @@ void ui_display_address(dispatcher_context_t *context, char *address, bool is_pa
 }
 
 
-void ui_display_multisig_header(dispatcher_context_t *context, char *wallet_name, uint8_t threshold, uint8_t n_keys, action_validate_cb callback) {
+void ui_display_wallet_header(dispatcher_context_t *context,
+    policy_map_wallet_header_t *wallet_header,
+    action_validate_cb callback)
+{
     (void)(context);
 
     ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
 
-    strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
-    snprintf(state->multisig_type, sizeof(state->multisig_type), "%u of %u", threshold, n_keys);
+    strncpy(state->wallet_name, wallet_header->name, sizeof(wallet_header->name));
+    strncpy(state->policy_map, wallet_header->policy_map, sizeof(wallet_header->policy_map));
 
     g_validate_callback = callback;
 
-    ux_flow_init(0, ux_display_multisig_header_flow, NULL);
+    ux_flow_init(0, ux_display_policy_map_header_flow, NULL);
 }
 
 
-void ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pubkey, uint8_t cosigner_index, uint8_t n_keys, action_validate_cb callback) {
+void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
+                                           char *pubkey,
+                                           uint8_t cosigner_index,
+                                           uint8_t n_keys,
+                                           action_validate_cb callback)
+{
     (void)(context);
 
     ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
@@ -504,7 +512,7 @@ void ui_display_multisig_cosigner_pubkey(dispatcher_context_t *context, char *pu
 
     g_validate_callback = callback;
 
-    ux_flow_init(0, ux_display_multisig_cosigner_pubkey_flow, NULL);
+    ux_flow_init(0, ux_display_policy_map_cosigner_pubkey_flow, NULL);
 }
 
 

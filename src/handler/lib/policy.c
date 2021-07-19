@@ -452,8 +452,7 @@ int get_policy_address_type(policy_node_t *policy) {
                 return ADDRESS_TYPE_SH_WIT;
             }
             return -1;
+        default:
+            return -1;
     }
-
-    // unrecognized type
-    return -1;
 }
