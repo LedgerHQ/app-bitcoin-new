@@ -823,6 +823,8 @@ class PSBT(object):
         if not (self.version is None or self.version == 0):
             raise ValueError("Can only convert from version 0 to version 2")
 
+        self.version = 2
+
         tx = self.tx
 
         self.tx = CTransaction()
