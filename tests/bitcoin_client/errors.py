@@ -66,6 +66,7 @@ class HWWError(Exception):
 
     Contains a message and error code.
     """
+
     def __init__(self, msg: str, code: int) -> None:
         """
         Create an exception with the message and error code
@@ -100,6 +101,7 @@ class NoPasswordError(HWWError):
     """
     :class:`HWWError` for :data:`NO_PASSWORD`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -110,6 +112,7 @@ class UnavailableActionError(HWWError):
     """
     :class:`HWWError` for :data:`UNAVAILABLE_ACTION`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -120,6 +123,7 @@ class DeviceAlreadyInitError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_ALREADY_INIT`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -130,6 +134,7 @@ class DeviceNotReadyError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_NOT_READY`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -140,6 +145,7 @@ class DeviceAlreadyUnlockedError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_ALREADY_UNLOCKED`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -150,6 +156,7 @@ class UnknownDeviceError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_TYPE`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -160,6 +167,7 @@ class NotImplementedError(HWWError):
     """
     :class:`HWWError` for :data:`NOT_IMPLEMENTED`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -170,6 +178,7 @@ class PSBTSerializationError(HWWError):
     """
     :class:`HWWError` for :data:`INVALID_TX`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -180,6 +189,7 @@ class BadArgumentError(HWWError):
     """
     :class:`HWWError` for :data:`BAD_ARGUMENT`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -190,6 +200,7 @@ class DeviceFailureError(HWWError):
     """
     :class:`HWWError` for :data:`UNKNOWN_ERROR`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -200,6 +211,7 @@ class ActionCanceledError(HWWError):
     """
     :class:`HWWError` for :data:`ACTION_CANCELED`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -210,6 +222,7 @@ class DeviceConnectionError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_CONN_ERROR`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message
@@ -220,6 +233,7 @@ class DeviceBusyError(HWWError):
     """
     :class:`HWWError` for :data:`DEVICE_BUSY`
     """
+
     def __init__(self, msg: str):
         """
         :param msg: The error message

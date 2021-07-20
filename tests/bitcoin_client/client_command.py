@@ -70,7 +70,7 @@ class GetPreimageCommand(ClientCommand):
 
                 if (payload_size < len(known_preimage)):
                     # split into list of length-1 bytes elements
-                    extra_elements = [known_preimage[i:i+1]
+                    extra_elements = [known_preimage[i:i + 1]
                                       for i in range(payload_size, len(known_preimage))]
                     # add to the queue any remaining extra bytes
                     self.queue.extend(extra_elements)
@@ -111,10 +111,10 @@ class GetMerkleLeafHashCommand(ClientCommand):
                 "This command should not execute when the queue is not empty.")
 
         proof = mt.prove_leaf(leaf_index)
-        n_proof_elements = len(proof)//20
+        n_proof_elements = len(proof) // 20
 
         # Compute how many elements we can fit in 255 - 20 - 1 - 1 = 233 bytes
-        n_response_elements = min(233//20, len(proof))
+        n_response_elements = min(233 // 20, len(proof))
         n_leftover_elements = len(proof) - n_response_elements
 
         # Add to the queue any proof elements that do not fit the response

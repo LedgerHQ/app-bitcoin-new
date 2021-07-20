@@ -124,6 +124,7 @@ class PubkeyProvider(object):
     Can contain the key origin info, the pubkey itself, and subsequent derivation paths for derivation from the pubkey
     The pubkey can be a typical pubkey or an extended pubkey.
     """
+
     def __init__(
         self,
         origin: Optional['KeyOriginInfo'],
@@ -239,6 +240,7 @@ class Descriptor(object):
     An abstract class for Descriptors themselves.
     Descriptors can contain multiple :class:`PubkeyProvider`\ s and no more than one ``Descriptor`` as a subdescriptor.
     """
+
     def __init__(
         self,
         pubkeys: List['PubkeyProvider'],
@@ -285,6 +287,7 @@ class PKHDescriptor(Descriptor):
     """
     A descriptor for ``pkh()`` descriptors
     """
+
     def __init__(
         self,
         pubkey: 'PubkeyProvider'
@@ -303,6 +306,7 @@ class WPKHDescriptor(Descriptor):
     """
     A descriptor for ``wpkh()`` descriptors
     """
+
     def __init__(
         self,
         pubkey: 'PubkeyProvider'
@@ -321,6 +325,7 @@ class MultisigDescriptor(Descriptor):
     """
     A descriptor for ``multi()`` and ``sortedmulti()`` descriptors
     """
+
     def __init__(
         self,
         pubkeys: List['PubkeyProvider'],
@@ -362,6 +367,7 @@ class SHDescriptor(Descriptor):
     """
     A descriptor for ``sh()`` descriptors
     """
+
     def __init__(
         self,
         subdescriptor: Optional['Descriptor']
@@ -382,6 +388,7 @@ class WSHDescriptor(Descriptor):
     """
     A descriptor for ``wsh()`` descriptors
     """
+
     def __init__(
         self,
         subdescriptor: Optional['Descriptor']

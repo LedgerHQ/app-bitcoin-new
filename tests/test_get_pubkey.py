@@ -1,15 +1,15 @@
-# default speculos seed: glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin
+from bitcoin_client.command import BitcoinCommand
 
 # TODO: add tests with display=True and non-standard path
 
-def test_get_pubkey(cmd):
+
+def test_get_pubkey(cmd: BitcoinCommand):
     pub_key = cmd.get_pubkey(
         bip32_path="m",  # root pubkey
         display=False
     )
 
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
-
 
     pub_key = cmd.get_pubkey(
         bip32_path="m/44'/1'/0'/0/0",

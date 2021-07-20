@@ -16,7 +16,6 @@ from .client_command import ClientCommandInterpreter
 from .merkle import get_merkleized_map_commitment
 from .wallet import Wallet, WalletType, PolicyMapWallet
 from .psbt import PSBT, deser_string
-from .tx import CTransaction
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:

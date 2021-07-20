@@ -1,10 +1,12 @@
+from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.common import AddressType
 
 # default speculos seed: glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin
 
 # TODO: add tests with display=True and non-standard path
 
-def test_get_address(cmd):
+
+def test_get_address(cmd: BitcoinCommand):
     # legacy address
     addr = cmd.get_address(
         address_type=AddressType.LEGACY,

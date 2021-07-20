@@ -8,7 +8,6 @@ file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 """
 
-import hashlib
 from binascii import hexlify, unhexlify
 from typing import List
 
@@ -83,7 +82,7 @@ def decode_check(b: bytes) -> str:
     result_check = decode(b)
     if len(result_check) < 4:
         ValueError("base58 string is too short to have a checksum")
-    
+
     result, checksum = result_check[:-4], result_check[-4:]
 
     if hash256(result)[0:4] != checksum:

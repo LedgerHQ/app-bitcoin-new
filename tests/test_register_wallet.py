@@ -1,9 +1,9 @@
+from bitcoin_client.command import BitcoinCommand
+from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DenyError
 from bitcoin_client.wallet import MultisigWallet
-from bitcoin_client.common import AddressType
 
 from utils import automation
-from typing import List
 
 from hashlib import sha256
 from ecdsa.curves import SECP256k1
@@ -14,7 +14,7 @@ import pytest
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_legacy(cmd, speculos_globals):
+def test_register_wallet_accept_legacy(cmd: BitcoinCommand, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.LEGACY,
@@ -42,7 +42,7 @@ def test_register_wallet_accept_legacy(cmd, speculos_globals):
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_sh_wit(cmd, speculos_globals):
+def test_register_wallet_accept_sh_wit(cmd: BitcoinCommand, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.SH_WIT,
@@ -70,7 +70,7 @@ def test_register_wallet_accept_sh_wit(cmd, speculos_globals):
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_wit(cmd, speculos_globals):
+def test_register_wallet_accept_wit(cmd: BitcoinCommand, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,

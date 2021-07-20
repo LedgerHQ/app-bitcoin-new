@@ -244,6 +244,7 @@ class KeyOriginInfo(object):
     """
     Object representing the origin of a key.
     """
+
     def __init__(self, fingerprint: bytes, path: Sequence[int]) -> None:
         """
         :param fingerprint: The 4 byte BIP 32 fingerprint of a parent key from which this key is derived from
