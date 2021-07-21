@@ -830,6 +830,9 @@ class PSBT(object):
         self.tx = CTransaction()
 
         self.tx_version = tx.nVersion
+
+        self.fallback_locktime = tx.nLockTime
+
         self.input_count = len(tx.vin)
         self.output_count = len(tx.vout)
 

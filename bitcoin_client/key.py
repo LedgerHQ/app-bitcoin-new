@@ -287,6 +287,15 @@ class ExtendedKey(object):
             key = key.derive_pub(i)
         return key
 
+    def neutered(self) -> 'ExtendedKey':
+        """
+        Returns the public key corresponding to this private key.
+        """
+        if not self.is_private:
+            raise ValueError("It is already a public key")
+
+        return ExtendedKey(ExtendedKey.TESTNET_PUBLIC if self.is_testnet else ExtendedKey.MAINNET_PUBLIC, self.depth, self.parent_fingerprint, self.child_num, self.chaincode, None, self.pubkey)
+
 
 class KeyOriginInfo(object):
     """
