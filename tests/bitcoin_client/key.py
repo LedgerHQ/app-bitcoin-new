@@ -201,6 +201,43 @@ class ExtendedKey(object):
         d['pubkey'] = binascii.hexlify(self.pubkey).decode()
         return d
 
+    def derive_priv(self, i: int) -> 'ExtendedKey':
+        """
+        Derive the private key at the given child index.
+
+        :param i: The child index of the pubkey to derive
+        """
+        if not self.privkey:
+            raise ValueError("Can only derive a private key from an extended private key")
+
+        # Data to HMAC
+        if is_hardened(i):
+            data = b'\0' + self.privkey + struct.pack(">L", i)
+        else:
+            data = self.pubkey + struct.pack(">L", i)
+
+        # Get HMAC of data
+        Ihmac = hmac.new(self.chaincode, data, hashlib.sha512).digest()
+        Il = Ihmac[:32]
+        Ir = Ihmac[32:]
+
+        # Construct new key material from Il and current private key
+        Il_int = int.from_bytes(Il, byteorder="big")
+        if Il_int > n:
+            return None
+
+        privkey_int = int.from_bytes(self.privkey, byteorder="big")
+        k_int = (Il_int + privkey_int) % n
+        if (k_int == 0):
+            return None
+
+        privkey = k_int.to_bytes(32, byteorder="big")
+        pubkey = point_to_bytes(point_mul(G, k_int))
+
+        chaincode = Ir
+        fingerprint = hash160(self.pubkey)[0:4]
+        return ExtendedKey(ExtendedKey.TESTNET_PRIVATE if self.is_testnet else ExtendedKey.MAINNET_PRIVATE, self.depth + 1, fingerprint, i, chaincode, privkey, pubkey)
+
     def derive_pub(self, i: int) -> 'ExtendedKey':
         """
         Derive the public key at the given child index.
@@ -227,6 +264,17 @@ class ExtendedKey(object):
         chaincode = Ir
         fingerprint = hash160(self.pubkey)[0:4]
         return ExtendedKey(ExtendedKey.TESTNET_PUBLIC if self.is_testnet else ExtendedKey.MAINNET_PUBLIC, self.depth + 1, fingerprint, i, chaincode, None, pubkey)
+
+    def derive_priv_path(self, path: Sequence[int]) -> 'ExtendedKey':
+        """
+        Derive the private key at the given path
+
+        :param path: Sequence of integers for the path of the key to derive
+        """
+        key = self
+        for i in path:
+            key = key.derive_priv(i)
+        return key
 
     def derive_pub_path(self, path: Sequence[int]) -> 'ExtendedKey':
         """
