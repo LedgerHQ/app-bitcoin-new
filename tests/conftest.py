@@ -119,10 +119,10 @@ def cmd(transport) -> BitcoinCommand:
 @dataclass(frozen=True)
 class SpeculosGlobals:
     seed = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
-    master_extended_privkey = "xprv9s21ZrQH143K4QDdULpHJyaEf1RKEhkxHaUReQSGHQ9Qhqzymp1tER1oBLqxePyRHepCzh3wnEoQR77ygSiEXzx9hVF7E8KEGqHLQqEmF9v"
-    master_extended_pubkey = "xpub661MyMwAqRbcGtJ6aNMHg7WyD3FoeAUoeoQ2SnqsqjgPaeL8KML8nDLH2c6cFk1EhVDzaFSCDgtLSua2dW7k7Z8hYvbXDRgHmr32jBV1S12"
-    master_compressed_pubkey = bytes.fromhex(
-        "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db")
+    # TODO: those are for testnet; we could compute them for any network from the seed
+    master_extended_privkey = "tprv8ZgxMBicQKsPfDTA8ufnUdCDy8qXUDnxd8PYWprimNdtVSk4mBMdkAPF6X1cemMjf6LyznfhwbPCsxfiof4BM4DkE8TQtV3HBw2krSqFqHA"
+    master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
+    master_key_fingerprint = 0xf5acc2fd
 
 
 @pytest.fixture
