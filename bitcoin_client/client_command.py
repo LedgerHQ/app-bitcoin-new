@@ -3,9 +3,8 @@ from typing import List, Mapping, Iterable
 from collections import deque
 from hashlib import sha256
 
-from .common import ByteStreamParser, ripemd160, write_varint
-from .key import ExtendedKey
-from .merkle import MerkleTree, element_hash
+from bitcoin_client.common import ByteStreamParser, ripemd160, write_varint
+from bitcoin_client.merkle import MerkleTree, element_hash
 
 # TODO: The current version treats all client commands individually, forcing the code of each command in command.py
 #       to explicitly handle the specific commands that are enabled for their specific needs. It might be easier to

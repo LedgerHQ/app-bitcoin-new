@@ -3,11 +3,9 @@ import logging
 import struct
 from typing import List, Tuple, Mapping, Union, Iterator, Optional, cast
 
-from bitcoin_client.common import bip32_path_from_string, AddressType
-
-from .common import write_varint
-from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
-from .wallet import Wallet, MultisigWallet
+from bitcoin_client.common import bip32_path_from_string, AddressType, write_varint
+from bitcoin_client.merkle import get_merkleized_map_commitment, MerkleTree, element_hash
+from bitcoin_client.wallet import Wallet
 
 MAX_APDU_LEN: int = 255
 

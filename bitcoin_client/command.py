@@ -4,18 +4,15 @@ from io import BytesIO, BufferedReader
 
 from ledgercomm import Transport
 
-from bitcoin_client.command_builder import (
-    BitcoinCommandBuilder,
-    BitcoinInsType,
-)
+from bitcoin_client.command_builder import BitcoinCommandBuilder, BitcoinInsType
 from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DeviceException
 
-from .client_command import ClientCommandInterpreter
+from bitcoin_client.client_command import ClientCommandInterpreter
 
-from .merkle import get_merkleized_map_commitment
-from .wallet import Wallet, WalletType, PolicyMapWallet
-from .psbt import PSBT, deser_string
+from bitcoin_client.merkle import get_merkleized_map_commitment
+from bitcoin_client.wallet import Wallet, WalletType, PolicyMapWallet
+from bitcoin_client.psbt import PSBT, deser_string
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:

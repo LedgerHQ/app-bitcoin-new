@@ -11,7 +11,9 @@ import pytest
 from ledgercomm import Transport
 
 from bitcoin_client.command import BitcoinCommand
-from bitcoin_client.button import ButtonTCP, ButtonFake
+
+# path with tests
+conftest_folder_path: Path = Path(__file__).parent
 
 
 def pytest_addoption(parser):
@@ -23,8 +25,6 @@ def pytest_addoption(parser):
 
 @pytest.fixture(scope="module")
 def sw_h_path():
-    # path with tests
-    conftest_folder_path: Path = Path(__file__).parent
     # sw.h should be in src/boilerplate/sw.h
     sw_h_path = conftest_folder_path.parent / "src" / "boilerplate" / "sw.h"
 
@@ -45,18 +45,6 @@ def headless(pytestconfig):
 
 
 @pytest.fixture
-def button(headless):
-    if headless:
-        button_client = ButtonTCP(server="127.0.0.1", port=42000)
-    else:
-        button_client = ButtonFake()
-
-    yield button_client
-
-    button_client.close()
-
-
-@pytest.fixture
 def device(request, hid):
     # If running on real hardware, nothing to do here
     if hid:
@@ -68,14 +56,14 @@ def device(request, hid):
     speculos_executable = os.environ.get("SPECULOS", "speculos.py")
 
     base_args = [
-        speculos_executable, "../bin/app.elf",
+        speculos_executable, f"{conftest_folder_path}/../bin/app.elf",
         "--sdk", "2.0",
         # "--display", "headless"
     ]
 
     # Look for the automation_file attribute in the test function, if present
     try:
-        automation_args = ["--automation", f"file:{request.function.automation_file}"]
+        automation_args = ["--automation", f"file:{conftest_folder_path}/{request.function.automation_file}"]
     except AttributeError:
         automation_args = []
 
@@ -123,6 +111,7 @@ class SpeculosGlobals:
     master_extended_privkey = "tprv8ZgxMBicQKsPfDTA8ufnUdCDy8qXUDnxd8PYWprimNdtVSk4mBMdkAPF6X1cemMjf6LyznfhwbPCsxfiof4BM4DkE8TQtV3HBw2krSqFqHA"
     master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
     master_key_fingerprint = 0xf5acc2fd
+    master_compressed_pubkey = bytes.fromhex("0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db")
 
 
 @pytest.fixture

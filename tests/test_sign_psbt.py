@@ -1,8 +1,13 @@
+from pathlib import Path
+
 from bitcoin_client.command import BitcoinCommand
 
-from utils import automation
 from bitcoin_client.psbt import PSBT
 from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
+
+from .utils import automation
+
+tests_root: Path = Path(__file__).parent
 
 
 def open_psbt_from_file(filename: str) -> PSBT:
@@ -17,7 +22,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
 def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
-    psbt = open_psbt_from_file("./psbt/singlesig/sh-wpkh-1to2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "sh(wpkh(@0))", ["[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"])
@@ -37,7 +42,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
 def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
-    psbt = open_psbt_from_file("./psbt/singlesig/wpkh-1to2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "wpkh(@0)", ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"])
@@ -58,7 +63,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file("./psbt/singlesig/wpkh-2to2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
     wallet = PolicyMapWallet(
         "", "wpkh(@0)", ["[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"])
@@ -123,7 +128,7 @@ def test_sign_psbt_multisig_wsh(cmd):
     wallet_sig = bytes.fromhex(
         "30440220564c14c281594221a3309b5acd11a427a32b9fc85b8d883564004f325fb0071b02201404316adb5127b7918ecf48e3ebceea41963898b26a4643e834baa0c72a5ea2")
 
-    psbt = open_psbt_from_file("./psbt/multisig/wsh-2of2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
     result = cmd.sign_psbt(psbt, wallet, wallet_sig)
 

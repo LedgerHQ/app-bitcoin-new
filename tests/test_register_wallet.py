@@ -3,7 +3,7 @@ from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DenyError
 from bitcoin_client.wallet import MultisigWallet
 
-from utils import automation
+from .utils import automation
 
 from hashlib import sha256
 from ecdsa.curves import SECP256k1

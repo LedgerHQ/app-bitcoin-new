@@ -1,5 +1,7 @@
 
 from hashlib import sha256
+from typing import List
+
 from ecdsa.curves import SECP256k1
 from ecdsa.keys import VerifyingKey
 from ecdsa.util import sigdecode_der
@@ -9,10 +11,7 @@ from bitcoin_client.exception import DenyError
 from bitcoin_client.wallet import MultisigWallet
 from bitcoin_client.common import AddressType
 
-from utils import automation
-from typing import List
-
-import pytest
+from .utils import automation
 
 
 @automation("automations/register_wallet_accept.json")

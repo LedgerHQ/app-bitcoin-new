@@ -2,8 +2,7 @@ from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.common import AddressType
 from bitcoin_client.wallet import MultisigWallet
 
-from utils import automation
-from typing import List
+from .utils import automation
 
 import pytest
 
