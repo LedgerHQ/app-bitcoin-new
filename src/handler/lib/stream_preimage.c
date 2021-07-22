@@ -9,6 +9,7 @@
 
 int call_stream_preimage(dispatcher_context_t *dispatcher_context,
                          const uint8_t hash[static 20],
+                         void (*len_callback)(size_t, void *),
                          void (*callback)(buffer_t *, void *),
                          void *callback_state) {
 
@@ -23,11 +24,11 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -1;
     }
 
-    uint64_t preimage_len_u64;
+    uint64_t preimage_len_u64; // preimage len (including the 0x00 prefix of Merkle tree leaves)
 
     uint8_t partial_data_len;
 
-    if (!buffer_read_varint(&dispatcher_context->read_buffer, &preimage_len_u64)
+    if (   !buffer_read_varint(&dispatcher_context->read_buffer, &preimage_len_u64)
         || !buffer_read_u8(&dispatcher_context->read_buffer, &partial_data_len)
         || !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len))
     {
@@ -42,6 +43,10 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
 
     if (partial_data_len > preimage_len) {
         return -4;
+    }
+
+    if (len_callback != NULL) {
+        len_callback(preimage_len - 1, callback_state);
     }
 
     uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;

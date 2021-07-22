@@ -538,11 +538,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
     flow_state.parser_state.output_index = output_index;
 
     uint8_t value_hash[20];
-    int res = call_get_merkleized_map_value_hash(dispatcher_context,
-                                                 map,
-                                                 key,
-                                                 key_len,
-                                                 value_hash);
+    int res = call_get_merkleized_map_value_hash(dispatcher_context, map, key, key_len, value_hash);
     if (res < 0) {
         return -1;
     }
@@ -552,7 +548,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
 
     flow_state.parser_state.parser_outputs = outputs;
 
-    res = call_stream_preimage(dispatcher_context, value_hash, cb_process_data, &flow_state);
+    res = call_stream_preimage(dispatcher_context, value_hash, NULL, cb_process_data, &flow_state);
     if (res < 0) {
         return -1;
     }

@@ -8,6 +8,7 @@ int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
                                     const uint8_t merkle_root[static 20],
                                     uint32_t tree_size,
                                     uint32_t leaf_index,
+                                    void (*len_callback)(size_t, void *),
                                     void (*callback)(buffer_t *, void *),
                                     void *callback_state)
 {
@@ -20,5 +21,5 @@ int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
         return -1;
     }
 
-    return call_stream_preimage(dispatcher_context, leaf_hash, callback, callback_state);
+    return call_stream_preimage(dispatcher_context, leaf_hash, len_callback, callback, callback_state);
 }

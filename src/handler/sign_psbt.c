@@ -41,6 +41,9 @@
 #include "lib/get_merkleized_map_value.h"
 #include "lib/stream_merkleized_map_value.h"
 #include "lib/psbt_parse_rawtx.h"
+
+#include "sign_psbt/update_hashes_with_map_value.h"
+
 #include "sign_psbt.h"
 
 extern global_context_t G_context;
@@ -1149,11 +1152,11 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
         uint8_t ith_prevout_n_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
-                                            &ith_map,
-                                            (uint8_t []){ PSBT_IN_OUTPUT_INDEX },
-                                            1,
-                                            ith_prevout_n_raw,
-                                            4))
+                                               &ith_map,
+                                               (uint8_t []){ PSBT_IN_OUTPUT_INDEX },
+                                               1,
+                                               ith_prevout_n_raw,
+                                               4))
         {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
@@ -1174,23 +1177,19 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
             } else {
                 // P2SH, the script_code is the redeemScript
 
-                uint8_t redeemScript[128]; // TODO: do we need to support arbitrary length redeemScripts?
+                // update sighash_context with the length-prefixed redeem script
+                int redeemScript_len = update_hashes_with_map_value(dc,
+                                                                    &state->cur_input.map,
+                                                                    (uint8_t []){ PSBT_IN_REDEEM_SCRIPT },
+                                                                    1,
+                                                                    NULL,
+                                                                    &sighash_context.header);
 
-                int redeemScript_len = call_get_merkleized_map_value(dc,
-                                                                     &state->cur_input.map,
-                                                                     (uint8_t []){ PSBT_IN_REDEEM_SCRIPT },
-                                                                     1,
-                                                                     redeemScript,
-                                                                     sizeof(redeemScript));
                 if (redeemScript_len < 0) {
                     PRINTF("Error fetching redeemScript\n");
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return;
                 }
-
-                // add redeemScript to hash, prefixed by its length
-                crypto_hash_update_varint(&sighash_context.header, redeemScript_len);
-                crypto_hash_update(&sighash_context.header, redeemScript, redeemScript_len);
             }
         }
 
@@ -1439,14 +1438,18 @@ static void sign_segwit(dispatcher_context_t *dc) {
         crypto_hash_update_u16(&sighash_context.header, 0x88ac);
     } else if (is_p2wsh(script, script_len)) {
         // P2WSH
-        uint8_t witnessScript[128]; // TODO: do we need to support arbitrary length witnessScripts?
 
-        int witnessScript_len = call_get_merkleized_map_value(dc,
-                                                              &state->cur_input.map,
-                                                              (uint8_t []){ PSBT_IN_WITNESS_SCRIPT },
-                                                              1,
-                                                              witnessScript,
-                                                              sizeof(witnessScript));
+        // update sighash_context.header with the length-prefixed witnessScript,
+        // and also compute sha256(witnessScript)
+        cx_sha256_t witnessScript_hash_context;
+        cx_sha256_init(&witnessScript_hash_context);
+
+        int witnessScript_len = update_hashes_with_map_value(dc,
+                                                             &state->cur_input.map,
+                                                             (uint8_t []){ PSBT_IN_WITNESS_SCRIPT },
+                                                             1,
+                                                             &witnessScript_hash_context.header,
+                                                             &sighash_context.header);
 
         if (witnessScript_len < 0) {
             PRINTF("Error fetching witnessScript\n");
@@ -1455,7 +1458,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         }
 
         uint8_t witnessScript_hash[32];
-        cx_hash_sha256(witnessScript, witnessScript_len, witnessScript_hash, 32);
+        crypto_hash_digest(&witnessScript_hash_context.header, witnessScript_hash, 32);
 
         // check that script == P2WSH(witnessScript)
         if (   script_len != 2+32
@@ -1468,10 +1471,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
-
-        // add witnessScript to hash, prefixed by its length
-        crypto_hash_update_varint(&sighash_context.header, witnessScript_len);
-        crypto_hash_update(&sighash_context.header, witnessScript, witnessScript_len);
     } else {
         PRINTF("Invalid or unsupported script in segwit transaction\n");
         SEND_SW(dc, SW_INCORRECT_DATA);

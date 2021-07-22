@@ -7,6 +7,7 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                      const merkleized_map_commitment_t *map,
                                      const uint8_t *key,
                                      int key_len,
+                                     void (*len_callback)(size_t, void *),
                                      void (*callback)(buffer_t *, void *),
                                      void *callback_state)
 {
@@ -23,9 +24,10 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
     }
 
     return call_stream_merkle_leaf_element(dispatcher_context,
-                                    map->values_root,
-                                    map->size,
-                                    index,
-                                    callback,
-                                    callback_state);
+                                           map->values_root,
+                                           map->size,
+                                           index,
+                                           len_callback,
+                                           callback,
+                                           callback_state);
 }
