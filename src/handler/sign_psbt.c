@@ -221,7 +221,7 @@ void handler_sign_psbt(
     }
     if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
         // TODO: remove this limitation
-        PRINTF("At most %d inputs are supported", MAX_N_INPUTS_CAN_SIGN);
+        PRINTF("At most %d inputs are supported\n", MAX_N_INPUTS_CAN_SIGN);
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -434,7 +434,7 @@ static void process_input_map(dispatcher_context_t *dc) {
     }
 
     if (state->cur_input.unexpected_pubkey_error) {
-        PRINTF("Unexpected pubkey length"); // only compressed pubkeys are supported
+        PRINTF("Unexpected pubkey length\n"); // only compressed pubkeys are supported
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -491,7 +491,7 @@ static void process_input_map(dispatcher_context_t *dc) {
     state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
 
     if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-        PRINTF("Prevout's scriptPubKey too long: %d\n", state->cur_input.prevout_scriptpubkey_len);
+        PRINTF("Prevout's scriptPubKey too long: %d bytes.\n", state->cur_input.prevout_scriptpubkey_len);
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -534,8 +534,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
     uint32_t change = read_u32_le(fpt_der, len - 8);
     uint32_t address_index = read_u32_le(fpt_der, len - 4);
 
-    PRINTF("Change and address_index for input %d: %d, %d\n", state->cur_input_index, change, address_index);
-
     // derive wallet's scriptPubKey, check if it matches the expected one
     uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
@@ -556,12 +554,9 @@ static void check_input_owned(dispatcher_context_t *dc) {
     if (   wallet_script_len == state->cur_input.prevout_scriptpubkey_len
         && memcmp(wallet_script, state->cur_input.prevout_scriptpubkey, wallet_script_len) == 0)
     {
-        PRINTF("Input %d is internal\n", state->cur_input_index);
-
         state->internal_inputs[state->cur_input_index] = 1;
         state->internal_inputs_total_value += state->cur_input.prevout_amount;
     } else {
-        PRINTF("Input %d is external\n", state->cur_input_index);
         state->has_external_inputs = true;
     }
 
@@ -609,11 +604,6 @@ static void verify_outputs_init(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    // TODO: remove
-    PRINTF("######## TOTAL INPUTS VALUE: %llu\n", state->inputs_total_value);
-    // TODO: remove
-    PRINTF("######## INTERNAL INPUTS VALUE: %llu\n", state->internal_inputs_total_value);
 
     state->outputs_total_value = 0;
     state->change_outputs_total_value = 0;
@@ -677,7 +667,7 @@ static void process_output_map(dispatcher_context_t *dc){
     }
 
     if (state->cur_output.unexpected_pubkey_error) {
-        PRINTF("Unexpected pubkey length"); // only compressed pubkeys are supported
+        PRINTF("Unexpected pubkey length\n"); // only compressed pubkeys are supported
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -721,8 +711,6 @@ static void process_output_map(dispatcher_context_t *dc){
     }
 
     state->cur_output.scriptpubkey_len = result_len;
-
-    PRINTF("######## OUTPUT %d VALUE: %llu\n", state->cur_output_index, value);
 
     dc->next(check_output_owned);
 }
@@ -850,8 +838,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
             }
         }
     }
-
-    PRINTF("Output %d is external\n", state->cur_output_index);
 
     ++state->external_outputs_count;
 
@@ -1031,6 +1017,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
 
     // TODO: add support for other sighash flags
     if (state->cur_input.sighash_type != SIGHASH_ALL) {
+        PRINTF("Only SIGHASH_ALL is currently supported\n");
         SEND_SW(dc, SW_INCORRECT_DATA); // TODO: more specific SW
         return;
     }
@@ -1196,7 +1183,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
                                                                      redeemScript,
                                                                      sizeof(redeemScript));
                 if (redeemScript_len < 0) {
-                    PRINTF("Error fetching redeemScript");
+                    PRINTF("Error fetching redeemScript\n");
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return;
                 }
@@ -1239,12 +1226,6 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
     crypto_hash_digest(&sighash_context.header, state->sighash, 32);
     cx_hash_sha256(state->sighash, 32, state->sighash, 32);
 
-    // TODO: remove
-    PRINTF("sighash: ");
-    for (int i = 0; i < 32; i++)
-        PRINTF("%02x", state->sighash[i]);
-    PRINTF("\n");
-
     dc->next(sign_sighash);
 }
 
@@ -1271,11 +1252,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
             return;
         }
 
-        // TODO: remove debug prints
-        PRINTF("Witness utxo for input %d: ", state->cur_input_index);
-        for (int i = 0; i < wit_utxo_len; i++)
-            PRINTF("%02x", raw_witnessUtxo[i]);
-        PRINTF("\n");
 
         int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
 
@@ -1303,11 +1279,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
                 return;
             }
 
-            // TODO: remove debug prints
-            PRINTF("Redeem script for input %d: ", state->cur_input_index);
-            for (int i = 0; i < redeemScript_length; i++)
-                PRINTF("%02x", redeemScript);
-            PRINTF("\n");
 
             uint8_t p2sh_redeemscript[2 + 20 + 1];
             p2sh_redeemscript[0] = 0xa9;
@@ -1337,7 +1308,6 @@ static void sign_segwit(dispatcher_context_t *dc) {
     uint8_t tmp[8];
 
     // nVersion
-    PRINTF("SIGHASH: nVersion: %d\n", state->tx_version);
     write_u32_le(tmp, 0, state->tx_version);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
@@ -1421,13 +1391,9 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
 
         // add to hash: hashPrevouts
-        for (int i = 0; i < 32; i++) PRINTF("%02X", hashPrevout[i]);
-        PRINTF("\n");
         crypto_hash_update(&sighash_context.header, hashPrevout, 32);
 
         // add to hash: hashSequence
-        for (int i = 0; i < 32; i++) PRINTF("%02X", hashSequence[i]);
-        PRINTF("\n");
         crypto_hash_update(&sighash_context.header, hashSequence, 32);
     }
 
@@ -1467,15 +1433,12 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     // scriptCode
     if (is_p2wpkh(script, script_len)) {
-        PRINTF("P2WPKH spend\n"); // TODO: remove
         // P2WPKH(script[2:22])
         crypto_hash_update_u32(&sighash_context.header, 0x1976a914);
         crypto_hash_update(&sighash_context.header, script + 2, 20);
         crypto_hash_update_u16(&sighash_context.header, 0x88ac);
     } else if (is_p2wsh(script, script_len)) {
-        PRINTF("P2WSH spend\n"); // TODO: remove
         // P2WSH
-
         uint8_t witnessScript[128]; // TODO: do we need to support arbitrary length witnessScripts?
 
         int witnessScript_len = call_get_merkleized_map_value(dc,
@@ -1520,11 +1483,11 @@ static void sign_segwit(dispatcher_context_t *dc) {
         uint8_t witness_utxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
         int witness_utxo_len = call_get_merkleized_map_value(dc,
-                                                            &state->cur_input.map,
-                                                            (uint8_t []){ PSBT_IN_WITNESS_UTXO },
-                                                            1,
-                                                            witness_utxo,
-                                                            sizeof(witness_utxo));
+                                                             &state->cur_input.map,
+                                                             (uint8_t []){ PSBT_IN_WITNESS_UTXO },
+                                                             1,
+                                                             witness_utxo,
+                                                             sizeof(witness_utxo));
         if (witness_utxo_len < 8) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
@@ -1603,8 +1566,6 @@ static void sign_sighash(dispatcher_context_t *dc) {
     // TODO: refactor the signing code elsewhere
     int sign_path_len = state->our_key_info.master_key_derivation_len + 2;
 
-    PRINTF("Signing path for input %d: ", state->cur_input_index); // TODO: remove
-    PRINTF_BIP32_PATH(sign_path, sign_path_len);
 
     crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
 
@@ -1630,12 +1591,6 @@ static void sign_sighash(dispatcher_context_t *dc) {
         }
     }
     END_TRY;
-
-    // TODO: send signture for this input
-    PRINTF("######## signature for input %d: ", state->cur_input_index);
-    for (int i = 0; i < sig_len; i++)
-        PRINTF("%02x", sig[i]);
-    PRINTF("\n");
 
 
     // yield signature
