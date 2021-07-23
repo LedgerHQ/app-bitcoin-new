@@ -113,7 +113,8 @@ to identify internal inputs/outputs.
 // HELPER FUNCTIONS
 
 // Updates the hash_context with the network serialization of all the outputs
-static void hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
+// returns -1 on error (in that case, a response is already set). 0 on success.
+static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     // TODO: support other SIGHASH FLAGS
@@ -128,7 +129,7 @@ static void hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
                                         &ith_map);
         if (res < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
+            return -1;
         }
 
         // get output's amount
@@ -141,7 +142,7 @@ static void hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
                                             8))
         {
             SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
+            return -1;
         }
 
         crypto_hash_update(hash_context, amount_raw, 8);
@@ -157,12 +158,13 @@ static void hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
                                                             sizeof(out_script));
         if (out_script_len == -1) {
             SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
+            return -1;
         }
 
         crypto_hash_update_varint(hash_context, out_script_len);
         crypto_hash_update(hash_context, out_script, out_script_len);
     }
+    return 0;
 }
 
 
@@ -1228,8 +1230,9 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
     // outputs
     crypto_hash_update_varint(&sighash_context.header, state->n_outputs);
-    hash_outputs(dc, &sighash_context.header);
-
+    if (hash_outputs(dc, &sighash_context.header) == -1) {
+        return; // response alredy set
+    }
 
     // nLocktime
     write_u32_le(tmp, 0, state->locktime);
@@ -1538,7 +1541,9 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
         cx_sha256_init(&hashOutputs_context);
 
-        hash_outputs(dc, &hashOutputs_context.header);
+        if (hash_outputs(dc, &hashOutputs_context.header) == -1) {
+            return; // response alredy set
+        }
 
         crypto_hash_digest(&hashOutputs_context.header, hashOutputs, 32);
         cx_hash_sha256(hashOutputs, 32, hashOutputs, 32);
