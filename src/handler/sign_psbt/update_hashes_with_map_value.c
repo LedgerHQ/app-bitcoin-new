@@ -1,4 +1,6 @@
 
+#include "update_hashes_with_map_value.h"
+
 #include "../lib/stream_merkleized_map_value.h"
 #include "../../crypto.h"
 

@@ -36,15 +36,15 @@
 
 #include "lib/policy.h"
 #include "lib/check_merkle_tree_sorted.h"
-#include "lib/stream_merkle_leaf_element.h"
 #include "lib/get_merkleized_map.h"
 #include "lib/get_merkleized_map_value.h"
-#include "lib/stream_merkleized_map_value.h"
 #include "lib/psbt_parse_rawtx.h"
 
-#include "sign_psbt/update_hashes_with_map_value.h"
-
 #include "sign_psbt.h"
+
+#include "sign_psbt/compare_wallet_script_at_path.h"
+#include "sign_psbt/get_fingerprint_and_path.h"
+#include "sign_psbt/update_hashes_with_map_value.h"
 
 extern global_context_t G_context;
 
@@ -98,8 +98,15 @@ static void finalize(dispatcher_context_t *dc);
 
 /*
 Current assumptions during signing:
-- exactly one of the keys in the wallet is internal
-- all the keys in the wallet have a wildcard (that is, they end with '**')
+  1) exactly one of the keys in the wallet is internal (enforce during wallet registration)
+  2) all the keys in the wallet have a wildcard (that is, they end with '**'), with at most
+     4 derivation steps before it.
+
+Assumption 2 simplifies the handling of pubkeys (and theyr paths) used for signing,
+as all the internal keys will have a path that ends with /change/address_index (BIP44-style).
+
+It would be possible to generalize to more complex scripts, but it makes it more difficult to detect the right paths
+to identify internal inputs/outputs.
 */
 
 
@@ -157,19 +164,6 @@ static void hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
         crypto_hash_update(hash_context, out_script, out_script_len);
     }
 }
-
-
-void PRINTF_BIP32_PATH(const uint32_t *path, size_t path_len) {
-    PRINTF("m");
-    for (unsigned int i = 0; i < path_len; i++) {
-        PRINTF("/%d", path[i] & 0x7FFFFFFF);
-        if (path[i] & 0x80000000) {
-            PRINTF("'");
-        }
-    }
-    PRINTF("\n");
-}
-
 
 
 /**
@@ -397,7 +391,9 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
             state->cur_input.has_sighash_type = true;
         } else if (key_type == PSBT_IN_BIP32_DERIVATION && !state->cur_input.has_bip32_derivation) {
-            // The first time that we encounter a PSBT_IN_SIGHASH_TYPE key, we store the pubkey
+            // The first time that we encounter a PSBT_IN_SIGHASH_TYPE key, we store the pubkey.
+            // Since we only use this to identify the change and address_index, it does not matter which of the keys
+            // we use here (if there are multiple), as pet the assumptions above.
             state->cur_input.has_bip32_derivation = true;
 
             if (   !buffer_read_bytes(data, state->cur_input.bip32_derivation_pubkey, 33) // read pubkey
@@ -517,52 +513,55 @@ static void check_input_owned(dispatcher_context_t *dc) {
     key[0] = PSBT_IN_BIP32_DERIVATION;
     memcpy(key + 1, state->cur_input.bip32_derivation_pubkey, 33);
 
-    uint8_t fpt_der[4 + 4*MAX_BIP32_PATH_STEPS];
+    uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
+    uint32_t fingerprint;
+    int bip32_path_len = get_fingerprint_and_path(dc,
+                                                  &state->cur_input.map,
+                                                  key,
+                                                  sizeof(key),
+                                                  &fingerprint,
+                                                  bip32_path);
 
-    int len = call_get_merkleized_map_value(dc, &state->cur_input.map,
-                                            key,
-                                            sizeof(key),
-                                            fpt_der,
-                                            sizeof(fpt_der));
-
-    // there must be at least 2 derivation steps (change and address_index),
-    // so at least 12 bytes (the first 4 bytes are for the key's master fingerprint)
-    if (len < 12 || len % 4 != 0) {
-        PRINTF("Invalid PSBT_IN_BIP32_DERIVATION length: %d\n", len);
+    // As per wallet policy assumptions, the path must have change and address index
+    if (bip32_path_len < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    // we interpret the final 8 bytes as change and address_index
-    uint32_t change = read_u32_le(fpt_der, len - 8);
-    uint32_t address_index = read_u32_le(fpt_der, len - 4);
+    bool external = false;
+    if (bip32_path_len < 2) {
+        external = true;
+    } else {
+        uint32_t change = bip32_path[bip32_path_len - 2];
+        uint32_t address_index = bip32_path[bip32_path_len - 1];
 
-    // derive wallet's scriptPubKey, check if it matches the expected one
-    uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-    buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
-
-    int wallet_script_len = call_get_wallet_script(dc,
-                                                   &state->wallet_policy_map,
-                                                   state->wallet_header_keys_info_merkle_root,
-                                                   state->wallet_header_n_keys,
-                                                   change,
-                                                   address_index,
-                                                   &wallet_script_buf,
-                                                   NULL);
-    if (wallet_script_len < 0) {
-        PRINTF("Failed to get wallet script\n");
-        SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
+        int res = compare_wallet_script_at_path(dc,
+                                                change,
+                                                address_index,
+                                                &state->wallet_policy_map,
+                                                state->wallet_header_keys_info_merkle_root,
+                                                state->wallet_header_n_keys,
+                                                state->cur_input.prevout_scriptpubkey,
+                                                state->cur_input.prevout_scriptpubkey_len);
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        } else if (res == 0) {
+            external = true;
+        } else if (res == 1) {
+            // input is internal, nothing to do
+        } else {
+            SEND_SW(dc, SW_BAD_STATE); // should never happen
+            return;
+        }
     }
 
-    if (   wallet_script_len == state->cur_input.prevout_scriptpubkey_len
-        && memcmp(wallet_script, state->cur_input.prevout_scriptpubkey, wallet_script_len) == 0)
-    {
+    if (external) {
+        state->has_external_inputs = true;
+    } else {
         state->internal_inputs[state->cur_input_index] = 1;
         state->internal_inputs_total_value += state->cur_input.prevout_amount;
-    } else {
-        state->has_external_inputs = true;
     }
-
 
     ++state->cur_input_index;
     dc->next(process_input_map);
@@ -634,6 +633,8 @@ static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur_output.has_bip32_derivation) {
             // The first time that we encounter a PSBT_IN_SIGHASH_TYPE key, we store the pubkey
             state->cur_output.has_bip32_derivation = true;
+
+            PRINTF("HAS DERIVATION PUBKEY\n");
 
             if (   !buffer_read_bytes(data, state->cur_output.bip32_derivation_pubkey, 33) // read pubkey
                 || buffer_can_read(data, 1) // ...but should not be able to read more
@@ -718,150 +719,150 @@ static void process_output_map(dispatcher_context_t *dc){
     dc->next(check_output_owned);
 }
 
-// TODO: lots of duplication with check_input_owned; refactor
 static void check_output_owned(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // get path, obtain change and address_index,
-    uint8_t key[1+33];
-    key[0] = PSBT_OUT_BIP32_DERIVATION;
-    memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 33);
+    bool external = false;
 
-    uint8_t fpt_der[4 + 4*MAX_BIP32_PATH_STEPS];
+    uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
+    int bip32_path_len;
 
-    int len = call_get_merkleized_map_value(dc, &state->cur_output.map,
-                                            key,
-                                            sizeof(key),
-                                            fpt_der,
-                                            sizeof(fpt_der));
+    do {
+        if (!state->cur_output.has_bip32_derivation) {
+            external = true;
+            break;
+        }
 
-    if (len != -1 && len % 4 != 0) {
-        PRINTF("Invalid PSBT_OUT_BIP32_DERIVATION length: %d\n", len);
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
+        // get path, obtain change and address_index,
+        uint8_t key[1+33];
+        key[0] = PSBT_OUT_BIP32_DERIVATION;
+        memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 33);
 
-    if (len > 0) {
-        // there must be at least 2 derivation steps (change and address_index),
-        // so at least 12 bytes (the first 4 bytes are for the key's master fingerprint)
-        if (len < 12 || len % 4 != 0) {
-            PRINTF("Invalid PSBT_OUT_BIP32_DERIVATION length: %d\n", len);
+        uint32_t fingerprint;
+        bip32_path_len = get_fingerprint_and_path(dc,
+                                                  &state->cur_output.map,
+                                                  key,
+                                                  sizeof(key),
+                                                  &fingerprint,
+                                                  bip32_path);
+
+        // As per wallet policy assumptions, the path must have change and address index
+        if (bip32_path_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
-        size_t bip32_path_len = (len - 4)/4;
-        uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-
-        if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
-            PRINTF("Too many steps: %d\n", bip32_path_len);
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
+        if (bip32_path_len < 2) {
+            external = true;
+            break;
         }
-
-        for (unsigned int i = 0; i < bip32_path_len; i++) {
-            bip32_path[i] = read_u32_le(fpt_der, 4 + 4*i);
-        }
-
-        // we interpret the final 8 bytes as change and address_index
         uint32_t change = bip32_path[bip32_path_len - 2];
         uint32_t address_index = bip32_path[bip32_path_len - 1];
 
-        // derive wallet's scriptPubKey, check if it matches the expected one
-        uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-        buffer_t wallet_script_buf = buffer_create(wallet_script, sizeof(wallet_script));
+        if (change != 1) {
+            // unlike for inputs, cnage must be 1 for this output to be considered internal
+            external = true;
+            break;
+        }
 
-        int wallet_script_len = call_get_wallet_script(dc,
-                                                       &state->wallet_policy_map,
-                                                       state->wallet_header_keys_info_merkle_root,
-                                                       state->wallet_header_n_keys,
-                                                       change,
-                                                       address_index,
-                                                       &wallet_script_buf,
-                                                       NULL);
-        if (wallet_script_len < 0) {
-            PRINTF("Failed to get wallet script for output\n");
+        int res = compare_wallet_script_at_path(dc,
+                                                change,
+                                                address_index,
+                                                &state->wallet_policy_map,
+                                                state->wallet_header_keys_info_merkle_root,
+                                                state->wallet_header_n_keys,
+                                                state->cur_output.scriptpubkey,
+                                                state->cur_output.scriptpubkey_len);
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        } else if (res == 0) {
+            external = true;
+        } else if (res == 1) {
+            // output is internal, nothing to do
+        } else {
+            SEND_SW(dc, SW_BAD_STATE); // should never happen
+            return;
+        }
+    } while (false); // execute only once; just to be able to break out
+
+    if (external) {
+        // external output, user needs to validate
+
+        ++state->external_outputs_count;
+
+        // show this output's address
+        // TODO: handle outputs without an address? (e.g.: OP_RETURN)
+        char output_address[MAX_ADDRESS_LENGTH_STR + 1];
+        int address_len = get_script_address(state->cur_output.scriptpubkey,
+                                             state->cur_output.scriptpubkey_len,
+                                             G_context,
+                                             output_address,
+                                             sizeof(output_address));
+        if (address_len < 0) {
             SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
+            return;
         }
 
-        if (   wallet_script_len == state->cur_output.scriptpubkey_len
-            && memcmp(wallet_script, state->cur_output.scriptpubkey, wallet_script_len) == 0
-            && change == 1)
-        {
-            PRINTF("Output %d is internal\n", state->cur_output_index);
+        dc->pause();
+        ui_validate_output(dc,
+                           state->external_outputs_count,
+                           output_address,
+                           state->cur_output.value,
+                           ui_action_validate_output);
+    } else {
+        // TODO: should we just consider unusual paths "external"?
 
-            state->change_outputs_total_value += state->cur_output.value;
-            ++state->change_count;
+        state->change_outputs_total_value += state->cur_output.value;
+        ++state->change_count;
 
-            bool is_path_unusual = false;
+        bool is_path_unusual = false;
 
-            if (state->is_wallet_canonical) {
-                uint32_t purpose; // the valid purpose depends on the requested address type
-                switch(state->address_type) {
-                    case ADDRESS_TYPE_LEGACY: //legacy
-                        purpose = 44;
-                        break;
-                    case ADDRESS_TYPE_WIT:    // native segwit
-                        purpose = 84;
-                        break;
-                    case ADDRESS_TYPE_SH_WIT: // wrapped segwit
-                        purpose = 49;
-                        break;
-                    default:
-                        SEND_SW(dc, SW_BAD_STATE);
-                        return;
-                }
-
-                // check if change path is as expected
-                is_path_unusual = is_address_path_standard(bip32_path,
-                                                           bip32_path_len, 
-                                                           purpose,
-                                                           G_context.bip44_coin_types,
-                                                           G_context.bip44_coin_types_len,
-                                                           true);
+        if (state->is_wallet_canonical) {
+            uint32_t purpose; // the valid purpose depends on the requested address type
+            switch(state->address_type) {
+                case ADDRESS_TYPE_LEGACY: //legacy
+                    purpose = 44;
+                    break;
+                case ADDRESS_TYPE_WIT:    // native segwit
+                    purpose = 84;
+                    break;
+                case ADDRESS_TYPE_SH_WIT: // wrapped segwit
+                    purpose = 49;
+                    break;
+                default:
+                    SEND_SW(dc, SW_BAD_STATE);
+                    return;
             }
 
-            if (is_path_unusual) {
-                // alert the user about the unusual path for a change address
+            // check if change path is as expected
+            is_path_unusual = is_address_path_standard(bip32_path,
+                                                       bip32_path_len, 
+                                                       purpose,
+                                                       G_context.bip44_coin_types,
+                                                       G_context.bip44_coin_types_len,
+                                                       true);
+        }
 
-                char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-                if (bip32_path_len > 0) {
-                    bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
-                }
+        if (is_path_unusual) {
+            // alert the user about the unusual path for a change address
 
-                dc->pause();
-                ui_display_unusual_path(dc, path_str, ui_action_validate_output);
-                return;
-            } else {
-                // normal change address, all good
-                dc->next(output_next);
-                return;
+            char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+            if (bip32_path_len > 0) {
+                bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
             }
+
+            dc->pause();
+            ui_display_unusual_path(dc, path_str, ui_action_validate_output);
+            return;
+        } else {
+            // normal change address, all good
+            dc->next(output_next);
+            return;
         }
     }
-
-    ++state->external_outputs_count;
-
-    // show this output's address
-    char output_address[MAX_ADDRESS_LENGTH_STR + 1];
-    int address_len = get_script_address(state->cur_output.scriptpubkey,
-                                         state->cur_output.scriptpubkey_len,
-                                         G_context,
-                                         output_address,
-                                         sizeof(output_address));
-    if (address_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
-        return;
-    }
-
-    dc->pause();
-    ui_validate_output(dc,
-                       state->external_outputs_count,
-                       output_address,
-                       state->cur_output.value,
-                       ui_action_validate_output);
 }
 
 static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
