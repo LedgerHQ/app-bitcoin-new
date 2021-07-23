@@ -56,7 +56,8 @@ typedef struct {
     uint8_t outputs_root[20]; // merkle root of the vector of output maps commitments
 
     bool is_wallet_canonical;
-    int address_type;
+    int address_type;         // only relevant for canonical wallets
+    int bip44_purpose;        // only relevant for canonical wallets
 
     uint8_t wallet_header_keys_info_merkle_root[20];
     size_t wallet_header_n_keys;

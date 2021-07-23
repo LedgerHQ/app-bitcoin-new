@@ -89,6 +89,8 @@ bool bip32_path_format(const uint32_t *bip32_path,
  *   Pointer to 32-bit integer input buffer.
  * @param[in]  bip32_path_len
  *   Maximum number of BIP32 paths in the input buffer.
+ * @param[in]  expected_purpose
+ *   The purpose that should be in the derivation (e.g. 44 for BIP44).
  * @param[in]  expected_coin_types
  *   Pointer to an array with the coin types that are considered acceptable. The
  *   elements of the array should be given as simple numbers (not their hardened version);
@@ -102,9 +104,10 @@ bool bip32_path_format(const uint32_t *bip32_path,
  *
  */
 bool is_pubkey_path_standard(const uint32_t *bip32_path,
-                      size_t bip32_path_len,
-                      const uint32_t expected_coin_types[],
-                      size_t expected_coin_types_len);
+                             size_t bip32_path_len,
+                             uint32_t expected_purpose,
+                             const uint32_t expected_coin_types[],
+                             size_t expected_coin_types_len);
 
 /**
  * Verifies if a given path is standard according to the BIP44 or derived standards for the derivation path for an address.
@@ -130,15 +133,16 @@ bool is_pubkey_path_standard(const uint32_t *bip32_path,
  *   that the coin_type is hardened, as expected in the standard.
  * @param[in]  expected_coin_types_len
  *   The length of expected_coin_types.
- * @param[in]  is_change
- *   true if the address should be treated as a change output, false otherwise.
+ * @param[in]  expected_change
+ *   It must be -1, 0 or 1. If -1, only checks that the provided change step is 0 or 1. If 0 or 1,
+ *   the change step must equal `expected_change`.
  *
  * @return true if the given address is standard, false otherwise.
  *
  */
 bool is_address_path_standard(const uint32_t *bip32_path,
-                      size_t bip32_path_len,
-                      uint32_t expected_purpose,
-                      const uint32_t expected_coin_types[],
-                      size_t expected_coin_types_len,
-                      bool is_change);
+                              size_t bip32_path_len,
+                              uint32_t expected_purpose,
+                              const uint32_t expected_coin_types[],
+                              size_t expected_coin_types_len,
+                              int expected_change);

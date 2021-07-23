@@ -270,14 +270,40 @@ void handler_sign_psbt(
         state->is_wallet_canonical = false;
     } else {
         // No signature, verify that the policy is a canonical one that is allowed by default
+
+        if (state->wallet_header_n_keys != 1) {
+            PRINTF("Non-standard policy, it should only have 1 key\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         state->address_type = get_policy_address_type(&state->wallet_policy_map);
         if (state->address_type == -1) {
             PRINTF("Non-standard policy, and no signature provided\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
         state->is_wallet_canonical = true;
+
+        // Based on the address type, we set the expected bip44 purpose for this canonical wallet
+        switch(state->address_type) {
+            case ADDRESS_TYPE_LEGACY: //legacy
+                state->bip44_purpose = 44;
+                break;
+            case ADDRESS_TYPE_WIT:    // native segwit
+                state->bip44_purpose = 84;
+                break;
+            case ADDRESS_TYPE_SH_WIT: // wrapped segwit
+                state->bip44_purpose = 49;
+                break;
+            default:
+                SEND_SW(dc, SW_BAD_STATE);
+                return;
+        }
+
+        // We do not check here that the purpose field, coin_type and account (first three step of the bip44
+        // derivation) are standard. Will check at signing time that the path is valid.
     }
 
 
@@ -502,7 +528,6 @@ static void process_input_map(dispatcher_context_t *dc) {
     dc->next(check_input_owned);
 }
 
-// TODO: this is wrong for mixed transaction were only some inputs are internal
 static void check_input_owned(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
 
@@ -529,9 +554,27 @@ static void check_input_owned(dispatcher_context_t *dc) {
     }
 
     bool external = false;
-    if (bip32_path_len < 2) {
-        external = true;
-    } else {
+
+    do {
+        if (bip32_path_len < 2) {
+            external = true;
+            break;
+        }
+
+        if (state->is_wallet_canonical) {
+            // check if change path is as expected
+            if (!is_address_path_standard(bip32_path,
+                                          bip32_path_len, 
+                                          state->bip44_purpose,
+                                          G_context.bip44_coin_types,
+                                          G_context.bip44_coin_types_len,
+                                          -1))
+            {
+                external = true;
+                break;
+            }
+        }
+
         uint32_t change = bip32_path[bip32_path_len - 2];
         uint32_t address_index = bip32_path[bip32_path_len - 1];
 
@@ -548,13 +591,14 @@ static void check_input_owned(dispatcher_context_t *dc) {
             return;
         } else if (res == 0) {
             external = true;
+            break;
         } else if (res == 1) {
             // input is internal, nothing to do
         } else {
             SEND_SW(dc, SW_BAD_STATE); // should never happen
             return;
         }
-    }
+    } while (false); // executed only once; in a block only to be able to break out of it
 
     if (external) {
         state->has_external_inputs = true;
@@ -633,8 +677,6 @@ static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur_output.has_bip32_derivation) {
             // The first time that we encounter a PSBT_IN_SIGHASH_TYPE key, we store the pubkey
             state->cur_output.has_bip32_derivation = true;
-
-            PRINTF("HAS DERIVATION PUBKEY\n");
 
             if (   !buffer_read_bytes(data, state->cur_output.bip32_derivation_pubkey, 33) // read pubkey
                 || buffer_can_read(data, 1) // ...but should not be able to read more
@@ -762,10 +804,26 @@ static void check_output_owned(dispatcher_context_t *dc) {
         uint32_t address_index = bip32_path[bip32_path_len - 1];
 
         if (change != 1) {
-            // unlike for inputs, cnage must be 1 for this output to be considered internal
+            // unlike for inputs, change must be 1 for this output to be considered internal
             external = true;
             break;
         }
+
+
+        if (state->is_wallet_canonical) {
+            // for canonical wallets, the path must be exactly as expected for a change output
+            if (!is_address_path_standard(bip32_path,
+                                          bip32_path_len, 
+                                          state->bip44_purpose,
+                                          G_context.bip44_coin_types,
+                                          G_context.bip44_coin_types_len,
+                                          1))
+            {
+                external = true;
+                break;
+            }
+        }
+
 
         int res = compare_wallet_script_at_path(dc,
                                                 change,
@@ -812,56 +870,15 @@ static void check_output_owned(dispatcher_context_t *dc) {
                            output_address,
                            state->cur_output.value,
                            ui_action_validate_output);
+        return;
     } else {
-        // TODO: should we just consider unusual paths "external"?
+        // valid change address, nothing to show to the user
 
         state->change_outputs_total_value += state->cur_output.value;
         ++state->change_count;
 
-        bool is_path_unusual = false;
-
-        if (state->is_wallet_canonical) {
-            uint32_t purpose; // the valid purpose depends on the requested address type
-            switch(state->address_type) {
-                case ADDRESS_TYPE_LEGACY: //legacy
-                    purpose = 44;
-                    break;
-                case ADDRESS_TYPE_WIT:    // native segwit
-                    purpose = 84;
-                    break;
-                case ADDRESS_TYPE_SH_WIT: // wrapped segwit
-                    purpose = 49;
-                    break;
-                default:
-                    SEND_SW(dc, SW_BAD_STATE);
-                    return;
-            }
-
-            // check if change path is as expected
-            is_path_unusual = is_address_path_standard(bip32_path,
-                                                       bip32_path_len, 
-                                                       purpose,
-                                                       G_context.bip44_coin_types,
-                                                       G_context.bip44_coin_types_len,
-                                                       true);
-        }
-
-        if (is_path_unusual) {
-            // alert the user about the unusual path for a change address
-
-            char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-            if (bip32_path_len > 0) {
-                bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
-            }
-
-            dc->pause();
-            ui_display_unusual_path(dc, path_str, ui_action_validate_output);
-            return;
-        } else {
-            // normal change address, all good
-            dc->next(output_next);
-            return;
-        }
+        dc->next(output_next);
+        return;
     }
 }
 

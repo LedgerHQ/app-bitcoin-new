@@ -96,9 +96,10 @@ bool bip32_path_format(const uint32_t *bip32_path,
 }
 
 bool is_pubkey_path_standard(const uint32_t *bip32_path,
-                      size_t bip32_path_len,
-                      const uint32_t expected_coin_types[],
-                      size_t expected_coin_types_len
+                             size_t bip32_path_len,
+                             uint32_t expected_purpose,
+                             const uint32_t expected_coin_types[],
+                             size_t expected_coin_types_len
 ){
     // if exporting the pubkey, should specify _at least_ until the coin type,
     // and not deeper than the account (therefore 2 or 3 steps)
@@ -107,10 +108,8 @@ bool is_pubkey_path_standard(const uint32_t *bip32_path,
     }
 
     uint32_t purpose = bip32_path[BIP44_PURPOSE_OFFSET];
-    if ((purpose != (44 ^ H)) &&
-        (purpose != (49 ^ H)) &&
-        (purpose != (84 ^ H))) {
-            return false;
+    if (purpose != (expected_purpose ^ H)) { // the purpose should be hardened
+        return false;
     }
 
     uint32_t coin_type = bip32_path[BIP44_COIN_TYPE_OFFSET];
@@ -144,31 +143,33 @@ bool is_pubkey_path_standard(const uint32_t *bip32_path,
     return true;
 }
 
-// TODO: change uint32_t expected_purpose param to address_type, perhaps
 bool is_address_path_standard(const uint32_t *bip32_path,
-                      size_t bip32_path_len,
-                      uint32_t expected_purpose,
-                      const uint32_t expected_coin_types[],
-                      size_t expected_coin_types_len,
-                      bool is_change
-){
+                              size_t bip32_path_len,
+                              uint32_t expected_purpose,
+                              const uint32_t expected_coin_types[],
+                              size_t expected_coin_types_len,
+                              int expected_change)
+{
     if (bip32_path_len != 5) {
         return false;
     }
 
-    if (!is_pubkey_path_standard(bip32_path, 3, expected_coin_types, expected_coin_types_len)) {
-        return false;
-    }
-
-    uint32_t purpose = bip32_path[BIP44_PURPOSE_OFFSET];
-    if (purpose != (expected_purpose ^ H)) {
+    if (!is_pubkey_path_standard(bip32_path, 3, expected_purpose, expected_coin_types, expected_coin_types_len)) {
         return false;
     }
 
     uint32_t change = bip32_path[BIP44_CHANGE_OFFSET];
-    // incidentally, this also checks that it is _not_ hardened
-    if (change != (is_change ? 1 : 0)) {
+    if (change != 0 && change != 1) {
         return false;
+    }
+
+    if (expected_change == 0 || expected_change == 1) {
+        // change should match the expected one
+        if (change != (uint32_t)expected_change) {
+            return false;
+        }
+    } else if (expected_change != -1) {
+        return false; // wrong expected_change parameter
     }
 
     uint32_t address_index = bip32_path[BIP44_ADDRESS_INDEX_OFFSET];

@@ -31,14 +31,14 @@ static void test_parse_policy_map_singlesig_1(void **state) {
 
     int res;
 
-    char *policy = "pk(@0)";
+    char *policy = "pkh(@0)";
     buffer_t policy_buf = buffer_create((void *)policy, strlen(policy));
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_with_key_t *node_1 = (script_node_with_key_t *)out;
+    policy_node_with_key_t *node_1 = (policy_node_with_key_t *)out;
 
-    assert_int_equal(node_1->type, TOKEN_PK);
+    assert_int_equal(node_1->type, TOKEN_PKH);
     assert_int_equal(node_1->key_index, 0);
 }
 
@@ -54,11 +54,11 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_with_script_t *root = (script_node_with_script_t *)out;
+    policy_node_with_script_t *root = (policy_node_with_script_t *)out;
 
     assert_int_equal(root->type, TOKEN_SH);
 
-    script_node_with_key_t *inner = (script_node_with_key_t *)root->script;
+    policy_node_with_key_t *inner = (policy_node_with_key_t *)root->script;
 
     assert_int_equal(inner->type, TOKEN_WPKH);
     assert_int_equal(inner->key_index, 0);
@@ -76,15 +76,15 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_with_script_t *root = (script_node_with_script_t *)out;
+    policy_node_with_script_t *root = (policy_node_with_script_t *)out;
 
     assert_int_equal(root->type, TOKEN_SH);
 
-    script_node_with_script_t *mid = (script_node_with_script_t *)root->script;
+    policy_node_with_script_t *mid = (policy_node_with_script_t *)root->script;
 
     assert_int_equal(mid->type, TOKEN_WSH);
 
-    script_node_with_key_t *inner = (script_node_with_key_t *)mid->script;
+    policy_node_with_key_t *inner = (policy_node_with_key_t *)mid->script;
 
     assert_int_equal(inner->type, TOKEN_PKH);
     assert_int_equal(inner->key_index, 0);
@@ -103,7 +103,7 @@ static void test_parse_policy_map_multisig_1(void **state) {
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_multisig_t *node_1 = (script_node_multisig_t *)out;
+    policy_node_multisig_t *node_1 = (policy_node_multisig_t *)out;
 
     assert_int_equal(node_1->type, TOKEN_SORTEDMULTI);
     assert_int_equal(node_1->k, 2);
@@ -125,11 +125,11 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_with_script_t *root = (script_node_with_script_t *)out;
+    policy_node_with_script_t *root = (policy_node_with_script_t *)out;
 
     assert_int_equal(root->type, TOKEN_WSH);
 
-    script_node_multisig_t *inner = (script_node_multisig_t *)root->script;
+    policy_node_multisig_t *inner = (policy_node_multisig_t *)root->script;
     assert_int_equal(inner->type, TOKEN_MULTI);
 
     assert_int_equal(inner->k, 3);
@@ -150,14 +150,14 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
     assert_int_equal(res, 0);
-    script_node_with_script_t *root = (script_node_with_script_t *)out;
+    policy_node_with_script_t *root = (policy_node_with_script_t *)out;
 
     assert_int_equal(root->type, TOKEN_SH);
 
-    script_node_with_script_t *mid = (script_node_with_script_t *)root->script;
+    policy_node_with_script_t *mid = (policy_node_with_script_t *)root->script;
     assert_int_equal(mid->type, TOKEN_WSH);
 
-    script_node_multisig_t *inner = (script_node_multisig_t *)mid->script;
+    policy_node_multisig_t *inner = (policy_node_multisig_t *)mid->script;
     assert_int_equal(inner->type, TOKEN_SORTEDMULTI);
 
     assert_int_equal(inner->k, 10);
