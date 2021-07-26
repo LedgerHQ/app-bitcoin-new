@@ -342,6 +342,12 @@ void crypto_get_compressed_pubkey_at_path(
  */
 uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]);
 
+/**
+ * Computes the fingerprint of the master key as per BIP32.
+ *
+ * @return the fingerprint of the master key.
+ */
+uint32_t crypto_get_master_key_fingerprint();
 
 /**
  * Computes the base58check-encoded extended pubkey at a given path.

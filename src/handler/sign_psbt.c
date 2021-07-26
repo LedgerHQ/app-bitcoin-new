@@ -314,11 +314,7 @@ void handler_sign_psbt(
     state->has_external_inputs = false;
     memset(state->internal_inputs, 0, sizeof state->internal_inputs);
 
-    // Get the master's key fingerprint
-    uint8_t master_pub_key[33];
-    uint32_t bip32_path[] = {};
-    crypto_get_compressed_pubkey_at_path(bip32_path, 0, master_pub_key, NULL);
-    state->master_key_fingerprint = crypto_get_key_fingerprint(master_pub_key);
+    state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
     // Check integrity of the global map
     if (call_check_merkle_tree_sorted(dc, state->global_map.keys_root, (size_t)state->global_map.size) < 0) {
@@ -974,9 +970,18 @@ static void sign_init(dispatcher_context_t *dc) {
 
         uint32_t fpr = read_u32_be(state->our_key_info.master_key_fingerprint, 0);
         if (fpr == state->master_key_fingerprint) {
-            // TODO: could be a collision, we should verify that we can generate the xpub here
-            our_key_found = true;
-            break;
+            // it could be a collision on the fingerprint; we verify that we can actually generate the same pubkey
+            char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+            get_serialized_extended_pubkey_at_path(state->our_key_info.master_key_derivation,
+                                                   state->our_key_info.master_key_derivation_len,
+                                                   G_context.bip32_pubkey_version,
+                                                   pubkey_derived);
+
+            if (strncmp(state->our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+                our_key_found = true;
+
+                break;
+            }
         }
     }
 
@@ -1573,6 +1578,10 @@ static void sign_sighash(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+
+    // TODO: force PIN validation before signing (prevention of evil maid attack)
+
+
     cx_ecfp_private_key_t private_key = {0};
     uint8_t chain_code[32] = {0};
     uint32_t info = 0;
@@ -1585,7 +1594,6 @@ static void sign_sighash(dispatcher_context_t *dc) {
     sign_path[state->our_key_info.master_key_derivation_len] = state->cur_input.change;
     sign_path[state->our_key_info.master_key_derivation_len + 1] = state->cur_input.address_index;
 
-    // TODO: refactor the signing code elsewhere
     int sign_path_len = state->our_key_info.master_key_derivation_len + 2;
 
 

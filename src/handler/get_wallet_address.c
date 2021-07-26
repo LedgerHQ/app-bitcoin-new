@@ -173,9 +173,9 @@ void handler_get_wallet_address(
     } else {
         dc->pause();
         ui_display_wallet_address(dc,
-            state->is_wallet_canonical ? NULL : wallet_header.name,
-            state->address,
-            ui_action_validate_address);
+                                  state->is_wallet_canonical ? NULL : wallet_header.name,
+                                  state->address,
+                                  ui_action_validate_address);
     }
 }
 

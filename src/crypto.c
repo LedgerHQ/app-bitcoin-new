@@ -336,6 +336,14 @@ uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {
 }
 
 
+uint32_t crypto_get_master_key_fingerprint() {
+    uint8_t master_pub_key[33];
+    uint32_t bip32_path[] = {};
+    crypto_get_compressed_pubkey_at_path(bip32_path, 0, master_pub_key, NULL);
+    return crypto_get_key_fingerprint(master_pub_key);
+}
+
+
 // TODO: Split serialization from key derivation?
 //       It might be difficult to have a clean API without wasting memory, as the checksum
 //       needs to be concatenated to the data before base58 serialization.

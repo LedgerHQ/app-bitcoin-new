@@ -21,6 +21,10 @@ typedef struct {
     };
     uint16_t n_policy_keys;
 
+    size_t n_internal_keys;
+
+    uint32_t master_key_fingerprint;
+
     uint8_t next_pubkey_index;
     uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN];
 } register_wallet_state_t;

@@ -14,6 +14,10 @@ class IncorrectDataError(Exception):
     pass
 
 
+class NotSupportedError(Exception):
+    pass
+
+
 class WrongP1P2Error(Exception):
     pass
 

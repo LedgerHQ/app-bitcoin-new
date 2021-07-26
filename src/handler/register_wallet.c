@@ -24,6 +24,7 @@
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
 #include "../common/merkle.h"
+#include "../common/read.h"
 #include "../common/wallet.h"
 #include "../common/write.h"
 
@@ -40,6 +41,10 @@
 static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
 static void process_next_cosigner_info(dispatcher_context_t *dc);
 static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
+static void finalize_response(dispatcher_context_t *dc);
+
+
+extern global_context_t G_context;
 
 
 /**
@@ -82,6 +87,8 @@ void handler_register_wallet(
 
     // Compute the wallet id (sha256 of the serialization)
     get_policy_wallet_id(&state->wallet_header, state->wallet_id);
+
+    state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
     state->next_pubkey_index = 0;
 
@@ -155,6 +162,22 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
         return;
     }
 
+
+    bool is_key_internal = false;
+    if (read_u32_be(key_info.master_key_fingerprint, 0) == state->master_key_fingerprint) {
+        // it could be a collision on the fingerprint; we verify that we can actually generate the same pubkey
+        char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+        get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                               key_info.master_key_derivation_len,
+                                               G_context.bip32_pubkey_version,
+                                               pubkey_derived);
+
+        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+            is_key_internal = true;
+            ++state->n_internal_keys;
+        }
+    }
+
     // TODO: it would be sensible to validate the pubkey (at least syntactically + validate checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
@@ -183,36 +206,50 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.n_keys) {
         dc->next(process_next_cosigner_info);
-        dc->run();
     } else {
-
-        // TODO: We should use key origin information to verify which one is our key.
-        //       We should either reject to register the wallet, or show a warning if none of the keys is ours.
-        //       Should only accept if exactly one is our key.
-        //       If zero keys are ours, we could still allow to register to verify receive addresses, but can't sign.
-
-        struct {
-            uint8_t wallet_id[32];
-            uint8_t signature_len;
-            uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
-        } response;
-
-        memcpy(response.wallet_id, state->wallet_id, sizeof(state->wallet_id));
-
-        // TODO: HMAC should be good enough in this case, and much faster; also, shorter than sigs
-
-        // TODO: we might want to add external info to be committed with the signature (e.g.: app version).
-        //       This would allow newer versions of the app to invalidate an old signature if desired, for example if
-        //       a vulnerability is discovered in the registration flow of a previous app.
-        //       The response would be changed to:
-        //         <metadata len> <metadata> <sig_len> <sig>
-        //       And the signature would be on the concatenation of the wallet id and the metadata.
-        //       The client must persist the metadata, together with the signature.
-
-        // sign wallet id and produce response
-        int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
-        response.signature_len = (uint8_t)signature_len;
-
-        SEND_RESPONSE(dc, &response, 32 + 1 + signature_len, SW_OK);
+        dc->next(finalize_response);
     }
+    dc->run();
+}
+
+
+static void finalize_response(dispatcher_context_t *dc) {
+    register_wallet_state_t *state = (register_wallet_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->n_internal_keys != 1) {
+        // Unclear if there is any use case for multiple internal keys in the same wallet.
+        // We disallow that, might reconsider in future versions if needed.
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
+    // TODO: force PIN validation to prevent evil maid attacks registering a wallet.
+    //       As only the wallet name is shown when signing from a registered wallet, registering a wallet is a
+    //       sensitive operation, and a fraudulent wallet with the same name would result in loss of funds.
+
+    struct {
+        uint8_t wallet_id[32];
+        uint8_t signature_len;
+        uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
+    } response;
+
+    memcpy(response.wallet_id, state->wallet_id, sizeof(state->wallet_id));
+
+    // TODO: HMAC should be good enough in this case, and much faster; also, shorter than sigs
+
+    // TODO: we might want to add external info to be committed with the signature (e.g.: app version).
+    //       This would allow newer versions of the app to invalidate an old signature if desired, for example if
+    //       a vulnerability is discovered in the registration flow of a previous app.
+    //       The response would be changed to:
+    //         <metadata len> <metadata> <sig_len> <sig>
+    //       And the signature would be on the concatenation of the wallet id and the metadata.
+    //       The client must persist the metadata, together with the signature.
+
+    // sign wallet id and produce response
+    int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
+    response.signature_len = (uint8_t)signature_len;
+
+    SEND_RESPONSE(dc, &response, 32 + 1 + signature_len, SW_OK);
 }
