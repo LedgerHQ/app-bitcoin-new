@@ -26,7 +26,7 @@ typedef struct {
     uint32_t master_key_fingerprint;
 
     uint8_t next_pubkey_index;
-    uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN];
+    uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN + 1];
 } register_wallet_state_t;
 
 void handler_register_wallet(

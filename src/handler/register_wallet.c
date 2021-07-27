@@ -128,20 +128,22 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
 
-    int pubkey_len = call_get_merkle_leaf_element(dc,
+    int pubkey_info_len = call_get_merkle_leaf_element(dc,
                                                   state->wallet_header.keys_info_merkle_root,
                                                   state->wallet_header.n_keys,
                                                   state->next_pubkey_index,
                                                   state->next_pubkey_info,
-                                                  sizeof(state->next_pubkey_info));
+                                                  MAX_POLICY_KEY_INFO_LEN);
 
-    if (pubkey_len < 0) {
+    if (pubkey_info_len < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
+    state->next_pubkey_info[pubkey_info_len] = 0;
+
     // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, pubkey_len);
+    buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, pubkey_info_len);
 
     policy_map_key_info_t key_info;
     if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
@@ -188,9 +190,10 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     dc->pause();
     ui_display_policy_map_cosigner_pubkey(dc,
-                                          key_info.ext_pubkey,
+                                          (char *)state->next_pubkey_info,
                                           state->next_pubkey_index, // 1-indexed for the UI
                                           state->wallet_header.n_keys,
+                                          is_key_internal,
                                           ui_action_validate_cosigner);
 }
 

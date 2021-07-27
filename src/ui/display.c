@@ -68,8 +68,8 @@ typedef struct {
 } ui_wallet_state_t;
 
 typedef struct {
-    char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-    char signer_index[sizeof("Signer 15 of 15")];
+    char pubkey[MAX_POLICY_KEY_INFO_LEN + 1];
+    char signer_index[sizeof("Key @999 <theirs>")];
 } ui_cosigner_pubkey_and_index_state_t;
 
 typedef struct {
@@ -501,14 +501,21 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
                                            char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
+                                           bool is_internal,
                                            action_validate_cb callback)
 {
     (void)(context);
+    (void)(n_keys);
 
     ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
 
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
-    snprintf(state->signer_index, sizeof(state->signer_index), "Signer %u of %u", cosigner_index + 1, n_keys);
+
+    if (is_internal) {
+        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u <ours>", cosigner_index + 1);
+    } else {
+        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u <theirs>", cosigner_index + 1);
+    }
 
     g_validate_callback = callback;
 

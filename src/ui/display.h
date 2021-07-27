@@ -36,6 +36,7 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_cont
                                            char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
+                                           bool is_internal,
                                            action_validate_cb callback);
 
 void ui_display_wallet_address(dispatcher_context_t *context,
