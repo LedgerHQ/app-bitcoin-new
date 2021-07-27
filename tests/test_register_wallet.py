@@ -5,10 +5,8 @@ from bitcoin_client.wallet import MultisigWallet
 
 from .utils import automation
 
+import hmac
 from hashlib import sha256
-from ecdsa.curves import SECP256k1
-from ecdsa.keys import VerifyingKey
-from ecdsa.util import sigdecode_der
 
 import pytest
 
@@ -25,22 +23,13 @@ def test_register_wallet_accept_legacy(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, sig = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
-    pk: VerifyingKey = VerifyingKey.from_string(
-        speculos_globals.master_compressed_pubkey, curve=SECP256k1, hashfunc=sha256
-    )
-
-    assert (
-        pk.verify(
-            signature=sig,
-            data=wallet.serialize(),
-            hashfunc=sha256,
-            sigdecode=sigdecode_der,
-        )
-        is True
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        wallet_hmac,
     )
 
 
@@ -56,22 +45,13 @@ def test_register_wallet_accept_sh_wit(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, sig = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
-    pk: VerifyingKey = VerifyingKey.from_string(
-        speculos_globals.master_compressed_pubkey, curve=SECP256k1, hashfunc=sha256
-    )
-
-    assert (
-        pk.verify(
-            signature=sig,
-            data=wallet.serialize(),
-            hashfunc=sha256,
-            sigdecode=sigdecode_der,
-        )
-        is True
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        wallet_hmac,
     )
 
 
@@ -87,22 +67,13 @@ def test_register_wallet_accept_wit(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, sig = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
-    pk: VerifyingKey = VerifyingKey.from_string(
-        speculos_globals.master_compressed_pubkey, curve=SECP256k1, hashfunc=sha256
-    )
-
-    assert (
-        pk.verify(
-            signature=sig,
-            data=wallet.serialize(),
-            hashfunc=sha256,
-            sigdecode=sigdecode_der,
-        )
-        is True
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        wallet_hmac,
     )
 
 

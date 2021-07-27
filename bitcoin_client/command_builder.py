@@ -139,11 +139,11 @@ class BitcoinCommandBuilder:
                               ins=BitcoinInsType.REGISTER_WALLET,
                               cdata=wallet.serialize())
 
-    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, change: bool, display: bool = False):
+    def get_wallet_address(self, wallet: Wallet, wallet_hmac: bytes, address_index: int, change: bool, display: bool = False):
         cdata: bytes = b"".join([
             wallet.id,
-            len(signature).to_bytes(1, byteorder="big"),
-            signature,
+            len(wallet_hmac).to_bytes(1, byteorder="big"),
+            wallet_hmac,
             wallet.serialize(),
             b'\1' if change else b'\0',
             address_index.to_bytes(4, byteorder="big")
@@ -157,10 +157,7 @@ class BitcoinCommandBuilder:
                   input_mappings: List[Mapping[bytes, bytes]],
                   output_mappings: List[Mapping[bytes, bytes]],
                   wallet: Wallet,
-                  wallet_sig: bytes):
-
-        if not wallet is None and wallet_sig is None:
-            raise ValueError("The wallet signature was not provided")
+                  wallet_hmac: bytes):
 
         cdata = bytearray()
         cdata += get_merkleized_map_commitment(global_mapping)
@@ -174,8 +171,8 @@ class BitcoinCommandBuilder:
                             for m_out in output_mappings]).root
 
         cdata += wallet.id
-        cdata += len(wallet_sig).to_bytes(1, byteorder="big")
-        cdata += wallet_sig
+        cdata += len(wallet_hmac).to_bytes(1, byteorder="big")
+        cdata += wallet_hmac
         cdata += wallet.serialize()
 
         return self.serialize(cla=self.CLA_BITCOIN,

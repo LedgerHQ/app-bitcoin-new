@@ -110,16 +110,23 @@ class BitcoinCommand:
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
 
+        if len(response) < 33:
+            raise RuntimeError(f"Invalid response length: {len(response)}")
+
         wallet_id = response[0:32]
-        sig_len = response[32]
-        sig = response[33:]
+        wallet_hmac_length = response[32]
 
-        if len(sig) != sig_len:
-            raise RuntimeError("Invalid response")
+        if wallet_hmac_length != 32:
+            raise RuntimeError(f"Expected the length of the hmac to be 32, not {wallet_hmac_length}")
 
-        return wallet_id, sig
+        if len(response) != 32 + 1 + wallet_hmac_length:
+            raise RuntimeError(f"Invalid response length: {len(response)}")
 
-    def get_wallet_address(self, wallet: Wallet, signature: bytes, address_index: int, display: bool = False) -> str:
+        wallet_hmac = response[33:33 + wallet_hmac_length]
+
+        return wallet_id, wallet_hmac
+
+    def get_wallet_address(self, wallet: Wallet, wallet_hmac: bytes, address_index: int, display: bool = False) -> str:
         if wallet.type != WalletType.POLICYMAP or not isinstance(wallet, PolicyMapWallet):
             raise ValueError("wallet type must be POLICYMAP")
 
@@ -127,7 +134,7 @@ class BitcoinCommand:
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
-            self.builder.get_wallet_address(wallet, signature, address_index, display),
+            self.builder.get_wallet_address(wallet, wallet_hmac, address_index, display),
             client_intepreter
         )
 
@@ -137,7 +144,7 @@ class BitcoinCommand:
         return response.decode()
 
     # TODO: should we return an updated PSBT with signatures, instead?
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_sig: bytes = b'') -> str:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: bytes = b'') -> str:
         print(psbt.serialize())
 
         if psbt.version != 2:
@@ -180,7 +187,7 @@ class BitcoinCommand:
 
         sw, _ = self.make_request(
             self.builder.sign_psbt(global_map, input_maps,
-                                   output_maps, wallet, wallet_sig),
+                                   output_maps, wallet, wallet_hmac),
             client_intepreter
         )
 

@@ -34,6 +34,9 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+#include "lib/policy.h"
+
+
 #include "client_commands.h"
 
 #include "register_wallet.h"
@@ -94,6 +97,8 @@ void handler_register_wallet(
 
     // TODO: check if policy is acceptable; only multisig should be accepted at this time,
     //       and it should be one of the accepted patterns.
+
+    // TODO: add restriction on the policy's name
 
     dc->pause();
     ui_display_wallet_header(dc, &state->wallet_header, ui_action_validate_header);
@@ -231,25 +236,30 @@ static void finalize_response(dispatcher_context_t *dc) {
 
     struct {
         uint8_t wallet_id[32];
-        uint8_t signature_len;
-        uint8_t signature[MAX_DER_SIG_LEN]; // the actual response might be shorter
+        uint8_t hmac_len;
+        uint8_t hmac[32];
     } response;
 
     memcpy(response.wallet_id, state->wallet_id, sizeof(state->wallet_id));
-
-    // TODO: HMAC should be good enough in this case, and much faster; also, shorter than sigs
 
     // TODO: we might want to add external info to be committed with the signature (e.g.: app version).
     //       This would allow newer versions of the app to invalidate an old signature if desired, for example if
     //       a vulnerability is discovered in the registration flow of a previous app.
     //       The response would be changed to:
-    //         <metadata len> <metadata> <sig_len> <sig>
+    //         <wallet_id> <metadata_len> <metadata> <hmac>
     //       And the signature would be on the concatenation of the wallet id and the metadata.
     //       The client must persist the metadata, together with the signature.
 
     // sign wallet id and produce response
-    int signature_len = crypto_sign_sha256_hash(state->wallet_id, response.signature);
-    response.signature_len = (uint8_t)signature_len;
+    uint8_t key[32];
 
-    SEND_RESPONSE(dc, &response, 32 + 1 + signature_len, SW_OK);
+    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, sizeof(WALLET_SLIP0021_LABEL), key);
+
+    response.hmac_len = 32;
+    cx_hmac_sha256(key, sizeof(key), state->wallet_id, sizeof(state->wallet_id), response.hmac, sizeof(response.hmac));
+
+    // TODO: wrap in try/catch to harden key deletion
+    memset(key, 0, sizeof(key));
+
+    SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
 }

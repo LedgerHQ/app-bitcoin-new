@@ -372,6 +372,19 @@ size_t get_serialized_extended_pubkey_at_path(
 
 
 /**
+ * Derives the level-1 symmetric key at the given label using SLIP-0021.
+ *
+ * @param[in]  label
+ *   Pointer to the label. The first byte of the label must be 0x00 to comply with SLIP-0021.
+ * @param[in]  label_len
+ *   Length of te label.
+ * @param[out] key
+ *   Pointer to a 32-byte output buffer that will contain the generated key.
+ */
+void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]);
+
+
+/**
  * Encodes a 20-bytes hash in base58 with checksum, after prepending a version prefix.
  * If version < 256, it is prepended as 1 byte.
  * If 256 <= version < 65536, it is prepended in big-endian as 2 bytes.

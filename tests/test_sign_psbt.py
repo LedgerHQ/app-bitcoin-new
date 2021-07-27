@@ -136,7 +136,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
     }
 
 
-# def test_sign_psbt_legacy(cmd):
+# def test_sign_psbt_legacy(cmd: BitcoinCommand):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
 #     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUhIh4AAAA="
@@ -149,7 +149,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 #     print(result)
 
 
-# def test_sign_psbt_legacy_p2pkh(cmd):
+# def test_sign_psbt_legacy_p2pkh(cmd: BitcoinCommand):
 #     # test from app-bitcoin
 
 #     # legacy address
@@ -167,7 +167,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_multisig_wsh(cmd):
+def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -177,13 +177,14 @@ def test_sign_psbt_multisig_wsh(cmd):
             f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
         ],
     )
-    wallet_sig = bytes.fromhex(
-        "30440220564c14c281594221a3309b5acd11a427a32b9fc85b8d883564004f325fb0071b02201404316adb5127b7918ecf48e3ebceea41963898b26a4643e834baa0c72a5ea2"
+
+    wallet_hmac = bytes.fromhex(
+        "e2f69f215cb51a869b7e470df25c8011a446480d70862c16c0613d080aad8331"
     )
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
-    result = cmd.sign_psbt(psbt, wallet, wallet_sig)
+    result = cmd.sign_psbt(psbt, wallet, wallet_hmac)
 
     assert result == {
         0: bytes.fromhex(
@@ -194,7 +195,7 @@ def test_sign_psbt_multisig_wsh(cmd):
     print(result)
 
 
-# def test_sign_psbt_legacy_wrong_non_witness_utxo(cmd):
+# def test_sign_psbt_legacy_wrong_non_witness_utxo(cmd: BitcoinCommand):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
 #     # The spend is valid, but the non-witness utxo is wrong; therefore, it should fail the hash test

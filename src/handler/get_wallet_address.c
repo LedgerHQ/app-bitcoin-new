@@ -72,13 +72,18 @@ void handler_get_wallet_address(
     }
 
     uint8_t wallet_id[32];
-    uint8_t wallet_sig_len;
-    uint8_t wallet_sig[MAX_DER_SIG_LEN];
+    uint8_t wallet_hmac[32];
+    uint8_t wallet_hmac_len;
     if (   !buffer_read_bytes(&dc->read_buffer, wallet_id, 32)
-        || !buffer_read_u8(&dc->read_buffer, &wallet_sig_len)
-        || !buffer_read_bytes(&dc->read_buffer, wallet_sig, wallet_sig_len))
+        || !buffer_read_u8(&dc->read_buffer, &wallet_hmac_len)
+        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, wallet_hmac_len))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        return;
+    }
+
+    if (wallet_hmac_len != 0 && wallet_hmac_len != 32) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -98,23 +103,26 @@ void handler_get_wallet_address(
         return;
     }
 
-    if (wallet_sig_len != 0) {
-        // Verify signature
-        if (!crypto_verify_sha256_hash(wallet_id, wallet_sig, wallet_sig_len)) {
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return;
-        }
-        state->is_wallet_canonical = false;
-    } else {
-        // No signature, verify that the policy is a canonical one that is allowed by default
+    if (wallet_hmac_len == 0) {
+        // No hmac, verify that the policy is a canonical one that is allowed by default
         state->address_type = get_policy_address_type(&state->wallet_policy_map);
         if (state->address_type == -1) {
-            PRINTF("Non-standard policy, and no signature provided\n");
+            PRINTF("Non-standard policy, and no hmac provided\n");
             SEND_SW(dc, SW_SIGNATURE_FAIL);
             return;
         }
 
         state->is_wallet_canonical = true;
+    } else {
+        // Verify hmac
+
+        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
+            PRINTF("Incorrect hmac\n");
+            SEND_SW(dc, SW_SIGNATURE_FAIL);
+            return;
+        }
+
+        state->is_wallet_canonical = false;
     }
 
     // change

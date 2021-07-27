@@ -112,7 +112,7 @@ class SpeculosGlobals:
     master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
     master_key_fingerprint = 0xf5acc2fd
     master_compressed_pubkey = bytes.fromhex("0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db")
-
+    wallet_registration_key = bytes.fromhex("81a65250c9040d6164706c8838951839f5260f5e68fb6e8cab2f6c9780b84562")
 
 @pytest.fixture
 def speculos_globals() -> SpeculosGlobals:

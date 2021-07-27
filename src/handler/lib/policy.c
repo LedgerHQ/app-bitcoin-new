@@ -456,3 +456,18 @@ int get_policy_address_type(policy_node_t *policy) {
             return -1;
     }
 }
+
+
+bool check_wallet_hmac(uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
+    uint8_t key[32];
+
+    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, sizeof(WALLET_SLIP0021_LABEL), key);
+
+    uint8_t correct_hmac[32];
+    cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
+
+    // TODO: wrap in try/catch to harden key deletion
+    memset(key, 0, sizeof(key));
+
+    return os_secure_memcmp(wallet_hmac, correct_hmac, 32) == 0;
+} 

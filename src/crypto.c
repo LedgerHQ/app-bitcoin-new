@@ -344,6 +344,20 @@ uint32_t crypto_get_master_key_fingerprint() {
 }
 
 
+void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]) {
+    // TODO: should wrap in try/catch?
+
+    os_perso_derive_node_with_seed_key(HDW_SLIP21,
+                                       CX_CURVE_SECP256K1,
+                                       (uint32_t *)label,
+                                       label_len, 
+                                       key,
+                                       NULL,
+                                       NULL,
+                                       0);
+}
+
+
 // TODO: Split serialization from key derivation?
 //       It might be difficult to have a clean API without wasting memory, as the checksum
 //       needs to be concatenated to the data before base58 serialization.
