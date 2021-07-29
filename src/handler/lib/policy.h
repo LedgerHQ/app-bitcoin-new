@@ -6,7 +6,8 @@
 /**
  * The label used to derive the symmetric key used to register/verify wallet policies on device.
  */
-#define WALLET_SLIP0021_LABEL "\0LEDGER-Wallet policy"
+#define WALLET_SLIP0021_LABEL     "\0LEDGER-Wallet policy"
+#define WALLET_SLIP0021_LABEL_LEN (sizeof(WALLET_SLIP0021_LABEL) - 1) // sizeof counts the terminating 0
 
 
 /**

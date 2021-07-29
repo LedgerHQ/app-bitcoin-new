@@ -179,7 +179,7 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
     )
 
     wallet_hmac = bytes.fromhex(
-        "e2f69f215cb51a869b7e470df25c8011a446480d70862c16c0613d080aad8331"
+        "5dab4a4dfa5ae128c3aeff877ca474eecf4ce1ef9d75e42311b1f335e022c4f9"
     )
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")

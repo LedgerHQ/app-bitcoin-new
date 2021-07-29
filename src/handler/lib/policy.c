@@ -461,9 +461,10 @@ int get_policy_address_type(policy_node_t *policy) {
 bool check_wallet_hmac(uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
     uint8_t key[32];
 
-    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, sizeof(WALLET_SLIP0021_LABEL), key);
+    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
     uint8_t correct_hmac[32];
+
     cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
 
     // TODO: wrap in try/catch to harden key deletion

@@ -256,7 +256,7 @@ static void finalize_response(dispatcher_context_t *dc) {
     // sign wallet id and produce response
     uint8_t key[32];
 
-    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, sizeof(WALLET_SLIP0021_LABEL), key);
+    crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
     response.hmac_len = 32;
     cx_hmac_sha256(key, sizeof(key), state->wallet_id, sizeof(state->wallet_id), response.hmac, sizeof(response.hmac));

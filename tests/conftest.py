@@ -83,7 +83,7 @@ class SpeculosGlobals:
         "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db"
     )
     wallet_registration_key = bytes.fromhex(
-        "81a65250c9040d6164706c8838951839f5260f5e68fb6e8cab2f6c9780b84562"
+        "7463d6d1a82f4647ead048c625ae0c27fe40b6d0d5f2d24104009ae9d3b7963c"
     )
 
 

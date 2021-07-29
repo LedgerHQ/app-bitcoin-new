@@ -347,9 +347,14 @@ uint32_t crypto_get_master_key_fingerprint() {
 void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]) {
     // TODO: should wrap in try/catch?
 
+    // TODO: find a better way
+    uint8_t label_copy[32] __attribute__((aligned(4)));
+
+    memcpy(label_copy, label, label_len);
+
     os_perso_derive_node_with_seed_key(HDW_SLIP21,
                                        CX_CURVE_SECP256K1,
-                                       (uint32_t *)label,
+                                       (uint32_t *)label_copy,
                                        label_len, 
                                        key,
                                        NULL,
