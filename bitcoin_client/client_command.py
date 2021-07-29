@@ -6,11 +6,6 @@ from hashlib import sha256
 from bitcoin_client.common import ByteStreamParser, ripemd160, write_varint
 from bitcoin_client.merkle import MerkleTree, element_hash
 
-# TODO: The current version treats all client commands individually, forcing the code of each command in command.py
-#       to explicitly handle the specific commands that are enabled for their specific needs. It might be easier to
-#       instead have a ClientCommandInterpreter that is aware of all the client commands, and has utility functions
-#       to manage the client side state (e.g.: the known hashes and Merkle trees).
-
 
 class ClientCommandCode(IntEnum):
     YIELD = 0x10
@@ -39,7 +34,7 @@ class YieldCommand(ClientCommand):
 
     def execute(self, request: bytes) -> bytes:
         self.results.append(request[1:])  # only skip the first byte (command code)
-        return b''
+        return b""
 
 
 class GetPreimageCommand(ClientCommand):
@@ -67,14 +62,20 @@ class GetPreimageCommand(ClientCommand):
 
                 payload_size = min(max_payload_size, len(known_preimage))
 
-                if (payload_size < len(known_preimage)):
+                if payload_size < len(known_preimage):
                     # split into list of length-1 bytes elements
-                    extra_elements = [known_preimage[i:i + 1]
-                                      for i in range(payload_size, len(known_preimage))]
+                    extra_elements = [
+                        known_preimage[i : i + 1]
+                        for i in range(payload_size, len(known_preimage))
+                    ]
                     # add to the queue any remaining extra bytes
                     self.queue.extend(extra_elements)
 
-                return preimage_len_out + payload_size.to_bytes(1, byteorder="big") + known_preimage[:payload_size]
+                return (
+                    preimage_len_out
+                    + payload_size.to_bytes(1, byteorder="big")
+                    + known_preimage[:payload_size]
+                )
 
         # not found
         raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
@@ -107,7 +108,8 @@ class GetMerkleLeafHashCommand(ClientCommand):
 
         if len(self.queue) != 0:
             raise RuntimeError(
-                "This command should not execute when the queue is not empty.")
+                "This command should not execute when the queue is not empty."
+            )
 
         proof = mt.prove_leaf(leaf_index)
         n_proof_elements = len(proof) // 20
@@ -119,12 +121,14 @@ class GetMerkleLeafHashCommand(ClientCommand):
         # Add to the queue any proof elements that do not fit the response
         self.queue.extend(proof[-n_leftover_elements:])
 
-        return b''.join([
-            mt.get(leaf_index),
-            len(proof).to_bytes(1, byteorder="big"),
-            n_proof_elements.to_bytes(1, byteorder="big"),
-            *proof[:n_response_elements]
-        ])
+        return b"".join(
+            [
+                mt.get(leaf_index),
+                len(proof).to_bytes(1, byteorder="big"),
+                n_proof_elements.to_bytes(1, byteorder="big"),
+                *proof[:n_response_elements],
+            ]
+        )
 
 
 class GetMerkleLeafIndexCommand(ClientCommand):
@@ -173,7 +177,8 @@ class GetMoreElementsCommand(ClientCommand):
         element_len = len(self.queue[0])
         if any(len(el) != element_len for el in self.queue):
             raise ValueError(
-                "The queue contains elements of different byte length, which is not expected.")
+                "The queue contains elements of different byte length, which is not expected."
+            )
 
         # pop from the queue, keeping the total response length at most 255
 
@@ -184,11 +189,13 @@ class GetMoreElementsCommand(ClientCommand):
             response_elements.extend(self.queue.popleft())
             n_added_elements += 1
 
-        return b''.join([
-            n_added_elements.to_bytes(1, byteorder="big"),
-            element_len.to_bytes(1, byteorder="big"),
-            bytes(response_elements)
-        ])
+        return b"".join(
+            [
+                n_added_elements.to_bytes(1, byteorder="big"),
+                element_len.to_bytes(1, byteorder="big"),
+                bytes(response_elements),
+            ]
+        )
 
 
 class ClientCommandInterpreter:
@@ -207,7 +214,7 @@ class ClientCommandInterpreter:
             GetPreimageCommand(self.known_preimages, queue),
             GetMerkleLeafIndexCommand(self.known_trees),
             GetMerkleLeafHashCommand(self.known_trees, queue),
-            GetMoreElementsCommand(queue)
+            GetMoreElementsCommand(queue),
         ]
 
         self.commands = {cmd.code: cmd for cmd in commands}
@@ -215,12 +222,14 @@ class ClientCommandInterpreter:
     def execute(self, hw_response: bytes) -> bytes:
         if len(hw_response) == 0:
             raise RuntimeError(
-                "Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet.")
+                "Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet."
+            )
 
         cmd_code = hw_response[0]
         if cmd_code not in self.commands:
-            raise RuntimeError("Unexpected command code: 0x{:02X}".format(
-                cmd_code))  # TODO: more precise Error type
+            raise RuntimeError(
+                "Unexpected command code: 0x{:02X}".format(cmd_code)
+            )  # TODO: more precise Error type
 
         return self.commands[cmd_code].execute(hw_response)
 
@@ -231,7 +240,7 @@ class ClientCommandInterpreter:
 
     def add_known_list(self, elements: List[bytes]):
         for el in elements:
-            self.add_known_preimage(b'\x00' + el)
+            self.add_known_preimage(b"\x00" + el)
 
         mt = MerkleTree(element_hash(el) for el in elements)
 

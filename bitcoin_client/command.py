@@ -1,8 +1,9 @@
-from typing import Tuple, List, Mapping
+from typing import Tuple, List, Mapping, Generator
 import base64
 from io import BytesIO, BufferedReader
 
 from ledgercomm import Transport
+from speculos.client import ApduException, ApduResponse
 
 from bitcoin_client.command_builder import BitcoinCommandBuilder, BitcoinInsType
 from bitcoin_client.common import AddressType
@@ -28,49 +29,81 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
             break
 
         value = deser_string(f)
-        print(f"Key type: {key[0]}")
-        print(f"{key.hex()}:{value.hex()}")
 
         result[key] = value
     return result
 
 
+class HWWClient:
+    def apdu_exchange(
+        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
+    ) -> bytes:
+        raise NotImplementedError()
+
+
+class HIDClient:
+    def __init__(self):
+        self.transport = Transport("hid")  # TODO: other params
+
+    def apdu_exchange(
+        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
+    ) -> bytes:
+        sw, data = self.transport.exchange(cla, ins, p1, p2, None, data)
+
+        if sw != 0x9000:
+            raise ApduException(sw, data)
+
+        return data
+
+    def apdu_exchange_nowait(
+        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
+    ) -> Generator[ApduResponse, None, None]:
+        raise NotImplementedError()
+
+    def close(self) -> None:
+        self.transport.close()
+
+
 class BitcoinCommand:
-    def __init__(self,
-                 transport: Transport,
-                 debug: bool = False) -> None:
-        self.transport = transport
+    def __init__(self, client: HWWClient, debug: bool = False) -> None:
+        self.client = client
         self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
 
-    def make_request(self, apdu: bytes, client_intepreter: ClientCommandInterpreter = None) -> Tuple[int, bytes]:
-        sw, response = self.transport.exchange_raw(apdu)
+    def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
+        try:
+            return 0x9000, self.client.apdu_exchange(**apdu)
+        except ApduException as e:
+            return e.sw, e.data
+
+    def make_request(
+        self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
+    ) -> Tuple[int, bytes]:
+        sw, response = self._apdu_exchange(apdu)
 
         while sw == 0xE000:
             if not client_intepreter:
                 raise RuntimeError("Unexpected SW_INTERRUPTED_EXECUTION received.")
 
             command_response = client_intepreter.execute(response)
-            sw, response = self.transport.exchange_raw(
-                self.builder.continue_interrupted(command_response))
+            sw, response = self._apdu_exchange(
+                self.builder.continue_interrupted(command_response)
+            )
 
         return sw, response
 
     def get_pubkey(self, bip32_path: str, display: bool = False) -> str:
         # TODO: add docs
-        sw, response = self.make_request(
-            self.builder.get_pubkey(bip32_path, display)
-        )
+        sw, response = self.make_request(self.builder.get_pubkey(bip32_path, display))
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
 
         return response.decode()
 
-    def get_address(self,
-                    address_type: AddressType,
-                    bip32_path: str,
-                    display: bool = False) -> str:
+    def get_address(
+        self, address_type: AddressType, bip32_path: str, display: bool = False
+    ) -> str:
         """Get an address given address type and BIP32 path. Optionally, validate with the user.
 
         Parameters
@@ -103,8 +136,7 @@ class BitcoinCommand:
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
-            self.builder.register_wallet(wallet),
-            client_intepreter
+            self.builder.register_wallet(wallet), client_intepreter
         )
 
         if sw != 0x9000:
@@ -117,25 +149,37 @@ class BitcoinCommand:
         wallet_hmac_length = response[32]
 
         if wallet_hmac_length != 32:
-            raise RuntimeError(f"Expected the length of the hmac to be 32, not {wallet_hmac_length}")
+            raise RuntimeError(
+                f"Expected the length of the hmac to be 32, not {wallet_hmac_length}"
+            )
 
         if len(response) != 32 + 1 + wallet_hmac_length:
             raise RuntimeError(f"Invalid response length: {len(response)}")
 
-        wallet_hmac = response[33:33 + wallet_hmac_length]
+        wallet_hmac = response[33 : 33 + wallet_hmac_length]
 
         return wallet_id, wallet_hmac
 
-    def get_wallet_address(self, wallet: Wallet, wallet_hmac: bytes, address_index: int, display: bool = False) -> str:
-        if wallet.type != WalletType.POLICYMAP or not isinstance(wallet, PolicyMapWallet):
+    def get_wallet_address(
+        self,
+        wallet: Wallet,
+        wallet_hmac: bytes,
+        address_index: int,
+        display: bool = False,
+    ) -> str:
+        if wallet.type != WalletType.POLICYMAP or not isinstance(
+            wallet, PolicyMapWallet
+        ):
             raise ValueError("wallet type must be POLICYMAP")
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
-            self.builder.get_wallet_address(wallet, wallet_hmac, address_index, display),
-            client_intepreter
+            self.builder.get_wallet_address(
+                wallet, wallet_hmac, address_index, display
+            ),
+            client_intepreter,
         )
 
         if sw != 0x9000:
@@ -144,12 +188,12 @@ class BitcoinCommand:
         return response.decode()
 
     # TODO: should we return an updated PSBT with signatures, instead?
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: bytes = b'') -> str:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: bytes = b"") -> str:
         print(psbt.serialize())
 
         if psbt.version != 2:
             psbt_v2 = PSBT()
-            psbt_v2.deserialize(psbt.serialize()) # clone psbt
+            psbt_v2.deserialize(psbt.serialize())  # clone psbt
             psbt_v2.to_psbt_v2()
         else:
             psbt_v2 = psbt
@@ -179,16 +223,18 @@ class BitcoinCommand:
 
         # We also add the Merkle tree of the (resp. output) input map commitments as a known tree
         input_commitments = [get_merkleized_map_commitment(m_in) for m_in in input_maps]
-        output_commitments = [get_merkleized_map_commitment(
-            m_out) for m_out in output_maps]
+        output_commitments = [
+            get_merkleized_map_commitment(m_out) for m_out in output_maps
+        ]
 
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
 
         sw, _ = self.make_request(
-            self.builder.sign_psbt(global_map, input_maps,
-                                   output_maps, wallet, wallet_hmac),
-            client_intepreter
+            self.builder.sign_psbt(
+                global_map, input_maps, output_maps, wallet, wallet_hmac
+            ),
+            client_intepreter,
         )
 
         if sw != 0x9000:
@@ -200,6 +246,4 @@ class BitcoinCommand:
         if any(len(x) <= 1 for x in results):
             raise RuntimeError("Invalid response")
 
-        return {
-            int(res[0]): res[1:] for res in results
-        }
+        return {int(res[0]): res[1:] for res in results}

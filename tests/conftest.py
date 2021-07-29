@@ -1,26 +1,26 @@
-import subprocess
-import os
-import socket
-import time
 from dataclasses import dataclass
+
+from tests.utils import automation
+
+import json
+
+from typing import Union
 
 from pathlib import Path
 
 import pytest
 
-from ledgercomm import Transport
+from bitcoin_client.command import BitcoinCommand, HIDClient
 
-from bitcoin_client.command import BitcoinCommand
+from speculos.client import SpeculosClient
 
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
 
 
 def pytest_addoption(parser):
-    parser.addoption("--hid",
-                     action="store_true")
-    parser.addoption("--headless",
-                     action="store_true")
+    parser.addoption("--hid", action="store_true")
+    parser.addoption("--headless", action="store_true")
 
 
 @pytest.fixture(scope="module")
@@ -45,63 +45,31 @@ def headless(pytestconfig):
 
 
 @pytest.fixture
-def device(request, hid):
-    # If running on real hardware, nothing to do here
+def client(request, hid) -> Union[HIDClient, SpeculosClient]:
     if hid:
-        yield
-        return
+        yield HIDClient()
+    else:
+        client = SpeculosClient(
+            str(conftest_folder_path.parent.joinpath("bin/app.elf"))
+        )
 
-    # Gets the speculos executable from the SPECULOS environment variable,
-    # or hopes that "speculos.py" is in the $PATH if not set
-    speculos_executable = os.environ.get("SPECULOS", "speculos.py")
-
-    base_args = [
-        speculos_executable, f"{conftest_folder_path}/../bin/app.elf",
-        "--sdk", "2.0",
-        # "--display", "headless"
-    ]
-
-    # Look for the automation_file attribute in the test function, if present
-    try:
-        automation_args = ["--automation", f"file:{conftest_folder_path}/{request.function.automation_file}"]
-    except AttributeError:
-        automation_args = []
-
-    speculos_proc = subprocess.Popen([*base_args, *automation_args])
-
-    # Attempts to connect to speculos to make sure that it's ready when the test starts
-    for _ in range(100):
         try:
-            socket.create_connection(("127.0.0.1", 9999), timeout=1.0)
-            connected = True
-            break
-        except ConnectionRefusedError:
-            time.sleep(0.1)
-            connected = False
+            automation_file = request.function.automation_file
+        except AttributeError:
+            automation_file = None
 
-    if not connected:
-        raise RuntimeError("Unable to connect to speculos.")
+        if automation_file:
+            rules = json.load(open(automation_file))
+            client.set_automation_rules(rules)
 
-    yield
+        yield client
 
-    speculos_proc.terminate()
-    speculos_proc.wait()
+        client.stop()
 
 
 @pytest.fixture
-def transport(device, hid):
-    transport = (Transport(interface="hid", debug=True)
-                 if hid else Transport(interface="tcp",
-                                       server="127.0.0.1",
-                                       port=9999,
-                                       debug=True))
-    yield transport
-    transport.close()
-
-
-@pytest.fixture
-def cmd(transport) -> BitcoinCommand:
-    return BitcoinCommand(transport=transport, debug=False)
+def cmd(client) -> BitcoinCommand:
+    return BitcoinCommand(client=client, debug=False)
 
 
 @dataclass(frozen=True)
@@ -110,9 +78,14 @@ class SpeculosGlobals:
     # TODO: those are for testnet; we could compute them for any network from the seed
     master_extended_privkey = "tprv8ZgxMBicQKsPfDTA8ufnUdCDy8qXUDnxd8PYWprimNdtVSk4mBMdkAPF6X1cemMjf6LyznfhwbPCsxfiof4BM4DkE8TQtV3HBw2krSqFqHA"
     master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
-    master_key_fingerprint = 0xf5acc2fd
-    master_compressed_pubkey = bytes.fromhex("0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db")
-    wallet_registration_key = bytes.fromhex("81a65250c9040d6164706c8838951839f5260f5e68fb6e8cab2f6c9780b84562")
+    master_key_fingerprint = 0xF5ACC2FD
+    master_compressed_pubkey = bytes.fromhex(
+        "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db"
+    )
+    wallet_registration_key = bytes.fromhex(
+        "81a65250c9040d6164706c8838951839f5260f5e68fb6e8cab2f6c9780b84562"
+    )
+
 
 @pytest.fixture
 def speculos_globals() -> SpeculosGlobals:
