@@ -54,10 +54,9 @@ DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
 # DEFINES   += COIN_COINID_SHORT=\"TEST\"
 # DEFINES   += COIN_KIND=COIN_KIND_BITCOIN_TESTNET
 # DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
-DEFINES_LIB = USE_LIB_BITCOIN
 APPNAME = "Bitcoin Test NEW"
 # Flags: BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
-APP_LOAD_FLAGS=--appFlags 0x250 --dep Bitcoin:$(APPVERSION)
+APP_LOAD_FLAGS = --appFlags 0xa50
 
 APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),bitcoin)
@@ -132,7 +131,7 @@ endif
 
 
 # Enabling debug PRINTF
-DEBUG:=10
+DEBUG:=1
 ifneq ($(DEBUG),0)
         ifeq ($(DEBUG),10)
                 $(warning Using semihosted PRINTF. Only run with speculos!)
