@@ -345,10 +345,10 @@ static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool 
 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
-        return;
+    } else {
+        dc->next(process_global_map);
     }
 
-    dc->next(process_global_map);
     dc->run();
 }
 
@@ -893,10 +893,10 @@ static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
-        return;
+    } else {
+        dc->next(output_next);
     }
 
-    dc->next(output_next);
     dc->run();
 }
 
@@ -932,10 +932,10 @@ static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept
 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
-        return;
+    } else {
+        dc->next(sign_init);
     }
 
-    dc->next(sign_init);
     dc->run();
 }
 

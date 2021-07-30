@@ -114,8 +114,8 @@ static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
         SEND_SW(dc, SW_DENY);
     } else {
         dc->next(process_next_cosigner_info);
-        dc->run();
     }
+    dc->run();
 }
 
 /**
@@ -208,6 +208,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
+        dc->run();
         return;
     }
  
