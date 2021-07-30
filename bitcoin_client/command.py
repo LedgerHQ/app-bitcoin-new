@@ -34,13 +34,6 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     return result
 
 
-class HWWClient:
-    def apdu_exchange(
-        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
-    ) -> bytes:
-        raise NotImplementedError()
-
-
 class HIDClient:
     def __init__(self):
         self.transport = Transport("hid")  # TODO: other params
@@ -60,12 +53,12 @@ class HIDClient:
     ) -> Generator[ApduResponse, None, None]:
         raise NotImplementedError()
 
-    def close(self) -> None:
+    def stop(self) -> None:
         self.transport.close()
 
 
 class BitcoinCommand:
-    def __init__(self, client: HWWClient, debug: bool = False) -> None:
+    def __init__(self, client: HIDClient, debug: bool = False) -> None:
         self.client = client
         self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
@@ -156,7 +149,7 @@ class BitcoinCommand:
         if len(response) != 32 + 1 + wallet_hmac_length:
             raise RuntimeError(f"Invalid response length: {len(response)}")
 
-        wallet_hmac = response[33 : 33 + wallet_hmac_length]
+        wallet_hmac = response[33: 33 + wallet_hmac_length]
 
         return wallet_id, wallet_hmac
 

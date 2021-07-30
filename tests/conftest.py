@@ -47,7 +47,7 @@ def headless(pytestconfig):
 @pytest.fixture
 def client(request, hid) -> Union[HIDClient, SpeculosClient]:
     if hid:
-        yield HIDClient()
+        client = HIDClient()
     else:
         client = SpeculosClient(
             str(conftest_folder_path.parent.joinpath("bin/app.elf"))
@@ -62,9 +62,9 @@ def client(request, hid) -> Union[HIDClient, SpeculosClient]:
             rules = json.load(open(automation_file))
             client.set_automation_rules(rules)
 
-        yield client
+    yield client
 
-        client.stop()
+    client.stop()
 
 
 @pytest.fixture
