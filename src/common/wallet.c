@@ -380,7 +380,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
                 }
             }
 
-            policy_node_with_script_t *node = (policy_node_with_script_t *)buffer_alloc(out_buf, sizeof(policy_node_with_script_t));
+            policy_node_with_script_t *node = (policy_node_with_script_t *)buffer_alloc(out_buf, sizeof(policy_node_with_script_t), true);
             if (node == NULL) {
                 return -4;
             }
@@ -406,7 +406,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
         case TOKEN_PKH:
         case TOKEN_WPKH:
         {
-            policy_node_with_key_t *node = (policy_node_with_key_t *)buffer_alloc(out_buf, sizeof(policy_node_with_key_t));
+            policy_node_with_key_t *node = (policy_node_with_key_t *)buffer_alloc(out_buf, sizeof(policy_node_with_key_t), true);
             if (node == NULL) {
                 return -6;
             }
@@ -423,7 +423,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
         case TOKEN_MULTI:
         case TOKEN_SORTEDMULTI:
         {
-            policy_node_multisig_t *node = (policy_node_multisig_t *)buffer_alloc(out_buf, sizeof(policy_node_multisig_t));
+            policy_node_multisig_t *node = (policy_node_multisig_t *)buffer_alloc(out_buf, sizeof(policy_node_multisig_t), true);
 
             if (node == NULL) {
                 return -8;
@@ -456,7 +456,7 @@ static int parse_script(buffer_t *in_buf, buffer_t *out_buf, size_t depth, unsig
                     return -11;
                 }
 
-                size_t *key_index_out = (size_t *)buffer_alloc(out_buf, sizeof(size_t));
+                size_t *key_index_out = (size_t *)buffer_alloc(out_buf, sizeof(size_t), true);
                 if (key_index_out == NULL) {
                     return -12;
                 }

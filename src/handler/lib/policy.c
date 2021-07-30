@@ -146,7 +146,7 @@ static int get_pkh_wpkh_script(_policy_parser_args_t *args,
 
     // memory block taking 33 bytes
     {
-        uint8_t *compressed_pubkey = (uint8_t *)buffer_alloc(args->mem, 33);
+        uint8_t *compressed_pubkey = (uint8_t *)buffer_alloc(args->mem, 33, false);
 
         if (compressed_pubkey == NULL) {
             result = -1;
@@ -197,7 +197,7 @@ static int get_sh_wsh_script(_policy_parser_args_t *args,
         // Memory optimization: as the script_hash_context is expensive (>100 bytes), if we know that the internal
         // script is short, we are better off computing the full internal script (rather than its hash).
         if (is_script_type_short(root->script->type)) {
-            uint8_t *internal_script = buffer_alloc(args->mem, 34);
+            uint8_t *internal_script = buffer_alloc(args->mem, 34, false);
             if (internal_script == NULL) {
                 result = -1;
                 break;
@@ -214,7 +214,7 @@ static int get_sh_wsh_script(_policy_parser_args_t *args,
                 break;
             }
 
-            script_hash = (uint8_t *)buffer_alloc(args->mem, 32); // sha256 of the script
+            script_hash = (uint8_t *)buffer_alloc(args->mem, 32, false); // sha256 of the script
             if (script_hash == NULL) {
                 result = -1;
                 break;
@@ -222,7 +222,7 @@ static int get_sh_wsh_script(_policy_parser_args_t *args,
 
             cx_hash_sha256(internal_script, internal_script_len, script_hash, 32);
         } else {
-            cx_sha256_t *script_hash_context = (cx_sha256_t *)buffer_alloc(args->mem, sizeof(cx_sha256_t));
+            cx_sha256_t *script_hash_context = (cx_sha256_t *)buffer_alloc(args->mem, sizeof(cx_sha256_t), true);
             if (script_hash_context == NULL) {
                 result = -1;
                 break;
@@ -236,7 +236,7 @@ static int get_sh_wsh_script(_policy_parser_args_t *args,
                 break;
             }
 
-            script_hash = (uint8_t *)buffer_alloc(args->mem, 32); // sha256 of the script
+            script_hash = (uint8_t *)buffer_alloc(args->mem, 32, false); // sha256 of the script
             if (script_hash == NULL) {
                 result = -1;
                 break;
@@ -291,7 +291,7 @@ int get_multi_script(_policy_parser_args_t *args,
     buffer_snapshot_t snap = buffer_snapshot(args->mem);
 
     do {
-        uint8_t *compressed_pubkey = (uint8_t *)buffer_alloc(args->mem, 33);
+        uint8_t *compressed_pubkey = (uint8_t *)buffer_alloc(args->mem, 33, false);
         if (compressed_pubkey == NULL) {
             result = -1;
             break;
@@ -349,7 +349,7 @@ int get_sortedmulti_script(_policy_parser_args_t *args,
     buffer_snapshot_t snap = buffer_snapshot(args->mem);
 
     do {
-        uint8_t **compressed_pubkeys = (uint8_t **)buffer_alloc(args->mem, root->n * sizeof(uint8_t *));
+        uint8_t **compressed_pubkeys = (uint8_t **)buffer_alloc(args->mem, root->n * sizeof(uint8_t *), true);
         if (compressed_pubkeys == NULL) {
             result = -1;
             break;
@@ -357,7 +357,7 @@ int get_sortedmulti_script(_policy_parser_args_t *args,
 
         // allocate space for, and derive each key
         for (unsigned int i = 0; i < root->n; i++) {
-            compressed_pubkeys[i] = (uint8_t *)buffer_alloc(args->mem, 33);
+            compressed_pubkeys[i] = (uint8_t *)buffer_alloc(args->mem, 33, false);
             if (compressed_pubkeys[i] == NULL) {
                 result = -1;
                 break;

@@ -237,12 +237,21 @@ bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n) {
 }
 
 // TODO: write unit tests
-void *buffer_alloc(buffer_t *buffer, size_t size) {
-    if (!buffer_can_read(buffer, size)) {
+void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
+    size_t padding_size = 0;
+
+    if (aligned) {
+        uint32_t d = (uint32_t)(buffer->ptr + buffer->offset) % 4;
+        if (d != 0) {
+            padding_size = 4 - d;
+        }
+    }
+
+    if (!buffer_can_read(buffer, padding_size + size)) {
         return NULL;
     }
 
-    void *result = buffer->ptr + buffer->offset; 
-    buffer_seek_cur(buffer, size);
+    void *result = buffer->ptr + buffer->offset + padding_size; 
+    buffer_seek_cur(buffer, padding_size + size);
     return result;
 }

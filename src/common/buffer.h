@@ -279,8 +279,9 @@ static inline buffer_t buffer_create(void *ptr, size_t size) {
 /**
  * Returns a pointer to the current position in the buffer if at least `size` bytes are available in the buffer,
  * or NULL otherwise. On success, the buffer is advanced by `size` bytes.
+ * If aligned == true, the returned pointer is 32-bit aligned (adding up to three padding bytes if necessary).
  */
-void *buffer_alloc(buffer_t *buffer, size_t size);
+void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned);
 
 /**
  * TODO: docs
