@@ -100,6 +100,10 @@ void app_main() {
     G_context.p2pkh_version = COIN_P2PKH_VERSION;
     G_context.p2sh_version = COIN_P2SH_VERSION;
 
+    _Static_assert(sizeof(G_context.name_short) >= sizeof(COIN_COINID_SHORT), "COIN_COINID_SHORT is too large");
+    strcpy(G_context.name_short, COIN_COINID_SHORT);
+
+
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     static char *native_segwit_prefix = COIN_NATIVE_SEGWIT_PREFIX;
     G_context.native_segwit_prefix = (char const *)PIC(native_segwit_prefix);

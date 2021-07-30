@@ -54,7 +54,11 @@ void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb c
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
                         char *address,
+                        char *coin_name,
                         uint64_t amount,
                         action_validate_cb callback);
 
-void ui_validate_transaction(dispatcher_context_t *context, uint64_t fee, action_validate_cb callback);
+void ui_validate_transaction(dispatcher_context_t *context,
+                             char *coin_name,
+                             uint64_t fee,
+                             action_validate_cb callback);

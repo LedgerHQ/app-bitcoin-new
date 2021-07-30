@@ -13,4 +13,5 @@ typedef struct {
     uint16_t p2pkh_version;           // version for P2PKH addresses
     uint16_t p2sh_version;            // version for P2SH addresses
     uint8_t bip44_coin_types_len;     // length of the bip44_coin_types array
+    char name_short[6];               // for unit in ux displays
 } global_context_t;

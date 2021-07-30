@@ -874,6 +874,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
         ui_validate_output(dc,
                            state->external_outputs_count,
                            output_address,
+                           G_context.name_short,
                            state->cur_output.value,
                            ui_action_validate_output);
         return;
@@ -924,7 +925,7 @@ static void confirm_transaction(dispatcher_context_t *dc) {
     uint64_t fee = state->inputs_total_value - state->outputs_total_value;
 
     dc->pause();
-    ui_validate_transaction(dc, fee, ui_action_validate_transaction);
+    ui_validate_transaction(dc, G_context.name_short, fee, ui_action_validate_transaction);
 }
 
 static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept) {

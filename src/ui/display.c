@@ -75,11 +75,11 @@ typedef struct {
 typedef struct {
     char index[sizeof("output #999")];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
-    char amount[sizeof("10000.00000000 BTC")];
+    char amount[sizeof("COINID 10000.00000000")];
 } ui_validate_output_state_t;
 
 typedef struct {
-    char fee[sizeof("10000.00000000 BTC")];
+    char fee[sizeof("COINID 10000.00000000")];
 } ui_validate_transaction_state_t;
 
 /**
@@ -575,6 +575,7 @@ void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb c
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
                         char *address,
+                        char *coin_name,
                         uint64_t amount,
                         action_validate_cb callback)
 {
@@ -589,7 +590,7 @@ void ui_validate_output(dispatcher_context_t *context,
     int whole_part = (int)(amount / 100000000);
     int fract_part = (int)(amount % 100000000);
 
-    snprintf(state->amount, sizeof(state->amount), "%d.%08d", whole_part, fract_part);
+    snprintf(state->amount, sizeof(state->amount), "%s %d.%08d", coin_name, whole_part, fract_part);
 
     g_validate_callback = callback;
 
@@ -597,7 +598,10 @@ void ui_validate_output(dispatcher_context_t *context,
 }
 
 
-void ui_validate_transaction(dispatcher_context_t *context, uint64_t fee, action_validate_cb callback) {
+void ui_validate_transaction(dispatcher_context_t *context,
+                             char *coin_name,
+                             uint64_t fee,
+                             action_validate_cb callback) {
     (void)(context);
 
     int whole_part = (int)(fee / 100000000);
@@ -607,7 +611,7 @@ void ui_validate_transaction(dispatcher_context_t *context, uint64_t fee, action
 
     g_validate_callback = callback;
 
-    snprintf(state->fee, sizeof(state->fee), "%d.%08d", whole_part, fract_part);
+    snprintf(state->fee, sizeof(state->fee), "%s %d.%08d", coin_name, whole_part, fract_part);
 
     ux_flow_init(0, ux_accept_transaction_flow, NULL);
 }
