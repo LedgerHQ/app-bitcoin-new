@@ -65,7 +65,7 @@ class GetPreimageCommand(ClientCommand):
                 if payload_size < len(known_preimage):
                     # split into list of length-1 bytes elements
                     extra_elements = [
-                        known_preimage[i : i + 1]
+                        known_preimage[i: i + 1]
                         for i in range(payload_size, len(known_preimage))
                     ]
                     # add to the queue any remaining extra bytes
@@ -234,8 +234,6 @@ class ClientCommandInterpreter:
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
-        # TODO: remove
-        print(f"Known preimage for {ripemd160(element).hex()}: {element.hex()}")
         self.known_preimages[ripemd160(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
@@ -243,8 +241,6 @@ class ClientCommandInterpreter:
             self.add_known_preimage(b"\x00" + el)
 
         mt = MerkleTree(element_hash(el) for el in elements)
-
-        print(f"Known merkle tree root: {mt.root.hex()}")  # TODO: remove
 
         self.known_trees[mt.root] = mt
 
@@ -257,10 +253,6 @@ class ClientCommandInterpreter:
 
     def add_known_mapping(self, mapping: Mapping[bytes, bytes]):
         items_sorted = list(sorted(mapping.items()))
-
-        print("Added known mapping:")  # TODO: remove
-        for key, value in items_sorted:
-            print(f"  {key.hex()}:{value.hex()}")
 
         keys = [i[0] for i in items_sorted]
         values = [i[1] for i in items_sorted]
