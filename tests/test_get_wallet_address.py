@@ -28,7 +28,7 @@ def test_get_wallet_address_legacy(cmd: BitcoinCommand):
 
     print(wallet.policy_map)
 
-    res = cmd.get_wallet_address(wallet, wallet_hmac, 0)
+    res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     print(res)
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
@@ -49,7 +49,7 @@ def test_get_wallet_address_sh_wit(cmd):
         "da0066f82b1d067703f97f5b3cf64a640442c482a2568c144bf1dae8024ad003"
     )
 
-    res = cmd.get_wallet_address(wallet, wallet_hmac, 0)
+    res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
 
 
@@ -69,5 +69,5 @@ def test_get_wallet_address_wit(cmd: BitcoinCommand):
         "5dab4a4dfa5ae128c3aeff877ca474eecf4ce1ef9d75e42311b1f335e022c4f9"
     )
 
-    res = cmd.get_wallet_address(wallet, wallet_hmac, 0)
+    res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"

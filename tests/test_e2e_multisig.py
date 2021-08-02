@@ -32,6 +32,6 @@ def test_register_and_get_address(cmd: BitcoinCommand, speculos_globals):
         wallet_hmac,
     )
 
-    res = cmd.get_wallet_address(wallet, wallet_hmac, 3)
+    res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
 
     assert res == "tb1qwuxulrpu5d02eag4tphxhamaa24s8sk8d5s7kw340cesr0wf87csks3c9a"

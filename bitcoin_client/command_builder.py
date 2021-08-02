@@ -26,7 +26,7 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
     offset: int = 0
 
     for i in range(chunk):
-        yield False, data[offset : offset + chunk_len]
+        yield False, data[offset: offset + chunk_len]
         offset += chunk_len
 
     if remaining:
@@ -158,6 +158,7 @@ class BitcoinCommandBuilder:
                 address_index.to_bytes(4, byteorder="big"),
             ]
         )
+
         return self.serialize(
             cla=self.CLA_BITCOIN,
             p1=1 if display else 0,

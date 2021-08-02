@@ -157,20 +157,24 @@ class BitcoinCommand:
         self,
         wallet: Wallet,
         wallet_hmac: bytes,
+        change: int,
         address_index: int,
-        display: bool = False,
+        display: bool,
     ) -> str:
         if wallet.type != WalletType.POLICYMAP or not isinstance(
             wallet, PolicyMapWallet
         ):
             raise ValueError("wallet type must be POLICYMAP")
 
+        if change != 0 and change != 1:
+            raise ValueError("Invalid change")
+
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(
-                wallet, wallet_hmac, address_index, display
+                wallet, wallet_hmac, address_index, change, display
             ),
             client_intepreter,
         )
