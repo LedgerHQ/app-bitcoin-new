@@ -201,7 +201,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
             return;
         }
 
-        handler(cmd->p1, cmd->p2, cmd->lc, &G_dispatcher_context);
+        handler(&G_dispatcher_context);
     }
 
     dispatcher_loop();

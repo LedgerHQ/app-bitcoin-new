@@ -24,11 +24,9 @@
 struct dispatcher_context_s;
 typedef struct dispatcher_context_s dispatcher_context_t;
 
-// Args: p1, p2, Lc, pointer to dispatcher context
-typedef void (*command_handler_t)(uint8_t, uint8_t, uint8_t, dispatcher_context_t *);
-// Args: pointer to dispatcher context
 typedef void (*command_processor_t)(dispatcher_context_t *);
 
+typedef command_processor_t command_handler_t;
 
 typedef struct machine_context_s {
     struct machine_context_s *parent_context;

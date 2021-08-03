@@ -97,14 +97,15 @@ class BitcoinCommandBuilder:
     def get_pubkey(self, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
-        cdata: bytes = b"".join(
-            [len(bip32_paths).to_bytes(1, byteorder="big"), *bip32_paths]
-        )
+        cdata: bytes = b"".join([
+            b'\1' if display else b'\0',
+            len(bip32_paths).to_bytes(1, byteorder="big"),
+            *bip32_paths
+        ])
 
         return self.serialize(
             cla=self.CLA_BITCOIN,
             ins=BitcoinInsType.GET_PUBKEY,
-            p1=1 if display else 0,
             cdata=cdata,
         )
 
@@ -113,14 +114,15 @@ class BitcoinCommandBuilder:
     ):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
-        cdata: bytes = b"".join(
-            [len(bip32_paths).to_bytes(1, byteorder="big"), *bip32_paths]
-        )
+        cdata: bytes = b"".join([
+            b'\1' if display else b'\0',
+            address_type.to_bytes(1, byteorder="big"),
+            len(bip32_paths).to_bytes(1, byteorder="big"),
+            *bip32_paths
+        ])
 
         return self.serialize(
             cla=self.CLA_BITCOIN,
-            p1=1 if display else 0,
-            p2=address_type,
             ins=BitcoinInsType.GET_ADDRESS,
             cdata=cdata,
         )
@@ -130,8 +132,6 @@ class BitcoinCommandBuilder:
 
         return self.serialize(
             cla=self.CLA_BITCOIN,
-            p1=0,
-            p2=0,
             ins=BitcoinInsType.REGISTER_WALLET,
             cdata=write_varint(len(wallet_bytes)) + wallet_bytes,
         )
@@ -146,6 +146,7 @@ class BitcoinCommandBuilder:
     ):
         cdata: bytes = b"".join(
             [
+                b'\1' if display else b'\0',                                # 1 byte
                 wallet.id,                                              # 32 bytes
                 wallet_hmac if wallet_hmac is not None else b'\0' * 32, # 32 bytes
                 b"\1" if change else b"\0",                             # 1 byte
@@ -155,7 +156,6 @@ class BitcoinCommandBuilder:
 
         return self.serialize(
             cla=self.CLA_BITCOIN,
-            p1=1 if display else 0,
             ins=BitcoinInsType.GET_WALLET_ADDRESS,
             cdata=cdata,
         )

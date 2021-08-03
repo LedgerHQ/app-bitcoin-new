@@ -4,8 +4,7 @@
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
- *  Y
- * ou may obtain a copy of the License at
+ *  You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -43,28 +42,10 @@ extern global_context_t G_context;
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
 
-void handler_get_wallet_address(
-    uint8_t p1,
-    uint8_t p2,
-    uint8_t lc,
-    dispatcher_context_t *dc
-) {
-    (void)lc;
-
+void handler_get_wallet_address(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
-    if (p1 != 0 && p1 != 1) {
-        SEND_SW(dc, SW_WRONG_P1P2);
-        return;
-    }
-
-    if (p2 != 0) {
-        SEND_SW(dc, SW_WRONG_P1P2);
-        return;
-    }
-
-    state->display_address = p1;
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -72,7 +53,8 @@ void handler_get_wallet_address(
         return;
     }
 
-    if (   !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32)
+    if (   !buffer_read_u8(&dc->read_buffer, &state->display_address)
+        || !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32)
         || !buffer_read_bytes(&dc->read_buffer, state->wallet_hmac, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);

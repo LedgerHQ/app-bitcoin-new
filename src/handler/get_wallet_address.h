@@ -37,9 +37,4 @@ typedef struct {
 } get_wallet_address_state_t;
 
 
-void handler_get_wallet_address(
-    uint8_t p1,
-    uint8_t p2,
-    uint8_t lc,
-    dispatcher_context_t *dispatcher_context
-);
+void handler_get_wallet_address(dispatcher_context_t *dispatcher_context);

@@ -172,20 +172,8 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in it.
  */
-void handler_sign_psbt(
-    uint8_t p1,
-    uint8_t p2,
-    uint8_t lc,
-    dispatcher_context_t *dc
-) {
-    (void)lc;
-
+void handler_sign_psbt(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
-
-    if (p1 != 0 || p2 != 0) {
-        SEND_SW(dc, SW_WRONG_P1P2);
-        return;
-    }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {

@@ -30,22 +30,9 @@ extern global_context_t G_context;
 
 static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice);
 
-void handler_get_pubkey(
-    uint8_t p1,
-    uint8_t p2,
-    uint8_t lc,
-    dispatcher_context_t *dc
-) {
+void handler_get_pubkey(dispatcher_context_t *dc) {
     get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
 
-    if (p1 > 1 || p2 != 0) {
-        SEND_SW(dc, SW_WRONG_P1P2);
-        return;
-    }
-    if (lc < 1) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
-    }
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -53,10 +40,16 @@ void handler_get_pubkey(
         return;
     }
 
+    uint8_t display;
     uint8_t bip32_path_len;
-    buffer_read_u8(&dc->read_buffer, &bip32_path_len);
+    if (   !buffer_read_u8(&dc->read_buffer, &display)
+        || !buffer_read_u8(&dc->read_buffer, &bip32_path_len))
+    {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        return;
+    }
 
-    if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
+    if (display > 1 || bip32_path_len > MAX_BIP32_PATH_STEPS) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -77,7 +70,7 @@ void handler_get_pubkey(
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    if (p1 == 1) {
+    if (display) {
         ui_display_pubkey(dc, path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
         SEND_RESPONSE(dc, state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);

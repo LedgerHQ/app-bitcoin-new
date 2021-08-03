@@ -4,8 +4,7 @@
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
- *  Y
- * ou may obtain a copy of the License at
+ *  You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -38,26 +37,33 @@ static int get_address_at_path(
     char out[static MAX_ADDRESS_LENGTH_STR + 1]
 );
 
-void handler_get_address(
-    uint8_t p1,
-    uint8_t p2,
-    uint8_t lc,
-    dispatcher_context_t *dc
-) {
+void handler_get_address(dispatcher_context_t *dc) {
     get_address_state_t *state = (get_address_state_t *)&G_command_state;
 
-    if (p1 > 1) {
-        SEND_SW(dc, SW_WRONG_P1P2);
+    uint8_t display, address_type;
+    if (   !buffer_read_u8(&dc->read_buffer, &display)
+        || !buffer_read_u8(&dc->read_buffer, &address_type))
+    {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (p2 != ADDRESS_TYPE_LEGACY && p2 != ADDRESS_TYPE_WIT && p2 != ADDRESS_TYPE_SH_WIT) {
-        SEND_SW(dc, SW_WRONG_P1P2);
+
+    if (display != 0 && display != 1) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (   address_type != ADDRESS_TYPE_LEGACY
+        && address_type != ADDRESS_TYPE_WIT
+        && address_type != ADDRESS_TYPE_SH_WIT)
+    {
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     uint32_t purpose; // the valid purpose depends on the requested address type
-    switch(p2) {
-        case ADDRESS_TYPE_LEGACY: //legacy
+    switch(address_type) {
+        case ADDRESS_TYPE_LEGACY: // legacy
             purpose = 44;
             break;
         case ADDRESS_TYPE_WIT:    // native segwit
@@ -67,13 +73,8 @@ void handler_get_address(
             purpose = 49;
             break;
         default:
-            SEND_SW(dc, SW_WRONG_P1P2);
+            SEND_SW(dc, SW_BAD_STATE); // cannot happen
             return;
-    }
-
-    if (lc < 1) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
     }
 
     // Device must be unlocked
@@ -108,14 +109,14 @@ void handler_get_address(
                                                         G_context.bip44_coin_types_len,
                                                         false);
 
-    int ret = get_address_at_path(bip32_path, bip32_path_len, p2, state->address);
+    int ret = get_address_at_path(bip32_path, bip32_path_len, address_type, state->address);
     if (ret < 0) {
         SEND_SW(dc, SW_BAD_STATE);
         return;
     }
     state->address_len = (size_t)ret;
 
-    if (p1 == 1 || is_path_suspicious) {
+    if (display == 1 || is_path_suspicious) {
         dc->pause();
         ui_display_address(dc, state->address, is_path_suspicious, path_str, ui_action_validate_address);
     } else {
