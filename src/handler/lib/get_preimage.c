@@ -7,11 +7,10 @@
 #include "../client_commands.h"
 
 
-int call_stream_preimage(dispatcher_context_t *dispatcher_context,
-                         const uint8_t hash[static 32],
-                         void (*len_callback)(size_t, void *),
-                         void (*callback)(buffer_t *, void *),
-                         void *callback_state) {
+int call_get_preimage(dispatcher_context_t *dispatcher_context,
+                      const uint8_t hash[static 32],
+                      uint8_t *out,
+                      size_t out_len) {
 
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
@@ -45,21 +44,17 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -4;
     }
 
-    if (len_callback != NULL) {
-        len_callback(preimage_len - 1, callback_state);
-    }
+    buffer_t buffer_out = buffer_create(out, out_len);
 
     uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
-
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
     // update hash
     crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
 
-    // call callback with data
-    buffer_t initial_buf = buffer_create(data_ptr + 1, partial_data_len - 1); // skip 0x00 prefix
-    callback(&initial_buf, callback_state);
+    // write to output buffer
+    buffer_write_bytes(&buffer_out, data_ptr, partial_data_len);
 
     size_t bytes_remaining = (size_t)preimage_len - partial_data_len;
 
@@ -94,9 +89,8 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);
 
-        // call callback with data
-        buffer_t buf = buffer_create(data_ptr, n_bytes);
-        callback(&buf, callback_state);
+        buffer_write_bytes(&buffer_out, data_ptr, n_bytes);
+
 
         bytes_remaining -= n_bytes;
     }
@@ -110,7 +104,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -9;
     }
 
-    return (int)preimage_len - 1;
+    return (int)preimage_len;
 }
 
 

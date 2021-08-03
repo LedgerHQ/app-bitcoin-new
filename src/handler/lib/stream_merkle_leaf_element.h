@@ -11,7 +11,7 @@
  * Returns a nagative number on failure, or the preimage length on success.
  */
 int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
-                                    const uint8_t merkle_root[static 20],
+                                    const uint8_t merkle_root[static 32],
                                     uint32_t tree_size,
                                     uint32_t leaf_index,
                                     void (*len_callback)(size_t, void *),

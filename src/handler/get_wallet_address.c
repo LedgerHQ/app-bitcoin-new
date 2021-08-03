@@ -32,6 +32,7 @@
 #include "../ui/menu.h"
 
 #include "lib/policy.h"
+#include "lib/get_preimage.h"
 
 #include "get_wallet_address.h"
 #include "client_commands.h"
@@ -73,22 +74,43 @@ void handler_get_wallet_address(
 
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
-    uint8_t wallet_hmac_len;
     if (   !buffer_read_bytes(&dc->read_buffer, wallet_id, 32)
-        || !buffer_read_u8(&dc->read_buffer, &wallet_hmac_len)
-        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, wallet_hmac_len))
+        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
-    if (wallet_hmac_len != 0 && wallet_hmac_len != 32) {
+    // change
+    if (!buffer_read_u8(&dc->read_buffer, &state->is_change)) {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (state->is_change != 0 && state->is_change != 1) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // address index
+    if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        return;
+    }
+
+    // Fetch the serialized wallet policy from the client
+    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
+    int serialized_wallet_policy_len = call_get_preimage(dc,
+                                                         wallet_id,
+                                                         serialized_wallet_policy,
+                                                         sizeof(serialized_wallet_policy));
+    if (serialized_wallet_policy_len < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     policy_map_wallet_header_t wallet_header;
-    if ((read_policy_map_wallet(&dc->read_buffer, &wallet_header)) < 0) {
+    buffer_t serialized_wallet_policy_buf = buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -103,7 +125,12 @@ void handler_get_wallet_address(
         return;
     }
 
-    if (wallet_hmac_len == 0) {
+    uint8_t hmac_or = 0; // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+    for (int i = 0; i < 32; i++) {
+        hmac_or = hmac_or | wallet_hmac[i];
+    }
+
+    if (hmac_or == 0) {
         // No hmac, verify that the policy is a canonical one that is allowed by default
         state->address_type = get_policy_address_type(&state->wallet_policy_map);
         if (state->address_type == -1) {
@@ -123,22 +150,6 @@ void handler_get_wallet_address(
         }
 
         state->is_wallet_canonical = false;
-    }
-
-    // change
-    if (!buffer_read_u8(&dc->read_buffer, &state->is_change)) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
-    }
-    if (state->is_change != 0 && state->is_change != 1) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    // address index
-    if (!buffer_read_u32(&dc->read_buffer, &state->address_index, BE)) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
     }
 
     // Compute the wallet id (sha256 of the serialization)

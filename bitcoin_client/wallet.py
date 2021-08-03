@@ -30,18 +30,17 @@ class Wallet:
         return sha256(self.serialize()).digest()
 
 
-# TODO: might want to switch to varint for all the length fields
 class PolicyMapWallet(Wallet):
     """
     Represents a wallet stored with a policy map and a number of keys_info.
-    The wallet is serialized as:
+    The wallet is serialized as follows:
        - 1 byte   : wallet type
-       - 1 byte   : length of the wallet name
+       - 1 byte   : length of the wallet name (max 16)
        - (var)    : wallet name (ASCII string)
-       - 2 bytes  : length of the policy map, encoded in big-endian
+       - 1 byte   : length of the policy map, at most 74 bytes at this time
        - (var)    : policy map
-       - 2 bytes  : number of keys
-       - 20-bytes : Merkle root of the Merkle tree of all the keys information.
+       - 1 byte   : number of keys (not larger than 252)
+       - 32-bytes : root of the Merkle tree of all the keys information.
 
     The specific format of the keys is deferred to subclasses.
     """

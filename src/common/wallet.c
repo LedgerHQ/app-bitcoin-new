@@ -84,8 +84,6 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
 };
 
 
-// TODO: rewrite parser to support all the policies above
-
 /**
  * Length of the longest token in the policy wallet descriptor language (not including the terminating \0 byte).
  */
@@ -93,7 +91,7 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
 
 
 int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header) {
-    if (!buffer_read_u8(buffer, &header->type)){
+    if (!buffer_read_u8(buffer, &header->type)) {
         return -1;
     }
 
@@ -118,7 +116,7 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
         return -6;
     }
 
-    if (header->name_len > MAX_POLICY_MAP_LENGTH) {
+    if (header->policy_map_len > MAX_POLICY_MAP_STR_LENGTH) {
         return -7;
     }
 
@@ -132,7 +130,7 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
     }
     header->n_keys = n_keys;
 
-    if (!buffer_read_bytes(buffer, (uint8_t *)header->keys_info_merkle_root, 20)) {
+    if (!buffer_read_bytes(buffer, (uint8_t *)header->keys_info_merkle_root, 32)) {
         return -10;
     }
 
@@ -601,7 +599,7 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
 
     crypto_hash_update_u16(&wallet_hash_context.header, wallet_header->n_keys);
 
-    crypto_hash_update(&wallet_hash_context.header, wallet_header->keys_info_merkle_root, 20);
+    crypto_hash_update(&wallet_hash_context.header, wallet_header->keys_info_merkle_root, 32);
 
     crypto_hash_digest(&wallet_hash_context.header, out, 32);
 }

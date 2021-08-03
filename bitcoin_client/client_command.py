@@ -1,9 +1,9 @@
 from enum import IntEnum
-from typing import List, Mapping, Iterable
+from typing import List, Mapping
 from collections import deque
 from hashlib import sha256
 
-from bitcoin_client.common import ByteStreamParser, ripemd160, write_varint
+from bitcoin_client.common import ByteStreamParser, sha256, write_varint
 from bitcoin_client.merkle import MerkleTree, element_hash
 
 
@@ -48,7 +48,7 @@ class GetPreimageCommand(ClientCommand):
 
     def execute(self, request: bytes) -> bytes:
         req = ByteStreamParser(request[1:])
-        req_hash = req.read_bytes(20)
+        req_hash = req.read_bytes(32)
         req.assert_empty()
 
         for known_hash, known_preimage in self.known_preimages.items():
@@ -93,7 +93,7 @@ class GetMerkleLeafHashCommand(ClientCommand):
     def execute(self, request: bytes) -> bytes:
         req = ByteStreamParser(request[1:])
 
-        root = req.read_bytes(20)
+        root = req.read_bytes(32)
         tree_size = req.read_uint(4)
         leaf_index = req.read_uint(4)
         req.assert_empty()
@@ -112,10 +112,10 @@ class GetMerkleLeafHashCommand(ClientCommand):
             )
 
         proof = mt.prove_leaf(leaf_index)
-        n_proof_elements = len(proof) // 20
+        n_proof_elements = len(proof) // 32
 
-        # Compute how many elements we can fit in 255 - 20 - 1 - 1 = 233 bytes
-        n_response_elements = min(233 // 20, len(proof))
+        # Compute how many elements we can fit in 255 - 32 - 1 - 1 = 221 bytes
+        n_response_elements = min((255 - 32 - 1 - 1) // 32, len(proof))
         n_leftover_elements = len(proof) - n_response_elements
 
         # Add to the queue any proof elements that do not fit the response
@@ -142,8 +142,8 @@ class GetMerkleLeafIndexCommand(ClientCommand):
     def execute(self, request: bytes) -> bytes:
         req = ByteStreamParser(request[1:])
 
-        root = req.read_bytes(20)
-        leaf_hash = req.read_bytes(20)
+        root = req.read_bytes(32)
+        leaf_hash = req.read_bytes(32)
         req.assert_empty()
 
         if root not in self.known_trees:
@@ -234,7 +234,7 @@ class ClientCommandInterpreter:
         return self.commands[cmd_code].execute(hw_response)
 
     def add_known_preimage(self, element: bytes):
-        self.known_preimages[ripemd160(element)] = element
+        self.known_preimages[sha256(element)] = element
 
     def add_known_list(self, elements: List[bytes]):
         for el in elements:

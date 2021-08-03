@@ -16,7 +16,7 @@
  * Returns 0 on success, or a negative number on failure.
  */
 int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
-                                                const uint8_t root[static 20],
+                                                const uint8_t root[static 32],
                                                 size_t size,
                                                 dispatcher_callback_descriptor_t callback);
 
@@ -24,7 +24,7 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
  * Convenience function to call the get_merkle_tree_sorted flow, with a void callback.
  */
 static inline int call_check_merkle_tree_sorted(dispatcher_context_t *dispatcher_context,
-                                                const uint8_t root[static 20],
+                                                const uint8_t root[static 32],
                                                 size_t size)
 {
     return call_check_merkle_tree_sorted_with_callback(dispatcher_context,

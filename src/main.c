@@ -140,14 +140,16 @@ void app_main() {
                     continue;
                 }
 
-                PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=%.*H\n",
+                PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
                        cmd.cla,
                        cmd.ins,
                        cmd.p1,
                        cmd.p2,
-                       cmd.lc,
-                       cmd.lc,
-                       cmd.data);
+                       cmd.lc);
+                for (int i = 0; i < cmd.lc; i++) {
+                    PRINTF("%02X", cmd.data[i]);
+                }
+                PRINTF("\n");
 
 
                 // Dispatch structured APDU command to handler

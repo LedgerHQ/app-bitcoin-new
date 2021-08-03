@@ -17,7 +17,7 @@ typedef struct {
     bool is_wallet_canonical;
     int address_type;
 
-    uint8_t wallet_header_keys_info_merkle_root[20];
+    uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
     union {
         uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];

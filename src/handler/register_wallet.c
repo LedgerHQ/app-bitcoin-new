@@ -76,6 +76,17 @@ void handler_register_wallet(
         return;
     }
 
+    uint64_t serialized_policy_map_len;
+    if (!buffer_read_varint(&dc->read_buffer, &serialized_policy_map_len)) {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        return;
+    }
+    if (serialized_policy_map_len > MAX_POLICY_MAP_SERIALIZED_LENGTH) {
+        PRINTF("Policy map too long\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
     if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
         PRINTF("Failed reading policy map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -84,6 +95,7 @@ void handler_register_wallet(
 
     buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
     if (parse_policy_map(&policy_map_buffer, state->policy_map_bytes, sizeof(state->policy_map_bytes)) < 0) {
+        PRINTF("Failed parsing policy map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -240,7 +252,6 @@ static void finalize_response(dispatcher_context_t *dc) {
 
     struct {
         uint8_t wallet_id[32];
-        uint8_t hmac_len;
         uint8_t hmac[32];
     } response;
 
@@ -259,7 +270,6 @@ static void finalize_response(dispatcher_context_t *dc) {
 
     crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
-    response.hmac_len = 32;
     cx_hmac_sha256(key, sizeof(key), state->wallet_id, sizeof(state->wallet_id), response.hmac, sizeof(response.hmac));
 
     // TODO: wrap in try/catch to harden key deletion

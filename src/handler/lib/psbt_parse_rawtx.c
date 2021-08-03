@@ -537,7 +537,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
 
     flow_state.parser_state.output_index = output_index;
 
-    uint8_t value_hash[20];
+    uint8_t value_hash[32];
     int res = call_get_merkleized_map_value_hash(dispatcher_context, map, key, key_len, value_hash);
     if (res < 0) {
         return -1;

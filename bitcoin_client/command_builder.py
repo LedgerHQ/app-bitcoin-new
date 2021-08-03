@@ -1,14 +1,8 @@
 import enum
-import logging
-import struct
-from typing import List, Tuple, Mapping, Union, Iterator, Optional, cast
+from typing import List, Tuple, Mapping, Union, Iterator, Optional
 
 from bitcoin_client.common import bip32_path_from_string, AddressType, write_varint
-from bitcoin_client.merkle import (
-    get_merkleized_map_commitment,
-    MerkleTree,
-    element_hash,
-)
+from bitcoin_client.merkle import get_merkleized_map_commitment, MerkleTree, element_hash
 from bitcoin_client.wallet import Wallet
 
 MAX_APDU_LEN: int = 255
@@ -132,30 +126,30 @@ class BitcoinCommandBuilder:
         )
 
     def register_wallet(self, wallet: Wallet):
+        wallet_bytes = wallet.serialize()
+
         return self.serialize(
             cla=self.CLA_BITCOIN,
             p1=0,
             p2=0,
             ins=BitcoinInsType.REGISTER_WALLET,
-            cdata=wallet.serialize(),
+            cdata=write_varint(len(wallet_bytes)) + wallet_bytes,
         )
 
     def get_wallet_address(
         self,
         wallet: Wallet,
-        wallet_hmac: bytes,
+        wallet_hmac: Optional[bytes],
         address_index: int,
         change: bool,
-        display: bool = False,
+        display: bool,
     ):
         cdata: bytes = b"".join(
             [
-                wallet.id,
-                len(wallet_hmac).to_bytes(1, byteorder="big"),
-                wallet_hmac,
-                wallet.serialize(),
-                b"\1" if change else b"\0",
-                address_index.to_bytes(4, byteorder="big"),
+                wallet.id,                                              # 32 bytes
+                wallet_hmac if wallet_hmac is not None else b'\0' * 32, # 32 bytes
+                b"\1" if change else b"\0",                             # 1 byte
+                address_index.to_bytes(4, byteorder="big"),             # 4 bytes
             ]
         )
 
@@ -172,7 +166,7 @@ class BitcoinCommandBuilder:
         input_mappings: List[Mapping[bytes, bytes]],
         output_mappings: List[Mapping[bytes, bytes]],
         wallet: Wallet,
-        wallet_hmac: bytes,
+        wallet_hmac: Optional[bytes],
     ):
 
         cdata = bytearray()
@@ -195,9 +189,7 @@ class BitcoinCommandBuilder:
         ).root
 
         cdata += wallet.id
-        cdata += len(wallet_hmac).to_bytes(1, byteorder="big")
-        cdata += wallet_hmac
-        cdata += wallet.serialize()
+        cdata += wallet_hmac if wallet_hmac is not None else b'\0' * 32
 
         return self.serialize(
             cla=self.CLA_BITCOIN, ins=BitcoinInsType.SIGN_PSBT, cdata=bytes(cdata)

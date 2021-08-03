@@ -1,4 +1,4 @@
-from typing import Tuple, List, Mapping, Generator
+from typing import Tuple, List, Mapping, Generator, Optional
 import base64
 from io import BytesIO, BufferedReader
 
@@ -126,6 +126,7 @@ class BitcoinCommand:
             raise ValueError("wallet type must be POLICYMAP")
 
         client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
 
         sw, response = self.make_request(
@@ -135,28 +136,18 @@ class BitcoinCommand:
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
 
-        if len(response) < 33:
+        if len(response) != 64:
             raise RuntimeError(f"Invalid response length: {len(response)}")
 
         wallet_id = response[0:32]
-        wallet_hmac_length = response[32]
-
-        if wallet_hmac_length != 32:
-            raise RuntimeError(
-                f"Expected the length of the hmac to be 32, not {wallet_hmac_length}"
-            )
-
-        if len(response) != 32 + 1 + wallet_hmac_length:
-            raise RuntimeError(f"Invalid response length: {len(response)}")
-
-        wallet_hmac = response[33: 33 + wallet_hmac_length]
+        wallet_hmac = response[32:64]
 
         return wallet_id, wallet_hmac
 
     def get_wallet_address(
         self,
         wallet: Wallet,
-        wallet_hmac: bytes,
+        wallet_hmac: Optional[bytes],
         change: int,
         address_index: int,
         display: bool,
@@ -171,6 +162,7 @@ class BitcoinCommand:
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter.add_known_preimage(wallet.serialize())
 
         sw, response = self.make_request(
             self.builder.get_wallet_address(
@@ -185,8 +177,7 @@ class BitcoinCommand:
         return response.decode()
 
     # TODO: should we return an updated PSBT with signatures, instead?
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: bytes = b"") -> str:
-        print(psbt.serialize())
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> str:
 
         if psbt.version != 2:
             psbt_v2 = PSBT()
@@ -202,6 +193,7 @@ class BitcoinCommand:
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter.add_known_preimage(wallet.serialize())
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
         client_intepreter.add_known_mapping(global_map)

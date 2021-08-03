@@ -10,10 +10,10 @@
 
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
 int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
-                              const uint8_t merkle_root[static 20],
+                              const uint8_t merkle_root[static 32],
                               uint32_t tree_size,
                               uint32_t leaf_index,
-                              uint8_t out[static 20]) {
+                              uint8_t out[static 32]) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
@@ -23,7 +23,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         tmp[0] = CCMD_GET_MERKLE_LEAF_PROOF;
         dc->add_to_response(tmp, 1);
 
-        dc->add_to_response(merkle_root, 20);
+        dc->add_to_response(merkle_root, 32);
 
         write_u32_be(tmp, 0, tree_size);
         dc->add_to_response(tmp, 4);
@@ -40,10 +40,10 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
 
     {
         int cur_step;         // counter for the proof steps
-        uint8_t cur_hash[20]; // temporary buffer for intermediate hashes
+        uint8_t cur_hash[32]; // temporary buffer for intermediate hashes
         uint8_t proof_size;
         uint8_t n_proof_elements;
-        if (!buffer_read_bytes(&dc->read_buffer, cur_hash, 20)
+        if (!buffer_read_bytes(&dc->read_buffer, cur_hash, 32)
             || !buffer_read_u8(&dc->read_buffer, &proof_size)
             || !buffer_read_u8(&dc->read_buffer, &n_proof_elements))
         {
@@ -57,12 +57,12 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             return -3;
         }
 
-        if (!buffer_can_read(&dc->read_buffer, 20 * (size_t)n_proof_elements)) {
+        if (!buffer_can_read(&dc->read_buffer, 32 * (size_t)n_proof_elements)) {
             return -4;
         }
 
         // Copy leaf hash to output (although it is not verified yet)
-        memcpy(out, cur_hash, 20);
+        memcpy(out, cur_hash, 32);
 
         // Initialize proof verification
         cur_step = 0;
@@ -84,7 +84,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
                     return -5; // unexpected, proof too long?
                 }
 
-                buffer_seek_cur(&dc->read_buffer, 20); // consume the bytes of the sibling hash
+                buffer_seek_cur(&dc->read_buffer, 32); // consume the bytes of the sibling hash
             }
 
             if (cur_step == proof_size) {
@@ -106,7 +106,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
                 return -7;
             }
 
-            if (elements_len != 20) {
+            if (elements_len != 32) {
                 return -8;
             }
 
@@ -116,7 +116,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             }
         }
 
-        if (memcmp(merkle_root, cur_hash, 20) != 0) {
+        if (memcmp(merkle_root, cur_hash, 32) != 0) {
             PRINTF("Merkle root mismatch");
             return -10;
         }

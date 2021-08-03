@@ -35,7 +35,19 @@
 
 
 // Enough to store "sh(wsh(sortedmulti(15,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))"
-#define MAX_POLICY_MAP_LENGTH 74
+#define MAX_POLICY_MAP_STR_LENGTH 74
+
+#define MAX_POLICY_MAP_NAME_LENGTH 16
+
+// at most 126 bytes
+// wallet type (1 byte)
+// name length (1 byte)
+// name (max MAX_POLICY_MAP_NAME_LENGTH bytes)
+// policy length (1 byte)
+// policy (max MAX_POLICY_MAP_STR_LENGTH bytes)
+// n_keys (1 byte)
+// keys_merkle_root (32 bytes)
+#define MAX_POLICY_MAP_SERIALIZED_LENGTH (1 + MAX_POLICY_MAP_NAME_LENGTH + 1 + MAX_POLICY_MAP_STR_LENGTH + 32)
 
 // Maximum size of a parsed policy map in memory
 #define MAX_POLICY_MAP_BYTES 128
@@ -59,9 +71,9 @@ typedef struct {
     uint8_t name_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
     uint16_t policy_map_len;
-    char policy_map[MAX_POLICY_MAP_LENGTH];
+    char policy_map[MAX_POLICY_MAP_STR_LENGTH];
     size_t n_keys;
-    uint8_t keys_info_merkle_root[20];        // root of the Merkle tree of the keys information
+    uint8_t keys_info_merkle_root[32];        // root of the Merkle tree of the keys information
 } policy_map_wallet_header_t;
 
 

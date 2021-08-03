@@ -36,6 +36,7 @@
 
 #include "lib/policy.h"
 #include "lib/check_merkle_tree_sorted.h"
+#include "lib/get_preimage.h"
 #include "lib/get_merkleized_map.h"
 #include "lib/get_merkleized_map_value.h"
 #include "lib/psbt_parse_rawtx.h"
@@ -202,8 +203,8 @@ void handler_sign_psbt(
     }
 
 
-    if (!buffer_read_bytes(&dc->read_buffer, state->global_map.keys_root, 20)
-        || !buffer_read_bytes(&dc->read_buffer, state->global_map.values_root, 20))
+    if (!buffer_read_bytes(&dc->read_buffer, state->global_map.keys_root, 32)
+        || !buffer_read_bytes(&dc->read_buffer, state->global_map.values_root, 32))
     {
         LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
@@ -213,7 +214,7 @@ void handler_sign_psbt(
 
     uint64_t n_inputs;
     if (   !buffer_read_varint(&dc->read_buffer, &n_inputs)
-        || !buffer_read_bytes(&dc->read_buffer, state->inputs_root, 20))
+        || !buffer_read_bytes(&dc->read_buffer, state->inputs_root, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
@@ -229,7 +230,7 @@ void handler_sign_psbt(
 
     uint64_t n_outputs;
     if (   !buffer_read_varint(&dc->read_buffer, &n_outputs)
-        || !buffer_read_bytes(&dc->read_buffer, state->outputs_root, 20))
+        || !buffer_read_bytes(&dc->read_buffer, state->outputs_root, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
@@ -238,22 +239,28 @@ void handler_sign_psbt(
 
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
-    uint8_t wallet_hmac_len;
     if (   !buffer_read_bytes(&dc->read_buffer, wallet_id, 32)
-        || !buffer_read_u8(&dc->read_buffer, &wallet_hmac_len)
-        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, wallet_hmac_len))
+        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
-    if (wallet_hmac_len != 0 && wallet_hmac_len != 32) {
+
+    // Fetch the serialized wallet policy from the client
+    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
+    int serialized_wallet_policy_len = call_get_preimage(dc,
+                                                         wallet_id,
+                                                         serialized_wallet_policy,
+                                                         sizeof(serialized_wallet_policy));
+    if (serialized_wallet_policy_len < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     policy_map_wallet_header_t wallet_header;
-    if ((read_policy_map_wallet(&dc->read_buffer, &wallet_header)) < 0) {
+    buffer_t serialized_wallet_policy_buf = buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -268,7 +275,11 @@ void handler_sign_psbt(
         return;
     }
 
-    if (wallet_hmac_len == 0) {
+    uint8_t hmac_or = 0; // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+    for (int i = 0; i < 32; i++) {
+        hmac_or = hmac_or | wallet_hmac[i];
+    }
+    if (hmac_or == 0) {
         // No hmac, verify that the policy is a canonical one that is allowed by default
 
         if (state->wallet_header_n_keys != 1) {

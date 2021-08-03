@@ -23,7 +23,7 @@ def test_get_wallet_address_legacy(cmd: BitcoinCommand):
         ],
     )
     wallet_hmac = bytes.fromhex(
-        "9eca5a688f4330ffd1d0dbe4a7ddc246a22ca77b061a45be26101f564ea49016"
+        "03cd94585d96270284fb9a8a4ccd1b4ad435f333bb40b4a0764721812d43cc68"
     )
 
     print(wallet.policy_map)
@@ -46,7 +46,7 @@ def test_get_wallet_address_sh_wit(cmd):
         ],
     )
     wallet_hmac = bytes.fromhex(
-        "da0066f82b1d067703f97f5b3cf64a640442c482a2568c144bf1dae8024ad003"
+        "c20d54511f461f0f4c2814628d24a5cdde882e3a44011463d7996a4aa03154ed"
     )
 
     res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
@@ -66,7 +66,7 @@ def test_get_wallet_address_wit(cmd: BitcoinCommand):
         ],
     )
     wallet_hmac = bytes.fromhex(
-        "5dab4a4dfa5ae128c3aeff877ca474eecf4ce1ef9d75e42311b1f335e022c4f9"
+        "df87ec380ff3b9c8bd5bcc3d233cf7b8155f95beb25c668de448c8418c4ee383"
     )
 
     res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)

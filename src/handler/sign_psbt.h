@@ -51,15 +51,15 @@ typedef struct {
     uint32_t locktime;
 
     int n_inputs;
-    uint8_t inputs_root[20];  // merkle root of the vector of input maps commitments
+    uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
     int n_outputs;
-    uint8_t outputs_root[20]; // merkle root of the vector of output maps commitments
+    uint8_t outputs_root[32]; // merkle root of the vector of output maps commitments
 
     bool is_wallet_canonical;
     int address_type;         // only relevant for canonical wallets
     int bip44_purpose;        // only relevant for canonical wallets
 
-    uint8_t wallet_header_keys_info_merkle_root[20];
+    uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
     union {
         uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];

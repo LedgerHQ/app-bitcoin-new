@@ -7,7 +7,7 @@ static int compare_byte_arrays(const uint8_t array1[], size_t array1_len, const 
 
 
 int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
-                                                const uint8_t root[static 20],
+                                                const uint8_t root[static 32],
                                                 size_t size,
                                                 dispatcher_callback_descriptor_t callback)
 {

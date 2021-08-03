@@ -1,11 +1,10 @@
-import hashlib
-from typing import List, Iterable, Mapping, Tuple
+from typing import List, Iterable, Mapping
 
-from .common import write_varint
+from .common import write_varint, sha256
 
 # TODO: a class to represent Merkle proofs in a more structured way (including size and leaf index)
 
-NIL = bytes([0] * 20)
+NIL = bytes([0] * 32)
 
 
 def floor_lg(n: int) -> int:
@@ -43,21 +42,14 @@ def largest_power_of_2_less_than(n: int) -> int:
 def element_hash(element_preimage: bytes) -> bytes:
     """Computes the hash of an element to be stored in the Merkle tree."""
 
-    h = hashlib.new('ripemd160')
-    h.update(b'\x00')
-    h.update(element_preimage)
-    return h.digest()
+    return sha256(b'\x00' + element_preimage)
 
 
 def combine_hashes(left: bytes, right: bytes) -> bytes:
-    if len(left) != 20 or len(right) != 20:
-        raise ValueError("The elements must be 20-bytes ripemd160 outputs.")
+    if len(left) != 32 or len(right) != 32:
+        raise ValueError("The elements must be 32-bytes sha256 outputs.")
 
-    h = hashlib.new('ripemd160')
-    h.update(b'\x01')
-    h.update(left)
-    h.update(right)
-    return h.digest()
+    return sha256(b'\x01' + left + right)
 
 
 # root is the only node with parent == None
@@ -150,8 +142,8 @@ class MerkleTree:
     def add(self, x: bytes) -> None:
         """Add an element as new leaf, and recompute the tree accordingly. Cost O(log n)."""
 
-        if len(x) != 20:
-            raise ValueError("Inserted elements must be exactly 20 bytes long")
+        if len(x) != 32:
+            raise ValueError("Inserted elements must be exactly 32 bytes long")
 
         new_leaf = Node(None, None, None, x)
         self.leaves.append(new_leaf)
@@ -202,8 +194,8 @@ class MerkleTree:
             raise ValueError(
                 "The index must be at least 0, and at most the current number of leaves.")
 
-        if len(x) != 20:
-            raise ValueError("Inserted elements must be exactly 20 bytes long.")
+        if len(x) != 32:
+            raise ValueError("Inserted elements must be exactly 32 bytes long.")
 
         if index == len(self.leaves):
             self.add(x)

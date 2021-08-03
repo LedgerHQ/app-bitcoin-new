@@ -36,7 +36,7 @@ def test_sign_psbt_singlesig_pkh_1to1(cmd: BitcoinCommand):
     # #0:
     #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
-    result = cmd.sign_psbt(psbt, wallet)
+    result = cmd.sign_psbt(psbt, wallet, None)
 
     print(result)
 
@@ -65,7 +65,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
     # #0:
     #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
-    result = cmd.sign_psbt(psbt, wallet)
+    result = cmd.sign_psbt(psbt, wallet, None)
 
     assert result == {
         0: bytes.fromhex(
@@ -88,7 +88,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
         ],
     )
 
-    result = cmd.sign_psbt(psbt, wallet)
+    result = cmd.sign_psbt(psbt, wallet, None)
 
     # expected sigs
     # #0:
@@ -116,7 +116,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
         ],
     )
 
-    result = cmd.sign_psbt(psbt, wallet)
+    result = cmd.sign_psbt(psbt, wallet, None)
 
     # expected sigs
     # #0:
@@ -179,7 +179,7 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
     )
 
     wallet_hmac = bytes.fromhex(
-        "5dab4a4dfa5ae128c3aeff877ca474eecf4ce1ef9d75e42311b1f335e022c4f9"
+        "df87ec380ff3b9c8bd5bcc3d233cf7b8155f95beb25c668de448c8418c4ee383"
     )
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
