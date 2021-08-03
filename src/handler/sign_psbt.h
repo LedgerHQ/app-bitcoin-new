@@ -95,7 +95,8 @@ typedef struct {
     int external_outputs_count; // count of external outputs that are shown to the user
     int change_count;           // count of outputs compatible with change outputs
 
-    policy_map_key_info_t our_key_info;
+    int our_key_derivation_length;
+    uint32_t our_key_derivation[MAX_BIP32_PATH_STEPS];
 } sign_psbt_state_t;
 
 

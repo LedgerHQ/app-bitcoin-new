@@ -983,22 +983,27 @@ static void sign_init(dispatcher_context_t *dc) {
         // Make a sub-buffer for the pubkey info
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
-        if (parse_policy_map_key_info(&key_info_buffer, &state->our_key_info) == -1) {
+        policy_map_key_info_t our_key_info;
+        if (parse_policy_map_key_info(&key_info_buffer, &our_key_info) == -1) {
             SEND_SW(dc, SW_BAD_STATE); // should never happen
             return;
         }
 
-        uint32_t fpr = read_u32_be(state->our_key_info.master_key_fingerprint, 0);
+        uint32_t fpr = read_u32_be(our_key_info.master_key_fingerprint, 0);
         if (fpr == state->master_key_fingerprint) {
             // it could be a collision on the fingerprint; we verify that we can actually generate the same pubkey
             char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-            get_serialized_extended_pubkey_at_path(state->our_key_info.master_key_derivation,
-                                                   state->our_key_info.master_key_derivation_len,
+            get_serialized_extended_pubkey_at_path(our_key_info.master_key_derivation,
+                                                   our_key_info.master_key_derivation_len,
                                                    G_context.bip32_pubkey_version,
                                                    pubkey_derived);
 
-            if (strncmp(state->our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+            if (strncmp(our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
                 our_key_found = true;
+                state->our_key_derivation_length = our_key_info.master_key_derivation_len;
+                for (int i = 0; i < our_key_info.master_key_derivation_len; i++) {
+                    state->our_key_derivation[i] = our_key_info.master_key_derivation[i];
+                }
 
                 break;
             }
@@ -1608,13 +1613,13 @@ static void sign_sighash(dispatcher_context_t *dc) {
 
     // TODO: should check the signing pubkey and path matches in the PSBT
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (unsigned int i = 0; i < state->our_key_info.master_key_derivation_len; i++) {
-        sign_path[i] = state->our_key_info.master_key_derivation[i];
+    for (int i = 0; i < state->our_key_derivation_length; i++) {
+        sign_path[i] = state->our_key_derivation[i];
     }
-    sign_path[state->our_key_info.master_key_derivation_len] = state->cur_input.change;
-    sign_path[state->our_key_info.master_key_derivation_len + 1] = state->cur_input.address_index;
+    sign_path[state->our_key_derivation_length] = state->cur_input.change;
+    sign_path[state->our_key_derivation_length + 1] = state->cur_input.address_index;
 
-    int sign_path_len = state->our_key_info.master_key_derivation_len + 2;
+    int sign_path_len = state->our_key_derivation_length + 2;
 
 
     crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);

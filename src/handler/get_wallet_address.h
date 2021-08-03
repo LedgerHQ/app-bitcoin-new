@@ -17,6 +17,14 @@ typedef struct {
     bool is_wallet_canonical;
     int address_type;
 
+    // as deriving wallet addresses is stack-intensive, we move some
+    // variables here to use less stack overall
+    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
+
+    uint8_t wallet_id[32];
+    uint8_t wallet_hmac[32];
+
+
     uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
     union {

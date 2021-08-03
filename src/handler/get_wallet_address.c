@@ -72,10 +72,8 @@ void handler_get_wallet_address(
         return;
     }
 
-    uint8_t wallet_id[32];
-    uint8_t wallet_hmac[32];
-    if (   !buffer_read_bytes(&dc->read_buffer, wallet_id, 32)
-        || !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32))
+    if (   !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32)
+        || !buffer_read_bytes(&dc->read_buffer, state->wallet_hmac, 32))
     {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
@@ -98,18 +96,17 @@ void handler_get_wallet_address(
     }
 
     // Fetch the serialized wallet policy from the client
-    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
     int serialized_wallet_policy_len = call_get_preimage(dc,
-                                                         wallet_id,
-                                                         serialized_wallet_policy,
-                                                         sizeof(serialized_wallet_policy));
+                                                         state->wallet_id,
+                                                         state->serialized_wallet_policy,
+                                                         sizeof(state->serialized_wallet_policy));
     if (serialized_wallet_policy_len < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
     policy_map_wallet_header_t wallet_header;
-    buffer_t serialized_wallet_policy_buf = buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+    buffer_t serialized_wallet_policy_buf = buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
     if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -127,7 +124,7 @@ void handler_get_wallet_address(
 
     uint8_t hmac_or = 0; // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
     for (int i = 0; i < 32; i++) {
-        hmac_or = hmac_or | wallet_hmac[i];
+        hmac_or = hmac_or | state->wallet_hmac[i];
     }
 
     if (hmac_or == 0) {
@@ -143,7 +140,7 @@ void handler_get_wallet_address(
     } else {
         // Verify hmac
 
-        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
+        if (!check_wallet_hmac(state->wallet_id, state->wallet_hmac)) {
             PRINTF("Incorrect hmac\n");
             SEND_SW(dc, SW_SIGNATURE_FAIL);
             return;
@@ -156,7 +153,7 @@ void handler_get_wallet_address(
     uint8_t computed_wallet_id[32];
     get_policy_wallet_id(&wallet_header, computed_wallet_id);
 
-    if (memcmp(wallet_id, computed_wallet_id, sizeof(wallet_id)) != 0) {
+    if (memcmp(state->wallet_id, computed_wallet_id, sizeof(state->wallet_id)) != 0) {
         SEND_SW(dc, SW_INCORRECT_DATA); // TODO: more specific error code
         return;
     }
