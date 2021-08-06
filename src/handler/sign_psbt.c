@@ -185,10 +185,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (state->global_map.size > 252) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
 
 
     if (!buffer_read_bytes(&dc->read_buffer, state->global_map.keys_root, 32)
@@ -567,7 +563,7 @@ static void check_input_owned(dispatcher_context_t *dc) {
         }
 
         if (state->is_wallet_canonical) {
-            // check if change path is as expected
+            // check if path is as expected
             if (!is_address_path_standard(bip32_path,
                                           bip32_path_len, 
                                           state->bip44_purpose,

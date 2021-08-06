@@ -146,7 +146,7 @@ class BitcoinCommandBuilder:
     ):
         cdata: bytes = b"".join(
             [
-                b'\1' if display else b'\0',                                # 1 byte
+                b'\1' if display else b'\0',                            # 1 byte
                 wallet.id,                                              # 32 bytes
                 wallet_hmac if wallet_hmac is not None else b'\0' * 32, # 32 bytes
                 b"\1" if change else b"\0",                             # 1 byte
