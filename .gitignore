@@ -11,6 +11,9 @@ unit-tests/build/
 unit-tests/coverage/
 unit-tests/coverage.info
 
+tests-legacy/bitcoin-bin
+tests-legacy/bitcoin-testnet-bin
+
 # Fuzzing
 fuzzing/build/
 

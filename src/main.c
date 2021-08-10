@@ -37,11 +37,24 @@
 #include "handler/register_wallet.h"
 #include "handler/get_wallet_address.h"
 
+#include "legacy/main_old.h"
+#include "legacy/btchip_display_variables.h"
+#include "legacy/include/swap_lib_calls.h"
+#include "legacy/include/btchip_context.h"
+
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 global_context_t G_context;
 command_state_t G_command_state;
+
+
+bool G_is_legacy;
+
+// legacy variables
+btchip_context_t btchip_context_D;
+btchip_altcoin_config_t *G_coin_config;
+
 
 dispatcher_context_t G_dispatcher_context;
 
@@ -74,21 +87,138 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 };
 
 
+void app_main() {
+    for (;;) {
+        // Length of APDU command received in G_io_apdu_buffer
+        int input_len = 0;
+        // Structured APDU command
+        command_t cmd;
+
+        // Reset length of APDU response
+        G_output_len = 0;
+
+        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
+        }
+
+        // Receive command bytes in G_io_apdu_buffer
+
+        if (G_is_legacy) {
+            input_len =
+                io_exchange(CHANNEL_APDU | btchip_context_D.io_flags,
+                            // use the previous outlength as the reply
+                            btchip_context_D.outLength);
+        } else {
+            input_len =
+                io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY,
+                            // use the previous outlength as the reply
+                            btchip_context_D.outLength);
+        }
+        btchip_context_D.inLength = input_len;
+
+        if (input_len < 0) {
+            PRINTF("=> io_exchange error\n");
+            return;
+        }
+
+        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            os_sched_exit(0);
+        }
+
+        if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
+            // legacy codes, use old dispatcher
+            app_dispatch();
+        } else {
+            // Reset structured APDU command
+            memset(&cmd, 0, sizeof(cmd));
+            // Parse APDU command from G_io_apdu_buffer
+            if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
+                PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
+                io_send_sw(SW_WRONG_DATA_LENGTH);
+                return;
+            }
+
+            PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
+                cmd.cla,
+                cmd.ins,
+                cmd.p1,
+                cmd.p2,
+                cmd.lc);
+            for (int i = 0; i < cmd.lc; i++) {
+                PRINTF("%02X", cmd.data[i]);
+            }
+            PRINTF("\n");
+
+
+            // Dispatch structured APDU command to handler
+            apdu_dispatcher(COMMAND_DESCRIPTORS,
+                            sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]),
+                            (machine_context_t *)&G_command_state,
+                            sizeof(G_command_state),
+                            ui_menu_main,
+                            &cmd);
+        }
+    }
+}
+
+void init_coin_config(btchip_altcoin_config_t *coin_config) {
+    memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
+    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
+    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
+    coin_config->p2sh_version = COIN_P2SH_VERSION;
+    coin_config->family = COIN_FAMILY;
+    strcpy(coin_config->coinid, COIN_COINID);
+    strcpy(coin_config->name, COIN_COINID_NAME);
+    strcpy(coin_config->name_short, COIN_COINID_SHORT);
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
+    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
+    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
+#else
+    coin_config->native_segwit_prefix = 0;
+#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+#ifdef COIN_FORKID
+    coin_config->forkid = COIN_FORKID;
+#endif // COIN_FORKID
+#ifdef COIN_CONSENSUS_BRANCH_ID
+    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
+#endif // COIN_CONSENSUS_BRANCH_ID
+#ifdef COIN_FLAGS
+    coin_config->flags = COIN_FLAGS;
+#endif // COIN_FLAGS
+    coin_config->kind = COIN_KIND;
+}
+
+
+/**
+ * Exit the application and go back to the dashboard.
+ */
+void app_exit() {
+    BEGIN_TRY_L(exit) {
+        TRY_L(exit) {
+            os_sched_exit(-1);
+        }
+        FINALLY_L(exit) {
+        }
+    }
+    END_TRY_L(exit);
+}
+
 /**
  * Handle APDU command received and send back APDU response using handlers.
  */
-void app_main() {
+void coin_main(btchip_altcoin_config_t *coin_config) {
     // assumptions on the length of data structures
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
-    // Length of APDU command received in G_io_apdu_buffer
-    int input_len = 0;
-    // Structured APDU command
-    command_t cmd;
-
-    // Reset length of APDU response
-    G_output_len = 0;
+    btchip_altcoin_config_t config;
+    if (coin_config == NULL) {
+        init_coin_config(&config);
+        G_coin_config = &config;
+    } else {
+        G_coin_config = coin_config;
+    }
 
     // Reset context
     explicit_bzero(&G_context, sizeof(G_context));
@@ -113,112 +243,47 @@ void app_main() {
 
 #   ifdef HAVE_SEMIHOSTED_PRINTF
         PRINTF("APDU State size: %d\n", sizeof(command_state_t));
+        PRINTF("Legacy State size: %d\n", sizeof(command_state_t));
 #   endif
 
     // Reset dispatcher state
     explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));
 
-    for (;;) {
-        BEGIN_TRY {
-            TRY {
-                // Reset structured APDU command
-                memset(&cmd, 0, sizeof(cmd));
+    memset(G_io_apdu_buffer, 0, 255); // paranoia
 
-                // Receive command bytes in G_io_apdu_buffer
-                input_len = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
+    // Process the incoming APDUs
 
-                if (input_len < 0) {
-                    PRINTF("=> io_exchange error\n");
-                    return;
-                }
-
-
-                // Parse APDU command from G_io_apdu_buffer
-                if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
-                    PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
-                    io_send_sw(SW_WRONG_DATA_LENGTH);
-                    continue;
-                }
-
-                PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
-                       cmd.cla,
-                       cmd.ins,
-                       cmd.p1,
-                       cmd.p2,
-                       cmd.lc);
-                for (int i = 0; i < cmd.lc; i++) {
-                    PRINTF("%02X", cmd.data[i]);
-                }
-                PRINTF("\n");
-
-
-                // Dispatch structured APDU command to handler
-                apdu_dispatcher(COMMAND_DESCRIPTORS,
-                                sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]),
-                                (machine_context_t *)&G_command_state,
-                                sizeof(G_command_state),
-                                ui_menu_main,
-                                &cmd);
-            }
-            CATCH(EXCEPTION_IO_RESET) {
-                THROW(EXCEPTION_IO_RESET);
-            }
-            CATCH_OTHER(e) {
-                io_send_sw(e);
-            }
-            FINALLY {
-            }
-            END_TRY;
-        }
-    }
-}
-
-/**
- * Exit the application and go back to the dashboard.
- */
-void app_exit() {
-    BEGIN_TRY_L(exit) {
-        TRY_L(exit) {
-            os_sched_exit(-1);
-        }
-        FINALLY_L(exit) {
-        }
-    }
-    END_TRY_L(exit);
-}
-
-/**
- * Main loop to setup USB, Bluetooth, UI and launch app_main().
- */
-__attribute__((section(".boot"))) int main() {
-    __asm volatile("cpsie i");
-
-    os_boot();
+    // first exchange, no out length :) only wait the apdu
+    btchip_context_D.outLength = 0; // LEGACY
+    btchip_context_D.io_flags = 0; // LEGACY
 
     for (;;) {
-        // Reset UI
-        memset(&G_ux, 0, sizeof(G_ux));
-
+        UX_INIT();
         BEGIN_TRY {
             TRY {
                 io_seproxyhal_init();
 
 #ifdef TARGET_NANOX
+                // grab the current plane mode setting
                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
-#endif  // TARGET_NANOX
+#endif // TARGET_NANOX
+
+                btchip_context_init();
 
                 USB_power(0);
                 USB_power(1);
 
-                ui_menu_main();
+                ui_idle();
 
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
                 BLE_power(1, "Nano X");
-#endif  // HAVE_BLE
+#endif // HAVE_BLE
+
                 app_main();
             }
             CATCH(EXCEPTION_IO_RESET) {
+                // reset IO and UX
                 CLOSE_TRY;
                 continue;
             }
@@ -231,8 +296,130 @@ __attribute__((section(".boot"))) int main() {
         }
         END_TRY;
     }
-
     app_exit();
+}
 
+
+
+__attribute__((section(".boot"))) int main(int arg0) {
+#ifdef USE_LIB_BITCOIN
+    // code paths for library usage and all other coins are only used for legacy compatibility, as of now
+    G_is_legacy = true;
+    BEGIN_TRY {
+        TRY {
+            unsigned int libcall_params[5];
+            btchip_altcoin_config_t coin_config;
+            init_coin_config(&coin_config);
+            PRINTF("Hello from litecoin\n");
+            check_api_level(CX_COMPAT_APILEVEL);
+            // delegate to bitcoin app/lib
+            libcall_params[0] = "Bitcoin";
+            libcall_params[1] = 0x100;
+            libcall_params[2] = RUN_APPLICATION;
+            libcall_params[3] = &coin_config;
+            libcall_params[4] = 0;
+            if (arg0) {
+                // call as a library
+                libcall_params[2] = ((unsigned int *)arg0)[1];
+                libcall_params[4] = ((unsigned int *)arg0)[3]; // library arguments
+                os_lib_call(&libcall_params);
+                ((unsigned int *)arg0)[0] = libcall_params[1];
+                os_lib_end();
+            }
+            else {
+                // launch coin application
+                os_lib_call(&libcall_params);
+            }
+        }
+        FINALLY {}
+    }
+    END_TRY;
+    // no return
+#else
+    // exit critical section
+    __asm volatile("cpsie i");
+
+    // ensure exception will work as planned
+    os_boot();
+
+    if (!arg0) {
+        // Bitcoin application launched from dashboard
+        G_is_legacy = false;
+        coin_main(NULL);
+        return 0;
+    }
+
+    // code paths for library usage and all other coins are only used for legacy compatibility, as of now
+    G_is_legacy = true;
+
+    struct libargs_s *args = (struct libargs_s *) arg0;
+    if (args->id != 0x100) {
+        app_exit();
+        return 0;
+    }
+    switch (args->command) {
+        case RUN_APPLICATION:
+            // coin application launched from dashboard
+            if (args->coin_config == NULL)
+                app_exit();
+            else
+                coin_main(args->coin_config);
+            break;
+        default:
+            // called as bitcoin or altcoin library
+            library_main(args);
+    }
+#endif // USE_LIB_BITCOIN
     return 0;
 }
+
+
+// /**
+//  * Main loop to setup USB, Bluetooth, UI and launch app_main().
+//  */
+// __attribute__((section(".boot"))) int main() {
+//     __asm volatile("cpsie i");
+
+//     os_boot();
+
+//     for (;;) {
+//         // Reset UI
+//         memset(&G_ux, 0, sizeof(G_ux));
+
+//         BEGIN_TRY {
+//             TRY {
+//                 io_seproxyhal_init();
+
+// #ifdef TARGET_NANOX
+//                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
+// #endif  // TARGET_NANOX
+
+//                 USB_power(0);
+//                 USB_power(1);
+
+//                 ui_menu_main();
+
+// #ifdef HAVE_BLE
+//                 BLE_power(0, NULL);
+//                 BLE_power(1, "Nano X");
+// #endif  // HAVE_BLE
+//                 app_main();
+//             }
+//             CATCH(EXCEPTION_IO_RESET) {
+//                 CLOSE_TRY;
+//                 continue;
+//             }
+//             CATCH_ALL {
+//                 CLOSE_TRY;
+//                 break;
+//             }
+//             FINALLY {
+//             }
+//         }
+//         END_TRY;
+//     }
+
+//     app_exit();
+
+//     return 0;
+// }

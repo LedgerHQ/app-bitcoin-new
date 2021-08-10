@@ -1,5 +1,12 @@
 #pragma once
 
+
+/**
+ * Instruction class of the Bitcoin application.
+ */
+#define CLA_APP_LEGACY 0xE0
+
+
 /**
  * Instruction class of the Bitcoin application.
  */
