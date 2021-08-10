@@ -129,6 +129,12 @@ void app_dispatch(void) {
             G_io_apdu_buffer[btchip_context_D.outLength + 1] =
                 (btchip_context_D.sw & 0xff);
             btchip_context_D.outLength += 2;
+
+            // legacy APDUs use IO_ASYNCH_REPLY to signal that no response should be sent
+            if ((btchip_context_D.io_flags & IO_ASYNCH_REPLY) == 0) {
+                // send response                
+                io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, btchip_context_D.outLength);
+            }
         }
         CATCH(EXCEPTION_IO_RESET) {
             THROW(EXCEPTION_IO_RESET);

@@ -49,8 +49,6 @@ global_context_t G_context;
 command_state_t G_command_state;
 
 
-bool G_is_legacy;
-
 // legacy variables
 btchip_context_t btchip_context_D;
 btchip_altcoin_config_t *G_coin_config;
@@ -103,18 +101,11 @@ void app_main() {
 
         // Receive command bytes in G_io_apdu_buffer
 
-        if (G_is_legacy) {
-            input_len =
-                io_exchange(CHANNEL_APDU | btchip_context_D.io_flags,
-                            // use the previous outlength as the reply
-                            btchip_context_D.outLength);
-        } else {
-            input_len =
-                io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY,
-                            // use the previous outlength as the reply
-                            btchip_context_D.outLength);
-        }
+        input_len = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
         btchip_context_D.inLength = input_len;
+
+        btchip_context_D.outLength = 0; // LEGACY
+        btchip_context_D.io_flags = 0; // LEGACY
 
         if (input_len < 0) {
             PRINTF("=> io_exchange error\n");
@@ -253,10 +244,6 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 
     // Process the incoming APDUs
 
-    // first exchange, no out length :) only wait the apdu
-    btchip_context_D.outLength = 0; // LEGACY
-    btchip_context_D.io_flags = 0; // LEGACY
-
     for (;;) {
         UX_INIT();
         BEGIN_TRY {
@@ -303,8 +290,6 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 
 __attribute__((section(".boot"))) int main(int arg0) {
 #ifdef USE_LIB_BITCOIN
-    // code paths for library usage and all other coins are only used for legacy compatibility, as of now
-    G_is_legacy = true;
     BEGIN_TRY {
         TRY {
             unsigned int libcall_params[5];
@@ -344,13 +329,9 @@ __attribute__((section(".boot"))) int main(int arg0) {
 
     if (!arg0) {
         // Bitcoin application launched from dashboard
-        G_is_legacy = false;
         coin_main(NULL);
         return 0;
     }
-
-    // code paths for library usage and all other coins are only used for legacy compatibility, as of now
-    G_is_legacy = true;
 
     struct libargs_s *args = (struct libargs_s *) arg0;
     if (args->id != 0x100) {
