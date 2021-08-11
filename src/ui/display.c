@@ -94,7 +94,7 @@ typedef union {
     ui_validate_transaction_state_t validate_transaction;
 } ui_state_t;
 
-static ui_state_t g_ui_state;
+ui_state_t __attribute__ ((section (".new_globals"))) g_ui_state;
 
 
 /*

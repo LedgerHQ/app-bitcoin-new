@@ -1142,98 +1142,6 @@ void btchip_bagl_request_segwit_input_approval()
 }
 
 
-
-// void app_exit(void) {
-//     BEGIN_TRY_L(exit) {
-//         TRY_L(exit) {
-//             os_sched_exit(-1);
-//         }
-//         FINALLY_L(exit) {
-//         }
-//     }
-//     END_TRY_L(exit);
-// }
-
-// void init_coin_config(btchip_altcoin_config_t *coin_config) {
-//     os_memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
-//     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
-//     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
-//     coin_config->p2pkh_version = COIN_P2PKH_VERSION;
-//     coin_config->p2sh_version = COIN_P2SH_VERSION;
-//     coin_config->family = COIN_FAMILY;
-//     strcpy(coin_config->coinid, COIN_COINID);
-//     strcpy(coin_config->name, COIN_COINID_NAME);
-//     strcpy(coin_config->name_short, COIN_COINID_SHORT);
-// #ifdef COIN_NATIVE_SEGWIT_PREFIX
-//     strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
-//     coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
-// #else
-//     coin_config->native_segwit_prefix = 0;
-// #endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-// #ifdef COIN_FORKID
-//     coin_config->forkid = COIN_FORKID;
-// #endif // COIN_FORKID
-// #ifdef COIN_CONSENSUS_BRANCH_ID
-//     coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-// #endif // COIN_CONSENSUS_BRANCH_ID
-// #ifdef COIN_FLAGS
-//     coin_config->flags = COIN_FLAGS;
-// #endif // COIN_FLAGS
-//     coin_config->kind = COIN_KIND;
-// }
-
-// void coin_main(btchip_altcoin_config_t *coin_config) {
-//     btchip_altcoin_config_t config;
-//     if (coin_config == NULL) {
-//         init_coin_config(&config);
-//         G_coin_config = &config;
-//     } else {
-//         G_coin_config = coin_config;
-//     }
-
-//     for (;;) {
-//         UX_INIT();
-//         BEGIN_TRY {
-//             TRY {
-//                 io_seproxyhal_init();
-
-// #ifdef TARGET_NANOX
-//                 // grab the current plane mode setting
-//                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
-// #endif // TARGET_NANOX
-
-//                 btchip_context_init();
-
-//                 USB_power(0);
-//                 USB_power(1);
-
-//                 ui_idle();
-
-// #ifdef HAVE_BLE
-//                 BLE_power(0, NULL);
-//                 BLE_power(1, "Nano X");
-// #endif // HAVE_BLE
-
-//                 app_main();
-//             }
-//             CATCH(EXCEPTION_IO_RESET) {
-//                 // reset IO and UX
-//                 CLOSE_TRY;
-//                 continue;
-//             }
-//             CATCH_ALL {
-//                 CLOSE_TRY;
-//                 break;
-//             }
-//             FINALLY {
-//             }
-//         }
-//         END_TRY;
-//     }
-//     app_exit();
-// }
-
-
 static void library_main_helper(struct libargs_s *args) {
     check_api_level(CX_COMPAT_APILEVEL);
     PRINTF("Inside a library \n");
@@ -1263,12 +1171,12 @@ static void library_main_helper(struct libargs_s *args) {
 }
 
 
-void init_coin_config(btchip_altcoin_config_t *coin_config);
+void init_coin_config_legacy(btchip_altcoin_config_t *coin_config);
 
 void library_main(struct libargs_s *args) {
     btchip_altcoin_config_t coin_config;
     if (args->coin_config == NULL) {
-        init_coin_config(&coin_config);
+        init_coin_config_legacy(&coin_config);
         args->coin_config = &coin_config;
     }
     bool end = false;
