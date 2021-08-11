@@ -17,9 +17,11 @@ def pytest_addoption(parser):
     parser.addoption("--hid",
                      action="store_true")
 
+
 @pytest.fixture
 def hid(pytestconfig):
     return pytestconfig.getoption("hid")
+
 
 @pytest.fixture
 def device(request, hid):
@@ -32,9 +34,17 @@ def device(request, hid):
     # or hopes that "speculos.py" is in the $PATH if not set
     speculos_executable = os.environ.get("SPECULOS", "speculos.py")
 
+    lib_path = "./bitcoin-bin/app.elf"
+    if os.path.isfile(lib_path):
+        print("Bitcoin app running with library")
+        lib_arg = ["-l", f"Bitcoin:{lib_path}"]
+    else:
+        print("Bitcoin app running as native application")
+        lib_arg = []
+
     base_args = [
         speculos_executable, "./bitcoin-testnet-bin/app.elf",
-        "-l", "Bitcoin:./bitcoin-bin/app.elf",
+        *lib_arg,
         "--sdk", "2.0",
         "--display", "headless"
     ]
@@ -46,7 +56,6 @@ def device(request, hid):
         automation_args = []
 
     speculos_proc = subprocess.Popen([*base_args, *automation_args])
-
 
     # Attempts to connect to speculos to make sure that it's ready when the test starts
     for _ in range(100):
@@ -76,6 +85,7 @@ def transport(device, hid):
                                        debug=True))
     yield transport
     transport.close()
+
 
 @pytest.fixture
 def cmd(transport):
