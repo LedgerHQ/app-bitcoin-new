@@ -117,11 +117,15 @@ SECTIONS
     . = _cxram + LENGTH(CXSRAM);
   } > CXSRAM = 0x00
 
-  OVERLAY :
+  /*
+   * Overlapping sections for the legacy/new globals
+   */
+  .ol0 (NOLOAD) : 
   {
-    .ol0 { *(.legacy_globals) }
-    .ol1 { *(.new_globals) }
+    overlay_start = .; 
+    *(.legacy_globals) 
   } > SRAM
+  .ol1 overlay_start (NOLOAD) : { *(.new_globals) } > SRAM
 
   .bss :
   {
