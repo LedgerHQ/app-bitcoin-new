@@ -11,7 +11,7 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
                                const uint8_t root[static 32],
                                const uint8_t leaf_hash[static 32])
 {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     { // free memory as soon as possible
         uint8_t request[1 + 32 + 32];

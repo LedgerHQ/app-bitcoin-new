@@ -15,7 +15,7 @@ static inline int call_get_merkle_leaf_element(dispatcher_context_t *dispatcher_
                                                uint8_t *out_ptr,
                                                size_t out_ptr_len)
 {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     uint8_t leaf_hash[32];
 

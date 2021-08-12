@@ -15,7 +15,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
                               uint32_t leaf_index,
                               uint8_t out[static 32]) {
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
 
     { // make sure memory is deallocated as soon as possible

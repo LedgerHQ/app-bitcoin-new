@@ -12,7 +12,7 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
                       uint8_t *out,
                       size_t out_len) {
 
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     uint8_t cmd = CCMD_GET_PREIMAGE;
     dispatcher_context->add_to_response(&cmd, 1);
