@@ -31,6 +31,9 @@ APPVERSION_N = 0
 APPVERSION_P = 1
 APPVERSION   = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
+
+APP_STACK_SIZE = 1500
+
 # simplify for tests
 ifndef COIN
 COIN=bitcoin_testnet

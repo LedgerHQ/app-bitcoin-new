@@ -119,8 +119,8 @@ SECTIONS
 
   OVERLAY :
   {
-	.ol0 { *(.legacy_globals) }
-	.ol1 { *(.new_globals) }
+    .ol0 { *(.legacy_globals) }
+    .ol1 { *(.new_globals) }
   } > SRAM
 
   .bss :
