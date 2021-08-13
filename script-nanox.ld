@@ -105,9 +105,12 @@ SECTIONS
   .ol0 (NOLOAD) : 
   {
     overlay_start = .; 
-    *(.legacy_globals) 
+    *(.legacy_globals)
   } > SRAM
-  .ol1 overlay_start (NOLOAD) : { *(.new_globals) } > SRAM
+  .ol1 overlay_start (NOLOAD) : {
+    *(.new_globals)
+    . = MAX (., overlay_start + SIZEOF (.ol0));
+  } > SRAM
   
   .bss :
   {
