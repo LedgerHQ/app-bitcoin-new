@@ -46,6 +46,10 @@
 #include "legacy/include/btchip_context.h"
 
 
+#ifdef HAVE_BOLOS_APP_STACK_CANARY
+extern unsigned int app_stack_canary;
+#endif
+
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
@@ -248,6 +252,11 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
         G_coin_config = coin_config;
     }
 
+    PRINT_STACK_POINTER();
+#   if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
+        PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
+#   endif
+
 #   ifdef HAVE_SEMIHOSTED_PRINTF
         PRINTF("APDU State size: %d\n", sizeof(command_state_t));
         PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
@@ -314,7 +323,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin";
+            libcall_params[0] = "Bitcoin NEW"; // TODO: change to "Bitcoin" after release
             libcall_params[1] = 0x100;
             libcall_params[2] = RUN_APPLICATION;
             libcall_params[3] = &coin_config;

@@ -71,6 +71,8 @@ static int get_derived_pubkey(_policy_parser_args_t *args,
                               int key_index,
                               uint8_t out[static 33])
 {
+    PRINT_STACK_POINTER();
+
     policy_map_key_info_t key_info;
 
     { // make sure memory is freed as soon as possible
@@ -276,6 +278,8 @@ int get_multi_script(_policy_parser_args_t *args,
                      buffer_t *out_buf,
                      cx_hash_t *hash_context)
 {
+    PRINT_STACK_POINTER();
+
     policy_node_multisig_t *root = (policy_node_multisig_t *)policy;
 
     // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
@@ -325,6 +329,8 @@ int get_sortedmulti_script(_policy_parser_args_t *args,
                            buffer_t *out_buf,
                            cx_hash_t *hash_context)
 {
+    PRINT_STACK_POINTER();
+
     policy_node_multisig_t *root = (policy_node_multisig_t *)policy;
 
     // TODO: replace with the maximum we can afford
@@ -396,6 +402,8 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
                             buffer_t *out_buf,
                             cx_hash_t *hash_context)
 {
+    PRINT_STACK_POINTER();
+
     switch (policy->type) {
         case TOKEN_PKH:
         case TOKEN_WPKH:
