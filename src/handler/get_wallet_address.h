@@ -21,6 +21,10 @@ typedef struct {
     // variables here to use less stack overall
     uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
 
+    policy_map_wallet_header_t wallet_header;
+
+    uint8_t computed_wallet_id[32];
+
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
 
@@ -31,6 +35,8 @@ typedef struct {
         uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
         policy_node_t wallet_policy_map;
     };
+
+    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
     int address_len;
     char address[MAX_ADDRESS_LENGTH_STR + 1]; // null-terminated string

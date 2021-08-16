@@ -87,17 +87,18 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    policy_map_wallet_header_t wallet_header;
     buffer_t serialized_wallet_policy_buf = buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
+    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    memcpy(state->wallet_header_keys_info_merkle_root, wallet_header.keys_info_merkle_root, sizeof(wallet_header.keys_info_merkle_root));
-    state->wallet_header_n_keys = wallet_header.n_keys;
+    memcpy(state->wallet_header_keys_info_merkle_root,
+           state->wallet_header.keys_info_merkle_root,
+           sizeof(state->wallet_header.keys_info_merkle_root));
+    state->wallet_header_n_keys = state->wallet_header.n_keys;
 
-    buffer_t policy_map_buffer = buffer_create(&wallet_header.policy_map, wallet_header.policy_map_len);
+    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
 
     if (parse_policy_map(&policy_map_buffer, state->wallet_policy_map_bytes, sizeof(state->wallet_policy_map_bytes)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -132,10 +133,9 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     }
 
     // Compute the wallet id (sha256 of the serialization)
-    uint8_t computed_wallet_id[32];
-    get_policy_wallet_id(&wallet_header, computed_wallet_id);
+    get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
-    if (memcmp(state->wallet_id, computed_wallet_id, sizeof(state->wallet_id)) != 0) {
+    if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
         SEND_SW(dc, SW_INCORRECT_DATA); // TODO: more specific error code
         return;
     }
@@ -143,8 +143,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     // TODO: for canonical wallets, we should check that there is only one key and its path is also canonical,
     //       (matching the expected path based on the address type provided above), account index not too large.
 
-    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-    buffer_t script_buf = buffer_create(script, sizeof(script));
+    buffer_t script_buf = buffer_create(state->script, sizeof(state->script));
 
     int script_len = call_get_wallet_script(dc,
                                             &state->wallet_policy_map,
@@ -159,7 +158,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    state->address_len = get_script_address(script, script_len, G_context, state->address, sizeof(state->address));
+    state->address_len = get_script_address(state->script, script_len, G_context, state->address, sizeof(state->address));
 
     if (state->address_len < 0) {
         SEND_SW(dc, SW_BAD_STATE); // unexpected
@@ -171,7 +170,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     } else {
         dc->pause();
         ui_display_wallet_address(dc,
-                                  state->is_wallet_canonical ? NULL : wallet_header.name,
+                                  state->is_wallet_canonical ? NULL : state->wallet_header.name,
                                   state->address,
                                   ui_action_validate_address);
     }

@@ -71,6 +71,7 @@ static void alert_external_inputs(dispatcher_context_t *dc);
 static void verify_outputs_init(dispatcher_context_t *dc);
 static void process_output_map(dispatcher_context_t *dc);
 static void check_output_owned(dispatcher_context_t *dc);
+static void output_validate_external(dispatcher_context_t *dc);
 static void output_next(dispatcher_context_t *dc);
 
 
@@ -769,9 +770,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
     bool external = false;
 
-    uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-    int bip32_path_len;
-
     do {
         if (!state->cur_output.has_bip32_derivation) {
             external = true;
@@ -784,6 +782,9 @@ static void check_output_owned(dispatcher_context_t *dc) {
         memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 33);
 
         uint32_t fingerprint;
+        uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
+        int bip32_path_len;
+
         bip32_path_len = get_fingerprint_and_path(dc,
                                                   &state->cur_output.map,
                                                   key,
@@ -849,29 +850,9 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
     if (external) {
         // external output, user needs to validate
-
         ++state->external_outputs_count;
 
-        // show this output's address
-        // TODO: handle outputs without an address? (e.g.: OP_RETURN)
-        char output_address[MAX_ADDRESS_LENGTH_STR + 1];
-        int address_len = get_script_address(state->cur_output.scriptpubkey,
-                                             state->cur_output.scriptpubkey_len,
-                                             G_context,
-                                             output_address,
-                                             sizeof(output_address));
-        if (address_len < 0) {
-            SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
-            return;
-        }
-
-        dc->pause();
-        ui_validate_output(dc,
-                           state->external_outputs_count,
-                           output_address,
-                           G_context.name_short,
-                           state->cur_output.value,
-                           ui_action_validate_output);
+        dc->next(output_validate_external);
         return;
     } else {
         // valid change address, nothing to show to the user
@@ -882,6 +863,33 @@ static void check_output_owned(dispatcher_context_t *dc) {
         dc->next(output_next);
         return;
     }
+}
+
+static void output_validate_external(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *)&G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    // show this output's address
+    // TODO: handle outputs without an address? (e.g.: OP_RETURN)
+    char output_address[MAX_ADDRESS_LENGTH_STR + 1];
+    int address_len = get_script_address(state->cur_output.scriptpubkey,
+                                            state->cur_output.scriptpubkey_len,
+                                            G_context,
+                                            output_address,
+                                            sizeof(output_address));
+    if (address_len < 0) {
+        SEND_SW(dc, SW_BAD_STATE); // shouldn't happen
+        return;
+    }
+
+    dc->pause();
+    ui_validate_output(dc,
+                        state->external_outputs_count,
+                        output_address,
+                        G_context.name_short,
+                        state->cur_output.value,
+                        ui_action_validate_output);
 }
 
 static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
@@ -952,6 +960,8 @@ static void sign_init(dispatcher_context_t *dc) {
     for (unsigned int i = 0; i < state->wallet_header_n_keys; i++) {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
+        LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         state->wallet_header_keys_info_merkle_root,
                                                         state->wallet_header_n_keys,
@@ -964,6 +974,8 @@ static void sign_init(dispatcher_context_t *dc) {
             return;
         }
 
+        LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
         // Make a sub-buffer for the pubkey info
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
@@ -973,6 +985,9 @@ static void sign_init(dispatcher_context_t *dc) {
             return;
         }
 
+        LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+
         uint32_t fpr = read_u32_be(our_key_info.master_key_fingerprint, 0);
         if (fpr == state->master_key_fingerprint) {
             // it could be a collision on the fingerprint; we verify that we can actually generate the same pubkey
@@ -981,6 +996,9 @@ static void sign_init(dispatcher_context_t *dc) {
                                                    our_key_info.master_key_derivation_len,
                                                    G_context.bip32_pubkey_version,
                                                    pubkey_derived);
+
+            LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
 
             if (strncmp(our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
                 our_key_found = true;
