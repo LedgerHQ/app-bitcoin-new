@@ -23,6 +23,9 @@
 #include "os.h"
 #include "ux.h"
 
+#include "cx_ram.h"
+
+
 #include "types.h"
 #include "globals.h"
 #include "io.h"
@@ -42,6 +45,7 @@
 #include "legacy/include/swap_lib_calls.h"
 #include "legacy/include/btchip_context.h"
 
+
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
@@ -52,6 +56,8 @@ command_state_t __attribute__ ((section (".new_globals"))) G_command_state;
 // legacy variables
 btchip_altcoin_config_t *G_coin_config;
 btchip_context_t __attribute__ ((section (".legacy_globals"))) btchip_context_D;
+
+
 
 
 dispatcher_context_t G_dispatcher_context;
@@ -230,6 +236,10 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
+    // the custom linker script redefines the space for G_cx to be 912 bytes instead of 1024.
+    _Static_assert(sizeof(union cx_u) <= 912, "G_cx too large");
+
+
     btchip_altcoin_config_t config;
     if (coin_config == NULL) {
         init_coin_config_legacy(&config);
@@ -240,7 +250,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 
 #   ifdef HAVE_SEMIHOSTED_PRINTF
         PRINTF("APDU State size: %d\n", sizeof(command_state_t));
-        PRINTF("Legacy State size: %d\n", sizeof(command_state_t));
+        PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
 #   endif
 
     // Reset dispatcher state

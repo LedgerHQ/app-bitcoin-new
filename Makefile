@@ -663,6 +663,9 @@ else
 endif
 
 
+# Needed to be able to include the definition of G_cx
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+
 
 ifneq ($(BOLOS_ENV),)
 $(info BOLOS_ENV=$(BOLOS_ENV))

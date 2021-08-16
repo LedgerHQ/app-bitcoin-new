@@ -24,8 +24,8 @@ MEMORY
   DISCARD (rwx) : ORIGIN = 0xd0000000, LENGTH = 1M
 
   FLASH   (rx)  : ORIGIN = 0xc0d00000, LENGTH = 400K
-  SRAM    (rwx) : ORIGIN = 0x20000200, LENGTH = 4K+512
-  CXSRAM  (rwx) : ORIGIN = 0x20001400, LENGTH = 1K
+  SRAM    (rwx) : ORIGIN = 0x20000200, LENGTH = 4K+512 + 112
+  CXSRAM  (rwx) : ORIGIN = 0x20001470, LENGTH = 912
 }
 
 PAGE_SIZE  = 64;
@@ -35,7 +35,7 @@ END_STACK  = ORIGIN(SRAM) + LENGTH(SRAM);
 /*
  * Ensure correct remap cx address
  */
-OFF_G_cx           = 0x20001400 - ORIGIN(CXSRAM);
+OFF_G_cx           = 0x20001470 - ORIGIN(CXSRAM);
 _cx_trampoline     = 0x120001;
 
 /*
