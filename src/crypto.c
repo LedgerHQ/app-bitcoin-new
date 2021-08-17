@@ -130,6 +130,8 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent, uint32_t index, serialized_extended_pubkey_t *child) {
+    PRINT_STACK_POINTER();
+
     if (index >= BIP32_FIRST_HARDENED_CHILD) {
         return -1; // can only derive unhardened children
     }

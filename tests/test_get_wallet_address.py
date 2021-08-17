@@ -26,10 +26,7 @@ def test_get_wallet_address_legacy(cmd: BitcoinCommand):
         "03cd94585d96270284fb9a8a4ccd1b4ad435f333bb40b4a0764721812d43cc68"
     )
 
-    print(wallet.policy_map)
-
     res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
-    print(res)
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
 

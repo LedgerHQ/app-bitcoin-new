@@ -38,8 +38,6 @@ def test_sign_psbt_singlesig_pkh_1to1(cmd: BitcoinCommand):
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
     result = cmd.sign_psbt(psbt, wallet, None)
 
-    print(result)
-
     assert result == {
         0: bytes.fromhex(
             "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
@@ -191,8 +189,6 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
             "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
         )
     }
-
-    print(result)
 
 
 # def test_sign_psbt_legacy_wrong_non_witness_utxo(cmd: BitcoinCommand):

@@ -66,16 +66,16 @@ static bool is_script_type_short(PolicyNodeType type) {
 // p2sh (also nested segwit) ==> legacy script  (start with 3 on mainnet, 2 on testnet)
 // p2wpkh or p2wsh           ==> bech32         (sart with bc1 on mainnet, tb1 on testnet)
 
-
-static int get_derived_pubkey(_policy_parser_args_t *args,
-                              int key_index,
-                              uint8_t out[static 33])
-{
+// convenience function, split from get_derived_pubkey only to improve stack usage
+// returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
+static int __attribute__((noinline)) get_extended_pubkey(_policy_parser_args_t *args,
+                                                         int key_index,
+                                                         serialized_extended_pubkey_t *out) {
     PRINT_STACK_POINTER();
 
     policy_map_key_info_t key_info;
 
-    { // make sure memory is freed as soon as possible
+    {
         char key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
         int key_info_len = call_get_merkle_leaf_element(args->dispatcher_context,
@@ -104,16 +104,29 @@ static int get_derived_pubkey(_policy_parser_args_t *args,
     }
     // TODO: validate checksum
 
-    serialized_extended_pubkey_t *ext_pubkey = &decoded_pubkey_check.serialized_extended_pubkey;
+    memcpy(out, &decoded_pubkey_check.serialized_extended_pubkey, sizeof(decoded_pubkey_check.serialized_extended_pubkey));
 
-    if (key_info.has_wildcard) {
-        // we derive the /0/i child of this pubkey
-        // we reuse the same memory of ext_pubkey
-        bip32_CKDpub(ext_pubkey, args->change, ext_pubkey);
-        bip32_CKDpub(ext_pubkey, args->address_index, ext_pubkey);
+    return key_info.has_wildcard ? 1 : 0;
+}
+
+static int get_derived_pubkey(_policy_parser_args_t *args, int key_index, uint8_t out[static 33]) {
+    PRINT_STACK_POINTER();
+
+    serialized_extended_pubkey_t ext_pubkey;
+
+    int ret = get_extended_pubkey(args, key_index, &ext_pubkey);
+    if (ret < 0) {
+        return -1;
     }
 
-    memcpy(out, ext_pubkey->compressed_pubkey, 33);
+    if (ret == 1) {
+        // we derive the /0/i child of this pubkey
+        // we reuse the same memory of ext_pubkey
+        bip32_CKDpub(&ext_pubkey, args->change, &ext_pubkey);
+        bip32_CKDpub(&ext_pubkey, args->address_index, &ext_pubkey);
+    }
+
+    memcpy(out, ext_pubkey.compressed_pubkey, 33);
 
     return 0;
 }

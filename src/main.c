@@ -157,9 +157,9 @@ void app_main() {
         // Reset length of APDU response
         G_output_len = 0;
 
-        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
-        }
+        // if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+        //     btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
+        // }
 
         // Receive command bytes in G_io_apdu_buffer
 
@@ -170,17 +170,13 @@ void app_main() {
             return;
         }
 
-        if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-            os_sched_exit(0);
-        }
+        // if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+        //     os_sched_exit(0);
+        // }
 
         if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
             // legacy codes, use old dispatcher
-
             btchip_context_D.inLength = input_len;
-
-            btchip_context_D.outLength = 0; // LEGACY
-            btchip_context_D.io_flags = 0; // LEGACY
 
             app_dispatch();
         } else {
@@ -236,6 +232,8 @@ void app_exit() {
  * Handle APDU command received and send back APDU response using handlers.
  */
 void coin_main(btchip_altcoin_config_t *coin_config) {
+    PRINT_STACK_POINTER();
+
     // assumptions on the length of data structures
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
@@ -244,7 +242,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     _Static_assert(sizeof(union cx_u) <= 912, "G_cx too large");
 
 
-    btchip_altcoin_config_t config;
+        btchip_altcoin_config_t config;
     if (coin_config == NULL) {
         init_coin_config_legacy(&config);
         G_coin_config = &config;
@@ -252,7 +250,6 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
         G_coin_config = coin_config;
     }
 
-    PRINT_STACK_POINTER();
 #   if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
         PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
 #   endif
@@ -323,7 +320,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin NEW"; // TODO: change to "Bitcoin" after release
+            libcall_params[0] = "Bitcoin";
             libcall_params[1] = 0x100;
             libcall_params[2] = RUN_APPLICATION;
             libcall_params[3] = &coin_config;
