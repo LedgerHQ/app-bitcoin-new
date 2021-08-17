@@ -45,7 +45,6 @@
 #include "legacy/include/swap_lib_calls.h"
 #include "legacy/include/btchip_context.h"
 
-
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
 #endif
@@ -235,14 +234,14 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     PRINT_STACK_POINTER();
 
     // assumptions on the length of data structures
+
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
-    // the custom linker script redefines the space for G_cx to be 912 bytes instead of 1024.
+    // G_cx to be 912 bytes instead of 1024
+    // (currently unused, but we could make use of the last 112 bytes of CXSRAM if short on memory)
     _Static_assert(sizeof(union cx_u) <= 912, "G_cx too large");
-
-
-        btchip_altcoin_config_t config;
+    btchip_altcoin_config_t config;
     if (coin_config == NULL) {
         init_coin_config_legacy(&config);
         G_coin_config = &config;

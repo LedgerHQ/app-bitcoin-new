@@ -100,20 +100,25 @@ SECTIONS
   } > DISCARD /*> SRAM AT>FLASH = 0x00 */
 
   /*
-   * Overlapping sections for the legacy/new globals
+   * Overlapping sections for the legacy/new globals in the .bss section
    */
   .ol0 (NOLOAD) : 
   {
-    overlay_start = .; 
+    bss_start = .; 
     *(.legacy_globals)
-  } > SRAM
-  .ol1 overlay_start (NOLOAD) : {
+  }  > SRAM
+  .ol1 bss_start (NOLOAD) : {
     *(.new_globals)
-    . = MAX (., overlay_start + SIZEOF (.ol0));
-  } > SRAM
-  
-  .bss :
+    . = MAX (., bss_start + SIZEOF (.ol0));
+  }  > SRAM
+
+  .bss bss_start :
   {
+    /**
+     * Skip space used by the overlays
+     */
+    . = bss_start + MAX (SIZEOF (.ol0), SIZEOF (.ol1));
+
     /**
      * Place RAM uninitialized variables
      */

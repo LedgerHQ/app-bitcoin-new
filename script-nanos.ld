@@ -24,8 +24,8 @@ MEMORY
   DISCARD (rwx) : ORIGIN = 0xd0000000, LENGTH = 1M
 
   FLASH   (rx)  : ORIGIN = 0xc0d00000, LENGTH = 400K
-  SRAM    (rwx) : ORIGIN = 0x20000200, LENGTH = 4K+512 + 112
-  CXSRAM  (rwx) : ORIGIN = 0x20001470, LENGTH = 912
+  SRAM    (rwx) : ORIGIN = 0x20000200, LENGTH = 4K+512
+  CXSRAM  (rwx) : ORIGIN = 0x20001400, LENGTH = 1K
 }
 
 PAGE_SIZE  = 64;
@@ -35,7 +35,7 @@ END_STACK  = ORIGIN(SRAM) + LENGTH(SRAM);
 /*
  * Ensure correct remap cx address
  */
-OFF_G_cx           = 0x20001470 - ORIGIN(CXSRAM);
+OFF_G_cx           = 0x20001400 - ORIGIN(CXSRAM);
 _cx_trampoline     = 0x120001;
 
 /*
@@ -118,20 +118,25 @@ SECTIONS
   } > CXSRAM = 0x00
 
   /*
-   * Overlapping sections for the legacy/new globals
+   * Overlapping sections for the legacy/new globals in the .bss section
    */
   .ol0 (NOLOAD) : 
   {
-    overlay_start = .; 
+    bss_start = .; 
     *(.legacy_globals)
-  } > SRAM
-  .ol1 overlay_start (NOLOAD) : {
+  }  > SRAM = 0x00
+  .ol1 bss_start (NOLOAD) : {
     *(.new_globals)
-    . = MAX (., overlay_start + SIZEOF (.ol0));
-  } > SRAM
+    . = MAX (., bss_start + SIZEOF (.ol0));
+  }  > SRAM = 0x00
 
-  .bss :
+  .bss bss_start :
   {
+    /**
+     * Skip space used by the overlays
+     */
+    . = bss_start + MAX (SIZEOF (.ol0), SIZEOF (.ol1));
+
     /**
      * Place RAM uninitialized variables
      */
