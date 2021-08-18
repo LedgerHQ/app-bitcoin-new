@@ -1171,12 +1171,12 @@ static void library_main_helper(struct libargs_s *args) {
 }
 
 
-void init_coin_config_legacy(btchip_altcoin_config_t *coin_config);
+void init_coin_config(btchip_altcoin_config_t *coin_config);
 
 void library_main(struct libargs_s *args) {
     btchip_altcoin_config_t coin_config;
     if (args->coin_config == NULL) {
-        init_coin_config_legacy(&coin_config);
+        init_coin_config(&coin_config);
         args->coin_config = &coin_config;
     }
     bool end = false;

@@ -47,7 +47,7 @@ static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
 static void finalize_response(dispatcher_context_t *dc);
 
 
-extern global_context_t G_context;
+extern global_context_t *G_coin_config;
 
 
 /**
@@ -176,7 +176,7 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
         char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
         get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                key_info.master_key_derivation_len,
-                                               G_context.bip32_pubkey_version,
+                                               G_coin_config->bip32_pubkey_version,
                                                pubkey_derived);
 
         if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {

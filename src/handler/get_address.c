@@ -26,7 +26,7 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
-extern global_context_t G_context;
+extern global_context_t *G_coin_config;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
@@ -102,11 +102,12 @@ void handler_get_address(dispatcher_context_t *dc) {
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
+    uint32_t coin_types[2] = { G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2 };
     bool is_path_suspicious = !is_address_path_standard(bip32_path,
                                                         bip32_path_len, 
                                                         purpose,
-                                                        G_context.bip44_coin_types,
-                                                        G_context.bip44_coin_types_len,
+                                                        coin_types,
+                                                        2,
                                                         false);
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, address_type, state->address);
@@ -184,7 +185,7 @@ static int get_address_at_path(
     switch(address_type) {
         case ADDRESS_TYPE_LEGACY:
             crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
-            address_len = base58_encode_address(pubkey_hash, G_context.p2pkh_version, out, MAX_ADDRESS_LENGTH_STR);
+            address_len = base58_encode_address(pubkey_hash, G_coin_config->p2pkh_version, out, MAX_ADDRESS_LENGTH_STR);
             break;
         case ADDRESS_TYPE_WIT:    // native segwit
         case ADDRESS_TYPE_SH_WIT: // wrapped segwit
@@ -198,11 +199,11 @@ static int get_address_at_path(
                 crypto_hash160((uint8_t *)&script, 22, script_rip);
 
                 if (address_type == ADDRESS_TYPE_SH_WIT) {
-                    address_len = base58_encode_address(script_rip, G_context.p2sh_version, out, MAX_ADDRESS_LENGTH_STR);
+                    address_len = base58_encode_address(script_rip, G_coin_config->p2sh_version, out, MAX_ADDRESS_LENGTH_STR);
                 } else { // ADDRESS_TYPE_WIT
                     int ret = segwit_addr_encode(
                         out,
-                        G_context.native_segwit_prefix,
+                        G_coin_config->native_segwit_prefix,
                         0, script + 2, 20
                     );
 

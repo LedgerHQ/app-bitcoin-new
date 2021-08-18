@@ -53,13 +53,14 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
-global_context_t __attribute__ ((section (".new_globals"))) G_context;
 command_state_t __attribute__ ((section (".new_globals"))) G_command_state;
 
 // legacy variables
-btchip_altcoin_config_t *G_coin_config;
 btchip_context_t __attribute__ ((section (".legacy_globals"))) btchip_context_D;
 
+
+// shared between legacy and new
+global_context_t *G_coin_config; // same type as btchip_altcoin_config_t
 
 
 
@@ -95,8 +96,13 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 };
 
 
-void init_coin_config_legacy(btchip_altcoin_config_t *coin_config) {
+void init_coin_config(btchip_altcoin_config_t *coin_config) {
     memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
+
+    // new app
+    coin_config->bip32_pubkey_version = BIP32_PUBKEY_VERSION;
+
+    // legacy
     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
     coin_config->p2pkh_version = COIN_P2PKH_VERSION;
@@ -123,28 +129,6 @@ void init_coin_config_legacy(btchip_altcoin_config_t *coin_config) {
     coin_config->kind = COIN_KIND;
 }
 
-void init_context_new() {
-    // Reset context
-    explicit_bzero(&G_context, sizeof(G_context));
-    G_context.bip32_pubkey_version = BIP32_PUBKEY_VERSION;
-    static uint32_t const coin_types[] = BIP44_COIN_TYPES;
-    G_context.bip44_coin_types_len = sizeof(coin_types)/sizeof(coin_types[0]); 
-    G_context.bip44_coin_types = coin_types;
-
-    G_context.p2pkh_version = COIN_P2PKH_VERSION;
-    G_context.p2sh_version = COIN_P2SH_VERSION;
-
-    _Static_assert(sizeof(G_context.name_short) >= sizeof(COIN_COINID_SHORT), "COIN_COINID_SHORT is too large");
-    strcpy(G_context.name_short, COIN_COINID_SHORT);
-
-
-#   ifdef COIN_NATIVE_SEGWIT_PREFIX
-        static char *native_segwit_prefix = COIN_NATIVE_SEGWIT_PREFIX;
-        G_context.native_segwit_prefix = (char const *)PIC(native_segwit_prefix);
-#   else
-        G_context.native_segwit_prefix = 0;
-#   endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-}
 
 void app_main() {
     for (;;) {
@@ -179,8 +163,6 @@ void app_main() {
 
             app_dispatch();
         } else {
-            init_context_new();
-
             // Reset structured APDU command
             memset(&cmd, 0, sizeof(cmd));
             // Parse APDU command from G_io_apdu_buffer
@@ -243,7 +225,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     _Static_assert(sizeof(union cx_u) <= 912, "G_cx too large");
     btchip_altcoin_config_t config;
     if (coin_config == NULL) {
-        init_coin_config_legacy(&config);
+        init_coin_config(&config);
         G_coin_config = &config;
     } else {
         G_coin_config = coin_config;
@@ -315,7 +297,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
         TRY {
             unsigned int libcall_params[5];
             btchip_altcoin_config_t coin_config;
-            init_coin_config_legacy(&coin_config);
+            init_coin_config(&coin_config);
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib

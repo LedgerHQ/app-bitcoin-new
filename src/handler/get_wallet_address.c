@@ -37,7 +37,7 @@
 #include "client_commands.h"
 
 
-extern global_context_t G_context;
+extern global_context_t *G_coin_config;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
@@ -158,7 +158,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    state->address_len = get_script_address(state->script, script_len, G_context, state->address, sizeof(state->address));
+    state->address_len = get_script_address(state->script, script_len, G_coin_config, state->address, sizeof(state->address));
 
     if (state->address_len < 0) {
         SEND_SW(dc, SW_BAD_STATE); // unexpected

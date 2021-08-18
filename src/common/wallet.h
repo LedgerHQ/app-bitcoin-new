@@ -147,7 +147,7 @@ int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
 
 int get_script_type(const uint8_t script[], size_t script_len);
 
-int get_script_address(const uint8_t script[], size_t script_len, global_context_t network, char *out, size_t out_len);
+int get_script_address(const uint8_t script[], size_t script_len, global_context_t *coin_config, char *out, size_t out_len);
 
 #ifndef SKIP_FOR_CMOCKA
 // /**

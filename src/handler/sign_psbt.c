@@ -47,7 +47,7 @@
 #include "sign_psbt/get_fingerprint_and_path.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
-extern global_context_t G_context;
+extern global_context_t *G_coin_config;
 
 
 // UI callbacks
@@ -563,13 +563,15 @@ static void check_input_owned(dispatcher_context_t *dc) {
             break;
         }
 
+
         if (state->is_wallet_canonical) {
             // check if path is as expected
+            uint32_t coin_types[2] = { G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2 };
             if (!is_address_path_standard(bip32_path,
                                           bip32_path_len, 
                                           state->bip44_purpose,
-                                          G_context.bip44_coin_types,
-                                          G_context.bip44_coin_types_len,
+                                          coin_types,
+                                          2,
                                           -1))
             {
                 external = true;
@@ -814,11 +816,12 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
         if (state->is_wallet_canonical) {
             // for canonical wallets, the path must be exactly as expected for a change output
+            uint32_t coin_types[2] = { G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2 };
             if (!is_address_path_standard(bip32_path,
                                           bip32_path_len, 
                                           state->bip44_purpose,
-                                          G_context.bip44_coin_types,
-                                          G_context.bip44_coin_types_len,
+                                          coin_types,
+                                          2,
                                           1))
             {
                 external = true;
@@ -875,7 +878,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
     char output_address[MAX_ADDRESS_LENGTH_STR + 1];
     int address_len = get_script_address(state->cur_output.scriptpubkey,
                                             state->cur_output.scriptpubkey_len,
-                                            G_context,
+                                            G_coin_config,
                                             output_address,
                                             sizeof(output_address));
     if (address_len < 0) {
@@ -887,7 +890,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
     ui_validate_output(dc,
                         state->external_outputs_count,
                         output_address,
-                        G_context.name_short,
+                        G_coin_config->name_short,
                         state->cur_output.value,
                         ui_action_validate_output);
 }
@@ -928,7 +931,7 @@ static void confirm_transaction(dispatcher_context_t *dc) {
     uint64_t fee = state->inputs_total_value - state->outputs_total_value;
 
     dc->pause();
-    ui_validate_transaction(dc, G_context.name_short, fee, ui_action_validate_transaction);
+    ui_validate_transaction(dc, G_coin_config->name_short, fee, ui_action_validate_transaction);
 }
 
 static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept) {
@@ -994,7 +997,7 @@ static void sign_init(dispatcher_context_t *dc) {
             char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
             get_serialized_extended_pubkey_at_path(our_key_info.master_key_derivation,
                                                    our_key_info.master_key_derivation_len,
-                                                   G_context.bip32_pubkey_version,
+                                                   G_coin_config->bip32_pubkey_version,
                                                    pubkey_derived);
 
             LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);

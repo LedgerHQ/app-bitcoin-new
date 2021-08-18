@@ -29,9 +29,9 @@ extern ux_state_t G_ux;
 extern bolos_ux_params_t G_ux_params;
 
 /**
- * Global context for user requests.
+ * Cryptocurrency constants.
  */
-extern global_context_t G_context;
+extern global_context_t *G_coin_config;
 
 /**
  * State of the current APDU interaction, if any.

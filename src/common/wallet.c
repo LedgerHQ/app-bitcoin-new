@@ -540,15 +540,15 @@ int get_script_type(const uint8_t script[], size_t script_len) {
 }
 
 // TODO: add unit tests
-int get_script_address(const uint8_t script[], size_t script_len, global_context_t network, char *out, size_t out_len) {
+int get_script_address(const uint8_t script[], size_t script_len, global_context_t *coin_config, char *out, size_t out_len) {
     int script_type = get_script_type(script, script_len);
     int addr_len;
     switch (script_type) {
         case SCRIPT_TYPE_P2PKH:
-            addr_len = base58_encode_address(script + 3, network.p2pkh_version, out, out_len - 1);
+            addr_len = base58_encode_address(script + 3, coin_config->p2pkh_version, out, out_len - 1);
             break;
         case SCRIPT_TYPE_P2SH:
-            addr_len = base58_encode_address(script + 2, network.p2sh_version, out, out_len - 1);
+            addr_len = base58_encode_address(script + 2, coin_config->p2sh_version, out, out_len - 1);
             break;
         case SCRIPT_TYPE_P2WPKH:
         case SCRIPT_TYPE_P2WSH:
@@ -558,13 +558,13 @@ int get_script_address(const uint8_t script[], size_t script_len, global_context
             int hash_length = (script_type == SCRIPT_TYPE_P2WPKH ? 20 : 32);
 
             // make sure that the output buffer is long enough
-            if (out_len < 73 + strlen(network.native_segwit_prefix)) {
+            if (out_len < 73 + strlen(coin_config->native_segwit_prefix)) {
                 return -1;
             }
 
             int ret = segwit_addr_encode(
                 out,
-                network.native_segwit_prefix,
+                coin_config->native_segwit_prefix,
                 0,
                 script + 2,
                 hash_length // 20 for WPKH, 32 for WSH

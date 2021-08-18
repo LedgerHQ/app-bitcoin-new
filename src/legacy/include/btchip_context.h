@@ -287,6 +287,10 @@ typedef enum btchip_coin_kind_e {
 } btchip_coin_kind_t;
 
 typedef struct btchip_altcoin_config_s {
+    // new app
+    unsigned long bip32_pubkey_version;
+
+    // legacy
     unsigned short bip44_coin_type;
     unsigned short bip44_coin_type2;
     unsigned short p2pkh_version;
