@@ -54,6 +54,7 @@ ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
 command_state_t __attribute__ ((section (".new_globals"))) G_command_state;
+dispatcher_context_t __attribute__ ((section (".new_globals"))) G_dispatcher_context;
 
 // legacy variables
 btchip_context_t __attribute__ ((section (".legacy_globals"))) btchip_context_D;
@@ -63,8 +64,11 @@ btchip_context_t __attribute__ ((section (".legacy_globals"))) btchip_context_D;
 global_context_t *G_coin_config; // same type as btchip_altcoin_config_t
 
 
+#define APP_MODE_UNINITIALIZED 0 // state before any APDU is executed
+#define APP_MODE_LEGACY        1 // state when the app is running legacy APDUs
+#define APP_MODE_NEW           2 // state when the app is running new APDUs
 
-dispatcher_context_t G_dispatcher_context;
+static uint8_t g_app_mode;
 
 
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
@@ -158,11 +162,25 @@ void app_main() {
         // }
 
         if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
+            if (g_app_mode != APP_MODE_LEGACY) {
+                memset(&btchip_context_D, 0, sizeof(btchip_context_D));
+
+                btchip_context_init();
+
+                g_app_mode = APP_MODE_LEGACY;
+            }
+
             // legacy codes, use old dispatcher
             btchip_context_D.inLength = input_len;
 
             app_dispatch();
         } else {
+            if (g_app_mode != APP_MODE_NEW) {
+                memset(&G_command_state, 0, sizeof(G_command_state));
+
+                g_app_mode = APP_MODE_NEW;
+            }
+
             // Reset structured APDU command
             memset(&cmd, 0, sizeof(cmd));
             // Parse APDU command from G_io_apdu_buffer
@@ -258,8 +276,6 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
 #endif // TARGET_NANOX
 
-                btchip_context_init();
-
                 USB_power(0);
                 USB_power(1);
 
@@ -292,12 +308,17 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 
 
 __attribute__((section(".boot"))) int main(int arg0) {
+    g_app_mode = APP_MODE_UNINITIALIZED;
+
 #ifdef USE_LIB_BITCOIN
     BEGIN_TRY {
         TRY {
             unsigned int libcall_params[5];
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
+
+            g_app_mode = APP_MODE_LEGACY; // in library mode, we currently only run with legacy APDUs
+
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
             // delegate to bitcoin app/lib
