@@ -700,3 +700,9 @@ listvariants:
 	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_testnet_lib bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance
 
 endif
+
+
+# Makes a detailed report of code and data size in debug/size-report.txt
+# More useful for production builds with DEBUG=0
+size-report: bin/app.elf
+	arm-none-eabi-nm --print-size --size-sort --radix=d bin/app.elf >debug/size-report.txt
