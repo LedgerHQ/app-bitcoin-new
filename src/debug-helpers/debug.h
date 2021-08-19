@@ -2,7 +2,7 @@
 
 void debug_write(const char *buf);
 
-int semihosted_printf(const char * format, ...);
+int semihosted_printf(const char *format, ...);
 
 void print_stack_pointer(const char *file, int line, const char *func_name);
 

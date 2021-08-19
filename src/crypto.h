@@ -13,9 +13,9 @@
 
 // Address types as defined in Bitcoin Core's HWI
 #define ADDRESS_TYPE_LEGACY 1  // Legacy address. P2PKH for single sig, P2SH for scripts.
-#define ADDRESS_TYPE_WIT 2     // Native segwit. P2WPKH for single sig, P2WPSH for scripts.
-#define ADDRESS_TYPE_SH_WIT 3  // Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
-
+#define ADDRESS_TYPE_WIT    2  // Native segwit. P2WPKH for single sig, P2WPSH for scripts.
+#define ADDRESS_TYPE_SH_WIT \
+    3  // Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.
@@ -35,7 +35,6 @@ typedef struct {
     uint8_t checksum[4];
 } serialized_extended_pubkey_check_t;
 
-
 /**
  * Derive private key given BIP32 path.
  *
@@ -53,13 +52,10 @@ typedef struct {
  * @throw INVALID_PARAMETER
  *
  */
-int crypto_derive_private_key(
-    cx_ecfp_private_key_t *private_key,
-    uint8_t chain_code[static 32],
-    const uint32_t *bip32_path,
-    uint8_t bip32_path_len
-);
-
+int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
+                              uint8_t chain_code[static 32],
+                              const uint32_t *bip32_path,
+                              uint8_t bip32_path_len);
 
 /**
  * Initialize public key given private key.
@@ -76,12 +72,9 @@ int crypto_derive_private_key(
  * @throw INVALID_PARAMETER
  *
  */
-int crypto_init_public_key(
-    cx_ecfp_private_key_t *private_key,
-    cx_ecfp_public_key_t *public_key,
-    uint8_t raw_public_key[static 64]
-);
-
+int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
+                           cx_ecfp_public_key_t *public_key,
+                           uint8_t raw_public_key[static 64]);
 
 /**
  * Initialize public key given private key.
@@ -91,18 +84,15 @@ int crypto_init_public_key(
  * @param[out] index
  *   Index of the child to derive. It MUST be not hardened, that is, strictly less than 0x80000000.
  * @param[out] child
- *   Pointer to the output struct for the child's serialized pubkey. It can equal parent, which in that case is
- *   overwritten.
+ *   Pointer to the output struct for the child's serialized pubkey. It can equal parent, which in
+ * that case is overwritten.
  *
  * @return 0 if success, a negative number on failure.
  *
  */
-int bip32_CKDpub(
-    const serialized_extended_pubkey_t *parent,
-    uint32_t index,
-    serialized_extended_pubkey_t *child
-);
-
+int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
+                 uint32_t index,
+                 serialized_extended_pubkey_t *child);
 
 /**
  * Computes the signature of a previously computed sha256 hash as input.
@@ -115,11 +105,7 @@ int bip32_CKDpub(
  *
  * @return the length of the resulting signature on success; returns -1 on failure.
  */
-int crypto_sign_sha256_hash(
-    const uint8_t in[static 32],
-    uint8_t out[static MAX_DER_SIG_LEN]
-);
-
+int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]);
 
 /**
  * Verifies the a signature of some sha256-hashed data.
@@ -134,12 +120,7 @@ int crypto_sign_sha256_hash(
  *
  * @return true if the signature is valid, false otherwise.
  */
-bool crypto_verify_sha256_hash(
-    const uint8_t hash[static 32],
-    uint8_t sig[],
-    size_t sig_len
-);
-
+bool crypto_verify_sha256_hash(const uint8_t hash[static 32], uint8_t sig[], size_t sig_len);
 
 /**
  * Convenience wrapper for cx_hash to add some data to an intialized hash context.
@@ -157,7 +138,6 @@ static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, si
     return cx_hash(hash_context, 0, in, in_len, NULL, 0);
 }
 
-
 /**
  * Convenience wrapper for cx_hash to compute the final hash, without adding any extra data
  * to the hash context.
@@ -174,7 +154,6 @@ static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, si
 static inline int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
     return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
 }
-
 
 /**
  * Convenience wrapper for crypto_hash_update, updating a hash with an uint8_t.
@@ -208,8 +187,8 @@ static inline int crypto_hash_update_u16(cx_hash_t *hash_context, uint16_t data)
 }
 
 /**
- * Convenience wrapper for crypto_hash_update, updating a hash with an uint64_t, serialized as a variable length
- * integer in bitcoin's format.
+ * Convenience wrapper for crypto_hash_update, updating a hash with an uint64_t, serialized as a
+ * variable length integer in bitcoin's format.
  *
  * @param[in] hash_context
  *  The context of the hash, which must already be initialized.
@@ -223,7 +202,6 @@ static inline int crypto_hash_update_varint(cx_hash_t *hash_context, uint64_t da
     int len = varint_write(buf, 0, data);
     return crypto_hash_update(hash_context, &buf, len);
 }
-
 
 /**
  * Convenience wrapper for crypto_hash_update, updating a hash with an uint32_t,
@@ -242,7 +220,6 @@ static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data)
     return crypto_hash_update(hash_context, &buf, sizeof(buf));
 }
 
-
 /**
  * Computes RIPEMD160(in).
  *
@@ -254,7 +231,6 @@ static inline int crypto_hash_update_u32(cx_hash_t *hash_context, uint32_t data)
  *   Pointer to the 160-bit (20 bytes) output array.
  */
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]);
-
 
 /**
  * Computes RIPEMD160(SHA256(in)).
@@ -268,16 +244,16 @@ void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20])
  */
 void crypto_hash160(const uint8_t *in, uint16_t in_len, uint8_t *out);
 
-
 /**
  * Computes the 33-bytes compressed public key from the uncompressed 65-bytes public key.
  *
  * @param[in] uncompressed_key
- *   Pointer to the uncompressed public key. The first byte must be 0x04, followed by 64 bytes public key data. 
+ *   Pointer to the uncompressed public key. The first byte must be 0x04, followed by 64 bytes
+ * public key data.
  * @param[out] out
- *   Pointer to the output array, that must be 33 bytes long. The first byte of the output will be 0x02 or 0x03.
- *   It is allowed to have out == uncompressed_key, and in that case the computation will be done in-place.
- *   Otherwise, the input and output arrays MUST be non-overlapping.
+ *   Pointer to the output array, that must be 33 bytes long. The first byte of the output will be
+ * 0x02 or 0x03. It is allowed to have out == uncompressed_key, and in that case the computation
+ * will be done in-place. Otherwise, the input and output arrays MUST be non-overlapping.
  *
  * @return 0 on success, a negative number on failure.
  */
@@ -287,11 +263,12 @@ int crypto_get_compressed_pubkey(const uint8_t uncompressed_key[static 65], uint
  * Computes the 65-bytes uncompressed public key from the compressed 33-bytes public key.
  *
  * @param[in] compressed_key
- *   Pointer to the compressed public key. The first byte must be 0x02 or 0x03, followed by 32 bytes.
+ *   Pointer to the compressed public key. The first byte must be 0x02 or 0x03, followed by 32
+ * bytes.
  * @param[out] out
- *   Pointer to the output array, that must be 65 bytes long. The first byte of the output will be 0x04.
- *   It is allowed to have out == compressed_key, and in that case the computation will be done in-place.
- *   Otherwise, the input and output arrays MUST be non-overlapping.
+ *   Pointer to the output array, that must be 65 bytes long. The first byte of the output will be
+ * 0x04. It is allowed to have out == compressed_key, and in that case the computation will be done
+ * in-place. Otherwise, the input and output arrays MUST be non-overlapping.
  *
  * @return 0 on success, a negative number on failure.
  */
@@ -299,20 +276,19 @@ int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33], uint
 
 /**
  * Computes the checksum as the first 4 bytes of the double sha256 hash of the input data.
- * 
+ *
  * @param[in] in
- *   Pointer to the input data. 
+ *   Pointer to the input data.
  * @param[in] in_len
- *   Length of the input data. 
+ *   Length of the input data.
  * @param[out] out
  *   Pointer to the output buffer, which must contain at least 4 bytes.
- *   
+ *
  */
 void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 4]);
 
-
 /**
- * Gets the compressed pubkey and (optionally) the chain code at the given derivation path. 
+ * Gets the compressed pubkey and (optionally) the chain code at the given derivation path.
  *
  * @param[in]  bip32_path
  *   Pointer to 32-bit integer input buffer.
@@ -323,17 +299,14 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
  * @param[out]  chaincode
  *   Either NULL, or a pointer to a 32-bytes buffer that will receive the chain code.
  */
-void crypto_get_compressed_pubkey_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t pubkey[static 33],
-    uint8_t chain_code[]
-);
-
+void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
+                                          uint8_t bip32_path_len,
+                                          uint8_t pubkey[static 33],
+                                          uint8_t chain_code[]);
 
 /**
- * Computes the fingerprint of a compressed key as per BIP32; that is, the first 4 bytes of the HASH160 of the given
- * compressed pubkey, interpreted as a big-endian 32-bit unsigned integer.
+ * Computes the fingerprint of a compressed key as per BIP32; that is, the first 4 bytes of the
+ * HASH160 of the given compressed pubkey, interpreted as a big-endian 32-bit unsigned integer.
  *
  * @param[in]  pub_key
  *   Pointer to 32-bit integer input buffer.
@@ -351,7 +324,7 @@ uint32_t crypto_get_master_key_fingerprint();
 
 /**
  * Computes the base58check-encoded extended pubkey at a given path.
- * 
+ *
  * @param[in]  bip32_path
  *   Pointer to 32-bit integer input buffer.
  * @param[in]  bip32_path_len
@@ -359,17 +332,15 @@ uint32_t crypto_get_master_key_fingerprint();
  * @param[in]  bip32_pubkey_version
  *   Version prefix to use for te pubkey.
  * @param[out] out
- *   Pointer to the output buffer, which must be long enough to contain the result (including the terminating null).
+ *   Pointer to the output buffer, which must be long enough to contain the result (including the
+ * terminating null).
  *
  * @return the length of the output pubkey (not including the null character).
  */
-size_t get_serialized_extended_pubkey_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint32_t bip32_pubkey_version,
-    char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]
-);
-
+size_t get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                              uint8_t bip32_path_len,
+                                              uint32_t bip32_pubkey_version,
+                                              char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]);
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.
@@ -382,7 +353,6 @@ size_t get_serialized_extended_pubkey_at_path(
  *   Pointer to a 32-byte output buffer that will contain the generated key.
  */
 void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]);
-
 
 /**
  * Encodes a 20-bytes hash in base58 with checksum, after prepending a version prefix.
@@ -398,7 +368,7 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
  *   The pointer to the output array.
  * @param[in]  out_len
  *   The 1-byte, 2-byte or 4-byte version prefix.
- * 
+ *
  * @return the length of the encoded output on success, -1 on failure (that is, if the output
  *   would be longer than out_len).
  */

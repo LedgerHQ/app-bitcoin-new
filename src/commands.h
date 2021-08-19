@@ -20,7 +20,7 @@ typedef enum {
 } command_e;
 
 /**
- * Union of the global state for all the commands. 
+ * Union of the global state for all the commands.
  */
 typedef union {
     get_address_state_t get_address_state;
@@ -29,7 +29,6 @@ typedef union {
     get_wallet_address_state_t get_wallet_address_state;
     sign_psbt_state_t sign_psbt_state;
 } command_state_t;
-
 
 /**
  * Since only one command can execute at the same time, we share the same global space

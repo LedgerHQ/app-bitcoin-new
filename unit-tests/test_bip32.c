@@ -51,7 +51,6 @@ static void test_bad_bip32_format(void **state) {
     assert_false(b);
 }
 
-
 static void test_bip32_read(void **state) {
     (void) state;
 

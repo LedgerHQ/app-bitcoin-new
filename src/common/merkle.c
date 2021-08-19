@@ -35,8 +35,9 @@ void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[s
     crypto_hash_digest(&hash.header, out, 32);
 }
 
-
-void merkle_combine_hashes(const uint8_t left[static 32], const uint8_t right[static 32], uint8_t out[static 32]) {
+void merkle_combine_hashes(const uint8_t left[static 32],
+                           const uint8_t right[static 32],
+                           uint8_t out[static 32]) {
     cx_sha256_t hash;
     cx_sha256_init(&hash);
 

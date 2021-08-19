@@ -30,20 +30,17 @@ extern global_context_t *G_coin_config;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
-static int get_address_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t address_type,
-    char out[static MAX_ADDRESS_LENGTH_STR + 1]
-);
+static int get_address_at_path(const uint32_t bip32_path[],
+                               uint8_t bip32_path_len,
+                               uint8_t address_type,
+                               char out[static MAX_ADDRESS_LENGTH_STR + 1]);
 
 void handler_get_address(dispatcher_context_t *dc) {
-    get_address_state_t *state = (get_address_state_t *)&G_command_state;
+    get_address_state_t *state = (get_address_state_t *) &G_command_state;
 
     uint8_t display, address_type;
-    if (   !buffer_read_u8(&dc->read_buffer, &display)
-        || !buffer_read_u8(&dc->read_buffer, &address_type))
-    {
+    if (!buffer_read_u8(&dc->read_buffer, &display) ||
+        !buffer_read_u8(&dc->read_buffer, &address_type)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
@@ -53,27 +50,25 @@ void handler_get_address(dispatcher_context_t *dc) {
         return;
     }
 
-    if (   address_type != ADDRESS_TYPE_LEGACY
-        && address_type != ADDRESS_TYPE_WIT
-        && address_type != ADDRESS_TYPE_SH_WIT)
-    {
+    if (address_type != ADDRESS_TYPE_LEGACY && address_type != ADDRESS_TYPE_WIT &&
+        address_type != ADDRESS_TYPE_SH_WIT) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    uint32_t purpose; // the valid purpose depends on the requested address type
-    switch(address_type) {
-        case ADDRESS_TYPE_LEGACY: // legacy
+    uint32_t purpose;  // the valid purpose depends on the requested address type
+    switch (address_type) {
+        case ADDRESS_TYPE_LEGACY:  // legacy
             purpose = 44;
             break;
-        case ADDRESS_TYPE_WIT:    // native segwit
+        case ADDRESS_TYPE_WIT:  // native segwit
             purpose = 84;
             break;
-        case ADDRESS_TYPE_SH_WIT: // wrapped segwit
+        case ADDRESS_TYPE_SH_WIT:  // wrapped segwit
             purpose = 49;
             break;
         default:
-            SEND_SW(dc, SW_BAD_STATE); // cannot happen
+            SEND_SW(dc, SW_BAD_STATE);  // cannot happen
             return;
     }
 
@@ -102,31 +97,31 @@ void handler_get_address(dispatcher_context_t *dc) {
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    uint32_t coin_types[2] = { G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2 };
-    bool is_path_suspicious = !is_address_path_standard(bip32_path,
-                                                        bip32_path_len, 
-                                                        purpose,
-                                                        coin_types,
-                                                        2,
-                                                        false);
+    uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+    bool is_path_suspicious =
+        !is_address_path_standard(bip32_path, bip32_path_len, purpose, coin_types, 2, false);
 
     int ret = get_address_at_path(bip32_path, bip32_path_len, address_type, state->address);
     if (ret < 0) {
         SEND_SW(dc, SW_BAD_STATE);
         return;
     }
-    state->address_len = (size_t)ret;
+    state->address_len = (size_t) ret;
 
     if (display == 1 || is_path_suspicious) {
         dc->pause();
-        ui_display_address(dc, state->address, is_path_suspicious, path_str, ui_action_validate_address);
+        ui_display_address(dc,
+                           state->address,
+                           is_path_suspicious,
+                           path_str,
+                           ui_action_validate_address);
     } else {
         SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
     }
 }
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
-    get_address_state_t *state = (get_address_state_t *)&G_command_state;
+    get_address_state_t *state = (get_address_state_t *) &G_command_state;
 
     if (accepted) {
         SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
@@ -136,7 +131,6 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
 
     dc->run();
 }
-
 
 // TODO: refactor: split the pubkey generation for the BIP32 path from the address generation
 
@@ -154,12 +148,10 @@ static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) 
  *
  * @return the length of the computed address on success, -1 on failure.
  */
-static int get_address_at_path(
-    const uint32_t bip32_path[],
-    uint8_t bip32_path_len,
-    uint8_t address_type,
-    char out[static MAX_ADDRESS_LENGTH_STR + 1]
-){
+static int get_address_at_path(const uint32_t bip32_path[],
+                               uint8_t bip32_path_len,
+                               uint8_t address_type,
+                               char out[static MAX_ADDRESS_LENGTH_STR + 1]) {
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
 
@@ -177,46 +169,48 @@ static int get_address_at_path(
     // reset private key
     explicit_bzero(&private_key, sizeof(private_key));
     // compute compressed public key (in-place)
-    crypto_get_compressed_pubkey((uint8_t *)&keydata, (uint8_t *)&keydata);
+    crypto_get_compressed_pubkey((uint8_t *) &keydata, (uint8_t *) &keydata);
 
     uint8_t pubkey_hash[20];
     size_t address_len;
 
-    switch(address_type) {
+    switch (address_type) {
         case ADDRESS_TYPE_LEGACY:
-            crypto_hash160((uint8_t *)&keydata, 33, pubkey_hash);
-            address_len = base58_encode_address(pubkey_hash, G_coin_config->p2pkh_version, out, MAX_ADDRESS_LENGTH_STR);
+            crypto_hash160((uint8_t *) &keydata, 33, pubkey_hash);
+            address_len = base58_encode_address(pubkey_hash,
+                                                G_coin_config->p2pkh_version,
+                                                out,
+                                                MAX_ADDRESS_LENGTH_STR);
             break;
-        case ADDRESS_TYPE_WIT:    // native segwit
-        case ADDRESS_TYPE_SH_WIT: // wrapped segwit
-            {
-                uint8_t script[22];
-                script[0] = 0x00; // OP_0
-                script[1] = 0x14; // PUSH 20 bytes
-                crypto_hash160((uint8_t *)&keydata, 33, script+2);
+        case ADDRESS_TYPE_WIT:     // native segwit
+        case ADDRESS_TYPE_SH_WIT:  // wrapped segwit
+        {
+            uint8_t script[22];
+            script[0] = 0x00;  // OP_0
+            script[1] = 0x14;  // PUSH 20 bytes
+            crypto_hash160((uint8_t *) &keydata, 33, script + 2);
 
-                uint8_t script_rip[20];
-                crypto_hash160((uint8_t *)&script, 22, script_rip);
+            uint8_t script_rip[20];
+            crypto_hash160((uint8_t *) &script, 22, script_rip);
 
-                if (address_type == ADDRESS_TYPE_SH_WIT) {
-                    address_len = base58_encode_address(script_rip, G_coin_config->p2sh_version, out, MAX_ADDRESS_LENGTH_STR);
-                } else { // ADDRESS_TYPE_WIT
-                    int ret = segwit_addr_encode(
-                        out,
-                        G_coin_config->native_segwit_prefix,
-                        0, script + 2, 20
-                    );
+            if (address_type == ADDRESS_TYPE_SH_WIT) {
+                address_len = base58_encode_address(script_rip,
+                                                    G_coin_config->p2sh_version,
+                                                    out,
+                                                    MAX_ADDRESS_LENGTH_STR);
+            } else {  // ADDRESS_TYPE_WIT
+                int ret =
+                    segwit_addr_encode(out, G_coin_config->native_segwit_prefix, 0, script + 2, 20);
 
-                    if (ret != 1) {
-                        return -1; // should never happen
-                    }
-
-                    address_len = strlen(out);
+                if (ret != 1) {
+                    return -1;  // should never happen
                 }
+
+                address_len = strlen(out);
             }
-            break;
+        } break;
         default:
-            return -1; // this can never happen
+            return -1;  // this can never happen
     }
 
     out[address_len] = '\0';

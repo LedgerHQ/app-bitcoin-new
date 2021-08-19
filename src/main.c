@@ -25,7 +25,6 @@
 
 #include "cx_ram.h"
 
-
 #include "types.h"
 #include "globals.h"
 #include "io.h"
@@ -53,24 +52,22 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
-command_state_t __attribute__ ((section (".new_globals"))) G_command_state;
-dispatcher_context_t __attribute__ ((section (".new_globals"))) G_dispatcher_context;
+command_state_t __attribute__((section(".new_globals"))) G_command_state;
+dispatcher_context_t __attribute__((section(".new_globals"))) G_dispatcher_context;
 
 // legacy variables
-btchip_context_t __attribute__ ((section (".legacy_globals"))) btchip_context_D;
-
+btchip_context_t __attribute__((section(".legacy_globals"))) btchip_context_D;
 
 // shared between legacy and new
-global_context_t *G_coin_config; // same type as btchip_altcoin_config_t
+global_context_t *G_coin_config;  // same type as btchip_altcoin_config_t
 
-
-#define APP_MODE_UNINITIALIZED 0 // state before any APDU is executed
-#define APP_MODE_LEGACY        1 // state when the app is running legacy APDUs
-#define APP_MODE_NEW           2 // state when the app is running new APDUs
+#define APP_MODE_UNINITIALIZED 0  // state before any APDU is executed
+#define APP_MODE_LEGACY        1  // state when the app is running legacy APDUs
+#define APP_MODE_NEW           2  // state when the app is running new APDUs
 
 static uint8_t g_app_mode;
 
-
+// clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
@@ -98,7 +95,7 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
         .handler = (command_handler_t)handler_sign_psbt
     },
 };
-
+// clang-format on
 
 void init_coin_config(btchip_altcoin_config_t *coin_config) {
     memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
@@ -120,19 +117,18 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
     coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
 #else
     coin_config->native_segwit_prefix = 0;
-#endif // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+#endif  // #ifdef COIN_NATIVE_SEGWIT_PREFIX
 #ifdef COIN_FORKID
     coin_config->forkid = COIN_FORKID;
-#endif // COIN_FORKID
+#endif  // COIN_FORKID
 #ifdef COIN_CONSENSUS_BRANCH_ID
     coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-#endif // COIN_CONSENSUS_BRANCH_ID
+#endif  // COIN_CONSENSUS_BRANCH_ID
 #ifdef COIN_FLAGS
     coin_config->flags = COIN_FLAGS;
-#endif // COIN_FLAGS
+#endif  // COIN_FLAGS
     coin_config->kind = COIN_KIND;
 }
-
 
 void app_main() {
     for (;;) {
@@ -191,21 +187,20 @@ void app_main() {
             }
 
             PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
-                cmd.cla,
-                cmd.ins,
-                cmd.p1,
-                cmd.p2,
-                cmd.lc);
+                   cmd.cla,
+                   cmd.ins,
+                   cmd.p1,
+                   cmd.p2,
+                   cmd.lc);
             for (int i = 0; i < cmd.lc; i++) {
                 PRINTF("%02X", cmd.data[i]);
             }
             PRINTF("\n");
 
-
             // Dispatch structured APDU command to handler
             apdu_dispatcher(COMMAND_DESCRIPTORS,
-                            sizeof(COMMAND_DESCRIPTORS)/sizeof(COMMAND_DESCRIPTORS[0]),
-                            (machine_context_t *)&G_command_state,
+                            sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
+                            (machine_context_t *) &G_command_state,
                             sizeof(G_command_state),
                             ui_menu_main,
                             &cmd);
@@ -238,7 +233,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
-    // G_cx to be 912 bytes instead of 1024
+    // We expect G_cx to be 912 bytes instead of 1024
     // (currently unused, but we could make use of the last 112 bytes of CXSRAM if short on memory)
     _Static_assert(sizeof(union cx_u) <= 912, "G_cx too large");
     btchip_altcoin_config_t config;
@@ -249,19 +244,19 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
         G_coin_config = coin_config;
     }
 
-#   if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
-        PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
-#   endif
+#if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
+    PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
+#endif
 
-#   ifdef HAVE_SEMIHOSTED_PRINTF
-        PRINTF("APDU State size: %d\n", sizeof(command_state_t));
-        PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
-#   endif
+#ifdef HAVE_SEMIHOSTED_PRINTF
+    PRINTF("APDU State size: %d\n", sizeof(command_state_t));
+    PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
+#endif
 
     // Reset dispatcher state
     explicit_bzero(&G_dispatcher_context, sizeof(G_dispatcher_context));
 
-    memset(G_io_apdu_buffer, 0, 255); // paranoia
+    memset(G_io_apdu_buffer, 0, 255);  // paranoia
 
     // Process the incoming APDUs
 
@@ -274,7 +269,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 #ifdef TARGET_NANOX
                 // grab the current plane mode setting
                 G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
-#endif // TARGET_NANOX
+#endif  // TARGET_NANOX
 
                 USB_power(0);
                 USB_power(1);
@@ -284,7 +279,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
                 BLE_power(1, "Nano X");
-#endif // HAVE_BLE
+#endif  // HAVE_BLE
 
                 app_main();
             }
@@ -305,8 +300,6 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     app_exit();
 }
 
-
-
 __attribute__((section(".boot"))) int main(int arg0) {
     g_app_mode = APP_MODE_UNINITIALIZED;
 
@@ -317,7 +310,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
 
-            g_app_mode = APP_MODE_LEGACY; // in library mode, we currently only run with legacy APDUs
+            g_app_mode =
+                APP_MODE_LEGACY;  // in library mode, we currently only run with legacy APDUs
 
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
@@ -329,18 +323,18 @@ __attribute__((section(".boot"))) int main(int arg0) {
             libcall_params[4] = 0;
             if (arg0) {
                 // call as a library
-                libcall_params[2] = ((unsigned int *)arg0)[1];
-                libcall_params[4] = ((unsigned int *)arg0)[3]; // library arguments
+                libcall_params[2] = ((unsigned int *) arg0)[1];
+                libcall_params[4] = ((unsigned int *) arg0)[3];  // library arguments
                 os_lib_call(&libcall_params);
-                ((unsigned int *)arg0)[0] = libcall_params[1];
+                ((unsigned int *) arg0)[0] = libcall_params[1];
                 os_lib_end();
-            }
-            else {
+            } else {
                 // launch coin application
                 os_lib_call(&libcall_params);
             }
         }
-        FINALLY {}
+        FINALLY {
+        }
     }
     END_TRY;
     // no return
@@ -374,6 +368,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
             // called as bitcoin or altcoin library
             library_main(args);
     }
-#endif // USE_LIB_BITCOIN
+#endif  // USE_LIB_BITCOIN
     return 0;
 }

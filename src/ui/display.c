@@ -36,7 +36,7 @@
 #include "../constants.h"
 
 #define MAX_BASE58_PUBKEY_LENGTH 112
-#define MAX_ADDRESS_LENGTH 35
+#define MAX_ADDRESS_LENGTH       35
 
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
@@ -94,12 +94,12 @@ typedef union {
     ui_validate_transaction_state_t validate_transaction;
 } ui_state_t;
 
-ui_state_t __attribute__ ((section (".new_globals"))) g_ui_state;
-
+ui_state_t __attribute__((section(".new_globals"))) g_ui_state;
 
 /*
     STATELESS STEPS
-    As these steps do not access per-step globals (except possibly a callback), they can be used in any flow.
+    As these steps do not access per-step globals (except possibly a callback), they can be used in
+   any flow.
 */
 
 // Step with icon and text for pubkey
@@ -145,13 +145,13 @@ UX_STEP_CB(ux_display_reject_step,
                "Reject",
            });
 
-
 /*
     STATEFUL STEPS
-    These can only be used in the context of specific flows, as they access a common shared space for strings.
+    These can only be used in the context of specific flows, as they access a common shared space
+   for strings.
 */
 
-// PATH/PUBKEY or PATH/ADDRESS 
+// PATH/PUBKEY or PATH/ADDRESS
 
 // Step with title/text for BIP32 path
 UX_STEP_NOCB(ux_display_path_step,
@@ -177,7 +177,6 @@ UX_STEP_NOCB(ux_display_address_step,
                  .text = g_ui_state.path_and_address.address,
              });
 
-
 // Step with icon and text with name of a wallet being registered
 UX_STEP_NOCB(ux_display_wallet_header_name_step,
              pnn,
@@ -191,10 +190,9 @@ UX_STEP_NOCB(ux_display_wallet_header_name_step,
 UX_STEP_NOCB(ux_display_wallet_policy_map_type_step,
              bnnn_paging,
              {
-                 .title = "Policy map:", // TODO: simplify for known multisig policies
+                 .title = "Policy map:",  // TODO: simplify for known multisig policies
                  .text = g_ui_state.wallet.policy_map,
              });
-
 
 // Step with index and xpub of a cosigner of a policy_map wallet
 UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
@@ -203,8 +201,6 @@ UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
                  .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
                  .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
              });
-
-
 
 // Step with icon and text with name of a wallet being registered
 UX_STEP_NOCB(ux_display_receive_in_wallet_step,
@@ -223,7 +219,6 @@ UX_STEP_NOCB(ux_display_wallet_address_step,
                  .text = g_ui_state.wallet.address,
              });
 
-
 // Step with icon and text with name of a wallet to spend from
 UX_STEP_NOCB(ux_display_spend_from_wallet_step,
              pnn,
@@ -233,7 +228,6 @@ UX_STEP_NOCB(ux_display_spend_from_wallet_step,
                  g_ui_state.wallet.wallet_name,
              });
 
-
 // Step with warning icon and text explaining that there are external inputs
 UX_STEP_NOCB(ux_display_warning_external_inputs_step,
              pnn,
@@ -242,8 +236,6 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
                  "Transaction with",
                  "external inputs!",
              });
-
-
 
 // Step with eye icon and "Review" and the output index
 UX_STEP_NOCB(ux_review_step,
@@ -270,15 +262,7 @@ UX_STEP_NOCB(ux_validate_address_step,
                  .text = g_ui_state.validate_output.address,
              });
 
-
-
-UX_STEP_NOCB(ux_confirm_transaction_step,
-             pnn,
-             {
-                 &C_icon_eye,
-                 "Confirm",
-                 "transaction"
-             });
+UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
              bnnn_paging,
              {
@@ -288,12 +272,7 @@ UX_STEP_NOCB(ux_confirm_transaction_fees_step,
 UX_STEP_CB(ux_accept_and_send_step,
            pbb,
            (*g_validate_callback)(&G_dispatcher_context, true),
-           {
-               &C_icon_validate_14,
-               "Accept",
-               "and send"
-           });
-
+           {&C_icon_validate_14, "Accept", "and send"});
 
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
@@ -308,7 +287,6 @@ UX_FLOW(ux_display_pubkey_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
 // FLOW to display a receive address, for a standard path:
 // #1 screen: eye icon + "Confirm Address"
 // #3 screen: display address
@@ -319,7 +297,6 @@ UX_FLOW(ux_display_address_flow,
         &ux_display_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
-
 
 // FLOW to display a receive address, for a non-standard path:
 // #1 screen: warning icon + "The derivation path is unusual!"
@@ -338,21 +315,16 @@ UX_FLOW(ux_display_address_suspicious_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
-// FLOW to warn the user if a change output has an unusual derivation path (account index or address index too large):
-// #1 screen: warning icon + "The derivation path is unusual!"
-// #2 screen: display BIP32 Path
-// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
-// #4 screen: approve button
-// #5 screen: reject button
+// FLOW to warn the user if a change output has an unusual derivation path (account index or address
+// index too large): #1 screen: warning icon + "The derivation path is unusual!" #2 screen: display
+// BIP32 Path #3 screen: crossmark icon + "Reject if not sure" (user can reject here) #4 screen:
+// approve button #5 screen: reject button
 UX_FLOW(ux_display_unusual_derivation_path_flow,
         &ux_display_unusual_derivation_path_step,
         &ux_display_path_step,
         &ux_display_reject_if_not_sure_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
-
-
 
 // FLOW to display the header of a policy map wallet:
 // #1 screen: eye icon + "Register wallet" and the wallet name
@@ -365,7 +337,6 @@ UX_FLOW(ux_display_policy_map_header_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
 // FLOW to display the header of a policy_map wallet:
 // #1 screen: Cosigner index and pubkey (paginated)
 // #2 screen: approve button
@@ -374,7 +345,6 @@ UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
         &ux_display_wallet_policy_map_cosigner_pubkey_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
-
 
 // FLOW to display the name and an address of a registered wallet:
 // #1 screen: wallet name
@@ -387,7 +357,6 @@ UX_FLOW(ux_display_wallet_name_address_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
 // FLOW to display an address of a canonical wallet:
 // #1 screen: wallet address
 // #2 screen: approve button
@@ -397,7 +366,6 @@ UX_FLOW(ux_display_canonical_wallet_address_flow,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
-
 
 // FLOW to display a registered wallet and authorize spending:
 // #1 screen: wallet name
@@ -409,8 +377,6 @@ UX_FLOW(ux_display_wallet_for_spending_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
-
 // FLOW to warn about external inputs
 // #1 screen: warning icon + "Transaction with external inputs!"
 // #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
@@ -420,7 +386,6 @@ UX_FLOW(ux_display_warning_external_inputs_flow,
         &ux_display_spend_from_wallet_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
-
 
 // FLOW to validate a single output
 // #1 screen: eye icon + "Review" + index of output to validate
@@ -435,7 +400,6 @@ UX_FLOW(ux_display_output_address_amount_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-
 // Finalize see the transaction fees and finally accept signing
 // #1 screen: eye icon + "Confirm Transaction"
 // #2 screen: fee amount
@@ -447,11 +411,13 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_accept_and_send_step,
         &ux_display_reject_step);
 
+void ui_display_pubkey(dispatcher_context_t *context,
+                       char *bip32_path,
+                       char *pubkey,
+                       action_validate_cb callback) {
+    (void) (context);
 
-void ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pubkey, action_validate_cb callback) {
-    (void)(context);
-
-    ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *)&g_ui_state;
+    ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
     strncpy(state->bip32_path, bip32_path, sizeof(state->bip32_path));
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
@@ -461,11 +427,14 @@ void ui_display_pubkey(dispatcher_context_t *context, char *bip32_path, char *pu
     ux_flow_init(0, ux_display_pubkey_flow, NULL);
 }
 
+void ui_display_address(dispatcher_context_t *context,
+                        char *address,
+                        bool is_path_suspicious,
+                        char *path_str,
+                        action_validate_cb callback) {
+    (void) (context);
 
-void ui_display_address(dispatcher_context_t *context, char *address, bool is_path_suspicious, char *path_str, action_validate_cb callback) {
-    (void)(context);
-
-    ui_path_and_address_state_t *state = (ui_path_and_address_state_t *)&g_ui_state;
+    ui_path_and_address_state_t *state = (ui_path_and_address_state_t *) &g_ui_state;
 
     strncpy(state->address, address, sizeof(state->address));
 
@@ -479,14 +448,12 @@ void ui_display_address(dispatcher_context_t *context, char *address, bool is_pa
     }
 }
 
-
 void ui_display_wallet_header(dispatcher_context_t *context,
-    policy_map_wallet_header_t *wallet_header,
-    action_validate_cb callback)
-{
-    (void)(context);
+                              policy_map_wallet_header_t *wallet_header,
+                              action_validate_cb callback) {
+    (void) (context);
 
-    ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
+    ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->wallet_name, wallet_header->name, sizeof(wallet_header->name));
     strncpy(state->policy_map, wallet_header->policy_map, sizeof(wallet_header->policy_map));
@@ -496,25 +463,30 @@ void ui_display_wallet_header(dispatcher_context_t *context,
     ux_flow_init(0, ux_display_policy_map_header_flow, NULL);
 }
 
-
 void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
                                            char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
                                            bool is_internal,
-                                           action_validate_cb callback)
-{
-    (void)(context);
-    (void)(n_keys);
+                                           action_validate_cb callback) {
+    (void) (context);
+    (void) (n_keys);
 
-    ui_cosigner_pubkey_and_index_state_t *state = (ui_cosigner_pubkey_and_index_state_t *)&g_ui_state;
+    ui_cosigner_pubkey_and_index_state_t *state =
+        (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
 
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
 
     if (is_internal) {
-        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u <ours>", cosigner_index + 1);
+        snprintf(state->signer_index,
+                 sizeof(state->signer_index),
+                 "Key @%u <ours>",
+                 cosigner_index + 1);
     } else {
-        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u <theirs>", cosigner_index + 1);
+        snprintf(state->signer_index,
+                 sizeof(state->signer_index),
+                 "Key @%u <theirs>",
+                 cosigner_index + 1);
     }
 
     g_validate_callback = callback;
@@ -522,11 +494,13 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
     ux_flow_init(0, ux_display_policy_map_cosigner_pubkey_flow, NULL);
 }
 
+void ui_display_wallet_address(dispatcher_context_t *context,
+                               char *wallet_name,
+                               char *address,
+                               action_validate_cb callback) {
+    (void) (context);
 
-void ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name, char *address, action_validate_cb callback) {
-    (void)(context);
-
-    ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
+    ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->address, address, sizeof(state->address));
     g_validate_callback = callback;
@@ -539,10 +513,12 @@ void ui_display_wallet_address(dispatcher_context_t *context, char *wallet_name,
     }
 }
 
-void ui_display_unusual_path(dispatcher_context_t *context, char *path_str, action_validate_cb callback) {
-    (void)(context);
+void ui_display_unusual_path(dispatcher_context_t *context,
+                             char *path_str,
+                             action_validate_cb callback) {
+    (void) (context);
 
-    ui_path_state_t *state = (ui_path_state_t *)&g_ui_state;
+    ui_path_state_t *state = (ui_path_state_t *) &g_ui_state;
 
     g_validate_callback = callback;
 
@@ -550,10 +526,12 @@ void ui_display_unusual_path(dispatcher_context_t *context, char *path_str, acti
     ux_flow_init(0, ux_display_unusual_derivation_path_flow, NULL);
 }
 
-void ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback) {
-    (void)(context);
+void ui_authorize_wallet_spend(dispatcher_context_t *context,
+                               char *wallet_name,
+                               action_validate_cb callback) {
+    (void) (context);
 
-    ui_wallet_state_t *state = (ui_wallet_state_t *)&g_ui_state;
+    ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
 
@@ -562,33 +540,30 @@ void ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name,
     ux_flow_init(0, ux_display_wallet_for_spending_flow, NULL);
 }
 
-
 void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb callback) {
-    (void)(context);
+    (void) (context);
 
     g_validate_callback = callback;
 
     ux_flow_init(0, ux_display_warning_external_inputs_flow, NULL);
 }
 
-
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
                         char *address,
                         char *coin_name,
                         uint64_t amount,
-                        action_validate_cb callback)
-{
-    (void)(context);
+                        action_validate_cb callback) {
+    (void) (context);
 
-    ui_validate_output_state_t *state = (ui_validate_output_state_t *)&g_ui_state;
+    ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
     snprintf(state->index, sizeof(state->index), "output #%d", index);
 
     strncpy(state->address, address, sizeof(state->address));
 
-    int whole_part = (int)(amount / 100000000);
-    int fract_part = (int)(amount % 100000000);
+    int whole_part = (int) (amount / 100000000);
+    int fract_part = (int) (amount % 100000000);
 
     snprintf(state->amount, sizeof(state->amount), "%s %d.%08d", coin_name, whole_part, fract_part);
 
@@ -597,17 +572,16 @@ void ui_validate_output(dispatcher_context_t *context,
     ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
 }
 
-
 void ui_validate_transaction(dispatcher_context_t *context,
                              char *coin_name,
                              uint64_t fee,
                              action_validate_cb callback) {
-    (void)(context);
+    (void) (context);
 
-    int whole_part = (int)(fee / 100000000);
-    int fract_part = (int)(fee % 100000000);
+    int whole_part = (int) (fee / 100000000);
+    int fract_part = (int) (fee % 100000000);
 
-    ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *)&g_ui_state;
+    ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     g_validate_callback = callback;
 

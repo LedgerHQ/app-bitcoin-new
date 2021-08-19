@@ -31,8 +31,7 @@ extern global_context_t *G_coin_config;
 static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice);
 
 void handler_get_pubkey(dispatcher_context_t *dc) {
-    get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
-
+    get_pubkey_state_t *state = (get_pubkey_state_t *) &G_command_state;
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -42,9 +41,8 @@ void handler_get_pubkey(dispatcher_context_t *dc) {
 
     uint8_t display;
     uint8_t bip32_path_len;
-    if (   !buffer_read_u8(&dc->read_buffer, &display)
-        || !buffer_read_u8(&dc->read_buffer, &bip32_path_len))
-    {
+    if (!buffer_read_u8(&dc->read_buffer, &display) ||
+        !buffer_read_u8(&dc->read_buffer, &bip32_path_len)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
@@ -75,14 +73,20 @@ void handler_get_pubkey(dispatcher_context_t *dc) {
     if (display) {
         ui_display_pubkey(dc, path_str, state->serialized_pubkey_str, ui_action_validate_pubkey);
     } else {
-        SEND_RESPONSE(dc, state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
+        SEND_RESPONSE(dc,
+                      state->serialized_pubkey_str,
+                      strlen(state->serialized_pubkey_str),
+                      SW_OK);
     }
 }
 
 static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice) {
-    get_pubkey_state_t *state = (get_pubkey_state_t *)&G_command_state;
+    get_pubkey_state_t *state = (get_pubkey_state_t *) &G_command_state;
     if (choice) {
-        SEND_RESPONSE(dc, state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
+        SEND_RESPONSE(dc,
+                      state->serialized_pubkey_str,
+                      strlen(state->serialized_pubkey_str),
+                      SW_OK);
     } else {
         SEND_SW(dc, SW_DENY);
     }

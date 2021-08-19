@@ -18,11 +18,10 @@ typedef size_t buffer_snapshot_t;
  * Struct for buffer with size and offset.
  */
 typedef struct {
-    uint8_t *ptr;  /// Pointer to byte buffer
-    size_t size;   /// Size of byte buffer
-    size_t offset; /// Offset in byte buffer
+    uint8_t *ptr;   /// Pointer to byte buffer
+    size_t size;    /// Size of byte buffer
+    size_t offset;  /// Offset in byte buffer
 } buffer_t;
-
 
 /**
  * Tell whether buffer can read bytes or not.
@@ -170,8 +169,8 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
  * @param[in,out]  buffer
  *   Pointer to input buffer struct.
  * @param[out]     out
- *   Pointer to output buffer. It is the responsibility of the caller to make sure that the output buffer
- *   is at least n bytes long.
+ *   Pointer to output buffer. It is the responsibility of the caller to make sure that the output
+ * buffer is at least n bytes long.
  * @param[in]      n
  *   Number of bytes to read from buffer.
  *
@@ -179,7 +178,6 @@ bool buffer_read_bip32_path(buffer_t *buffer, uint32_t *out, size_t out_len);
  *
  */
 bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n);
-
 
 /**
  * Write a uint8_t into a buffer.
@@ -239,7 +237,6 @@ bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness)
  */
 bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness);
 
-
 /**
  * Write a number of bytes to a buffer.
  *
@@ -255,7 +252,6 @@ bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness)
  */
 bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n);
 
-
 /**
  * Creates a buffer pointing at ptr and with the given size; the initial offset is 0.
  *
@@ -268,18 +264,13 @@ bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n);
  *
  */
 static inline buffer_t buffer_create(void *ptr, size_t size) {
-    return (buffer_t) {
-        .ptr = ptr,
-        .size = size,
-        .offset = 0
-    };
+    return (buffer_t){.ptr = ptr, .size = size, .offset = 0};
 }
 
-
 /**
- * Returns a pointer to the current position in the buffer if at least `size` bytes are available in the buffer,
- * or NULL otherwise. On success, the buffer is advanced by `size` bytes.
- * If aligned == true, the returned pointer is 32-bit aligned (adding up to three padding bytes if necessary).
+ * Returns a pointer to the current position in the buffer if at least `size` bytes are available in
+ * the buffer, or NULL otherwise. On success, the buffer is advanced by `size` bytes. If aligned ==
+ * true, the returned pointer is 32-bit aligned (adding up to three padding bytes if necessary).
  */
 void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned);
 

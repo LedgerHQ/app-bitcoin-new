@@ -5,8 +5,8 @@
 /**
  * In this flow, the HWW sends a CCMD_GET_PREIMAGE command with a SHA256 hash.
  * The client must respond with a the preimage (at most 254 bytes), prefixed by its length.
- * The flow fails with SW_WRONG_DATA_LENGTH if the response is too short; it will fail with SW_INCORRECT_DATA
- * if the computed hash does not match.
+ * The flow fails with SW_WRONG_DATA_LENGTH if the response is too short; it will fail with
+ * SW_INCORRECT_DATA if the computed hash does not match.
  *
  * Returns the length of the preimage on success, or a negative number in case of failure.
  */

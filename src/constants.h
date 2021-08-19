@@ -1,11 +1,9 @@
 #pragma once
 
-
 /**
  * Instruction class of the Bitcoin application.
  */
 #define CLA_APP_LEGACY 0xE0
-
 
 /**
  * Instruction class of the Bitcoin application.
@@ -30,7 +28,7 @@
 /**
  * Maximum length of a serialized address (in characters).
  */
-#define MAX_ADDRESS_LENGTH_STR 74 // segwit addresses can reach 74 characters
+#define MAX_ADDRESS_LENGTH_STR 74  // segwit addresses can reach 74 characters
 
 /**
  * Maximum transaction length (bytes).
@@ -47,23 +45,20 @@
  */
 #define EXPONENT_SMALLEST_UNIT 3
 
-
 /**
  * Maximum scriptPubKey length for an input that we can sign.
  */
-#define MAX_PREVOUT_SCRIPTPUBKEY_LEN 34 // P2WSH's scriptPubKeys are the longest supported
+#define MAX_PREVOUT_SCRIPTPUBKEY_LEN 34  // P2WSH's scriptPubKeys are the longest supported
 
 /**
  * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
  */
 #define MAX_WALLET_NAME_LENGTH 16
 
-
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
  */
 #define MAX_SERIALIZED_PUBKEY_LENGTH 113
-
 
 // SIGHASH flags
 #define SIGHASH_ALL          0x00000001

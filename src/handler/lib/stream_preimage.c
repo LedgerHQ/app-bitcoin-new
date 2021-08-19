@@ -6,13 +6,11 @@
 #include "../../crypto.h"
 #include "../client_commands.h"
 
-
 int call_stream_preimage(dispatcher_context_t *dispatcher_context,
                          const uint8_t hash[static 32],
                          void (*len_callback)(size_t, void *),
                          void (*callback)(buffer_t *, void *),
                          void *callback_state) {
-
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     uint8_t cmd = CCMD_GET_PREIMAGE;
@@ -24,17 +22,16 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -1;
     }
 
-    uint64_t preimage_len_u64; // preimage len (including the 0x00 prefix of Merkle tree leaves)
+    uint64_t preimage_len_u64;  // preimage len (including the 0x00 prefix of Merkle tree leaves)
 
     uint8_t partial_data_len;
 
-    if (   !buffer_read_varint(&dispatcher_context->read_buffer, &preimage_len_u64)
-        || !buffer_read_u8(&dispatcher_context->read_buffer, &partial_data_len)
-        || !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len))
-    {
+    if (!buffer_read_varint(&dispatcher_context->read_buffer, &preimage_len_u64) ||
+        !buffer_read_u8(&dispatcher_context->read_buffer, &partial_data_len) ||
+        !buffer_can_read(&dispatcher_context->read_buffer, partial_data_len)) {
         return -2;
     }
-    uint32_t preimage_len = (uint32_t)preimage_len_u64;
+    uint32_t preimage_len = (uint32_t) preimage_len_u64;
 
     if (preimage_len < 1) {
         // at least the initial 0x00 prefix should be there
@@ -49,8 +46,8 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         len_callback(preimage_len - 1, callback_state);
     }
 
-    uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
-
+    uint8_t *data_ptr =
+        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
@@ -58,24 +55,26 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
     crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
 
     // call callback with data
-    buffer_t initial_buf = buffer_create(data_ptr + 1, partial_data_len - 1); // skip 0x00 prefix
+    buffer_t initial_buf = buffer_create(data_ptr + 1, partial_data_len - 1);  // skip 0x00 prefix
     callback(&initial_buf, callback_state);
 
-    size_t bytes_remaining = (size_t)preimage_len - partial_data_len;
+    size_t bytes_remaining = (size_t) preimage_len - partial_data_len;
 
     while (bytes_remaining > 0) {
-        uint8_t get_more_elements_req[] = { CCMD_GET_MORE_ELEMENTS };
-        SET_RESPONSE(dispatcher_context, get_more_elements_req, sizeof(get_more_elements_req), SW_INTERRUPTED_EXECUTION);
+        uint8_t get_more_elements_req[] = {CCMD_GET_MORE_ELEMENTS};
+        SET_RESPONSE(dispatcher_context,
+                     get_more_elements_req,
+                     sizeof(get_more_elements_req),
+                     SW_INTERRUPTED_EXECUTION);
         if (dispatcher_context->process_interruption(dispatcher_context) < 0) {
             return -5;
         }
 
         // Parse response to CCMD_GET_MORE_ELEMENTS
         uint8_t n_bytes, elements_len;
-        if (!buffer_read_u8(&dispatcher_context->read_buffer, &n_bytes)
-            || !buffer_read_u8(&dispatcher_context->read_buffer, &elements_len)
-            || !buffer_can_read(&dispatcher_context->read_buffer, (size_t)n_bytes * elements_len))
-        {
+        if (!buffer_read_u8(&dispatcher_context->read_buffer, &n_bytes) ||
+            !buffer_read_u8(&dispatcher_context->read_buffer, &elements_len) ||
+            !buffer_can_read(&dispatcher_context->read_buffer, (size_t) n_bytes * elements_len)) {
             return -6;
         }
 
@@ -89,7 +88,8 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
             return -8;
         }
 
-        uint8_t *data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        uint8_t *data_ptr =
+            dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);
@@ -110,7 +110,5 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
         return -9;
     }
 
-    return (int)preimage_len - 1;
+    return (int) preimage_len - 1;
 }
-
-

@@ -10,16 +10,22 @@ int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
                                     uint32_t leaf_index,
                                     void (*len_callback)(size_t, void *),
                                     void (*callback)(buffer_t *, void *),
-                                    void *callback_state)
-{
-
+                                    void *callback_state) {
     LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
     uint8_t leaf_hash[32];
-    int res = call_get_merkle_leaf_hash(dispatcher_context, merkle_root, tree_size, leaf_index, leaf_hash);
+    int res = call_get_merkle_leaf_hash(dispatcher_context,
+                                        merkle_root,
+                                        tree_size,
+                                        leaf_index,
+                                        leaf_hash);
     if (res < 0) {
         return -1;
     }
 
-    return call_stream_preimage(dispatcher_context, leaf_hash, len_callback, callback, callback_state);
+    return call_stream_preimage(dispatcher_context,
+                                leaf_hash,
+                                len_callback,
+                                callback,
+                                callback_state);
 }

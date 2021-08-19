@@ -3,7 +3,6 @@
 #include "../boilerplate/dispatcher.h"
 #include "../common/merkle.h"
 
-
 #define MAX_N_INPUTS_CAN_SIGN 32
 
 typedef struct {
@@ -14,10 +13,12 @@ typedef struct {
     bool has_sighash_type;
 
     bool has_bip32_derivation;
-    uint8_t bip32_derivation_pubkey[33]; // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error; // set to true if the pubkey in the keydata of PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t
+        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
+    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
+                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
 
-    uint64_t prevout_amount;     // the value of the prevout of the current input
+    uint64_t prevout_amount;  // the value of the prevout of the current input
 
     uint8_t prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int prevout_scriptpubkey_len;
@@ -32,8 +33,10 @@ typedef struct {
     merkleized_map_commitment_t map;
 
     bool has_bip32_derivation;
-    uint8_t bip32_derivation_pubkey[33]; // the pubkey of the first PSBT_OUT_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error; // set to true if the pubkey in the keydata of PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t
+        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION seen key
+    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
+                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
 
     uint64_t value;
     uint8_t scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
@@ -41,11 +44,10 @@ typedef struct {
 
 } cur_output_info_t;
 
-
 typedef struct {
     machine_context_t ctx;
 
-    merkleized_map_commitment_t global_map; // 48 bytes
+    merkleized_map_commitment_t global_map;  // 48 bytes
 
     uint32_t tx_version;
     uint32_t locktime;
@@ -53,11 +55,11 @@ typedef struct {
     int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
     int n_outputs;
-    uint8_t outputs_root[32]; // merkle root of the vector of output maps commitments
+    uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
     bool is_wallet_canonical;
-    int address_type;         // only relevant for canonical wallets
-    int bip44_purpose;        // only relevant for canonical wallets
+    int address_type;   // only relevant for canonical wallets
+    int bip44_purpose;  // only relevant for canonical wallets
 
     uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
@@ -68,7 +70,7 @@ typedef struct {
 
     uint32_t master_key_fingerprint;
 
-    uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN]; // TODO: use a bitvector
+    uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN];  // TODO: use a bitvector
 
     bool has_external_inputs;
 
@@ -92,12 +94,11 @@ typedef struct {
 
     uint64_t change_outputs_total_value;
 
-    int external_outputs_count; // count of external outputs that are shown to the user
-    int change_count;           // count of outputs compatible with change outputs
+    int external_outputs_count;  // count of external outputs that are shown to the user
+    int change_count;            // count of outputs compatible with change outputs
 
     int our_key_derivation_length;
     uint32_t our_key_derivation[MAX_BIP32_PATH_STEPS];
 } sign_psbt_state_t;
-
 
 void handler_sign_psbt(dispatcher_context_t *dispatcher_context);

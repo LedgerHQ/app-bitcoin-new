@@ -36,16 +36,14 @@
 #include "get_wallet_address.h"
 #include "client_commands.h"
 
-
 extern global_context_t *G_coin_config;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
-
 void handler_get_wallet_address(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -53,10 +51,9 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    if (   !buffer_read_u8(&dc->read_buffer, &state->display_address)
-        || !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32)
-        || !buffer_read_bytes(&dc->read_buffer, state->wallet_hmac, 32))
-    {
+    if (!buffer_read_u8(&dc->read_buffer, &state->display_address) ||
+        !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32) ||
+        !buffer_read_bytes(&dc->read_buffer, state->wallet_hmac, 32)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
@@ -87,7 +84,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    buffer_t serialized_wallet_policy_buf = buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
+    buffer_t serialized_wallet_policy_buf =
+        buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
     if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -98,14 +96,18 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
            sizeof(state->wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = state->wallet_header.n_keys;
 
-    buffer_t policy_map_buffer = buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    buffer_t policy_map_buffer =
+        buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
 
-    if (parse_policy_map(&policy_map_buffer, state->wallet_policy_map_bytes, sizeof(state->wallet_policy_map_bytes)) < 0) {
+    if (parse_policy_map(&policy_map_buffer,
+                         state->wallet_policy_map_bytes,
+                         sizeof(state->wallet_policy_map_bytes)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    uint8_t hmac_or = 0; // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+    uint8_t hmac_or =
+        0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
     for (int i = 0; i < 32; i++) {
         hmac_or = hmac_or | state->wallet_hmac[i];
     }
@@ -136,12 +138,14 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
     if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA); // TODO: more specific error code
+        SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific error code
         return;
     }
 
-    // TODO: for canonical wallets, we should check that there is only one key and its path is also canonical,
-    //       (matching the expected path based on the address type provided above), account index not too large.
+    // TODO: for canonical wallets, we should check that there is only one key and its path is also
+    // canonical,
+    //       (matching the expected path based on the address type provided above), account index
+    //       not too large.
 
     buffer_t script_buf = buffer_create(state->script, sizeof(state->script));
 
@@ -154,14 +158,18 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
                                             &script_buf,
                                             NULL);
     if (script_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE); // unexpected
+        SEND_SW(dc, SW_BAD_STATE);  // unexpected
         return;
     }
 
-    state->address_len = get_script_address(state->script, script_len, G_coin_config, state->address, sizeof(state->address));
+    state->address_len = get_script_address(state->script,
+                                            script_len,
+                                            G_coin_config,
+                                            state->address,
+                                            sizeof(state->address));
 
     if (state->address_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE); // unexpected
+        SEND_SW(dc, SW_BAD_STATE);  // unexpected
         return;
     }
 
@@ -176,9 +184,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     }
 }
 
-
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *)&G_command_state;
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 

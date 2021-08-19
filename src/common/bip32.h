@@ -4,13 +4,11 @@
 #include <stdint.h>   // uint*_t
 #include <stdbool.h>  // bool
 
-
 /**
  * Maximum length of BIP32 path allowed.
  * Note: BIP32 allows up to 256 derivation steps - but generally only 5 are used.
  */
 #define MAX_BIP32_PATH_STEPS 6
-
 
 /**
  * Maximum length of a string representing a BIP32 derivation path.
@@ -20,18 +18,18 @@
 #define MAX_SERIALIZED_BIP32_PATH_LENGTH (12 * MAX_BIP32_PATH_STEPS)
 
 /**
- * Index of first hardened child according to BIP32; it can also be used as the bitmask for hardened children.
+ * Index of first hardened child according to BIP32; it can also be used as the bitmask for hardened
+ * children.
  */
 #define BIP32_FIRST_HARDENED_CHILD 0x80000000
 
-#define BIP44_PURPOSE_OFFSET 0
-#define BIP44_COIN_TYPE_OFFSET 1
-#define BIP44_ACCOUNT_OFFSET 2
-#define BIP44_CHANGE_OFFSET 3
-#define BIP44_ADDRESS_INDEX_OFFSET 4
-#define MAX_BIP44_ACCOUNT_RECOMMENDED 100
+#define BIP44_PURPOSE_OFFSET                0
+#define BIP44_COIN_TYPE_OFFSET              1
+#define BIP44_ACCOUNT_OFFSET                2
+#define BIP44_CHANGE_OFFSET                 3
+#define BIP44_ADDRESS_INDEX_OFFSET          4
+#define MAX_BIP44_ACCOUNT_RECOMMENDED       100
 #define MAX_BIP44_ADDRESS_INDEX_RECOMMENDED 50000
-
 
 /**
  * Read BIP32 path from byte buffer.
@@ -49,7 +47,6 @@
  *
  */
 bool bip32_path_read(const uint8_t *in, size_t in_len, uint32_t *out, size_t out_len);
-
 
 /**
  * Format BIP32 path as string.
@@ -71,12 +68,11 @@ bool bip32_path_format(const uint32_t *bip32_path,
                        char *out,
                        size_t out_len);
 
-
 /**
- * Verifies if a given path is standard according to BIP44 or derived standards, and it is reasonable to export
- * its pubkey. Should not export paths that are too short to specify the coin type (it would expose other
- * coins' keys), but also not deeper than the standard account number (third level of derivation), since no
- * standard currently defines deeper hardened derivations.
+ * Verifies if a given path is standard according to BIP44 or derived standards, and it is
+ * reasonable to export its pubkey. Should not export paths that are too short to specify the coin
+ * type (it would expose other coins' keys), but also not deeper than the standard account number
+ * (third level of derivation), since no standard currently defines deeper hardened derivations.
  *
  * Returns false if any of the following conditions is not satisfied by the given bip32_path:
  * - the bip32_path has 2 or 3 steps;
@@ -110,7 +106,8 @@ bool is_pubkey_path_standard(const uint32_t *bip32_path,
                              size_t expected_coin_types_len);
 
 /**
- * Verifies if a given path is standard according to the BIP44 or derived standards for the derivation path for an address.
+ * Verifies if a given path is standard according to the BIP44 or derived standards for the
+ * derivation path for an address.
  *
  * Returns false if any of the following conditions is not satisfied by the given bip32_path:
  * - the bip32_path has exactly 5 elements;

@@ -6,9 +6,9 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-
 #include "../src/crypto.h"
 
+// clang-format off
 // HACK: define empty functions for the expected imports in cx.h and os.h.
 int cx_ecfp_generate_pair ( cx_curve_t curve, cx_ecfp_public_key_t * pubkey, cx_ecfp_private_key_t * privkey, int keepprivate ){return 0;}
 int cx_hash_sha256 ( const unsigned char * in, unsigned int len, unsigned char * out, unsigned int out_len ){return 0;}
@@ -17,9 +17,6 @@ int cx_ecfp_init_private_key ( cx_curve_t curve, const unsigned char * rawkey, u
 int cx_ripemd160_init ( cx_ripemd160_t * hash ){return 0;}
 void os_memmove(void * dst, const void * src, unsigned int length){}
 void os_perso_derive_node_bip32 ( cx_curve_t curve, const unsigned int * path, unsigned int pathLength, unsigned char * privateKey, unsigned char * chain ){}
-
-
-// system calls to mock (or disable)
 
 const uint8_t uncompressed_key_02[] = {
     0x04,
@@ -42,7 +39,6 @@ const uint8_t uncompressed_key_03[] = {
     0x1d,0x5e,0x56,0x4f,0xc5,0x1b,0x4f,0xb9,0x1a,0x83,0x67,0x73,0x3b,0x97,0xc7,0x6a,
     0x5c,0x99,0x70,0x5d,0x7e,0x99,0x12,0x59,0xb7,0x9d,0x8c,0xa3,0x65,0x35,0x09,0xcb // odd
 };
-
 const uint8_t compressed_key_03[] = {
     0x03,
     0xdf,0x94,0x6e,0x0b,0x3f,0x6a,0xd7,0xf3,0x55,0x6b,0x53,0x71,0x62,0xf3,0x9f,0x07,
@@ -57,7 +53,7 @@ const uint8_t uncompressed_key_invalid[] = {
     0x1d,0x5e,0x56,0x4f,0xc5,0x1b,0x4f,0xb9,0x1a,0x83,0x67,0x73,0x3b,0x97,0xc7,0x6a,
     0x5c,0x99,0x70,0x5d,0x7e,0x99,0x12,0x59,0xb7,0x9d,0x8c,0xa3,0x65,0x35,0x09,0xcb // odd
 };
-
+// clang-format on
 
 static void test_get_compressed_pubkey_02(void **state) {
     (void) state;
@@ -108,14 +104,11 @@ static void test_get_compressed_pubkey_invalid(void **state) {
     assert_int_equal(ret, -1);
 }
 
-
 int main() {
-    const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_get_compressed_pubkey_02),
-        cmocka_unit_test(test_get_compressed_pubkey_03),
-        cmocka_unit_test(test_get_compressed_pubkey_in_place),
-        cmocka_unit_test(test_get_compressed_pubkey_invalid)
-    };
+    const struct CMUnitTest tests[] = {cmocka_unit_test(test_get_compressed_pubkey_02),
+                                       cmocka_unit_test(test_get_compressed_pubkey_03),
+                                       cmocka_unit_test(test_get_compressed_pubkey_in_place),
+                                       cmocka_unit_test(test_get_compressed_pubkey_invalid)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

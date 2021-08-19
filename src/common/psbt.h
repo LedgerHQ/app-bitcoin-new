@@ -1,5 +1,7 @@
 #pragma once
 
+// clang-format off
+
 enum PsbtGlobalType {
 	PSBT_GLOBAL_UNSIGNED_TX           = 0x00,
 	PSBT_GLOBAL_XPUB                  = 0x01,

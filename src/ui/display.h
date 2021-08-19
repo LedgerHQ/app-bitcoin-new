@@ -44,10 +44,13 @@ void ui_display_wallet_address(dispatcher_context_t *context,
                                char *address,
                                action_validate_cb callback);
 
-void ui_display_unusual_path(dispatcher_context_t *context, char *path_str, action_validate_cb callback);
+void ui_display_unusual_path(dispatcher_context_t *context,
+                             char *path_str,
+                             action_validate_cb callback);
 
-
-void ui_authorize_wallet_spend(dispatcher_context_t *context, char *wallet_name, action_validate_cb callback);
+void ui_authorize_wallet_spend(dispatcher_context_t *context,
+                               char *wallet_name,
+                               action_validate_cb callback);
 
 void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb callback);
 

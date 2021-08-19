@@ -36,7 +36,6 @@ TODO: simplify buffer functions.
 // - peek the next byte
 // - buffer_read_char for convenience
 
-
 bool buffer_can_read(const buffer_t *buffer, size_t n) {
     return buffer->size - buffer->offset >= n;
 }
@@ -168,7 +167,7 @@ bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n) {
     return true;
 }
 
-// TODO: unit tests for the buffer_write_* functions 
+// TODO: unit tests for the buffer_write_* functions
 bool buffer_write_u8(buffer_t *buffer, uint8_t value) {
     if (!buffer_can_read(buffer, 1)) {
         return false;
@@ -241,7 +240,7 @@ void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
     size_t padding_size = 0;
 
     if (aligned) {
-        uint32_t d = (uint32_t)(buffer->ptr + buffer->offset) % 4;
+        uint32_t d = (uint32_t) (buffer->ptr + buffer->offset) % 4;
         if (d != 0) {
             padding_size = 4 - d;
         }
@@ -251,7 +250,7 @@ void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
         return NULL;
     }
 
-    void *result = buffer->ptr + buffer->offset + padding_size; 
+    void *result = buffer->ptr + buffer->offset + padding_size;
     buffer_seek_cur(buffer, padding_size + size);
     return result;
 }

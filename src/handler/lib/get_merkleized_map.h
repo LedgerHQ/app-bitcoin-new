@@ -3,7 +3,6 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
 
-
 /**
  * TODO: docs
  */
@@ -21,8 +20,7 @@ static inline int call_get_merkleized_map(dispatcher_context_t *dispatcher_conte
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,
-                                          merkleized_map_commitment_t *out_ptr)
-{
+                                          merkleized_map_commitment_t *out_ptr) {
     return call_get_merkleized_map_with_callback(dispatcher_context,
                                                  root,
                                                  size,

@@ -5,9 +5,7 @@
 #include "../common/wallet.h"
 #include "../boilerplate/dispatcher.h"
 
-
 #include "lib/get_merkle_leaf_element.h"
-
 
 typedef struct {
     machine_context_t ctx;

@@ -37,5 +37,3 @@ extern global_context_t *G_coin_config;
  * State of the current APDU interaction, if any.
  */
 extern command_state_t G_command_state;
-
-

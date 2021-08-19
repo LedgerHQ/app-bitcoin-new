@@ -1,3 +1,5 @@
+// clang-format off
+
 /* Copyright (c) 2017, 2021 Pieter Wuille
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy

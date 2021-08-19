@@ -28,7 +28,6 @@ typedef struct {
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
 
-
     uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
     union {
@@ -39,8 +38,7 @@ typedef struct {
     uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
     int address_len;
-    char address[MAX_ADDRESS_LENGTH_STR + 1]; // null-terminated string
+    char address[MAX_ADDRESS_LENGTH_STR + 1];  // null-terminated string
 } get_wallet_address_state_t;
-
 
 void handler_get_wallet_address(dispatcher_context_t *dispatcher_context);

@@ -4,9 +4,9 @@
 #include "../../common/merkle.h"
 
 /**
- * This flow obtains and streams to the callback the preimage of a leaf of a Merkle tree, specified by its index.
- * If len_callback is not NONE, it is called before the other callback with the length of the preimage
- * (not including the 0x00 prefix).
+ * This flow obtains and streams to the callback the preimage of a leaf of a Merkle tree, specified
+ * by its index. If len_callback is not NONE, it is called before the other callback with the length
+ * of the preimage (not including the 0x00 prefix).
  *
  * Returns a nagative number on failure, or the preimage length on success.
  */

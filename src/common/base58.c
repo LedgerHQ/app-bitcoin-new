@@ -76,9 +76,9 @@ int base58_decode(const char *in, size_t in_len, uint8_t *out, size_t out_len) {
     while (start_at < in_len) {
         uint16_t remainder = 0;
         for (uint8_t div_loop = start_at; div_loop < in_len; div_loop++) {
-            uint16_t digit256 = (uint16_t)(tmp[div_loop] & 0xFF);
+            uint16_t digit256 = (uint16_t) (tmp[div_loop] & 0xFF);
             uint16_t tmp_div = remainder * 58 + digit256;
-            tmp[div_loop] = (uint8_t)(tmp_div / 256);
+            tmp[div_loop] = (uint8_t) (tmp_div / 256);
             remainder = tmp_div % 256;
         }
 
