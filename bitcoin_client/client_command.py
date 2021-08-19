@@ -81,7 +81,7 @@ class GetPreimageCommand(ClientCommand):
         raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
 
 
-class GetMerkleLeafHashCommand(ClientCommand):
+class GetMerkleLeafProofCommand(ClientCommand):
     def __init__(self, known_trees: Mapping[bytes, MerkleTree], queue: "deque[bytes]"):
         self.queue = queue
         self.known_trees = known_trees
@@ -208,7 +208,7 @@ class ClientCommandInterpreter:
     Moreover, it containes the state that is relevant for the interpreted client side commands:
     - a queue of bytes that contains any bytes that could not fit in a response from the
       GET_PREIMAGE client command (when a preimage is too long to fit in a single message) or the
-      GET_MERKLE_LEAF_HASH command (which returns a Merkle proof, which might be too long to fit
+      GET_MERKLE_LEAF_PROOF command (which returns a Merkle proof, which might be too long to fit
       in a single message). The data in the queue is returned in one (or more) successive
       GET_MORE_ELEMENTS commands from the hardware wallet.
 
@@ -234,7 +234,7 @@ class ClientCommandInterpreter:
             YieldCommand(self.yielded),
             GetPreimageCommand(self.known_preimages, queue),
             GetMerkleLeafIndexCommand(self.known_trees),
-            GetMerkleLeafHashCommand(self.known_trees, queue),
+            GetMerkleLeafProofCommand(self.known_trees, queue),
             GetMoreElementsCommand(queue),
         ]
 
@@ -292,7 +292,7 @@ class ClientCommandInterpreter:
 
         If `el` is one of `elements`, the client must respond with b'\0' + `el` when a GET_PREIMAGE
         client command is sent with `sha256(b'\0' + el)`.
-        Moreover, the commands GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_HASH must correctly answer
+        Moreover, the commands GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_PROOF must correctly answer
         queries relative to the Merkle whose root is `mt_root`.
 
         Parameters
