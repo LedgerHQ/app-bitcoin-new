@@ -589,8 +589,6 @@ DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=4 IO_HID_EP_LENGTH=
 DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
 DEFINES   += HAVE_UX_FLOW
 
-DEFINES   += HAVE_WEBUSB WEBUSB_URL_SIZE_B=0 WEBUSB_URL=""
-
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += APPVERSION=\"$(APPVERSION)\"
 
@@ -603,7 +601,6 @@ ifeq ($(TARGET_NAME),TARGET_NANOX)
 DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
 DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
 
-DEFINES       += HAVE_GLO096
 DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
 DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
 DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
@@ -675,13 +672,13 @@ ifeq ($(TARGET_NAME),TARGET_NANOX)
 endif
 
 load: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
 
 load-offline: all
-	python -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
+	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
 
 delete:
-	python -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
+	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
 
 include $(BOLOS_SDK)/Makefile.rules
 
