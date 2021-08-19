@@ -199,11 +199,32 @@ class GetMoreElementsCommand(ClientCommand):
 
 
 class ClientCommandInterpreter:
-    # TODO: should we enable a constructor to only pass a subset of the commands?
+    """Interpreter for the client-side commands.
+
+    This class keeps has methods to keep track of:
+    - known preimages
+    - known Merkle trees from lists of elements
+
+    Moreover, it containes the state that is relevant for the interpreted client side commands:
+    - a queue of bytes that contains any bytes that could not fit in a response from the
+      GET_PREIMAGE client command (when a preimage is too long to fit in a single message) or the
+      GET_MERKLE_LEAF_HASH command (which returns a Merkle proof, which might be too long to fit
+      in a single message). The data in the queue is returned in one (or more) successive
+      GET_MORE_ELEMENTS commands from the hardware wallet.
+
+    Finally, it keeps track of the yielded values (that is, the values sent from the hardware
+    wallet with a YIELD client command).
+
+    Attributes
+    ----------
+    yielded: list[bytes]
+        A list of all the value sent by the Hardware Wallet with a YIELD client command during thw
+        processing of an APDU.
+    """
+
     def __init__(self):
         self.known_preimages: Mapping[bytes, bytes] = {}
         self.known_trees: Mapping[bytes, MerkleTree] = {}
-        self.known_keylists: Mapping[bytes, List[str]] = {}
 
         self.yielded: List[bytes] = []
 
@@ -220,6 +241,21 @@ class ClientCommandInterpreter:
         self.commands = {cmd.code: cmd for cmd in commands}
 
     def execute(self, hw_response: bytes) -> bytes:
+        """Interprets the client command requested by the hardware wallet, returning the appropriet
+        response and updating the client interpreter's internal state if appropriate.
+
+        Parameters
+        ----------
+        hw_response : bytes
+            The data content of the SW_INTERRUPTED_EXECUTION sent by the hardware wallet.
+
+        Returns
+        -------
+        bytes
+            The result of the execution of the appropriate client side command, containing the response
+            to be sent via INS_CONTINUE.
+        """
+
         if len(hw_response) == 0:
             raise RuntimeError(
                 "Unexpected empty SW_INTERRUPTED_EXECUTION response from hardware wallet."
@@ -229,14 +265,42 @@ class ClientCommandInterpreter:
         if cmd_code not in self.commands:
             raise RuntimeError(
                 "Unexpected command code: 0x{:02X}".format(cmd_code)
-            )  # TODO: more precise Error type
+            )
 
         return self.commands[cmd_code].execute(hw_response)
 
-    def add_known_preimage(self, element: bytes):
+    def add_known_preimage(self, element: bytes) -> None:
+        """Adds a preimage to the list of known preimages.
+
+        The client must respond with `element` when a GET_PREIMAGE command is sent with
+        `sha256(element)` in its request.
+
+        Parameters
+        ----------
+        element : bytes
+            An array of bytes whose preimage must be known to the client during an APDU execution.
+        """
+
         self.known_preimages[sha256(element)] = element
 
-    def add_known_list(self, elements: List[bytes]):
+    def add_known_list(self, elements: List[bytes]) -> None:
+        """Adds a known Merkleized list.
+
+        Builds the Merkle tree of `elements`, and adds it to the Merkle trees known to the client
+        (mapped by Merkle root `mt_root`).
+        moreover, adds all the leafs (after adding the b'\0' prefix) to the list of known preimages.
+
+        If `el` is one of `elements`, the client must respond with b'\0' + `el` when a GET_PREIMAGE
+        client command is sent with `sha256(b'\0' + el)`.
+        Moreover, the commands GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_HASH must correctly answer
+        queries relative to the Merkle whose root is `mt_root`.
+
+        Parameters
+        ----------
+        elements : List[bytes]
+            A list of `bytes` corresponding to the leafs of the Merkle tree.
+        """
+
         for el in elements:
             self.add_known_preimage(b"\x00" + el)
 
@@ -244,14 +308,19 @@ class ClientCommandInterpreter:
 
         self.known_trees[mt.root] = mt
 
-    def add_known_pubkey_list(self, keys_info: List[str]):
-        elements_encoded = [key_info.encode() for key_info in keys_info]
-        self.add_known_list(elements_encoded)
+    def add_known_mapping(self, mapping: Mapping[bytes, bytes]) -> None:
+        """Adds the Merkle trees of keys, and the Merkle tree of values (ordered by key)
+        of a mapping of bytes to bytes.
 
-        mt = MerkleTree(element_hash(el) for el in elements_encoded)
-        self.known_keylists[mt.root] = keys_info
+        Adds the Merkle tree of the list of keys, and the Merkle tree of the list of corresponding
+        values, with the same semantics as the `add_known_list` applied separately to the two lists. 
 
-    def add_known_mapping(self, mapping: Mapping[bytes, bytes]):
+        Parameters
+        ----------
+        mapping : Mapping[bytes, bytes]
+            A mapping whose keys and values are `bytes`.
+        """
+
         items_sorted = list(sorted(mapping.items()))
 
         keys = [i[0] for i in items_sorted]

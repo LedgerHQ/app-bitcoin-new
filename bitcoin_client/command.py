@@ -127,7 +127,7 @@ class BitcoinCommand:
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_preimage(wallet.serialize())
-        client_intepreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
 
         sw, response = self.make_request(
             self.builder.register_wallet(wallet), client_intepreter
@@ -161,7 +161,7 @@ class BitcoinCommand:
             raise ValueError("Invalid change")
 
         client_intepreter = ClientCommandInterpreter()
-        client_intepreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
         sw, response = self.make_request(
@@ -192,7 +192,7 @@ class BitcoinCommand:
         assert f.read(5) == b"psbt\xff"
 
         client_intepreter = ClientCommandInterpreter()
-        client_intepreter.add_known_pubkey_list(wallet.keys_info)
+        client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
