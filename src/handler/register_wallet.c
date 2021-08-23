@@ -28,8 +28,8 @@
 #include "../common/wallet.h"
 #include "../common/write.h"
 
+#include "../commands.h"
 #include "../constants.h"
-#include "../types.h"
 #include "../crypto.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"

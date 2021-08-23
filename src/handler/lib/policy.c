@@ -6,7 +6,6 @@
 #include "../../crypto.h"
 #include "../../common/base58.h"
 #include "../../common/segwit_addr.h"
-#include "../../types.h"
 
 /**
  * Convenience structure to optimize the size of parameters passed to a recursive function.

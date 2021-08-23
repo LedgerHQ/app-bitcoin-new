@@ -5,7 +5,6 @@
 #include "ux.h"
 #include "os_io_seproxyhal.h"
 
-#include "types.h"
 #include "common/buffer.h"
 
 void io_seproxyhal_display(const bagl_element_t *element);
@@ -21,7 +20,6 @@ uint8_t io_event(uint8_t channel);
 
 uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len);
 
-
 /**
  * TODO: docs
  */
@@ -36,7 +34,6 @@ void io_add_to_response(const void *rdata, size_t rdata_len);
  * TODO: docs
  */
 void io_finalize_response(uint16_t sw);
-
 
 /* TODO: docs */
 void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw);

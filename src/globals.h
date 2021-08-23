@@ -5,8 +5,9 @@
 #include "ux.h"
 
 #include "boilerplate/io.h"
-#include "types.h"
+#include "commands.h"
 #include "constants.h"
+#include "context.h"
 
 /**
  * Global buffer for interactions between SE and MCU.

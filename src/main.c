@@ -25,7 +25,6 @@
 
 #include "cx_ram.h"
 
-#include "types.h"
 #include "globals.h"
 #include "io.h"
 #include "sw.h"

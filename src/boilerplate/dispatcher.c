@@ -23,7 +23,6 @@
 #include "globals.h"
 #include "io.h"
 #include "sw.h"
-#include "types.h"
 
 #include "common/buffer.h"
 
