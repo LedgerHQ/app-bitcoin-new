@@ -37,6 +37,7 @@ typedef struct {
 
 /**
  * Derive private key given BIP32 path.
+ * It must be wrapped in a TRY block that wipes the output private key in the FINALLY block.
  *
  * @param[out] private_key
  *   Pointer to private key.
@@ -93,34 +94,6 @@ int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
                  serialized_extended_pubkey_t *child);
-
-/**
- * Computes the signature of a previously computed sha256 hash as input.
- * The key used to sign is the master key, and the nonce is chosen deterministically as per RFC6979.
- *
- * @param[in] in
- *   Pointer to input data.
- * @param[out] out
- *   Pointer to the output array, which must be at least 72 bytes long.
- *
- * @return the length of the resulting signature on success; returns -1 on failure.
- */
-int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]);
-
-/**
- * Verifies the a signature of some sha256-hashed data.
- * The key used to sign is the master public key.
- *
- * @param[in] hash
- *   Pointer to the 32-byte sha256 hash of the signed message.
- * @param[in] sig
- *   Pointer to the signature.
- * @param[in] sig_len
- *   Length of the signature
- *
- * @return true if the signature is valid, false otherwise.
- */
-bool crypto_verify_sha256_hash(const uint8_t hash[static 32], uint8_t sig[], size_t sig_len);
 
 /**
  * Convenience wrapper for cx_hash to add some data to an intialized hash context.
@@ -344,6 +317,7 @@ size_t get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.
+ * Must be wrapped in a TRY/FINALLY block to make sure that the output key is wiped after using it.
  *
  * @param[in]  label
  *   Pointer to the label. The first byte of the label must be 0x00 to comply with SLIP-0021.

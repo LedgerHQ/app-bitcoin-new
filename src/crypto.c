@@ -74,31 +74,27 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t bip32_path_len) {
     uint8_t raw_private_key[32] = {0};
 
-    // TODO: disabled exception handling, as it breaks with CMocha. Once the sdk is updated,
-    //       there will be versions of the cx.h functions that do not throw exceptions.
-    //       NOTE: the current version is insecure as it might not wipe the private key after usage!
+    BEGIN_TRY {
+        TRY {
+            // derive the seed with bip32_path
 
-    // BEGIN_TRY {
-    //     TRY {
-    // derive the seed with bip32_path
+            os_perso_derive_node_bip32(CX_CURVE_256K1,
+                                       bip32_path,
+                                       bip32_path_len,
+                                       raw_private_key,
+                                       chain_code);
 
-    os_perso_derive_node_bip32(CX_CURVE_256K1,
-                               bip32_path,
-                               bip32_path_len,
-                               raw_private_key,
-                               chain_code);
-
-    // new private_key from raw
-    cx_ecfp_init_private_key(CX_CURVE_256K1, raw_private_key, sizeof(raw_private_key), private_key);
-    // }
-    // CATCH_OTHER(e) {
-    //     THROW(e);
-    // }
-    // FINALLY {
-    explicit_bzero(&raw_private_key, sizeof(raw_private_key));
-    //     }
-    // }
-    // END_TRY;
+            // new private_key from raw
+            cx_ecfp_init_private_key(CX_CURVE_256K1,
+                                     raw_private_key,
+                                     sizeof(raw_private_key),
+                                     private_key);
+        }
+        FINALLY {
+            explicit_bzero(&raw_private_key, sizeof(raw_private_key));
+        }
+    }
+    END_TRY;
 
     return 0;
 }
@@ -180,52 +176,6 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     crypto_get_compressed_pubkey(child_uncompressed_pubkey, child->compressed_pubkey);
 
     return 0;
-}
-
-int crypto_sign_sha256_hash(const uint8_t in[static 32], uint8_t out[static MAX_DER_SIG_LEN]) {
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t chain_code[32] = {0};
-    uint32_t info = 0;
-
-    // derive private key according to BIP32 path
-    // TODO: should we sign with a specific path? e.g. reserve m/0xC0FF33'/... for all internal
-    // keys.
-    const uint32_t root_path[] = {};
-    crypto_derive_private_key(&private_key, chain_code, root_path, 0);
-
-    int sig_len = 0;
-    BEGIN_TRY {
-        TRY {
-            sig_len = cx_ecdsa_sign(&private_key,
-                                    CX_RND_RFC6979,
-                                    CX_SHA256,
-                                    in,
-                                    32,
-                                    out,
-                                    MAX_DER_SIG_LEN,
-                                    &info);
-        }
-        CATCH_OTHER(e) {
-            return -1;
-        }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
-
-    return sig_len;
-}
-
-bool crypto_verify_sha256_hash(const uint8_t hash[static 32], uint8_t sig[], size_t sig_len) {
-    uint8_t raw_public_key[65];
-    cx_ecfp_public_key_t public_key;
-
-    crypto_get_compressed_pubkey_at_path(NULL, 0, raw_public_key, NULL);
-    crypto_get_uncompressed_pubkey(raw_public_key, raw_public_key);
-    cx_ecfp_init_public_key(CX_CURVE_SECP256K1, raw_public_key, 65, &public_key);
-
-    return cx_ecdsa_verify(&public_key, 0, CX_SHA256, hash, 32, sig, sig_len) == 1;
 }
 
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
@@ -332,9 +282,10 @@ uint32_t crypto_get_master_key_fingerprint() {
 }
 
 void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]) {
-    // TODO: should wrap in try/catch?
-
-    // TODO: find a better way
+    // TODO: is there a better way?
+    //       The label is a byte string in SLIP-0021, but os_perso_derive_node_with_seed_key
+    //       accesses the `path` argument as an array of uint32_t, causing a device freeze if memory
+    //       is not aligned.
     uint8_t label_copy[32] __attribute__((aligned(4)));
 
     memcpy(label_copy, label, label_len);

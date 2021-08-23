@@ -162,12 +162,21 @@ static int get_address_at_path(const uint32_t bip32_path[],
     } keydata;
 
     keydata.prefix = 0x04;
-    // derive private key according to BIP32 path
-    crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
-    // generate corresponding public key
-    crypto_init_public_key(&private_key, &public_key, keydata.raw_public_key);
-    // reset private key
-    explicit_bzero(&private_key, sizeof(private_key));
+
+    BEGIN_TRY {
+        TRY {
+            // derive private key according to BIP32 path
+            crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
+            // generate corresponding public key
+            crypto_init_public_key(&private_key, &public_key, keydata.raw_public_key);
+        }
+        FINALLY {
+            // reset private key
+            explicit_bzero(&private_key, sizeof(private_key));
+        }
+    }
+    END_TRY;
+
     // compute compressed public key (in-place)
     crypto_get_compressed_pubkey((uint8_t *) &keydata, (uint8_t *) &keydata);
 

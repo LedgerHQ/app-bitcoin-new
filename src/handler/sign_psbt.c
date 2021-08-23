@@ -1587,13 +1587,12 @@ static void sign_sighash(dispatcher_context_t *dc) {
 
     int sign_path_len = state->our_key_derivation_length + 2;
 
-    crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
-
     uint8_t sig[MAX_DER_SIG_LEN];
 
     int sig_len = 0;
     BEGIN_TRY {
         TRY {
+            crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
             sig_len = cx_ecdsa_sign(&private_key,
                                     CX_RND_RFC6979,
                                     CX_SHA256,
