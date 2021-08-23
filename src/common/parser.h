@@ -20,7 +20,7 @@ typedef struct {
 typedef int (*parsing_step_t)(void *, buffer_t *[2]);
 
 // Convenience functions to handle reading from the concatenation of two buffers.
-// All these functions are analogouse to the corresponding buffer_read_X functions, but they exhaust
+// All these functions are analogous to the corresponding buffer_read_X functions, but they exhaust
 // the first buffer before reading from the second buffer.
 
 /**

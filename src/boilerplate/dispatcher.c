@@ -36,13 +36,11 @@ struct {
     uint16_t sw;
 } G_dispatcher_state;
 
-
 static void dispatcher_loop();
 
 static void next(command_processor_t next_processor) {
     G_dispatcher_context.machine_context_ptr->next_processor = next_processor;
 }
-
 
 static void add_to_response(const void *rdata, size_t rdata_len) {
     io_add_to_response(rdata, rdata_len);
@@ -66,7 +64,9 @@ static void run() {
     dispatcher_loop();
 }
 
-static void start_flow(command_processor_t first_processor, machine_context_t *subcontext, command_processor_t return_processor) {
+static void start_flow(command_processor_t first_processor,
+                       machine_context_t *subcontext,
+                       command_processor_t return_processor) {
     // set the return_processor as the next processor for the current flow
     G_dispatcher_context.machine_context_ptr->next_processor = return_processor;
 
@@ -81,7 +81,6 @@ static void start_flow(command_processor_t first_processor, machine_context_t *s
 static void run_callback(dispatcher_callback_descriptor_t cb, buffer_t *calldata) {
     cb.fn(cb.state, calldata);
 }
-
 
 // TODO: refactor code in common with the main apdu loop
 static int process_interruption(dispatcher_context_t *dc) {
@@ -111,26 +110,27 @@ static int process_interruption(dispatcher_context_t *dc) {
         return -1;
     }
 
-    // TODO: INS_CONTINUE is the only valid apdu here; should fail for anything else,
-    // or abort and go back to main somehow.
-
     PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
-            cmd.cla,
-            cmd.ins,
-            cmd.p1,
-            cmd.p2,
-            cmd.lc);
+           cmd.cla,
+           cmd.ins,
+           cmd.p1,
+           cmd.p2,
+           cmd.lc);
     for (int i = 0; i < cmd.lc; i++) {
         PRINTF("%02X", cmd.data[i]);
     }
     PRINTF("\n");
 
+    // INS_CONTINUE is the only valid apdu here
+    if (cmd.cla != CLA_FRAMEWORK || cmd.ins != INS_CONTINUE) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return -1;
+    }
 
     dc->read_buffer = buffer_create(cmd.data, cmd.lc);
 
     return 0;
 }
-
 
 void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      int n_descriptors,
@@ -138,8 +138,6 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      size_t top_context_size,
                      void (*termination_cb)(void),
                      const command_t *cmd) {
-
-
     // TODO: decide what to do if a command is sent while something was still running
     // currently: wiping everything
 
@@ -165,14 +163,15 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
             return;
         }
 
-        if (G_dispatcher_context.machine_context_ptr == NULL || G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
+        if (G_dispatcher_context.machine_context_ptr == NULL ||
+            G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
             PRINTF("Unexpected INS_CONTINUE.\n");
-            io_send_sw(SW_BAD_STATE); // received INS_CONTINUE, but no command was interrupted.
+            io_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
             return;
         }
     } else {
-        // If a previous command was interrupted but any command other than INS_CONTINUE is received,
-        // the interrupted command is discarded.
+        // If a previous command was interrupted but any command other than INS_CONTINUE is
+        // received, the interrupted command is discarded.
 
         G_dispatcher_context.machine_context_ptr = top_context;
 
@@ -182,14 +181,12 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         bool cla_found = false, ins_found = false;
         command_handler_t handler;
         for (int i = 0; i < n_descriptors; i++) {
-            if (cmd_descriptors[i].cla != cmd->cla)
-                continue;
+            if (cmd_descriptors[i].cla != cmd->cla) continue;
             cla_found = true;
-            if (cmd_descriptors[i].ins != cmd->ins)
-                continue;
+            if (cmd_descriptors[i].ins != cmd->ins) continue;
             ins_found = true;
 
-            handler = (command_handler_t)PIC(cmd_descriptors[i].handler);
+            handler = (command_handler_t) PIC(cmd_descriptors[i].handler);
             break;
         }
 
@@ -230,8 +227,8 @@ static void dispatcher_loop() {
 
             proc(&G_dispatcher_context);
 
-            // if an interruption is sent, should exit the loop and persist the context for the next call
-            // in that case, there MUST be a next_processor
+            // if an interruption is sent, should exit the loop and persist the context for the next
+            // call in that case, there MUST be a next_processor
             if (G_dispatcher_state.sw == SW_INTERRUPTED_EXECUTION) {
                 if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
                     PRINTF("Interruption requested, but the next processor was not set.\n");
@@ -240,10 +237,11 @@ static void dispatcher_loop() {
             }
         } else if (G_dispatcher_context.machine_context_ptr->parent_context != NULL) {
             // the current submachine ended, continue from parent's context
-            G_dispatcher_context.machine_context_ptr = G_dispatcher_context.machine_context_ptr->parent_context;
+            G_dispatcher_context.machine_context_ptr =
+                G_dispatcher_context.machine_context_ptr->parent_context;
             continue;
         } else {
-            break; // all done
+            break;  // all done
         }
     }
 
