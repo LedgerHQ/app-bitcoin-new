@@ -168,7 +168,7 @@ Registers a wallet policy on the device, after validating it with the user.
 | `<variable>`    | `policy_length` | The length of the policy (unsigned varint) |
 | `policy_length` | `policy`        | The serialized wallet policy |
 
-The `policy` is serialized as described [here](wallet.md).
+The `policy` is serialized as described [here](wallet.md). At this time, no policy can be longer than 252 bytes, therefore the `policy_length` field is always encoded as 1 byte.
 
 **Output data**
 
@@ -305,25 +305,67 @@ The client must respond with an empty message.
 
 **Command code**: 0x40
 
-<!-- TODO -->
+The `GET_PREIMAGE` command requests the client to reveal a SHA-256 preimage.
+
+The request contains a single 32-byte hash.
+<!-- TODO: could add a byte to specify the hash function; 0 for SHA-256, other values reserved for future usages -->
+
+The response must contain:
+- `<var>`: the length of the preimage, encoded as a Bitcoin-style varint
+- `1` byte: a 1-byte unsigned integer `b`, the length of the prefix of the pre-image that is part of the response
+- `b` bytes: corresponding to the first `b` bytes of the preimage.
+
+If the pre-image is too long to be contained in a single response, the client should choose `b` to be as large as possible; subsequent bytes are enqueued as single-byte elements that the Hardware Wallet will request with one ore more `GET_MORE_ELEMENTS` requests.
 
 ### GET_MERKLE_LEAF_PROOF
 
 **Command code**: 0x41
 
-<!-- TODO -->
+The `GET_MERKLE_LEAF_PROOF` command requests the hash of a given leaf of a Merkle tree, together with the Merkle proof.
+
+The request contains:
+- `32` bytes: the Merkle root hash
+<!-- TODO: might change to varint -->
+- `4` bytes: the tree size `n`, encoded as an unsigned 4-byte big-endian integer.
+- `4` bytes: the leaf index `i`, encoded as an unsigned 4-byte big-endian integer.
+
+The client must respond with:
+- `32` bytes: the hash of the leaf with index `i` in the requested Merkle tree.
+- `1` byte: the length of the Merkle proof
+- `1` byte: the amount `p` of hashes of the proof that are contained in the response
+- `32 * p` bytes: the concatenation of the first `p` hashes in the Merkle proof.
+
+If the proof is too long to be contained in a single response, the client should choose `p` to be as large as possible; subsequent bytes are enqueued as 32-byte elements that the Hardware Wallet will request with one ore more `GET_MORE_ELEMENTS` requests.
 
 ### GET_MERKLE_LEAF_INDEX
 
 **Command code**: 0x42
 
-<!-- TODO -->
+The `GET_MERKLE_LEAF_INDEX` requests the index of a leaf with a certain hash. if multiple leafs have the same hash, the client could respond with either.
+
+The request contains:
+- `32` bytes: the Merkle root hash
+- `32` bytes: the leaf hash
+
+The response contains:
+- `1` byte: `1` if the leaf is found, `0` if matching leaf exists
+- `<var>`: the index of the leaf, encoded as a Bitcoin-style varint
 
 ### GET_MORE_ELEMENTS
 
 **Command code**: 0xA0
 
-<!-- TODO -->
+The `GET_MORE_ELEMENTS` command requests the client to return more elements that were enqueued by previous client commands (like `GET_PREIMAGE` and `GET_MERKLE_LEAF_PROOF`).
+
+All of the elements in the queue must all be byte strings of the same length; the command fails otherwise. The client should return as many elements as it is possible to fit in the response, while leaving the remaining ones (if any) in the queue.
+
+The request is empty.
+
+The response contains:
+- `1` byte: the number `n` of returned element
+- `1` byte: the size `s` of each returned element
+- `n * s` bytes: the concatenation of the `n` returned elements
+
 
 ## Security considerations
 
