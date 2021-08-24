@@ -31,14 +31,22 @@ The `CONTINUE` command is sent as a response to a client command from the Hardwa
 
 Several commands are executed via an interactive protocol that requires multiple rounds. At any time after receiving the command and before returning the commands final response (which is status word `0x9000` in case of success), the Hardware Wallet can respond with a special status word `SW_INTERRUPTED_EXECUTION` (`0xE000`), containing a request for the client in the response data. The first byte of the response is the *client command code*, identified what kind of request the Hardware Wallet is asking the client to perform. The client *must* comply with the request and send a special *CONTINUE* command `CLA = 0xF8` and `INS = 0x01`, with the appropriate response.
 
+The specs for the client commands are detailed below.
+
 ## Descriptors and wallet policies
 
 The Bitcoin app uses a language similar to [output script descriptors](https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md) in order to represent the wallets that can be used to sign transactions.
-Wallets need to be registered on the device, with an interactive process that requires user's approval.
+Wallet policies need to be registered on the device, with an interactive process that requires user's approval.
 
 See [here](wallet.md) for detailed information on the wallet policy language.
 
 ## Wallet registration flow
+
+In order to use a wallet policy that is not one of the default ones, the policy must first be registered on the wallet, which is a protocol that requires explicit approval from the user.
+
+A wallet policy is initiated using the `REGISTER_WALLET` command. The screen of the hardware wallet will ask the user to inspect the wallet descriptor template, followed by each of the keys of the cosigners that are part of the wallet policy.
+
+Once the user approves, the `REGISTER_WALLET` returns to the client a 32-byte HMAC-SHA256. This will be provided to any future command that makes use of the wallet policy; therefore, the HMAC should be permanently stored on the client. In case of loss of the HMAC, the registration flow must be repeated from scratch.
 
 ## Status Words
 
@@ -284,6 +292,8 @@ The `GET_MORE_ELEMENTS` command must be handled.
 The `YIELD` command must be processed in order to receive the signatures.
 
 ## Client commands
+
+This section documents the commands that the Hardware Wallet can request to the client when returning with a `SW_INTERRUPTED_EXECUTION` status word.
 
 | CMD | COMMAND NAME          | DESCRIPTION |
 |-----|-----------------------|-------------|

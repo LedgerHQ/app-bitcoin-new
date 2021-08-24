@@ -77,7 +77,9 @@ The wallet policy is serialized as the concatenation of:
 - `<variable length>`:  the wallet name
 - `<variable length>`: the length of the wallet descriptor template, as a Bitcoin-style variable-length integer
 - `<variable length>`: the wallet descriptor template
-- `<32 bytes>`: the root of the canonical Merkle trees of the list of keys.
+- `<32 bytes>`: the root of the canonical Merkle tree of the list of keys.
+
+See [merkle](merkle.md) for information on Merkle trees.
 
 The sha256 hash of a serialized wallet policy is used as a *wallet policy id*.
 
