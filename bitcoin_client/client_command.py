@@ -48,6 +48,10 @@ class GetPreimageCommand(ClientCommand):
 
     def execute(self, request: bytes) -> bytes:
         req = ByteStreamParser(request[1:])
+
+        if req.read_bytes(1) != b'\0':
+            raise RuntimeError(f"Unsupported request: the first byte should be 0")
+
         req_hash = req.read_bytes(32)
         req.assert_empty()
 

@@ -19,6 +19,10 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
 
     uint8_t cmd = CCMD_GET_PREIMAGE;
     dispatcher_context->add_to_response(&cmd, 1);
+
+    uint8_t zero = 0;
+    dispatcher_context->add_to_response(&zero, 1);
+
     dispatcher_context->add_to_response(hash, 32);
     dispatcher_context->finalize_response(SW_INTERRUPTED_EXECUTION);
 

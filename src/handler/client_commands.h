@@ -10,7 +10,7 @@
 
 /* MERKLE PROOFS */
 
-// Request : <GET_PREIMAGE : 1> <hash : 32>
+// Request : <GET_PREIMAGE : 1> <hash_type : 1> <hash : 32>
 // Response: <len = preimage length : 1> <preimage : len>
 #define CCMD_GET_PREIMAGE 0x40
 

@@ -2,8 +2,6 @@ from typing import List, Iterable, Mapping
 
 from .common import write_varint, sha256
 
-# TODO: a class to represent Merkle proofs in a more structured way (including size and leaf index)
-
 NIL = bytes([0] * 32)
 
 

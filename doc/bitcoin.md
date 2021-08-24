@@ -283,7 +283,7 @@ The `GET_MORE_ELEMENTS` command must be handled.
 
 The `YIELD` command must be processed in order to receive the signatures.
 
-## Client commands
+## Client commands reference
 
 This section documents the commands that the Hardware Wallet can request to the client when returning with a `SW_INTERRUPTED_EXECUTION` status word.
 
@@ -309,8 +309,9 @@ The client must respond with an empty message.
 
 The `GET_PREIMAGE` command requests the client to reveal a SHA-256 preimage.
 
-The request contains a single 32-byte hash.
-<!-- TODO: could add a byte to specify the hash function; 0 for SHA-256, other values reserved for future usages -->
+The request contains:
+- `1` byte: must equal 0, reserved for future usage. (The client should abort if non-zero)
+- `32` bytes: a sha-256 hash.
 
 The response must contain:
 - `<var>`: the length of the preimage, encoded as a Bitcoin-style varint
