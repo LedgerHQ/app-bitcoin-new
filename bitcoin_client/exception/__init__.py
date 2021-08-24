@@ -8,12 +8,6 @@ from .errors import (UnknownDeviceError,
                      InsNotSupportedError,
                      ClaNotSupportedError,
                      WrongResponseLengthError,
-                     DisplayBip32PathFailError,
-                     DisplayAddressFailError,
-                     DisplayAmountFailError,
-                     WrongTxLengthError,
-                     TxParsingFailError,
-                     TxHashFail,
                      BadStateError,
                      SignatureFailError)
 
@@ -28,12 +22,6 @@ __all__ = [
     "InsNotSupportedError",
     "ClaNotSupportedError",
     "WrongResponseLengthError",
-    "DisplayBip32PathFailError",
-    "DisplayAddressFailError",
-    "DisplayAmountFailError",
-    "WrongTxLengthError",
-    "TxParsingFailError",
-    "TxHashFail",
     "BadStateError",
     "SignatureFailError"
 ]

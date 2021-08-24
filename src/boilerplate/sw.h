@@ -6,7 +6,8 @@
 #define SW_OK 0x9000
 
 /**
- * Status word for command not valid for security reasons (for example: device needs to be unlocked with PIN).
+ * Status word for command not valid for security reasons (for example: device needs to be unlocked
+ * with PIN).
  */
 #define SW_SECURITY_STATUS_NOT_SATISFIED 0x6982
 
@@ -51,36 +52,6 @@
 #define SW_WRONG_RESPONSE_LENGTH 0xB000
 
 /**
- * Status word for fail to display BIP32 path.
- */
-#define SW_DISPLAY_BIP32_PATH_FAIL 0xB001
-
-/**
- * Status word for fail to display address.
- */
-#define SW_DISPLAY_ADDRESS_FAIL 0xB002
-
-/**
- * Status word for fail to display amount.
- */
-#define SW_DISPLAY_AMOUNT_FAIL 0xB003
-
-/**
- * Status word for wrong transaction length.
- */
-#define SW_WRONG_TX_LENGTH 0xB004
-
-/**
- * Status word for fail of transaction parsing.
- */
-#define SW_TX_PARSING_FAIL 0xB005
-
-/**
- * Status word for fail of transaction hash.
- */
-#define SW_TX_HASH_FAIL 0xB006
-
-/**
  * Status word for bad state.
  */
 #define SW_BAD_STATE 0xB007
@@ -89,7 +60,6 @@
  * Status word for signature fail.
  */
 #define SW_SIGNATURE_FAIL 0xB008
-
 
 /**
  * Status word for interrupted excution.

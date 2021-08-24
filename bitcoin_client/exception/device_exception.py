@@ -15,12 +15,6 @@ class DeviceException(Exception):  # pylint: disable=too-few-public-methods
         0x6D00: InsNotSupportedError,
         0x6E00: ClaNotSupportedError,
         0xB000: WrongResponseLengthError,
-        0xB001: DisplayBip32PathFailError,
-        0xB002: DisplayAddressFailError,
-        0xB003: DisplayAmountFailError,
-        0xB004: WrongTxLengthError,
-        0xB005: TxParsingFailError,
-        0xB006: TxHashFail,
         0xB007: BadStateError,
         0xB008: SignatureFailError,
         0xE000: InterruptedExecution,  # not an error
