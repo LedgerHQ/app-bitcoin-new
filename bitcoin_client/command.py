@@ -86,7 +86,21 @@ class BitcoinCommand:
         return sw, response
 
     def get_pubkey(self, bip32_path: str, display: bool = False) -> str:
-        # TODO: add docs
+        """Gets the serialized extended public key for certain BIP32 path. Optionally, validate with the user.
+
+        Parameters
+        ----------
+        bip32_path : str
+            BIP32 path of the public key you want.
+        display : bool
+            Whether you want to display address and ask confirmation on the device.
+
+        Returns
+        -------
+        str
+            The requested serialized extended public key.
+        """
+
         sw, response = self.make_request(self.builder.get_pubkey(bip32_path, display))
 
         if sw != 0x9000:
@@ -110,7 +124,8 @@ class BitcoinCommand:
 
         Returns
         -------
-
+        str
+            The requested address.
         """
         sw, response = self.make_request(
             self.builder.get_address(address_type, bip32_path, display)
@@ -122,6 +137,20 @@ class BitcoinCommand:
         return response.decode()
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
+        """Registers a wallet policy with the user. After approval returns the wallet id and hmac to be stored on the client.
+
+        Parameters
+        ----------
+        wallet : Wallet
+            The Wallet policy to register on the device.
+
+        Returns
+        -------
+        Tuple[bytes, bytes]
+            The first element the tuple is the 32-bytes wallet id.
+            The second element is the hmac.
+        """
+
         if wallet.type != WalletType.POLICYMAP:
             raise ValueError("wallet type must be POLICYMAP")
 
@@ -152,6 +181,32 @@ class BitcoinCommand:
         address_index: int,
         display: bool,
     ) -> str:
+        """For a given wallet that was already registered on the device (or a standard wallet that does not need registration),
+        returns the address for a certain `change`/`address_index` combination.
+
+        Parameters
+        ----------
+        wallet : Wallet
+            The registered wallet policy, or a standard wallet policy.
+
+        wallet_hmac: Optional[bytes]
+            For a registered wallet, the hmac obtained at wallet registration. `None` for a standard wallet policy.
+
+        change: int
+            0 for a standard receive address, 1 for a change address. Other values are invalid.
+
+        address_index: int
+            The address index in the last step of the BIP32 derivation.
+
+        display: bool
+            Whether you want to display address and ask confirmation on the device.
+
+        Returns
+        -------
+        str
+            The requested address.
+        """
+
         if wallet.type != WalletType.POLICYMAP or not isinstance(
             wallet, PolicyMapWallet
         ):
@@ -177,8 +232,30 @@ class BitcoinCommand:
         return response.decode()
 
     # TODO: should we return an updated PSBT with signatures, instead?
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> str:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> Mapping[int, bytes]:
+        """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
+        Signature requires explicit approval from the user.
+
+        Parameters
+        ----------
+        psbt : PSBT
+            A PSBT of version 0 or 2, with all the necessary information to sign the inputs already filled in; what the
+            required fields changes depending on the type of input.
+            The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
+            signing (this will change for Taproot inputs).
+
+        wallet : Wallet
+            The registered wallet policy, or a standard wallet policy.
+
+        wallet_hmac: Optional[bytes]
+            For a registered wallet, the hmac obtained at wallet registration. `None` for a standard wallet policy.
+
+        Returns
+        -------
+        Mapping[int, bytes]
+            A mapping that has as keys the indexes of inputs that the Hardware Wallet signed, and the corresponding signatures as values.
+        """
         if psbt.version != 2:
             psbt_v2 = PSBT()
             psbt_v2.deserialize(psbt.serialize())  # clone psbt
@@ -188,6 +265,10 @@ class BitcoinCommand:
 
         psbt_bytes = base64.b64decode(psbt_v2.serialize())
         f = BytesIO(psbt_bytes)
+
+        # We parse the individual maps (global map, each input map, and each output map) from the psbt serialized as a
+        # sequence of bytes, in order to produce the serialized Merkleized map commitments. Moreover, we prepare the
+        # client interpreter to respond on queries on all the relevant Merkle trees and pre-images in the psbt.
 
         assert f.read(5) == b"psbt\xff"
 
@@ -210,11 +291,9 @@ class BitcoinCommand:
         for m in output_maps:
             client_intepreter.add_known_mapping(m)
 
-        # We also add the Merkle tree of the (resp. output) input map commitments as a known tree
+        # We also add the Merkle tree of the input (resp. output) map commitments as a known tree
         input_commitments = [get_merkleized_map_commitment(m_in) for m_in in input_maps]
-        output_commitments = [
-            get_merkleized_map_commitment(m_out) for m_out in output_maps
-        ]
+        output_commitments = [get_merkleized_map_commitment(m_out) for m_out in output_maps]
 
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)

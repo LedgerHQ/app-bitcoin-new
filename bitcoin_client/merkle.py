@@ -6,7 +6,10 @@ NIL = bytes([0] * 32)
 
 
 def floor_lg(n: int) -> int:
-    """Return floor(log_2(n))."""
+    """Return floor(log_2(n)) for a positive integer `n`"""
+
+    assert n > 0
+
     r = 0
     t = 1
     while 2 * t <= n:
@@ -16,7 +19,10 @@ def floor_lg(n: int) -> int:
 
 
 def ceil_lg(n: int) -> int:
-    """Return ceiling(log_2(n))."""
+    """Return ceiling(log_2(n)) for a positive integer `n`."""
+
+    assert n > 0
+
     r = 0
     t = 1
     while t < n:
@@ -26,11 +32,18 @@ def ceil_lg(n: int) -> int:
 
 
 def is_power_of_2(n: int) -> bool:
+    """For a positive integer `n`, returns `True` is `n` is a perfect power of 2, `False` otherwise."""
+
+    assert n >= 1
+
     return n & (n - 1) == 0
 
 
 def largest_power_of_2_less_than(n: int) -> int:
+    """For an integer `n` which is at least 2, returns the largest exact power of 2 that is strictly less than `n`."""
+
     assert n > 1
+
     if is_power_of_2(n):
         return n // 2
     else:
@@ -116,8 +129,8 @@ class MerkleTree:
 
     def __init__(self, elements: Iterable[bytes] = []):
         self.leaves = [Node(None, None, None, el) for el in elements]
-        if len(self.leaves) > 0:
-            n_elements = len(self.leaves)
+        n_elements = len(self.leaves)
+        if n_elements > 0:
             self.root_node = make_tree(self.leaves, 0, n_elements)
             self.depth = ceil_lg(n_elements)
         else:
@@ -235,6 +248,12 @@ class MerkleTree:
 
 
 def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> bytes:
+    """Returns a serialized Merkleized map commitment, encoded as the concatenation of:
+       - the number of key/value pairs, as a Bitcoin-style varint;
+       - the root of the Merkle tree of the keys
+       - the root of the Merkle tree of the values.
+    """
+
     items_sorted = list(sorted(mapping.items()))
     keys_hashes = [element_hash(i[0]) for i in items_sorted]
     values_hashes = [element_hash(i[1]) for i in items_sorted]
