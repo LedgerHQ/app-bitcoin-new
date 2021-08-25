@@ -43,6 +43,8 @@
 #include "legacy/include/swap_lib_calls.h"
 #include "legacy/include/btchip_context.h"
 
+#include "main.h"
+
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
 #endif
@@ -60,11 +62,7 @@ btchip_context_t __attribute__((section(".legacy_globals"))) btchip_context_D;
 // shared between legacy and new
 global_context_t *G_coin_config;  // same type as btchip_altcoin_config_t
 
-#define APP_MODE_UNINITIALIZED 0  // state before any APDU is executed
-#define APP_MODE_LEGACY        1  // state when the app is running legacy APDUs
-#define APP_MODE_NEW           2  // state when the app is running new APDUs
-
-static uint8_t g_app_mode;
+uint8_t G_app_mode;
 
 // clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
@@ -139,10 +137,6 @@ void app_main() {
         // Reset length of APDU response
         G_output_len = 0;
 
-        // if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-        //     btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
-        // }
-
         // Receive command bytes in G_io_apdu_buffer
 
         input_len = io_exchange(CHANNEL_APDU | IO_ASYNCH_REPLY, 0);
@@ -152,28 +146,32 @@ void app_main() {
             return;
         }
 
-        // if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
-        //     os_sched_exit(0);
-        // }
-
         if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
-            if (g_app_mode != APP_MODE_LEGACY) {
+            if (G_app_mode != APP_MODE_LEGACY) {
                 memset(&btchip_context_D, 0, sizeof(btchip_context_D));
 
                 btchip_context_init();
 
-                g_app_mode = APP_MODE_LEGACY;
+                G_app_mode = APP_MODE_LEGACY;
+            }
+
+            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+                btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
             }
 
             // legacy codes, use old dispatcher
             btchip_context_D.inLength = input_len;
 
             app_dispatch();
+
+            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+                os_sched_exit(0);
+            }
         } else {
-            if (g_app_mode != APP_MODE_NEW) {
+            if (G_app_mode != APP_MODE_NEW) {
                 memset(&G_command_state, 0, sizeof(G_command_state));
 
-                g_app_mode = APP_MODE_NEW;
+                G_app_mode = APP_MODE_NEW;
             }
 
             // Reset structured APDU command
@@ -300,7 +298,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
-    g_app_mode = APP_MODE_UNINITIALIZED;
+    G_app_mode = APP_MODE_UNINITIALIZED;
 
 #ifdef USE_LIB_BITCOIN
     BEGIN_TRY {
@@ -309,7 +307,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
 
-            g_app_mode =
+            G_app_mode =
                 APP_MODE_LEGACY;  // in library mode, we currently only run with legacy APDUs
 
             PRINTF("Hello from litecoin\n");
