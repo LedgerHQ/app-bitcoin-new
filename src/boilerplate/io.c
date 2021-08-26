@@ -39,7 +39,7 @@ void io_seproxyhal_display(const bagl_element_t *element) {
 }
 
 uint8_t io_event(uint8_t channel) {
-    (void)channel;
+    (void) channel;
 
     switch (G_io_seproxyhal_spi_buffer[0]) {
         case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
@@ -93,7 +93,7 @@ uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len) {
     return 0;
 }
 
-void io_add_to_response(const void *rdata, size_t rdata_len){
+void io_add_to_response(const void *rdata, size_t rdata_len) {
     if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
         G_output_len = IO_APDU_BUFFER_SIZE;
         write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
@@ -115,7 +115,6 @@ void io_finalize_response(uint16_t sw) {
         G_output_len += 2;
     }
 }
-
 
 void io_reset_response() {
     G_output_len = 0;

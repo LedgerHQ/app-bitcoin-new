@@ -5,7 +5,6 @@
  */
 #define CLA_FRAMEWORK 0xF8
 
-
 /**
  * TODO
  */
