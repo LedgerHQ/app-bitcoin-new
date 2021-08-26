@@ -315,3 +315,19 @@ class BitcoinCommand:
             raise RuntimeError("Invalid response")
 
         return {int(res[0]): res[1:] for res in results}
+
+    def get_master_fingerprint(self) -> bytes:
+        """Gets the fingerprint of the master public key, as per BIP-32.
+
+        Returns
+        -------
+        bytes
+            The fingerprint of the master public key, as an array of 4 bytes.
+        """
+
+        sw, response = self.make_request(self.builder.get_master_fingerprint())
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
+
+        return response

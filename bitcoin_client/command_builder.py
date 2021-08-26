@@ -33,6 +33,7 @@ class BitcoinInsType(enum.IntEnum):
     REGISTER_WALLET = 0x02
     GET_WALLET_ADDRESS = 0x03
     SIGN_PSBT = 0x04
+    GET_MASTER_FINGERPRINT = 0x05
     GET_SUM_OF_SQUARES = 0xF0
 
 
@@ -193,6 +194,12 @@ class BitcoinCommandBuilder:
 
         return self.serialize(
             cla=self.CLA_BITCOIN, ins=BitcoinInsType.SIGN_PSBT, cdata=bytes(cdata)
+        )
+
+    def get_master_fingerprint(self):
+        return self.serialize(
+            cla=self.CLA_BITCOIN,
+            ins=BitcoinInsType.GET_MASTER_FINGERPRINT
         )
 
     def continue_interrupted(self, cdata: bytes):

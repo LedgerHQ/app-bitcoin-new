@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../crypto.h"
 #include "../common/bip32.h"
 #include "../boilerplate/dispatcher.h"
 

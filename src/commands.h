@@ -3,6 +3,7 @@
 #include "boilerplate/dispatcher.h"
 #include "constants.h"
 #include "handler/get_address.h"
+#include "handler/get_master_fingerprint.h"
 #include "handler/get_pubkey.h"
 #include "handler/get_wallet_address.h"
 #include "handler/register_wallet.h"
@@ -17,6 +18,7 @@ typedef enum {
     REGISTER_WALLET = 0x02,
     GET_WALLET_ADDRESS = 0x03,
     SIGN_PSBT = 0x04,
+    GET_MASTER_FINGERPRINT = 0x05,
 } command_e;
 
 /**
@@ -24,6 +26,7 @@ typedef enum {
  */
 typedef union {
     get_address_state_t get_address_state;
+    get_master_fingerprint_t get_master_fingerprint;
     get_pubkey_state_t get_pubkey_state;
     register_wallet_state_t register_wallet_state;
     get_wallet_address_state_t get_wallet_address_state;

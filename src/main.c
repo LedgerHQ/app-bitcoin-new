@@ -33,10 +33,7 @@
 #include "boilerplate/constants.h"
 #include "boilerplate/dispatcher.h"
 
-#include "handler/get_pubkey.h"
-#include "handler/get_address.h"
-#include "handler/register_wallet.h"
-#include "handler/get_wallet_address.h"
+#include "commands.h"
 
 #include "legacy/main_old.h"
 #include "legacy/btchip_display_variables.h"
@@ -90,6 +87,11 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
         .cla = CLA_APP,
         .ins = SIGN_PSBT,
         .handler = (command_handler_t)handler_sign_psbt
+    },
+    {
+        .cla = CLA_APP,
+        .ins = GET_MASTER_FINGERPRINT,
+        .handler = (command_handler_t)handler_get_master_fingerprint
     },
 };
 // clang-format on
