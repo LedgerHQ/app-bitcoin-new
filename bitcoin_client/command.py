@@ -3,7 +3,6 @@ import base64
 from io import BytesIO, BufferedReader
 
 from ledgercomm import Transport
-from speculos.client import ApduException, ApduResponse
 
 from bitcoin_client.command_builder import BitcoinCommandBuilder, BitcoinInsType
 from bitcoin_client.common import AddressType
@@ -15,6 +14,16 @@ from bitcoin_client.merkle import get_merkleized_map_commitment
 from bitcoin_client.wallet import Wallet, WalletType, PolicyMapWallet
 from bitcoin_client.psbt import PSBT, deser_string
 
+
+try:
+    from speculos.client import ApduException
+except ImportError:
+    # Speculos package not available, we use our own class
+    class ApduException(Exception):
+        def __init__(self, sw: int, data: bytes) -> None:
+            super().__init__(f"Exception: invalid status 0x{sw:x}")
+            self.sw = sw
+            self.data = data
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     result = {}
@@ -50,7 +59,7 @@ class HIDClient:
 
     def apdu_exchange_nowait(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
-    ) -> Generator[ApduResponse, None, None]:
+    ):
         raise NotImplementedError()
 
     def stop(self) -> None:
