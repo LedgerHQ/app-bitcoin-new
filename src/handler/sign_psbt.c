@@ -190,7 +190,7 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
     if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
         // TODO: remove this limitation
         PRINTF("At most %d inputs are supported\n", MAX_N_INPUTS_CAN_SIGN);
-        SEND_SW(dc, SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
     state->n_inputs = (size_t) n_inputs;
