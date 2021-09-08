@@ -98,6 +98,36 @@ def point_to_bytes(p: Point) -> bytes:
         raise ValueError("Cannot convert None to bytes")
     return (b'\x03' if p[1] & 1 else b'\x02') + p[0].to_bytes(32, byteorder="big")
 
+def int_from_bytes(b: bytes) -> int:
+    return int(binascii.hexlify(b), 16)
+
+def lift_x(x: int) -> 'Point':
+    c = (pow(x, 3, p) + 7) % p
+    y = pow(c, (p + 1) // 4, p)
+
+    assert(c == y * y % p)
+
+    return (x, p - y if y & 1 else y)
+
+def tagged_hash(tag: str, data: bytes) -> bytes:
+    hashtag = hashlib.sha256(tag.encode()).digest()
+    return hashlib.sha256(hashtag + hashtag + data).digest()
+
+
+def taproot_tweak_pubkey(pubkey: bytes, h: bytes) -> Tuple[int, bytes]:
+    t = int_from_bytes(tagged_hash("TapTweak", pubkey + h))
+    if t >= p:
+        raise ValueError
+    Q = point_add(lift_x(int_from_bytes(pubkey)), point_mul(G, t))
+    return 0 if Q[1] & 1 == 0 else 1, Q[0].to_bytes(32, byteorder="big")
+
+
+def get_taproot_output_key(derived_key: bytes) -> bytes:
+    assert(len(derived_key) == 33)
+    p = derived_key[1:]
+    _, key = taproot_tweak_pubkey(p, b'')
+    return key
+
 
 # An extended public key (xpub) or private key (xprv). Just a data container for now.
 # Only handles deserialization of extended keys into component data to be handled by something else

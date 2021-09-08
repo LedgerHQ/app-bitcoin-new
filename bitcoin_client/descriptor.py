@@ -38,7 +38,7 @@ Descriptors can be parsed, however the actual scripts are not generated.
 """
 
 
-from .key import ExtendedKey, KeyOriginInfo, parse_path
+from .key import ExtendedKey, KeyOriginInfo, get_taproot_output_key, parse_path
 from .common import hash160, sha256
 
 from binascii import unhexlify
@@ -192,7 +192,7 @@ class PubkeyProvider(object):
             if self.deriv_path is not None:
                 path_str = self.deriv_path[1:]
                 if path_str[-1] == "*":
-                    path_str = path_str[-1] + str(pos)
+                    path_str = path_str[:-1] + str(pos)
                 path = parse_path(path_str)
                 child_key = self.extkey.derive_pub_path(path)
                 return child_key.pubkey
@@ -405,6 +405,27 @@ class WSHDescriptor(Descriptor):
         return ExpandedScripts(script, None, witness_script)
 
 
+class TRDescriptor(Descriptor):
+    """
+    A descriptor for ``tr()`` descriptors. Only supports ``tr(KEY)``, and ``KEY`` must not be an x-only key
+    """
+
+    def __init__(
+        self,
+        pubkey: 'PubkeyProvider'
+    ) -> None:
+        """
+        :param pubkey: The :class:`PubkeyProvider` for this descriptor
+        """
+        super().__init__([pubkey], None, "tr")
+
+    def expand(self, pos: int) -> "ExpandedScripts":
+        internal_key = self.pubkeys[0].get_pubkey_bytes(pos)
+
+        script = b"\x51\x20" + get_taproot_output_key(internal_key)
+        return ExpandedScripts(script, None, None)
+
+
 def _get_func_expr(s: str) -> Tuple[str, str]:
     """
     Get the function name and then the expression inside
@@ -509,6 +530,13 @@ def _parse_descriptor(desc: str, ctx: '_ParseDescriptorContext') -> 'Descriptor'
         raise ValueError("A function is needed within P2SH")
     elif ctx == _ParseDescriptorContext.P2WSH:
         raise ValueError("A function is needed within P2WSH")
+    if ctx == _ParseDescriptorContext.TOP and func == "tr":
+        pubkey, expr = parse_pubkey(expr)
+        if expr:
+            raise ValueError("TREE expressions are not yet supported in tr descriptor")
+        return TRDescriptor(pubkey)
+    elif ctx != _ParseDescriptorContext.TOP and func == "tr":
+        raise ValueError("Cannot have tr in non-top level")
     raise ValueError("{} is not a valid descriptor function".format(func))
 
 
