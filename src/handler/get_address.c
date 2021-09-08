@@ -50,6 +50,7 @@ void handler_get_address(dispatcher_context_t *dc) {
         return;
     }
 
+    // TODO: handle ADDRESS_TYPE_TAPROOT if this APDU is not removed
     if (address_type != ADDRESS_TYPE_LEGACY && address_type != ADDRESS_TYPE_WIT &&
         address_type != ADDRESS_TYPE_SH_WIT) {
         SEND_SW(dc, SW_INCORRECT_DATA);

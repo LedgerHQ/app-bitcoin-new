@@ -81,7 +81,7 @@ typedef enum {
     // TOKEN_COMBO     // disabled, does not mix well with the script policy language
     TOKEN_MULTI,
     TOKEN_SORTEDMULTI,
-    // TOKEN_TR,       // currently unsupported
+    TOKEN_TR,
     // TOKEN_ADDR,     // unsupported
     // TOKEN_RAW,      // unsupported
 } PolicyNodeType;

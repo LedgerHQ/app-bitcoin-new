@@ -1,6 +1,6 @@
 from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.common import AddressType
-from bitcoin_client.wallet import MultisigWallet
+from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
 
 from .utils import automation
 
@@ -68,3 +68,21 @@ def test_get_wallet_address_wit(cmd: BitcoinCommand):
 
     res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
+
+
+def test_get_wallet_address_taproot(cmd: BitcoinCommand):
+    # test for a native taproot wallet (bech32m addresses, per BIP-0086)
+
+    wallet = PolicyMapWallet(
+        name="",
+        policy_map="tr(@0)",
+        keys_info=[
+            f"[f5acc2fd/86'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**",
+        ],
+    )
+
+    res = cmd.get_wallet_address(wallet, None, 0, 0, False)
+    assert res == "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7"
+
+    res = cmd.get_wallet_address(wallet, None, 0, 9, False)
+    assert res == "tb1psl7eyk2jyjzq6evqvan854fts7a5j65rth25yqahkd2a765yvj0qggs5ne"

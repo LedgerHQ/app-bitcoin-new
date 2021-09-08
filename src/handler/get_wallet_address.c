@@ -106,8 +106,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         return;
     }
 
-    uint8_t hmac_or =
-        0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+    // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+    uint8_t hmac_or = 0;
     for (int i = 0; i < 32; i++) {
         hmac_or = hmac_or | state->wallet_hmac[i];
     }
@@ -143,9 +143,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     }
 
     // TODO: for canonical wallets, we should check that there is only one key and its path is also
-    // canonical,
-    //       (matching the expected path based on the address type provided above), account index
-    //       not too large.
+    // canonical, (matching the expected path based on the address type provided above), account
+    // index not too large.
 
     buffer_t script_buf = buffer_create(state->script, sizeof(state->script));
 

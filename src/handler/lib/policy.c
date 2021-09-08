@@ -402,6 +402,45 @@ int get_sortedmulti_script(_policy_parser_args_t *args,
     return result;
 }
 
+static int get_tr_script(_policy_parser_args_t *args,
+                         policy_node_t *policy,
+                         buffer_t *out_buf,
+                         cx_hash_t *hash_context) {
+    policy_node_with_key_t *root = (policy_node_with_key_t *) policy;
+
+    unsigned int out_len = 2 + 32;
+    if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
+        return -1;
+    }
+
+    int result;
+    buffer_snapshot_t snap = buffer_snapshot(args->mem);
+
+    // memory block taking 33+32 bytes
+    {
+        uint8_t *compressed_pubkey = (uint8_t *) buffer_alloc(args->mem, 33, false);
+        uint8_t *tweaked_key = (uint8_t *) buffer_alloc(args->mem, 32, false);
+
+        if (compressed_pubkey == NULL || tweaked_key == NULL) {
+            result = -1;
+        } else if (-1 == get_derived_pubkey(args, root->key_index, compressed_pubkey)) {
+            result = -1;
+        } else {
+            update_output_u8(out_buf, hash_context, 0x51);
+            update_output_u8(out_buf, hash_context, 0x20);
+
+            uint8_t parity;
+            crypto_tr_tweak_pubkey(compressed_pubkey + 1, &parity, tweaked_key);
+
+            update_output(out_buf, hash_context, tweaked_key, 32);
+
+            result = 2 + 32;
+        }
+    }
+    buffer_restore(args->mem, snap);
+    return result;
+}
+
 int _call_get_wallet_script(_policy_parser_args_t *args,
                             policy_node_t *policy,
                             buffer_t *out_buf,
@@ -419,6 +458,8 @@ int _call_get_wallet_script(_policy_parser_args_t *args,
             return get_multi_script(args, policy, out_buf, hash_context);
         case TOKEN_SORTEDMULTI:
             return get_sortedmulti_script(args, policy, out_buf, hash_context);
+        case TOKEN_TR:
+            return get_tr_script(args, policy, out_buf, hash_context);
         default:
             return -1;
     }
@@ -449,7 +490,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 }
 
 int get_policy_address_type(policy_node_t *policy) {
-    // legacy, native segwit or wrapped segwit
+    // legacy, native segwit, wrapped segwit, or taproot
     switch (policy->type) {
         case TOKEN_PKH:
             return ADDRESS_TYPE_LEGACY;
@@ -461,6 +502,8 @@ int get_policy_address_type(policy_node_t *policy) {
                 return ADDRESS_TYPE_SH_WIT;
             }
             return -1;
+        case TOKEN_TR:
+            return ADDRESS_TYPE_TR;
         default:
             return -1;
     }

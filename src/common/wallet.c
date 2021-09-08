@@ -20,7 +20,8 @@ typedef enum {
     SCRIPT_TYPE_P2PKH = 0x00,
     SCRIPT_TYPE_P2SH = 0x01,
     SCRIPT_TYPE_P2WPKH = 0x02,
-    SCRIPT_TYPE_P2WSH = 0x03
+    SCRIPT_TYPE_P2WSH = 0x03,
+    SCRIPT_TYPE_P2TR = 0x04
 } script_type_e;
 
 /*
@@ -29,7 +30,7 @@ Currently supported policies for singlesig:
 - pkh(key/**) where `key` follows `BIP44`       (legacy)
 - wpkh(key/**) where `key` follows `BIP 84`     (native segwit)
 - sh(wpkh(key/**)) where `key` follows `BIP 49` (nested segwit)
-
+- tr(key/**) where `key` follows `BIP 86`       (single-key p2tr)
 
 Currently supported wallet policies for multisig:
 
@@ -59,7 +60,8 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_PKH, .name = "pkh"},
     {.type = TOKEN_WPKH, .name = "wpkh"},
     {.type = TOKEN_MULTI, .name = "multi"},
-    {.type = TOKEN_SORTEDMULTI, .name = "sortedmulti"}};
+    {.type = TOKEN_SORTEDMULTI, .name = "sortedmulti"},
+    {.type = TOKEN_TR, .name = "tr"}};
 
 /**
  * Length of the longest token in the policy wallet descriptor language (not including the
@@ -384,7 +386,9 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_PKH:
-        case TOKEN_WPKH: {
+        case TOKEN_WPKH:
+        case TOKEN_TR:  // not currently supporting x-only keys
+        {
             policy_node_with_key_t *node =
                 (policy_node_with_key_t *) buffer_alloc(out_buf,
                                                         sizeof(policy_node_with_key_t),
@@ -504,6 +508,10 @@ int get_script_type(const uint8_t script[], size_t script_len) {
         return SCRIPT_TYPE_P2WSH;
     }
 
+    if (script_len == 34 && script[0] == 0x51 && script[1] == 0x20) {
+        return SCRIPT_TYPE_P2TR;
+    }
+
     // unknown
     return -1;
 }
@@ -526,10 +534,15 @@ int get_script_address(const uint8_t script[],
                 base58_encode_address(script + 2, coin_config->p2sh_version, out, out_len - 1);
             break;
         case SCRIPT_TYPE_P2WPKH:
-        case SCRIPT_TYPE_P2WSH: {
-            // bech32 encoding
+        case SCRIPT_TYPE_P2WSH:
+        case SCRIPT_TYPE_P2TR: {
+            // bech32/bech32m encoding
 
+            // 20 for P2WPKH, 32 for P2WSH or P2TR
             int hash_length = (script_type == SCRIPT_TYPE_P2WPKH ? 20 : 32);
+
+            // witness program version
+            int version = (script_type == SCRIPT_TYPE_P2TR ? 1 : 0);
 
             // make sure that the output buffer is long enough
             if (out_len < 73 + strlen(coin_config->native_segwit_prefix)) {
@@ -538,7 +551,7 @@ int get_script_address(const uint8_t script[],
 
             int ret = segwit_addr_encode(out,
                                          coin_config->native_segwit_prefix,
-                                         0,
+                                         version,
                                          script + 2,
                                          hash_length  // 20 for WPKH, 32 for WSH
             );

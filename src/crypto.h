@@ -11,11 +11,15 @@
 #include "./common/write.h"
 #include "./common/varint.h"
 
-// Address types as defined in Bitcoin Core's HWI
-#define ADDRESS_TYPE_LEGACY 1  // Legacy address. P2PKH for single sig, P2SH for scripts.
-#define ADDRESS_TYPE_WIT    2  // Native segwit. P2WPKH for single sig, P2WPSH for scripts.
-#define ADDRESS_TYPE_SH_WIT \
-    3  // Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
+// Address types (as defined in Bitcoin Core's HWI)
+// Legacy address. P2PKH for single sig, P2SH for scripts.
+#define ADDRESS_TYPE_LEGACY 1
+// Native segwit. P2WPKH for single sig, P2WPSH for scripts.
+#define ADDRESS_TYPE_WIT 2
+// Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
+#define ADDRESS_TYPE_SH_WIT 3
+// Taproot
+#define ADDRESS_TYPE_TR 4
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.
@@ -347,3 +351,17 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
  *   would be longer than out_len).
  */
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
+
+/**
+ * Builds a tweaked public key from a BIP340 public key array.
+ * Equivalent to taproot_tweak_pubkey of BIP341 with `h` set to the empty byte string.
+ *
+ * @param[in]  pubkey
+ *   Pointer to the 32-byte to be used as public key.
+ * @param[out]  y_parity
+ *   Pointer to a variable that will be set to 0/1 according to the parity of th y-coordinate of the
+ * final tweaked pubkey.
+ * @param[out]  out
+ *  Pointer to the a 32-byte array that will contain the x coordinate of the tweaked key.
+ */
+int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]);

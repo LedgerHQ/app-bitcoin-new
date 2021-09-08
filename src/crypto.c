@@ -57,10 +57,14 @@ static const uint8_t secp256k1_sqr_exponent[] = {
     0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xff, 0xff, 0x0c};
 
+/* BIP0341 tags for computing the tagged hashes when tweaking public keys */
+static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
+
 static int secp256k1_point(const uint8_t scalar[static 32], uint8_t out[static 65]);
 
 /**
  * Gets the point on the SECP256K1 that corresponds to kG, where G is the curve's generator point.
+ * Returns 0 if point is Infinity, encoding length otherwise.
  */
 static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
     memcpy(out, secp256k1_generator, 65);
@@ -364,4 +368,90 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
     memcpy(tmp + version_len, in, 20);
     crypto_get_checksum(tmp, version_len + 20, tmp + version_len + 20);
     return base58_encode(tmp, version_len + 20 + 4, out, out_len);
+}
+
+static void crypto_tr_tagged_hash(const uint8_t *tag,
+                                  uint16_t tag_len,
+                                  const uint8_t *data,
+                                  uint16_t data_len,
+                                  uint8_t out[static 32]) {
+    cx_sha256_t hash_context;
+    cx_sha256_init(&hash_context);
+
+    // TODO: could precompute the hashtag
+    uint8_t hashtag[32];
+    crypto_hash_update(&hash_context.header, tag, tag_len);
+    crypto_hash_digest(&hash_context.header, hashtag, sizeof(hashtag));
+
+    cx_sha256_init(&hash_context);
+    crypto_hash_update(&hash_context.header, hashtag, sizeof(hashtag));
+    crypto_hash_update(&hash_context.header, hashtag, sizeof(hashtag));
+    crypto_hash_update(&hash_context.header, data, data_len);
+    crypto_hash_digest(&hash_context.header, out, 32);
+}
+
+static int crypto_tr_lift_x(uint8_t x[static 32], uint8_t out[static 65]) {
+    // save memory by reusing output buffer for intermediate results
+    uint8_t *y = out + 1 + 32;
+    // we use the memory for the x-coordinate of the output as a temporary variable
+    uint8_t *c = out + 1;
+
+    uint8_t e = 3;
+    cx_math_powm(c, x, &e, 1, secp256k1_p, 32);  // c = x^3 (mod p)
+    uint8_t scalar[32] = {0};
+    scalar[31] = 7;
+    cx_math_addm(c, c, scalar, secp256k1_p, 32);  // c = x^3 + 7 (mod p)
+
+    cx_math_powm(y, c, secp256k1_sqr_exponent, 32, secp256k1_p, 32);  // y = sqrt(x^3 + 7) (mod p)
+
+    // sanity check: fail if y * y % p != x^3 + 7
+    uint8_t y_2[32];
+    e = 2;
+    cx_math_powm(y_2, y, &e, 1, secp256k1_p, 32);  // y^2 (mod p)
+    if (cx_math_cmp(y_2, c, 32) != 0) {
+        return -1;
+    }
+
+    if (y[31] & 1) {
+        // y must be even: take the negation
+        cx_math_sub(out + 1 + 32, secp256k1_p, y, 32);
+    }
+
+    // add the 0x04 prefix; copy x verbatim
+    out[0] = 0x04;
+    memcpy(out + 1, x, 32);
+
+    return 0;
+}
+
+// Like taproot_tweak_pubkey of BIP0341, with empty string h
+int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]) {
+    uint8_t t[32];
+
+    crypto_tr_tagged_hash(BIP0341_taptweak_tag, sizeof(BIP0341_taptweak_tag), pubkey, 32, t);
+
+    // fail if t is not smaller than the group order
+    if (cx_math_cmp(t, secp256k1_p, 32) >= 0) {
+        return -1;
+    }
+
+    uint8_t Q[65];
+
+    uint8_t lifted_pubkey[65];
+    if (crypto_tr_lift_x(pubkey, lifted_pubkey) < 0) {
+        return -1;
+    }
+
+    if (secp256k1_point(t, Q) == 0) {
+        // point at infinity
+        return -1;
+    }
+
+    if (cx_ecfp_add_point(CX_CURVE_SECP256K1, Q, Q, lifted_pubkey, sizeof(Q)) == 0) {
+        return -1;  // the point at infinity is not valid (should never happen in practice)
+    }
+
+    *y_parity = Q[64] & 1;
+    memcpy(out, Q + 1, 32);
+    return 0;
 }
