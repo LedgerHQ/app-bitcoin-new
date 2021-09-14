@@ -36,6 +36,7 @@ from io import BytesIO, BufferedReader
 from typing import (
     Dict,
     List,
+    Tuple,
     Mapping,
     MutableMapping,
     Optional,
@@ -99,6 +100,66 @@ def SerializeHDKeypath(hd_keypaths: Mapping[bytes, KeyOriginInfo], type: bytes) 
         r += ser_string(packed)
     return r
 
+def DeserializeHDHashesKeypath(
+    f: Readable,
+    key: bytes,
+    hashes_hd_keypaths: MutableMapping[bytes, Tuple[List[bytes], KeyOriginInfo]],
+    expected_sizes: Sequence[int],
+) -> None:
+    """
+    :meta private:
+
+    Deserialize a serialized PSBT public key and leaf-hashes + keypath key-value pair
+    (as the PSBT_IN_TAP_BIP32_DERIVATION and PSBT_OUT_TAP_BIP32_DERIVATION key-value pairs).
+
+    :param f: The byte stream to read the value from.
+    :param key: The bytes of the key of the key-value pair.
+    :param hashes_hd_keypaths: Dictionary of public key bytes to pairs of lists of hashes and :class:`~hwilib.key.KeyOriginInfo`.
+    :param expected_sizes: List of key lengths expected for the keypair being deserialized.
+    """
+    if len(key) not in expected_sizes:
+        raise PSBTSerializationError("Size of key was not the expected size. Length: {}".format(len(key)))
+
+    pubkey = key[1:]
+    if pubkey in hashes_hd_keypaths:
+        raise PSBTSerializationError("Duplicate key, input partial signature for pubkey already provided")
+
+    value = deser_string(f)
+    f_value = BufferedReader(BytesIO(value)) # type: ignore
+
+    hashes_len = deser_compact_size(f_value)
+    hashes = [f_value.read(32) for _ in range(hashes_len)]
+
+    key_origin_info = KeyOriginInfo.deserialize(deser_string(f))
+
+    hashes_hd_keypaths[pubkey] = (hashes, key_origin_info)
+
+def SerializeHDHashesKeypath(hashes_hd_keypaths: Mapping[bytes, Tuple[List[bytes], KeyOriginInfo]], type: bytes) -> bytes:
+    """
+    :meta private:
+
+    Serialize a public key to pairs of leaf-hashes + :class:`~hwilib.key.KeyOriginInfo` mapping as a PSBT key-value pair.
+    Used for PSBT_IN_TAP_BIP32_DERIVATION and PSBT_OUT_TAP_BIP32_DERIVATION key-value pairs.
+
+    :param hashes_hd_keypaths: The mapping of public key to keypath
+    :param type: The PSBT type bytes to use
+    :returns: The serialized keypaths
+    """
+    r = b""
+    for pubkey, hashes_path in sorted(hashes_hd_keypaths.items()):
+        hashes, path = hashes_path
+        r += ser_string(type + pubkey)
+
+        value = b"".join([
+            ser_compact_size(len(hashes)),
+            *hashes,
+            path.serialize()
+        ])
+
+        r += ser_string(value)
+    return r
+
+
 class PartiallySignedInput:
     """
     An object for a PSBT input map.
@@ -122,6 +183,14 @@ class PartiallySignedInput:
         self.required_time_locktime: Optional[int] = None
         self.required_height_locktime: Optional[int] = None
 
+        # taproot fields
+        self.tap_key_sig: bytes = b""
+        # self.tap_script_sig = # Not implemented
+        # self.tap_leaf_script = # Not implemented
+        self.tap_hd_keypaths: Dict[bytes, Tuple[List[bytes], KeyOriginInfo]] = {}
+        self.tap_internal_key: bytes = b""
+        # self.tap_merkle_root = # Not implemented
+
         self.unknown: Dict[bytes, bytes] = {}
 
     def set_null(self) -> None:
@@ -137,6 +206,17 @@ class PartiallySignedInput:
         self.hd_keypaths.clear()
         self.final_script_sig = b""
         self.final_script_witness = CTxInWitness()
+
+        self.previous_txid = None
+        self.output_index = None
+        self.sequence = None
+        self.required_time_locktime = None
+        self.required_height_locktime = None
+
+        self.tap_key_sig = b""
+        self.tap_hd_keypaths = {}
+        self.tap_internal_key = b""
+
         self.unknown.clear()
 
     def deserialize(self, f: Readable, psbt_version: int) -> None:
@@ -310,6 +390,34 @@ class PartiallySignedInput:
 
                 self.required_height_locktime = struct.unpack("<I", required_height_locktime_bytes)[0]
 
+            elif key_type == 0x13:
+                if len(self.tap_key_sig) != 0:
+                    raise PSBTSerializationError("Duplicate key, input key path Schnorr signature already provided")
+                elif len(key) != 1:
+                    raise PSBTSerializationError("Input key path Schnorr signature key is more than one byte type")
+
+                self.tap_key_sig = deser_string(f)
+
+                if len(self.tap_key_sig) not in [64, 65]:
+                    raise PSBTSerializationError("Input key path Schnorr signature must be 64 or 65 bytes long")
+
+            # 0x14 and 0x15 are not implemented
+
+            elif key_type == 0x16:
+                DeserializeHDHashesKeypath(f, key, self.tap_hd_keypaths, [1 + 32])
+            elif key_type == 0x17:
+                if len(self.tap_internal_key) != 0:
+                    raise PSBTSerializationError("Duplicate key, input taproot internal key already provided")
+                elif len(key) != 1:
+                    raise PSBTSerializationError("Input taproot internal key's key is more than one byte type")
+
+                self.tap_internal_key = deser_string(f)
+
+                if len(self.tap_internal_key) != 32:
+                    raise PSBTSerializationError("Input taproot internal key's value is not 32 bytes long")
+
+            # 0x18 is not implemented
+
             else:
                 if key in self.unknown:
                     raise PSBTSerializationError("Duplicate key, key for unknown value already provided")
@@ -394,9 +502,25 @@ class PartiallySignedInput:
             r += ser_string(b"\x12")
             r += ser_string(struct.pack("<I", self.required_height_locktime))
 
-        # serialize the unknown key types 0x13 and above
+        if len(self.tap_key_sig) != 0:
+            r += ser_string(b"\x13")
+            r += ser_string(self.tap_key_sig)
+
+        # serialize the unknown key types 0x14 and 0x15
         for key, value in sorted(self.unknown.items()):
-            if key[0] >= 0x13:
+            if 0x14 <= key[0] <= 0x15:
+                r += ser_string(key)
+                r += ser_string(value)
+
+        r += SerializeHDHashesKeypath(self.tap_hd_keypaths, b"\x16")
+
+        if len(self.tap_internal_key) != 0:
+            r += ser_string(b"\x17")
+            r += ser_string(self.tap_internal_key)
+
+        # serialize the unknown key types 0x18 and above
+        for key, value in sorted(self.unknown.items()):
+            if key[0] >= 0x18:
                 r += ser_string(key)
                 r += ser_string(value)
 
@@ -418,6 +542,11 @@ class PartiallySignedOutput:
         self.amount: Optional[int] = None
         self.script: Optional[bytes] = None
 
+        # taproot
+        self.tap_internal_key: bytes = b""
+        # self.tap_tree = # Not implemented
+        self.tap_hd_keypaths: Dict[bytes, Tuple[List[bytes], KeyOriginInfo]] = {}
+
         self.unknown: Dict[bytes, bytes] = {}
 
     def set_null(self) -> None:
@@ -427,6 +556,13 @@ class PartiallySignedOutput:
         self.redeem_script = b""
         self.witness_script = b""
         self.hd_keypaths.clear()
+
+        self.amount = None
+        self.script = None
+
+        self.tap_internal_key = b""
+        self.tap_hd_keypaths = {}
+
         self.unknown.clear()
 
     def deserialize(self, f: Readable, psbt_version: int) -> None:
@@ -496,6 +632,22 @@ class PartiallySignedOutput:
 
                 self.script = deser_string(f)
 
+            elif key_type == 0x05:
+                if len(self.tap_internal_key) != 0:
+                    raise PSBTSerializationError("Duplicate key, output taproot internal key already provided")
+                elif len(key) != 1:
+                    raise PSBTSerializationError("Output taproot internal key's key is more than one byte type")
+
+                self.tap_internal_key = deser_string(f)
+
+                if len(self.tap_internal_key) != 32:
+                    raise PSBTSerializationError("Output taproot internal key's value is not 32 bytes long")
+
+            # 0x06 is not implemented
+
+            elif key_type == 0x07:
+                DeserializeHDHashesKeypath(f, key, self.tap_hd_keypaths, [1 + 32])
+
             else:
                 if key in self.unknown:
                     raise PSBTSerializationError("Duplicate key, key for unknown value already provided")
@@ -533,9 +685,23 @@ class PartiallySignedOutput:
             r += ser_string(b"\x04")
             r += ser_string(self.script)
 
+        if len(self.tap_internal_key) != 0:
+            r += ser_string(b"\x05")
+            r += ser_string(self.tap_internal_key)
+
+        # key 0x06 is not implemented
         for key, value in sorted(self.unknown.items()):
-            r += ser_string(key)
-            r += ser_string(value)
+            if key[0] == 0x06:
+                r += ser_string(key)
+                r += ser_string(value)
+
+        if self.tap_hd_keypaths:
+            r += SerializeHDHashesKeypath(self.tap_hd_keypaths, b"\x07")
+
+        for key, value in sorted(self.unknown.items()):
+            if key[0] >= 0x08:
+                r += ser_string(key)
+                r += ser_string(value)
 
         r += b"\x00"
 
