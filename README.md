@@ -1,6 +1,6 @@
 # Ledger Bitcoin Application
 
-TODO
+***This application is still experimental. Do not use in production. Breaking changes to the API are likely to happen.***
 
 ## Prerequisite
 
