@@ -9,6 +9,7 @@ typedef struct {
     merkleized_map_commitment_t map;
 
     bool has_witnessUtxo;
+    bool has_nonWitnessUtxo;
     bool has_redeemScript;
     bool has_sighash_type;
 

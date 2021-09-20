@@ -156,6 +156,20 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
     return 0;
 }
 
+static int get_segwit_version(const uint8_t scriptPubKey[], int scriptPubKey_len) {
+    if (scriptPubKey_len <= 1) {
+        return -1;
+    }
+
+    if (scriptPubKey[0] == 0x00) {
+        return 0;
+    } else if (scriptPubKey[0] >= 0x51 && scriptPubKey[0] <= 0x60) {
+        return scriptPubKey[0] - 0x50;
+    }
+
+    return -1;
+}
+
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
@@ -399,6 +413,8 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         buffer_read_u8(data, &key_type);
         if (key_type == PSBT_IN_WITNESS_UTXO) {
             state->cur_input.has_witnessUtxo = true;
+        } else if (key_type == PSBT_IN_NON_WITNESS_UTXO) {
+            state->cur_input.has_nonWitnessUtxo = true;
         } else if (key_type == PSBT_IN_REDEEM_SCRIPT) {
             state->cur_input.has_redeemScript = true;
         } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
@@ -463,55 +479,114 @@ static void process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    txid_parser_outputs_t parser_outputs;
-    // request non-witness utxo, and get the prevout's value and scriptpubkey
-    res = call_psbt_parse_rawtx(dc,
-                                &state->cur_input.map,
-                                (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
-                                1,
-                                prevout_n,
-                                &parser_outputs);
-    if (res < 0) {
+    // either witness utxo or non-witness utxo (or both) must be present.
+    if (!state->cur_input.has_nonWitnessUtxo && !state->cur_input.has_witnessUtxo) {
+        PRINTF("No witness utxo nor non-witness utxo present in input.\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    uint8_t prevout_hash[32];
+    // validate non-witness utxo (if present) and witness utxo (if present)
 
-    // check if the prevout_hash of the transaction matches the computed one from the non-witness
-    // utxo
-    res = call_get_merkleized_map_value(dc,
-                                        &state->cur_input.map,
-                                        (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
-                                        1,
-                                        prevout_hash,
-                                        sizeof(prevout_hash));
+    if (state->cur_input.has_nonWitnessUtxo) {
+        txid_parser_outputs_t parser_outputs;
+        // request non-witness utxo, and get the prevout's value and scriptpubkey
+        res = call_psbt_parse_rawtx(dc,
+                                    &state->cur_input.map,
+                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
+                                    1,
+                                    prevout_n,
+                                    &parser_outputs);
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
 
-    if (res == -1 || memcmp(parser_outputs.txid, prevout_hash, 32) != 0) {
-        PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
+        uint8_t prevout_hash[32];
 
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
+        // check if the prevout_hash of the transaction matches the computed one from the
+        // non-witness utxo
+        res = call_get_merkleized_map_value(dc,
+                                            &state->cur_input.map,
+                                            (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
+                                            1,
+                                            prevout_hash,
+                                            sizeof(prevout_hash));
 
-    uint64_t prevout_value = parser_outputs.vout_value;
+        if (res == -1 || memcmp(parser_outputs.txid, prevout_hash, 32) != 0) {
+            PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
 
-    state->inputs_total_value += prevout_value;
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
 
-    state->cur_input.prevout_amount = prevout_value;
+        uint64_t prevout_value = parser_outputs.vout_value;
 
-    state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
+        state->inputs_total_value += prevout_value;
 
-    if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-        PRINTF("Prevout's scriptPubKey too long: %d bytes.\n",
+        state->cur_input.prevout_amount = prevout_value;
+
+        state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
+
+        if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+            PRINTF("Prevout's scriptPubKey too long: %d bytes.\n",
+                   state->cur_input.prevout_scriptpubkey_len);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        memcpy(state->cur_input.prevout_scriptpubkey,
+               parser_outputs.vout_scriptpubkey,
                state->cur_input.prevout_scriptpubkey_len);
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
     }
 
-    memcpy(state->cur_input.prevout_scriptpubkey,
-           parser_outputs.vout_scriptpubkey,
-           state->cur_input.prevout_scriptpubkey_len);
+    if (state->cur_input.has_witnessUtxo) {
+        uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+
+        int wit_utxo_len = call_get_merkleized_map_value(dc,
+                                                         &state->cur_input.map,
+                                                         (uint8_t[]){PSBT_IN_WITNESS_UTXO},
+                                                         1,
+                                                         raw_witnessUtxo,
+                                                         sizeof(raw_witnessUtxo));
+        if (wit_utxo_len < 0) {
+            PRINTF("Error fetching witness utxo\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
+
+        if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
+            PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
+
+        uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+
+        if (state->cur_input.has_nonWitnessUtxo) {
+            // we already know the scriptPubKey, but we double check that it matches
+            if (state->cur_input.prevout_scriptpubkey_len != wit_utxo_scriptPubkey_len ||
+                memcmp(state->cur_input.prevout_scriptpubkey,
+                       wit_utxo_scriptPubkey,
+                       wit_utxo_scriptPubkey_len) != 0 ||
+                state->cur_input.prevout_amount != wit_utxo_prevout_amount) {
+                PRINTF(
+                    "scriptPubKey or amount in non-witness utxo doesn't match with witness utxo\n");
+                SEND_SW(dc, SW_INCORRECT_DATA);
+            }
+        } else {
+            // we extract the scriptPubKey and prevout amount from the witness utxo
+            state->cur_input.prevout_amount = wit_utxo_prevout_amount;
+            state->cur_input.prevout_scriptpubkey_len = wit_utxo_scriptPubkey_len;
+            memcpy(state->cur_input.prevout_scriptpubkey,
+                   wit_utxo_scriptPubkey,
+                   wit_utxo_scriptPubkey_len);
+        }
+    }
 
     dc->next(check_input_owned);
 }
@@ -594,6 +669,22 @@ static void check_input_owned(dispatcher_context_t *dc) {
     } else {
         state->internal_inputs[state->cur_input_index] = 1;
         state->internal_inputs_total_value += state->cur_input.prevout_amount;
+
+        int segwit_version = get_segwit_version(state->cur_input.prevout_scriptpubkey,
+                                                state->cur_input.prevout_scriptpubkey_len);
+
+        // For legacy or segwit-v0 inputs, the non-witness utxo must be present
+        if ((segwit_version == -1 || segwit_version == 0) && !state->cur_input.has_nonWitnessUtxo) {
+            PRINTF("Non-witness utxo missing for legacy or segwitv0 input\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+        }
+
+        // For all segwit transactions, the witness utxo must be present
+        if (segwit_version >= 0 && !state->cur_input.has_witnessUtxo) {
+            PRINTF("Witness utxo missing for segwit input\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
     }
 
     ++state->cur_input_index;
@@ -660,7 +751,7 @@ static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         buffer_read_u8(data, &key_type);
 
         if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur_output.has_bip32_derivation) {
-            // The first time that we encounter a PSBT_IN_SIGHASH_TYPE key, we store the pubkey
+            // The first time that we encounter a PSBT_OUT_BIP32_DERIVATION key, we store the pubkey
             state->cur_output.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
@@ -1269,6 +1360,8 @@ static void sign_segwit(dispatcher_context_t *dc) {
     uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int script_len;
 
+    uint8_t segwit_version;
+
     {
         uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
@@ -1326,13 +1419,30 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
             memcpy(script, redeemScript, redeemScript_length);
             script_len = redeemScript_length;
+
+            segwit_version = get_segwit_version(redeemScript, redeemScript_length);
         } else {
             memcpy(script, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
             script_len = wit_utxo_scriptPubkey_len;
+
+            segwit_version = get_segwit_version(wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
         }
     }
 
+    if (segwit_version == -1) {
+        SEND_SW(dc, SW_BAD_STATE);  // can't happen
+        return;
+    }
+
+    if (segwit_version > 1) {
+        PRINTF("Segwit version not supported: %d\n", segwit_version);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
     // Compute sighash
+
+    // TODO: sighash for taproot txs
 
     cx_sha256_t sighash_context;
     cx_sha256_init(&sighash_context);
