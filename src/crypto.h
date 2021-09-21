@@ -353,6 +353,11 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
 
 /**
+ * TODO: docs
+ */
+void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len);
+
+/**
  * Builds a tweaked public key from a BIP340 public key array.
  * Equivalent to taproot_tweak_pubkey of BIP341 with `h` set to the empty byte string.
  *

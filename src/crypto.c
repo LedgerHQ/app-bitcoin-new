@@ -370,6 +370,19 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
     return base58_encode(tmp, version_len + 20 + 4, out, out_len);
 }
 
+void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len) {
+    // we recycle the input to save memory (will reinit later)
+    cx_sha256_init(hash_context);
+
+    uint8_t hashtag[32];
+    crypto_hash_update(&hash_context->header, tag, tag_len);
+    crypto_hash_digest(&hash_context->header, hashtag, sizeof(hashtag));
+
+    cx_sha256_init(hash_context);
+    crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
+    crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
+}
+
 static void crypto_tr_tagged_hash(const uint8_t *tag,
                                   uint16_t tag_len,
                                   const uint8_t *data,
@@ -378,14 +391,8 @@ static void crypto_tr_tagged_hash(const uint8_t *tag,
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
 
-    // TODO: could precompute the hashtag
-    uint8_t hashtag[32];
-    crypto_hash_update(&hash_context.header, tag, tag_len);
-    crypto_hash_digest(&hash_context.header, hashtag, sizeof(hashtag));
+    crypto_tr_tagged_hash_init(&hash_context, tag, tag_len);
 
-    cx_sha256_init(&hash_context);
-    crypto_hash_update(&hash_context.header, hashtag, sizeof(hashtag));
-    crypto_hash_update(&hash_context.header, hashtag, sizeof(hashtag));
     crypto_hash_update(&hash_context.header, data, data_len);
     crypto_hash_digest(&hash_context.header, out, 32);
 }
