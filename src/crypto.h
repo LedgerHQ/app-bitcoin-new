@@ -359,7 +359,7 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
 
 /**
  * Builds a tweaked public key from a BIP340 public key array.
- * Equivalent to taproot_tweak_pubkey of BIP341 with `h` set to the empty byte string.
+ * Implementation of taproot_tweak_pubkey of BIP341 with `h` set to the empty byte string.
  *
  * @param[in]  pubkey
  *   Pointer to the 32-byte to be used as public key.
@@ -370,6 +370,16 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
  *  Pointer to the a 32-byte array that will contain the x coordinate of the tweaked key.
  */
 int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]);
+
+/**
+ * Builds a tweaked public key from a BIP340 public key array.
+ * Implementation of taproot_tweak_seckey of BIP341 with `h` set to the empty byte string.
+ *
+ * @param[in|out] seckey
+ *   Pointer to the 32-byte containing the secret key; it will contain the output tweaked secret
+ * key.
+ */
+int crypto_tr_tweak_seckey(uint8_t seckey[static 32]);
 
 // BIP0340 Schnorr signatures (TODO: remove once firmware/sdk is upgraded)
 #define CX_ECSCHNORR_BIP0340 (0 << 12)

@@ -433,6 +433,7 @@ static int crypto_tr_lift_x(uint8_t x[static 32], uint8_t out[static 65]) {
 }
 
 // Like taproot_tweak_pubkey of BIP0341, with empty string h
+// TODO: should it recycle pubkey also for the output (like crypto_tr_tweak_seckey below)?
 int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]) {
     uint8_t t[32];
 
@@ -461,6 +462,42 @@ int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t
 
     *y_parity = Q[64] & 1;
     memcpy(out, Q + 1, 32);
+    return 0;
+}
+
+// Like taproot_tweak_seckey of BIP0341, with empty string h
+int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
+    uint8_t P[65];
+
+    BEGIN_TRY {
+        TRY {
+            secp256k1_point(seckey, P);
+
+            if (P[64] & 1) {
+                // odd y, negate the secret key
+                cx_math_sub(seckey, secp256k1_p, seckey, 32);
+            }
+
+            uint8_t t[32];
+            crypto_tr_tagged_hash(BIP0341_taptweak_tag,
+                                  sizeof(BIP0341_taptweak_tag),
+                                  &P[1],  // P[1:33] is x(P)
+                                  32,
+                                  t);
+
+            // fail if t is not smaller than the group order
+            if (cx_math_cmp(t, secp256k1_p, 32) >= 0) {
+                return -1;
+            }
+
+            cx_math_addm(seckey, seckey, t, secp256k1_p, 32);
+        }
+        FINALLY {
+            explicit_bzero(&P, sizeof(P));
+        }
+    }
+    END_TRY;
+
     return 0;
 }
 
