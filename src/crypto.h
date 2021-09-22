@@ -384,10 +384,10 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]);
 // BIP0340 Schnorr signatures (TODO: remove once firmware/sdk is upgraded)
 #define CX_ECSCHNORR_BIP0340 (0 << 12)
 
-cx_err_t cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
-                                    uint32_t mode,
-                                    cx_md_t hashID,
-                                    const uint8_t *msg,
-                                    size_t msg_len,
-                                    uint8_t *sig,
-                                    size_t *sig_len);
+cx_err_t custom_cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
+                                           uint32_t mode,
+                                           cx_md_t hashID,
+                                           const uint8_t *msg,
+                                           size_t msg_len,
+                                           uint8_t *sig,
+                                           size_t *sig_len);

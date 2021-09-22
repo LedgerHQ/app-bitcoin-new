@@ -22,6 +22,7 @@
 #include "os.h"
 #include "cx.h"
 #include "cx_ecfp.h"
+#include "ox_ec.h"
 
 #include "common/base58.h"
 #include "common/bip32.h"
@@ -509,13 +510,13 @@ const uint8_t BIP0340_challenge[] =
 const uint8_t BIP0340_aux[] = {'B', 'I', 'P', '0', '3', '4', '0', '/', 'a', 'u', 'x'};
 const uint8_t BIP0340_nonce[] = {'B', 'I', 'P', '0', '3', '4', '0', '/', 'n', 'o', 'n', 'c', 'e'};
 
-cx_err_t cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
-                                    uint32_t mode,
-                                    cx_md_t hashID,
-                                    const uint8_t *msg,
-                                    size_t msg_len,
-                                    uint8_t *sig,
-                                    size_t *sig_len) {
+cx_err_t custom_cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
+                                           uint32_t mode,
+                                           cx_md_t hashID,
+                                           const uint8_t *msg,
+                                           size_t msg_len,
+                                           uint8_t *sig,
+                                           size_t *sig_len) {
 #define CX_MAX_TRIES 100
 
     cx_sha256_t H;
@@ -560,7 +561,7 @@ cx_err_t cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
     if ((mode & CX_MASK_EC) == CX_ECSCHNORR_BIP0340) {
         // Q = [d].G
         CX_CHECK(cx_ecdomain_generator_bn(pv_key->curve, &Q));
-        CX_CHECK(cx_ecpoint_rnd_fixed_scalarmul(&Q, pv_key->d, size));
+        CX_CHECK(cx_ecpoint_rnd_scalarmul(&Q, pv_key->d, size));
         // If Qy is even use d otherwise use n-d
         CX_CHECK(cx_bn_init(bn_d, pv_key->d, size));
         CX_CHECK(cx_ecpoint_export(&Q, NULL, 0, P, size));
@@ -631,7 +632,7 @@ cx_err_t cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
     tries++;
     // RETRY2:
     CX_CHECK(cx_ecdomain_generator_bn(pv_key->curve, &Q));
-    CX_CHECK(cx_ecpoint_rnd_fixed_scalarmul(&Q, sig, size));
+    CX_CHECK(cx_ecpoint_rnd_scalarmul(&Q, sig, size));
 
     switch (mode & CX_MASK_EC) {
             /* Schnorr signature with secp256k1 according to BIP0340
