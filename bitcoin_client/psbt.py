@@ -130,7 +130,7 @@ def DeserializeHDHashesKeypath(
     hashes_len = deser_compact_size(f_value)
     hashes = [f_value.read(32) for _ in range(hashes_len)]
 
-    key_origin_info = KeyOriginInfo.deserialize(deser_string(f))
+    key_origin_info = KeyOriginInfo.deserialize(f_value.read())
 
     hashes_hd_keypaths[pubkey] = (hashes, key_origin_info)
 
@@ -893,10 +893,7 @@ class PSBT(object):
                     raise PSBTSerializationError("Non-witness UTXO does not match outpoint hash")
 
         if psbt_version == 0 and (len(self.inputs) != input_count):
-            print(len(self.inputs))
-            print(input_count)
-
-            raise PSBTSerializationError("Inputs provided does not match the number of inputs in transaction")
+            raise PSBTSerializationError("Inputs provided do not match the number of inputs in transaction")
 
         # Read output data
         output_count = len(self.tx.vout) if psbt_version == 0 else self.output_count
@@ -908,7 +905,7 @@ class PSBT(object):
             self.outputs.append(output)
 
         if len(self.outputs) != output_count:
-            raise PSBTSerializationError("Outputs provided does not match the number of outputs in transaction")
+            raise PSBTSerializationError(f"Outputs provided do not match the number of outputs in transaction: {psbt_version} {len(self.outputs)} {output_count}")
 
     def serialize(self) -> str:
         """
