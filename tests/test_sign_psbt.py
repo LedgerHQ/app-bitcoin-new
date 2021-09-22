@@ -203,3 +203,62 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
 
 #     with pytest.raises(IncorrectDataError):
 #         cmd.sign_psbt(psbt)
+
+@automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_taproot_1to1(cmd: BitcoinCommand):
+    # PSBT for a p2tr 1-input 1-output spend (no change address)
+
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to1.psbt")
+
+    wallet = PolicyMapWallet(
+        "",
+        "tr(@0)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+        ],
+    )
+
+    result = cmd.sign_psbt(psbt, wallet, None)
+
+    # expected sigs
+    # #0:
+    #   "pubkey" : "TODO",
+    #   "signature" : "TODO"
+
+    print(result)
+
+    # assert result == {
+    #     0: bytes.fromhex(
+    #         "TODO"
+    #     )
+    # }
+
+
+@automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
+    # PSBT for a p2tr 1-input 2-output spend (1 change address)
+
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
+
+    wallet = PolicyMapWallet(
+        "",
+        "tr(@0)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+        ],
+    )
+
+    result = cmd.sign_psbt(psbt, wallet, None)
+
+    # expected sigs
+    # #0:
+    #   "pubkey" : "TODO",
+    #   "signature" : "TODO"
+
+    print(result)
+
+    # assert result == {
+    #     0: bytes.fromhex(
+    #         "TODO"
+    #     ),
+    # }

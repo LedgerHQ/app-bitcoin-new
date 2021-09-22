@@ -14,10 +14,14 @@ typedef struct {
     bool has_sighash_type;
 
     bool has_bip32_derivation;
-    uint8_t
-        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
-                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION or
+                                          // PSBT_IN_TAP_BIP32_DERIVATION key seen.
+                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
+                                          // (taproot), based on the script type.
+
+    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
+                                   // PSBT_IN_BIP32_DERIVATION or PSBT_IN_TAP_BIP32_DERIVATION is
+                                   // not the correct length.
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
@@ -38,10 +42,14 @@ typedef struct {
     merkleized_map_commitment_t map;
 
     bool has_bip32_derivation;
-    uint8_t
-        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
-                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION or
+                                          // PSBT_OUT_TAP_BIP32_DERIVATION key seen.
+                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
+                                          // (taproot), based on the script type.
+
+    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
+                                   // PSBT_OUT_BIP32_DERIVATION or PSBT_OUT_TAP_BIP32_DERIVATION is
+                                   // not the correct length.
 
     uint64_t value;
     uint8_t scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];

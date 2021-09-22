@@ -113,6 +113,14 @@ typedef struct {
     size_t *key_indexes;  // pointer to array of exactly n key indexes
 } policy_node_multisig_t;
 
+typedef enum {
+    SCRIPT_TYPE_P2PKH = 0x00,
+    SCRIPT_TYPE_P2SH = 0x01,
+    SCRIPT_TYPE_P2WPKH = 0x02,
+    SCRIPT_TYPE_P2WSH = 0x03,
+    SCRIPT_TYPE_P2TR = 0x04
+} script_type_e;
+
 /**
  * TODO: docs
  */
