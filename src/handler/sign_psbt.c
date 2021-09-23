@@ -605,9 +605,6 @@ static void process_input_map(dispatcher_context_t *dc) {
             state->inputs_total_value += wit_utxo_prevout_amount;
 
             state->cur_input.prevout_amount = wit_utxo_prevout_amount;
-            PRINTF("PREVOUT AMOUNT FOR INPUT %d: %lu\n",
-                   state->cur_input_index,
-                   state->cur_input.prevout_amount);  // TODO: remove
             state->cur_input.prevout_scriptpubkey_len = wit_utxo_scriptPubkey_len;
             memcpy(state->cur_input.prevout_scriptpubkey,
                    wit_utxo_scriptPubkey,
@@ -623,11 +620,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    PRINTF("INPUT SCRIPT:\n");  // TODO: remove
-    for (int i = 0; i < state->cur_input.prevout_scriptpubkey_len; i++)
-        PRINTF("%02X", state->cur_input.prevout_scriptpubkey[i]);
-    PRINTF("\n");
-
     int script_type = get_script_type(state->cur_input.prevout_scriptpubkey,
                                       state->cur_input.prevout_scriptpubkey_len);
 
@@ -635,7 +627,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
     do {
         if (!state->cur_input.has_bip32_derivation) {
-            LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);  // TODO: remove
             external = true;
             break;
         }
@@ -647,8 +638,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
         uint32_t fingerprint;
 
         if (script_type == -1) {
-            LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);  // TODO: remove
-
             external = true;  // unknown script, definitely external
             break;
         } else if (script_type == SCRIPT_TYPE_P2TR) {
@@ -679,15 +668,11 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
         // As per wallet policy assumptions, the path must have change and address index
         if (bip32_path_len < 0) {
-            PRINTF("%d\n", bip32_path_len);  // TODO: remove
-
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
         if (bip32_path_len < 2) {
-            LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);  // TODO: remove
-
             external = true;
             break;
         }
@@ -702,8 +687,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
                                           coin_types,
                                           2,
                                           -1)) {
-                LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);  // TODO: remove
-
                 external = true;
                 break;
             }
@@ -724,8 +707,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         } else if (res == 0) {
-            LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);  // TODO: remove
-
             external = true;
             break;
         } else if (res == 1) {
@@ -935,8 +916,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
 
     bool external = false;
 
-    PRINTF("SCRIPT TYPE: %d\n", script_type);  // TODO: remove
-
     do {
         if (!state->cur_output.has_bip32_derivation) {
             external = true;
@@ -1037,8 +1016,6 @@ static void check_output_owned(dispatcher_context_t *dc) {
         // external output, user needs to validate
         ++state->external_outputs_count;
 
-        PRINTF("Output %d is external\n", state->cur_output_index);  // TODO: remove
-
         dc->next(output_validate_external);
         return;
     } else {
@@ -1108,10 +1085,6 @@ static void confirm_transaction(dispatcher_context_t *dc) {
 
     if (state->inputs_total_value < state->outputs_total_value) {
         // negative fee transaction is invalid
-        PRINTF("TOTAL INS/OUTS: %lu/%lu\n",
-               state->inputs_total_value,
-               state->outputs_total_value);  // TODO: remove
-
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -1680,6 +1653,8 @@ static void sign_segwit(dispatcher_context_t *dc) {
             uint8_t *scriptPubKey = wit_utxo + 9;
 
             crypto_hash_update(&sha_amounts_context.header, wit_utxo, 8);
+
+            crypto_hash_update_varint(&sha_scriptpubkeys_context.header, scriptPubKey_len);
             crypto_hash_update(&sha_scriptpubkeys_context.header, scriptPubKey, scriptPubKey_len);
         }
 
@@ -1885,14 +1860,14 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
     write_u32_le(tmp, 0, state->locktime);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
-    if ((sighash_byte & 0xFF) != SIGHASH_ANYONECANPAY) {
+    if ((sighash_byte & 0x80) != SIGHASH_ANYONECANPAY) {
         crypto_hash_update(&sighash_context.header, state->hashes.sha_prevouts, 32);
         crypto_hash_update(&sighash_context.header, state->hashes.sha_amounts, 32);
         crypto_hash_update(&sighash_context.header, state->hashes.sha_scriptpubkeys, 32);
         crypto_hash_update(&sighash_context.header, state->hashes.sha_sequences, 32);
     }
 
-    if ((sighash_byte & 0xFF) != SIGHASH_NONE && (sighash_byte & 0xFF) != SIGHASH_SINGLE) {
+    if ((sighash_byte & 3) != SIGHASH_NONE && (sighash_byte & 3) != SIGHASH_SINGLE) {
         crypto_hash_update(&sighash_context.header, state->hashes.sha_outputs, 32);
     }
 
@@ -1955,10 +1930,6 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
     // TODO: SIGHASH_SINGLE not implemented
 
     crypto_hash_digest(&sighash_context.header, state->sighash, 32);
-
-    PRINTF("SEGWITV1 SIGHASH: ");  // TODO: remove
-    for (int i = 0; i < 32; i++) PRINTF("%02X", state->sighash[i]);
-    PRINTF("\n");
 
     dc->next(sign_sighash_schnorr);
 }
@@ -2096,9 +2067,12 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     dc->add_to_response(&input_index, 1);
     dc->add_to_response(&sig, sizeof(sig));
 
-    // TODO: do we still add the sighash byte?
+    // only append the sighash type byte if it is non-zero
     uint8_t sighash_byte = (uint8_t) (state->cur_input.sighash_type & 0xFF);
-    dc->add_to_response(&sighash_byte, 1);
+    if (sighash_byte != 0x00) {
+        // only add the sighash byte if not 0
+        dc->add_to_response(&sighash_byte, 1);
+    }
     dc->finalize_response(SW_INTERRUPTED_EXECUTION);
 
     if (dc->process_interruption(dc) < 0) {

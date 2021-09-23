@@ -53,6 +53,13 @@ static const uint8_t secp256k1_p[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x2f};
 
 /**
+ * Curve order for secp256k1
+ */
+static const uint8_t secp256k1_n[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+    0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41};
+
+/**
  * (p + 1)/4, used to calculate square roots in secp256k1
  */
 static const uint8_t secp256k1_sqr_exponent[] = {
@@ -440,8 +447,8 @@ int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t
 
     crypto_tr_tagged_hash(BIP0341_taptweak_tag, sizeof(BIP0341_taptweak_tag), pubkey, 32, t);
 
-    // fail if t is not smaller than the group order
-    if (cx_math_cmp(t, secp256k1_p, 32) >= 0) {
+    // fail if t is not smaller than the curve order
+    if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
         return -1;
     }
 
@@ -476,7 +483,7 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
 
             if (P[64] & 1) {
                 // odd y, negate the secret key
-                cx_math_sub(seckey, secp256k1_p, seckey, 32);
+                cx_math_sub(seckey, secp256k1_n, seckey, 32);
             }
 
             uint8_t t[32];
@@ -486,12 +493,12 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
                                   32,
                                   t);
 
-            // fail if t is not smaller than the group order
-            if (cx_math_cmp(t, secp256k1_p, 32) >= 0) {
+            // fail if t is not smaller than the curve order
+            if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
                 return -1;
             }
 
-            cx_math_addm(seckey, seckey, t, secp256k1_p, 32);
+            cx_math_addm(seckey, seckey, t, secp256k1_n, 32);
         }
         FINALLY {
             explicit_bzero(&P, sizeof(P));
