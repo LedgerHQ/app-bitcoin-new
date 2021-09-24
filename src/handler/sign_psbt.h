@@ -9,19 +9,28 @@ typedef struct {
     merkleized_map_commitment_t map;
 
     bool has_witnessUtxo;
+    bool has_nonWitnessUtxo;
     bool has_redeemScript;
     bool has_sighash_type;
 
     bool has_bip32_derivation;
-    uint8_t
-        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
-                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION or
+                                          // PSBT_IN_TAP_BIP32_DERIVATION key seen.
+                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
+                                          // (taproot), based on the script type.
+
+    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
+                                   // PSBT_IN_BIP32_DERIVATION or PSBT_IN_TAP_BIP32_DERIVATION is
+                                   // not the correct length.
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
     uint8_t prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     int prevout_scriptpubkey_len;
+
+    // the script used when signing, either from the witness utxo or the redeem script
+    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    int script_len;
 
     uint32_t sighash_type;
 
@@ -33,10 +42,14 @@ typedef struct {
     merkleized_map_commitment_t map;
 
     bool has_bip32_derivation;
-    uint8_t
-        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION seen key
-    bool unexpected_pubkey_error;     // set to true if the pubkey in the keydata of
-                                      // PSBT_IN_BIP32_DERIVATION is not 33 bytes long
+    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION or
+                                          // PSBT_OUT_TAP_BIP32_DERIVATION key seen.
+                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
+                                          // (taproot), based on the script type.
+
+    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
+                                   // PSBT_OUT_BIP32_DERIVATION or PSBT_OUT_TAP_BIP32_DERIVATION is
+                                   // not the correct length.
 
     uint64_t value;
     uint8_t scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
@@ -86,6 +99,14 @@ typedef struct {
     };
 
     uint8_t sighash[32];
+
+    struct {
+        uint8_t sha_prevouts[32];
+        uint8_t sha_amounts[32];
+        uint8_t sha_scriptpubkeys[32];
+        uint8_t sha_sequences[32];
+        uint8_t sha_outputs[32];
+    } hashes;
 
     uint64_t inputs_total_value;
     uint64_t outputs_total_value;

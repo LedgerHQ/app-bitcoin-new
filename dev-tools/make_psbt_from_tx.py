@@ -1,25 +1,17 @@
-import sys
-
-sys.path.append("..")
-
 from io import BytesIO, BufferedReader
 from copy import deepcopy
-from typing import List, Optional
-
+from typing import List, Optional, Union
 import pprint
-
-from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
-
-from bitcoin_client.common import hash160, hash256
-
+from bitcoinrpc.authproxy import AuthServiceProxy
+from bitcoin_client.descriptor import get_taproot_output_key
+from bitcoin_client.common import hash160
 from bitcoin_client.tx import CTransaction
-from bitcoin_client.psbt import PSBT
+from bitcoin_client.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from bitcoin_client.key import ExtendedKey, KeyOriginInfo
-
-from bitcoin_client._script import is_p2pkh, is_p2sh, is_p2wpkh, is_p2wsh
+from bitcoin_client._script import is_p2pkh, is_p2tr
 
 # Change accordingly
-txid = "f26b62046101b7cd369eafb3aed5bef343ff3849b98b3cf42dea9cdc78b4c2f4"
+txid = "TODO"
 
 rpc_user = "TODO"
 rpc_password = "TODO"
@@ -65,9 +57,9 @@ def find_pubkey_path(
         tmp = speculos_root_ext_privkey.derive_priv(purpose ^ H)
         tmp = tmp.derive_priv(coin_type ^ H)
         for account in range(max_account):
-            tmp = tmp.derive_priv(account ^ H)
+            tmp2 = tmp.derive_priv(account ^ H)
             for change in [0, 1]:
-                tmp = tmp.derive_priv(change)
+                tmp3 = tmp2.derive_priv(change)
                 for address_index in range(max_address_index):
                     path = [
                         purpose ^ H,
@@ -76,9 +68,44 @@ def find_pubkey_path(
                         change,
                         address_index,
                     ]
-                    expected_privkey = tmp.derive_priv(address_index)
+                    expected_privkey = tmp3.derive_priv(address_index)
 
                     if hash160(expected_privkey.pubkey) == pkh:
+                        return path
+    return None
+
+
+def find_pubkey_path_taproot(
+    pk: bytes,
+    purposes: List[int] = [86],
+    max_account: int = 3,
+    max_address_index: int = 10,
+) -> Optional[List[int]]:
+    """Iterates over plausible paths to find what was the path that generated the key for a P2TR address.
+    Tweaks the pubkey with the hash of itself as suggested in BIP-341.
+    """
+
+    for purpose in purposes:
+        tmp = speculos_root_ext_privkey.derive_priv(purpose ^ H)
+        tmp = tmp.derive_priv(coin_type ^ H)
+        for account in range(max_account):
+            tmp2 = tmp.derive_priv(account ^ H)
+            for change in [0, 1]:
+                tmp3 = tmp2.derive_priv(change)
+                for address_index in range(max_address_index):
+                    path = [
+                        purpose ^ H,
+                        coin_type ^ H,
+                        account ^ H,
+                        change,
+                        address_index,
+                    ]
+                    expected_privkey = tmp3.derive_priv(address_index)
+
+                    tweaked_pubkey = get_taproot_output_key(
+                        expected_privkey.pubkey)
+
+                    if pk == tweaked_pubkey:
                         return path
     return None
 
@@ -115,6 +142,32 @@ def psbt_to_dict(psbt: PSBT) -> dict:
     return res
 
 
+def fill_p2tr_inout(scriptPubKey: bytes, inout: Union[PartiallySignedInput, PartiallySignedOutput]) -> None:
+    """Fills the info of a PSBT PartiallySignedInput or PartiallySignedOutput"""
+
+    assert(is_p2tr(scriptPubKey))
+
+    pubkey = scriptPubKey[2:]
+
+    path = find_pubkey_path_taproot(pubkey)
+
+    if path is None:
+        print("Path not found")
+        return
+
+    print("Path:", path_to_str(path))
+
+    internal_privkey = speculos_root_ext_privkey.derive_priv_path(path)
+    internal_pubkey = internal_privkey.pubkey[1:]
+
+    print("Internal pubkey:", internal_pubkey.hex())
+
+    inout.tap_internal_key = internal_pubkey
+
+    koo = KeyOriginInfo(speculos_master_key_fingerprint, path)
+    inout.tap_hd_keypaths[internal_pubkey] = (list(), koo)
+
+
 def run():
     tx = get_tx_from_id(txid)
 
@@ -130,22 +183,25 @@ def run():
     # pp.pprint(psbt_to_dict(psbt))
 
     for i in range(len(psbt.tx.vin)):
-
+        print(f"Input #{i}")
         scriptSig = tx.vin[i].scriptSig
 
-        # add non_witness_utxo, witness info, redeem script, etc.
         non_witness_utxo = get_tx_from_id("%064x" % tx.vin[i].prevout.hash)
-        psbt.inputs[i].non_witness_utxo = non_witness_utxo
 
-        scriptPubKey = non_witness_utxo.vout[tx.vin[i].prevout.n].scriptPubKey
+        witness_utxo = non_witness_utxo.vout[tx.vin[i].prevout.n]
+        scriptPubKey = witness_utxo.scriptPubKey
 
         if is_p2pkh(scriptPubKey):
-            print("Input 0 is P2PKH")
+            print("Input is P2PKH")
+            # add non_witness_utxo, witness info, redeem script, etc.
+            psbt.inputs[i].non_witness_utxo = non_witness_utxo
+
             pkh = scriptPubKey[3:23]
             path = find_pubkey_path(pkh)
 
             if not path:
-                raise ValueError(f"Unable to generate pubkey with hash: {pkh.hex()}")
+                raise ValueError(
+                    f"Unable to generate pubkey with hash: {pkh.hex()}")
 
             # add pubkey and origin info to PSBT
             privkey = speculos_root_ext_privkey.derive_priv_path(path)
@@ -156,11 +212,11 @@ def run():
 
             # extract expected pubkey and signature for this input
             sig_len = scriptSig[0]
-            sig = scriptSig[1 : 1 + sig_len]
+            sig = scriptSig[1: 1 + sig_len]
 
             assert scriptSig[1 + sig_len] == 33  # pubkey len
 
-            pubkey = scriptSig[1 + sig_len + 1 :]
+            pubkey = scriptSig[1 + sig_len + 1:]
 
             assert len(sig) == sig_len and len(pubkey) == 33
 
@@ -178,12 +234,25 @@ def run():
             policy = f"pkh({key_info})"
 
             print(f"  Expected wallet policy        : {policy}")
+        elif is_p2tr(scriptPubKey):
+            psbt.inputs[i].witness_utxo = witness_utxo
+
+            fill_p2tr_inout(scriptPubKey, psbt.inputs[i])
         else:
-            raise RuntimeError(
-                f"We don't know how to handle this script type: {scriptPubKey.hex()}"
-            )
+            print(
+                f"We don't know how to handle this script type for input: {scriptPubKey.hex()}. Skipping")
 
         print()
+
+    for i in range(len(psbt.tx.vout)):
+        print(f"Output #{i}")
+        scriptPubKey = tx.vout[i].scriptPubKey
+
+        if is_p2tr(scriptPubKey):
+            fill_p2tr_inout(scriptPubKey, psbt.outputs[i])
+        else:
+            print(
+                f"We don't know how to handle this script type for output: {scriptPubKey.hex()}. Skipping")
 
     print("Final psbt:")
     print(psbt.serialize())

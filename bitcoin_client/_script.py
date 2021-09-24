@@ -76,6 +76,16 @@ def is_p2pk(script: bytes) -> bool:
     return (len(script) == 35 or len(script) == 67) and (script[0] == 0x21 or script[0] == 0x41) and script[-1] == 0xac
 
 
+def is_p2tr(script: bytes) -> bool:
+    """
+    Determine whether a script is a P2TR output script.
+
+    :param script: The script
+    :returns: Whether the script is a P2TR output script
+    """
+    return len(script) == 34 and script[0] == 0x51 and script[1] == 0x20
+
+
 def is_witness(script: bytes) -> Tuple[bool, int, bytes]:
     """
     Determine whether a script is a segwit output script.

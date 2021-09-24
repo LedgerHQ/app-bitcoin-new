@@ -77,7 +77,7 @@ def test_get_wallet_address_taproot(cmd: BitcoinCommand):
         name="",
         policy_map="tr(@0)",
         keys_info=[
-            f"[f5acc2fd/86'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**",
+            f"[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**",
         ],
     )
 
@@ -86,3 +86,9 @@ def test_get_wallet_address_taproot(cmd: BitcoinCommand):
 
     res = cmd.get_wallet_address(wallet, None, 0, 9, False)
     assert res == "tb1psl7eyk2jyjzq6evqvan854fts7a5j65rth25yqahkd2a765yvj0qggs5ne"
+
+    res = cmd.get_wallet_address(wallet, None, 1, 0, False)
+    assert res == "tb1pmr60r5vfjmdkrwcu4a2z8h39mzs7a6wf2rfhuml6qgcp940x9cxs7t9pdy"
+
+    res = cmd.get_wallet_address(wallet, None, 1, 9, False)
+    assert res == "tb1p98d6s9jkf0la8ras4nnm72zme5r03fexn29e3pgz4qksdy84ndpqgjak72"

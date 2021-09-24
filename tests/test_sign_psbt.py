@@ -6,6 +6,8 @@ from bitcoin_client.psbt import PSBT
 from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
 
 from .utils import automation
+from .utils import bip0340
+
 
 tests_root: Path = Path(__file__).parent
 
@@ -203,3 +205,40 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
 
 #     with pytest.raises(IncorrectDataError):
 #         cmd.sign_psbt(psbt)
+
+
+@automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
+    # PSBT for a p2tr 1-input 2-output spend (1 change address)
+
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
+
+    wallet = PolicyMapWallet(
+        "",
+        "tr(@0)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+        ],
+    )
+
+    result = cmd.sign_psbt(psbt, wallet, None)
+
+    # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
+    # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
+    # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
+
+    # sighash verified with bitcoin-core
+    sighash0 = bytes.fromhex("7A999E5AD6F53EA6448E7026061D3B4523F957999C430A5A492DFACE74AE31B6")
+
+    # get the (tweaked) pubkey from the scriptPubKey
+    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+
+    assert len(result) == 1
+
+    # the sighash 0x01 is appended to the signature
+    assert len(result[0]) == 64+1
+    assert result[0][-1] == 0x01
+
+    sig0 = result[0][:-1]
+
+    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
