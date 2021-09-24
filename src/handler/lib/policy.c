@@ -383,8 +383,25 @@ int get_sortedmulti_script(_policy_parser_args_t *args,
             break;
         }
 
-        // sort the pubkeys
-        qsort(compressed_pubkeys, root->n, sizeof(uint8_t *), cmp_compressed_pubkeys);
+        // sort the pubkey pointers (we avoid use qsort, as it takes ~700 bytes in binary size)
+
+        // qsort(compressed_pubkeys, root->n, sizeof(uint8_t *), cmp_compressed_pubkeys);
+
+        // bubble sort
+        bool swapped;
+        do {
+            swapped = false;
+            for (unsigned int i = 1; i < root->n; i++) {
+                if (cmp_compressed_pubkeys(&compressed_pubkeys[i - 1], &compressed_pubkeys[i]) >
+                    0) {
+                    swapped = true;
+
+                    uint8_t *t = compressed_pubkeys[i - 1];
+                    compressed_pubkeys[i - 1] = compressed_pubkeys[i];
+                    compressed_pubkeys[i] = t;
+                }
+            }
+        } while (swapped);
 
         for (unsigned int i = 0; i < root->n; i++) {
             // push <i-th pubkey> (33 = 0x21 bytes)
