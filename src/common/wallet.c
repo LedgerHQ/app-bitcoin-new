@@ -508,6 +508,8 @@ int get_script_type(const uint8_t script[], size_t script_len) {
     return -1;
 }
 
+#ifndef SKIP_FOR_CMOCKA
+
 // TODO: add unit tests
 int get_script_address(const uint8_t script[],
                        size_t script_len,
@@ -561,8 +563,6 @@ int get_script_address(const uint8_t script[],
     out[addr_len] = '\0';
     return addr_len;
 }
-
-#ifndef SKIP_FOR_CMOCKA
 
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]) {
     cx_sha256_t wallet_hash_context;
