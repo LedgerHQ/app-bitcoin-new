@@ -273,6 +273,34 @@ For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
 <!-- TODO: once the path checking is added for default wallet, document it here -->
 
+### GET_MASTER_FINGERPRINT
+
+Returns the fingerprint of the master public key, as defined in [BIP-0032#Key identifiers](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#key-identifiers).
+
+#### Encoding
+
+**Command**
+
+| *CLA* | *INS* |
+|-------|-------|
+| E1    | 04    |
+
+**Input data**
+
+No input data.
+
+**Output data**
+
+| Length | Description                |
+|--------|----------------------------|
+| `4`    | The master key fingerprint |
+
+#### Description
+
+The fingerprint is necessary to fill the key origin information for some PSBT fields, or to create wallet descriptors.
+
+User interaction is not required for this command.
+
 #### Client commands
 
 `GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
