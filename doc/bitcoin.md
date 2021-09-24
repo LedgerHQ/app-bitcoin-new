@@ -283,7 +283,7 @@ Returns the fingerprint of the master public key, as defined in [BIP-0032#Key id
 
 | *CLA* | *INS* |
 |-------|-------|
-| E1    | 04    |
+| E1    | 05    |
 
 **Input data**
 
