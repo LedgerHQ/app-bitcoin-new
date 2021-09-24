@@ -15,7 +15,7 @@ Our implementation of Merkle trees loosely follow the structure defined in [RFC 
 
 We call a *byte string* an arbitrary array of bytes, where each byte is a value between `0` and `255`. A *hash function* takes as input an arbitrary length byte string, and produces a fixed-length output. Outputs of SHA-256 are 32 bytes long.
 
-Following the notation of RFC 6962, we are given an ordered list of inputs `D[n] = {d(0), d(1), ..., d(n-1)}`, where each element `d(i)` is a byte string. We denote with `||` the concatenation operator, and with `D[a:b]` the list `D[d(a), d(a+1), ..., d(b - 1)]`.
+Following the notation of RFC 6962, we are given an ordered list of inputs `D[n] = {d(0), d(1), ..., d(n-1)}`, where each element `d(i)` is a byte string. We denote with `||` the concatenation operator, and with `D[a:b]` the list `{d(a), d(a+1), ..., d(b - 1)}`.
 
 We define the Merkle Tree Hash (MTH) (also called the *Merkle root*) as follows. 
 
@@ -33,7 +33,7 @@ Note that the 1-byte prefix `0x00` is prepended when computing the leaf hashes, 
 
 ### Merkle proofs
 
-The Merkle proof (called *Merkle audit path* in the language for RFC 6962) for a leaf node in the minimal set of additional nodes that is necessary to compute the Merkle Tree Hash. See section 2.1.3. of RFC 6962 for some examples.
+The Merkle proof (called *Merkle audit path* in the language for RFC 6962) for a leaf node is the minimal set of additional nodes that is necessary to compute the Merkle Tree Hash. See section 2.1.3. of RFC 6962 for some examples.
 
 For any non-root node of the tree (either internal or leaf), let the *brother* be the unique other note sharing the same parent, that is the unique other node whose hash is combined together to compute an internal node.
 
