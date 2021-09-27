@@ -273,6 +273,16 @@ For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
 <!-- TODO: once the path checking is added for default wallet, document it here -->
 
+#### Client commands
+
+`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
+
+The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` for all the Merkle trees in the input, including each of the Merkle trees for keys and values of the Merkleized map commitments of each of the inputs/outputs maps of the psbt.
+
+The `GET_MORE_ELEMENTS` command must be handled.
+
+The `YIELD` command must be processed in order to receive the signatures.
+
 ### GET_MASTER_FINGERPRINT
 
 Returns the fingerprint of the master public key, as defined in [BIP-0032#Key identifiers](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#key-identifiers).
@@ -300,16 +310,6 @@ No input data.
 The fingerprint is necessary to fill the key origin information for some PSBT fields, or to create wallet descriptors.
 
 User interaction is not required for this command.
-
-#### Client commands
-
-`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
-
-The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` for all the Merkle trees in the input, including each of the Merkle trees for keys and values of the Merkleized map commitments of each of the inputs/outputs maps of the psbt.
-
-The `GET_MORE_ELEMENTS` command must be handled.
-
-The `YIELD` command must be processed in order to receive the signatures.
 
 ## Client commands reference
 
