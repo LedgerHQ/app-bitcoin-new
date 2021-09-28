@@ -99,12 +99,12 @@ Returns an extended public key at the given derivation path.
 #### Description
 
 This command returns the extended public key for the given BIP 32 path.
-If the `display` parameter is `1`, the result is also shown on the secure screen for verification.
 
-The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki), [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) and [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) are considered standard. 
+The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki), [BIP-48](https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki), [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki), [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) and [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki), either in full or are at the deepest hardened level (excluding `change` and `address_index`), are considered standard.
 
-If the path is not standard, a warning is shown on-screen; in that case, the pubkey is only returned after user's confirmation *even if tie `display` parameter is `0`*.
+If the `display` parameter is `0` and the path is not standard, an error is returned.
 
+If the `display` parameter is `1`, the result is also shown on the secure screen for verification. The UX flow shows on the device screen the exact path and the complete serialized extended pubkey as defined in [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for that path. If the path is not standard, an additional warning is shown to the user. 
 
 ### GET_ADDRESS
 
