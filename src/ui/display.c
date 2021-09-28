@@ -48,16 +48,16 @@ extern dispatcher_context_t G_dispatcher_context;
 //       (especially since the same flow step can be shared in different flows)
 
 typedef struct {
-    char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
 } ui_path_state_t;
 
 typedef struct {
-    char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
     char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 } ui_path_and_pubkey_state_t;
 
 typedef struct {
-    char bip32_path[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
 } ui_path_and_address_state_t;
 
@@ -114,7 +114,7 @@ UX_STEP_NOCB(ux_display_unusual_derivation_path_step,
              {
                  &C_icon_warning,
                  "The derivation",
-                 "path is unusual!",
+                 "path is unusual",
              });
 
 // Step with icon and text to caution the user to reject if unsure
@@ -158,7 +158,7 @@ UX_STEP_NOCB(ux_display_path_step,
              bnnn_paging,
              {
                  .title = "Path",
-                 .text = g_ui_state.path_and_pubkey.bip32_path,
+                 .text = g_ui_state.path_and_pubkey.bip32_path_str,
              });
 
 // Step with title/text for pubkey
@@ -287,11 +287,28 @@ UX_FLOW(ux_display_pubkey_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
+// FLOW to display BIP32 path and pubkey, for a non-standard path:
+// #1 screen: warning icon + "The derivation path is unusual"
+// #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #3 screen: eye icon + "Confirm Pubkey"
+// #4 screen: display BIP32 Path
+// #5 screen: display pubkey
+// #6 screen: approve button
+// #7 screen: reject button
+UX_FLOW(ux_display_pubkey_suspicious_flow,
+        &ux_display_unusual_derivation_path_step,
+        &ux_display_confirm_pubkey_step,
+        &ux_display_path_step,
+        &ux_display_reject_if_not_sure_step,
+        &ux_display_pubkey_step,
+        &ux_display_approve_step,
+        &ux_display_reject_step);
+
 // FLOW to display a receive address, for a standard path:
 // #1 screen: eye icon + "Confirm Address"
-// #3 screen: display address
-// #4 screen: approve button
-// #5 screen: reject button
+// #2 screen: display address
+// #3 screen: approve button
+// #4 screen: reject button
 UX_FLOW(ux_display_address_flow,
         &ux_display_confirm_address_step,
         &ux_display_address_step,
@@ -299,7 +316,7 @@ UX_FLOW(ux_display_address_flow,
         &ux_display_reject_step);
 
 // FLOW to display a receive address, for a non-standard path:
-// #1 screen: warning icon + "The derivation path is unusual!"
+// #1 screen: warning icon + "The derivation path is unusual"
 // #2 screen: display BIP32 Path
 // #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
 // #4 screen: eye icon + "Confirm Address"
@@ -315,10 +332,13 @@ UX_FLOW(ux_display_address_suspicious_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-// FLOW to warn the user if a change output has an unusual derivation path (account index or address
-// index too large): #1 screen: warning icon + "The derivation path is unusual!" #2 screen: display
-// BIP32 Path #3 screen: crossmark icon + "Reject if not sure" (user can reject here) #4 screen:
-// approve button #5 screen: reject button
+// FLOW to warn the user if a change output has an unusual derivation path
+// (e.g. account index or address index too large):
+// #1 screen: warning icon + "The derivation path is unusual"
+// #2 screen: display BIP32 Path
+// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #4 screen: approve button
+// #5 screen: reject button
 UX_FLOW(ux_display_unusual_derivation_path_flow,
         &ux_display_unusual_derivation_path_step,
         &ux_display_path_step,
@@ -412,19 +432,24 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_display_reject_step);
 
 void ui_display_pubkey(dispatcher_context_t *context,
-                       char *bip32_path,
+                       char *bip32_path_str,
+                       bool is_path_suspicious,
                        char *pubkey,
                        action_validate_cb callback) {
     (void) (context);
 
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
-    strncpy(state->bip32_path, bip32_path, sizeof(state->bip32_path));
+    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
 
     g_validate_callback = callback;
 
-    ux_flow_init(0, ux_display_pubkey_flow, NULL);
+    if (!is_path_suspicious) {
+        ux_flow_init(0, ux_display_pubkey_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_display_pubkey_suspicious_flow, NULL);
+    }
 }
 
 void ui_display_address(dispatcher_context_t *context,
@@ -443,7 +468,7 @@ void ui_display_address(dispatcher_context_t *context,
     if (!is_path_suspicious) {
         ux_flow_init(0, ux_display_address_flow, NULL);
     } else {
-        strncpy(state->bip32_path, path_str, sizeof(state->bip32_path));
+        strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
         ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
     }
 }
@@ -514,7 +539,7 @@ void ui_display_wallet_address(dispatcher_context_t *context,
 }
 
 void ui_display_unusual_path(dispatcher_context_t *context,
-                             char *path_str,
+                             char *bip32_path_str,
                              action_validate_cb callback) {
     (void) (context);
 
@@ -522,7 +547,7 @@ void ui_display_unusual_path(dispatcher_context_t *context,
 
     g_validate_callback = callback;
 
-    strncpy(state->bip32_path, path_str, sizeof(state->bip32_path));
+    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
     ux_flow_init(0, ux_display_unusual_derivation_path_flow, NULL);
 }
 

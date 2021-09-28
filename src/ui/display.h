@@ -17,15 +17,16 @@ typedef void (*action_validate_cb)(dispatcher_context_t *dispatcher_context, boo
  * TODO: document params
  */
 void ui_display_pubkey(dispatcher_context_t *dispatcher_context,
-                       char *path,
-                       char *xpub,
+                       char *bip32_path_str,
+                       bool is_path_suspicious,
+                       char *pubkey,
                        action_validate_cb callback);
 
 // TODO: docs
 void ui_display_address(dispatcher_context_t *dispatcher_context,
                         char *address,
                         bool is_path_suspicious,
-                        char *path_str,
+                        char *bip32_path_str,
                         action_validate_cb callback);
 
 void ui_display_wallet_header(dispatcher_context_t *context,
@@ -45,7 +46,7 @@ void ui_display_wallet_address(dispatcher_context_t *context,
                                action_validate_cb callback);
 
 void ui_display_unusual_path(dispatcher_context_t *context,
-                             char *path_str,
+                             char *bip32_path_str,
                              action_validate_cb callback);
 
 void ui_authorize_wallet_spend(dispatcher_context_t *context,
