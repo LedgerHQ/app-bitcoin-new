@@ -116,20 +116,20 @@ class GetMerkleLeafProofCommand(ClientCommand):
             )
 
         proof = mt.prove_leaf(leaf_index)
-        n_proof_elements = len(proof) // 32
 
         # Compute how many elements we can fit in 255 - 32 - 1 - 1 = 221 bytes
         n_response_elements = min((255 - 32 - 1 - 1) // 32, len(proof))
         n_leftover_elements = len(proof) - n_response_elements
 
         # Add to the queue any proof elements that do not fit the response
-        self.queue.extend(proof[-n_leftover_elements:])
+        if (n_leftover_elements > 0):
+            self.queue.extend(proof[-n_leftover_elements:])
 
         return b"".join(
             [
                 mt.get(leaf_index),
                 len(proof).to_bytes(1, byteorder="big"),
-                n_proof_elements.to_bytes(1, byteorder="big"),
+                n_response_elements.to_bytes(1, byteorder="big"),
                 *proof[:n_response_elements],
             ]
         )
