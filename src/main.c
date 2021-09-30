@@ -150,7 +150,7 @@ void app_main() {
 
         if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
             if (G_app_mode != APP_MODE_LEGACY) {
-                memset(&btchip_context_D, 0, sizeof(btchip_context_D));
+                explicit_bzero(&btchip_context_D, sizeof(btchip_context_D));
 
                 btchip_context_init();
 
@@ -171,7 +171,7 @@ void app_main() {
             }
         } else {
             if (G_app_mode != APP_MODE_NEW) {
-                memset(&G_command_state, 0, sizeof(G_command_state));
+                explicit_bzero(&G_command_state, sizeof(G_command_state));
 
                 G_app_mode = APP_MODE_NEW;
             }
