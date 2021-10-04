@@ -60,7 +60,7 @@ The app supports a number of features related to wallet policies. In order to se
 - show the addresses for a registered wallet on the trusted screen;
 - sign spends from the wallet. 
 
-Since the application is stateless, wallet registration is not persisted on device. In order to make it possible to use a registered wallet in future requests, the device returns a hmac-sha256 (32 bits long) for the wallet upon a successful registration. The client side is responsible for persisting the wallet policy *and* the returned hmac-sha256, and to provide this information in future requests.
+Since the application is stateless, wallet registration is not persisted on device. In order to make it possible to use a registered wallet in future requests, the device returns a hmac-sha256 (32 bytes long) for the wallet upon a successful registration. The client side is responsible for persisting the wallet policy *and* the returned hmac-sha256, and to provide this information in future requests.
 
 As the symmetric key used for hmac-sha256 is deterministically derived from the hardware wallet seed (using [SLIP-0021](https://github.com/satoshilabs/slips/blob/master/slip-0021.md)), the completed wallet registration is non-revokable.
 
