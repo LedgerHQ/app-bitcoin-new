@@ -3,7 +3,7 @@ from typing import List
 
 from hashlib import sha256
 
-from .common import serialize_str, AddressType
+from .common import serialize_str, AddressType, write_varint
 from .merkle import MerkleTree, element_hash
 
 class WalletType(IntEnum):
@@ -37,9 +37,9 @@ class PolicyMapWallet(Wallet):
        - 1 byte   : wallet type
        - 1 byte   : length of the wallet name (max 16)
        - (var)    : wallet name (ASCII string)
-       - 1 byte   : length of the policy map, at most 74 bytes at this time
+       - (varint) : length of the policy map, at most 74 bytes at this time
        - (var)    : policy map
-       - 1 byte   : number of keys (not larger than 252)
+       - (varint) : number of keys (not larger than 252)
        - 32-bytes : root of the Merkle tree of all the keys information.
 
     The specific format of the keys is deferred to subclasses.
@@ -59,9 +59,9 @@ class PolicyMapWallet(Wallet):
 
         return b"".join([
             super().serialize(),
-            len(self.policy_map).to_bytes(2, byteorder="big"),
+            write_varint(len(self.policy_map)),
             self.policy_map.encode("latin-1"),
-            len(self.keys_info).to_bytes(2, byteorder="big"),
+            write_varint(len(self.keys_info)),
             MerkleTree(keys_info_hashes).root
         ])
 

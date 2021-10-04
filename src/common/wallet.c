@@ -83,9 +83,11 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
     }
     header->name[header->name_len] = '\0';
 
-    if (!buffer_read_u16(buffer, &header->policy_map_len, BE)) {
+    uint64_t policy_map_len;
+    if (!buffer_read_varint(buffer, &policy_map_len) || policy_map_len > 74) {
         return -6;
     }
+    header->policy_map_len = (uint16_t) policy_map_len;
 
     if (header->policy_map_len > MAX_POLICY_MAP_STR_LENGTH) {
         return -7;
@@ -95,11 +97,11 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
         return -8;
     }
 
-    uint16_t n_keys;
-    if (!buffer_read_u16(buffer, &n_keys, BE)) {
+    uint64_t n_keys;
+    if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
         return -9;
     }
-    header->n_keys = n_keys;
+    header->n_keys = (uint16_t) n_keys;
 
     if (!buffer_read_bytes(buffer, (uint8_t *) header->keys_info_merkle_root, 32)) {
         return -10;
@@ -572,12 +574,12 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
     crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->name_len);
     crypto_hash_update(&wallet_hash_context.header, wallet_header->name, wallet_header->name_len);
 
-    crypto_hash_update_u16(&wallet_hash_context.header, wallet_header->policy_map_len);
+    crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->policy_map_len);
     crypto_hash_update(&wallet_hash_context.header,
                        wallet_header->policy_map,
                        wallet_header->policy_map_len);
 
-    crypto_hash_update_u16(&wallet_hash_context.header, wallet_header->n_keys);
+    crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->n_keys);
 
     crypto_hash_update(&wallet_hash_context.header, wallet_header->keys_info_merkle_root, 32);
 

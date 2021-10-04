@@ -34,7 +34,6 @@ class BitcoinInsType(enum.IntEnum):
     GET_WALLET_ADDRESS = 0x03
     SIGN_PSBT = 0x04
     GET_MASTER_FINGERPRINT = 0x05
-    GET_SUM_OF_SQUARES = 0xF0
 
 
 class FrameworkInsType(enum.IntEnum):
