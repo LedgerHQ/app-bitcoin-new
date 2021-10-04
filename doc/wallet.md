@@ -73,10 +73,12 @@ A registered wallet policy comprises the following:
 
 The wallet policy is serialized as the concatenation of:
 
-- `1 byte`: the length of the wallet name
-- `<variable length>`:  the wallet name
-- `<variable length>`: the length of the wallet descriptor template, as a Bitcoin-style variable-length integer
-- `<variable length>`: the wallet descriptor template
+- `1 byte`: a byte equal to `0x01`, reserved for future use
+- `1 byte`: the length of the wallet name (0 for standard wallet)
+- `<variable length>`:  the wallet name (empty for standard wallets)
+- `<variable length>`: the length of the wallet descriptor template, encoded as a Bitcoin-style variable-length integer
+- `<variable length>`: the wallet descriptor template, as an ascii string (no terminating 0)
+- `<variable length>`: the number of keys in the list of keys, encoded as a Bitcoin-style variable-length integer
 - `<32 bytes>`: the root of the canonical Merkle tree of the list of keys.
 
 See [merkle](merkle.md) for information on Merkle trees.
