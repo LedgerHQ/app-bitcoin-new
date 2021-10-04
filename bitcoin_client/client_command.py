@@ -55,31 +55,32 @@ class GetPreimageCommand(ClientCommand):
         req_hash = req.read_bytes(32)
         req.assert_empty()
 
-        for known_hash, known_preimage in self.known_preimages.items():
-            if req_hash == known_hash:
-                preimage_len_out = write_varint(len(known_preimage))
+        if req_hash in self.known_preimages:
+            known_preimage = self.known_preimages[req_hash]
 
-                # We can send at most 255 - len(preimage_len_out) - 1 bytes in a single message;
-                # the rest will be stored for GET_MORE_ELEMENTS
+            preimage_len_out = write_varint(len(known_preimage))
 
-                max_payload_size = 255 - len(preimage_len_out) - 1
+            # We can send at most 255 - len(preimage_len_out) - 1 bytes in a single message;
+            # the rest will be stored for GET_MORE_ELEMENTS
 
-                payload_size = min(max_payload_size, len(known_preimage))
+            max_payload_size = 255 - len(preimage_len_out) - 1
 
-                if payload_size < len(known_preimage):
-                    # split into list of length-1 bytes elements
-                    extra_elements = [
-                        known_preimage[i: i + 1]
-                        for i in range(payload_size, len(known_preimage))
-                    ]
-                    # add to the queue any remaining extra bytes
-                    self.queue.extend(extra_elements)
+            payload_size = min(max_payload_size, len(known_preimage))
 
-                return (
-                    preimage_len_out
-                    + payload_size.to_bytes(1, byteorder="big")
-                    + known_preimage[:payload_size]
-                )
+            if payload_size < len(known_preimage):
+                # split into list of length-1 bytes elements
+                extra_elements = [
+                    known_preimage[i: i + 1]
+                    for i in range(payload_size, len(known_preimage))
+                ]
+                # add to the queue any remaining extra bytes
+                self.queue.extend(extra_elements)
+
+            return (
+                preimage_len_out
+                + payload_size.to_bytes(1, byteorder="big")
+                + known_preimage[:payload_size]
+            )
 
         # not found
         raise RuntimeError(f"Requested unknown preimage for: {req_hash.hex()}")
