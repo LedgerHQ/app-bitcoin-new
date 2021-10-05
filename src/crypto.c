@@ -87,6 +87,7 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t bip32_path_len) {
     uint8_t raw_private_key[32] = {0};
 
+    int ret = 0;
     BEGIN_TRY {
         TRY {
             // derive the seed with bip32_path
@@ -103,13 +104,16 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                                      sizeof(raw_private_key),
                                      private_key);
         }
+        CATCH_ALL {
+            ret = -1;
+        }
         FINALLY {
             explicit_bzero(&raw_private_key, sizeof(raw_private_key));
         }
     }
     END_TRY;
 
-    return 0;
+    return ret;
 }
 
 // TODO: missing unit tests
@@ -477,6 +481,7 @@ int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t
 int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
     uint8_t P[65];
 
+    int ret = 0;
     BEGIN_TRY {
         TRY {
             secp256k1_point(seckey, P);
@@ -495,18 +500,24 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
 
             // fail if t is not smaller than the curve order
             if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
-                return -1;
+                CLOSE_TRY;
+                ret = -1;
+                goto end;
             }
 
             cx_math_addm(seckey, seckey, t, secp256k1_n, 32);
         }
+        CATCH_ALL {
+            ret = -1;
+        }
         FINALLY {
+        end:
             explicit_bzero(&P, sizeof(P));
         }
     }
     END_TRY;
 
-    return 0;
+    return ret;
 }
 
 // BIP0340 Schnorr signatures (TODO: remove once firmware/sdk is upgraded)

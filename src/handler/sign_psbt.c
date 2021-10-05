@@ -1959,6 +1959,7 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     uint8_t sig[MAX_DER_SIG_LEN];
 
     int sig_len = 0;
+    bool error = false;
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
@@ -1971,15 +1972,20 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
                                     MAX_DER_SIG_LEN,
                                     &info);
         }
-        CATCH_OTHER(e) {
-            SEND_SW(dc, SW_BAD_STATE);
-            return;
+        CATCH_ALL {
+            error = true;
         }
         FINALLY {
             explicit_bzero(&private_key, sizeof(private_key));
         }
     }
     END_TRY;
+
+    if (error) {
+        // unexpected error when signing
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
 
     // yield signature
     uint8_t cmd = CCMD_YIELD;
@@ -2026,6 +2032,7 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     uint8_t sig[64];
     size_t sig_len = 72;  // TODO: remove, workaround for bug in cx_ecschnorr_sign_no_throw
 
+    bool error = false;
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
@@ -2044,15 +2051,20 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
                 return;
             }
         }
-        CATCH_OTHER(e) {
-            SEND_SW(dc, SW_BAD_STATE);
-            return;
+        CATCH_ALL {
+            error = true;
         }
         FINALLY {
             explicit_bzero(&private_key, sizeof(private_key));
         }
     }
     END_TRY;
+
+    if (error) {
+        // unexpected error when signing
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
 
     if (sig_len != 64) {
         PRINTF("SIG LEN: %d\n", sig_len);
