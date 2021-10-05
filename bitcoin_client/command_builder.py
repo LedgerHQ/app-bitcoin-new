@@ -5,8 +5,6 @@ from bitcoin_client.common import bip32_path_from_string, AddressType, write_var
 from bitcoin_client.merkle import get_merkleized_map_commitment, MerkleTree, element_hash
 from bitcoin_client.wallet import Wallet
 
-MAX_APDU_LEN: int = 255
-
 
 def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
     size: int = len(data)
@@ -106,24 +104,6 @@ class BitcoinCommandBuilder:
         return self.serialize(
             cla=self.CLA_BITCOIN,
             ins=BitcoinInsType.GET_PUBKEY,
-            cdata=cdata,
-        )
-
-    def get_address(
-        self, address_type: AddressType, bip32_path: List[int], display: bool = False
-    ):
-        bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
-
-        cdata: bytes = b"".join([
-            b'\1' if display else b'\0',
-            address_type.to_bytes(1, byteorder="big"),
-            len(bip32_paths).to_bytes(1, byteorder="big"),
-            *bip32_paths
-        ])
-
-        return self.serialize(
-            cla=self.CLA_BITCOIN,
-            ins=BitcoinInsType.GET_ADDRESS,
             cdata=cdata,
         )
 

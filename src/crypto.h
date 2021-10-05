@@ -53,33 +53,11 @@ typedef struct {
  *   Number of path in BIP32 path.
  *
  * @return 0 if success, -1 otherwise.
- *
- * @throw INVALID_PARAMETER
- *
  */
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t chain_code[static 32],
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len);
-
-/**
- * Initialize public key given private key.
- *
- * @param[in]  private_key
- *   Pointer to private key.
- * @param[out] public_key
- *   Pointer to public key.
- * @param[out] raw_public_key
- *   Pointer to raw public key.
- *
- * @return 0 if success, -1 otherwise.
- *
- * @throw INVALID_PARAMETER
- *
- */
-int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
-                           cx_ecfp_public_key_t *public_key,
-                           uint8_t raw_public_key[static 64]);
 
 /**
  * Initialize public key given private key.

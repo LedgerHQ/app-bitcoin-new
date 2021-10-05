@@ -14,7 +14,6 @@ The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that u
 | CLA | INS | COMMAND NAME       | DESCRIPTION |
 |-----|-----|--------------------|-------------|
 |  E1 |  00 | GET_PUBKEY         | Return (and optionally show on screen) extended pubkey |
-|  E1 |  01 | GET_ADDRESS        | Return (and optionally show on screen) an internal address |
 |  E1 |  02 | REGISTER_WALLET    | Registers a wallet on the device (with user's approval) |
 |  E1 |  03 | GET_WALLET_ADDRESS | Return and show on screen an address for a registered or default wallet |
 |  E1 |  04 | SIGN_PSBT          | Signs a PSBT with a registered or default wallet |
@@ -105,49 +104,6 @@ The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-00
 If the `display` parameter is `0` and the path is not standard, an error is returned.
 
 If the `display` parameter is `1`, the result is also shown on the secure screen for verification. The UX flow shows on the device screen the exact path and the complete serialized extended pubkey as defined in [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for that path. If the path is not standard, an additional warning is shown to the user. 
-
-### GET_ADDRESS
-
-Returns an address at a given derivation path.
-
-#### Encoding
-
-**Command**
-
-| *CLA* | *INS* |
-|-------|-------|
-| E1    | 01    |
-
-**Input data**
-
-| Length | Name              | Description |
-|--------|-------------------|-------------|
-| `1`    | `display`         | `0` or `1`  |
-| `1`    | `address_type`    | `1` (legacy), `2` (segwit) or `3` (nested segwit) |
-| `1`    | `n`               | Number of derivation steps (maximum 6) |
-| `4`    | `bip32_path[0]`   | First derivation step (big endian) |
-| `4`    | `bip32_path[1]`   | Second derivation step (big endian) |
-|        | ...               |             |
-| `4`    | `bip32_path[n-1]` | `n`-th derivation step (big endian) |
-
-**Output data**
-
-| Length  | Description           |
-|---------|-----------------------|
-| `<var>` | The requested address |
-
-#### Description
-
-This command returns the address corresponding to the given BIP 32 path, for the specified address type. The address type must be either:
-- `1` for a legacy address (P2PKH);
-- `2` for a bech32 native SegWit address (P2SH);
-- `3` for a nested SegWit address (P2SH-P2WPKH).
-
-If the `display` parameter is `1`, the address is shown to the user for validation.
-
-The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki), [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) and [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki) are considered standard.  
-
-If the path is not standard, a warning is shown on-screen; in that case, the address is only returned after user's confirmation *even if tie `display` parameter is `0`.
 
 ### REGISTER_WALLET
 

@@ -80,7 +80,6 @@ static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
     return cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, out, 65, k, 32);
 }
 
-// TODO: missing unit tests
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t chain_code[static 32],
                               const uint32_t *bip32_path,
@@ -114,19 +113,6 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
     END_TRY;
 
     return ret;
-}
-
-// TODO: missing unit tests
-// TODO: get rid of this function, it doesn't make much sense
-int crypto_init_public_key(cx_ecfp_private_key_t *private_key,
-                           cx_ecfp_public_key_t *public_key,
-                           uint8_t raw_public_key[static 64]) {
-    // generate corresponding public key
-    cx_ecfp_generate_pair(CX_CURVE_256K1, public_key, private_key, 1);
-
-    memmove(raw_public_key, public_key->W + 1, 64);
-
-    return 0;
 }
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
@@ -277,7 +263,10 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
     }
 
     // generate corresponding public key
-    crypto_init_public_key(&private_key, &public_key, keydata.raw_public_key);
+    cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
+
+    memmove(keydata.raw_public_key, public_key.W + 1, 64);
+
     // reset private key
     explicit_bzero(&private_key, sizeof(private_key));  // delete sensitive data
     // compute compressed public key

@@ -65,11 +65,6 @@ uint8_t G_app_mode;
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
-        .ins = GET_ADDRESS,
-        .handler = (command_handler_t)handler_get_address
-    },
-    {
-        .cla = CLA_APP,
         .ins = GET_PUBKEY,
         .handler = (command_handler_t)handler_get_pubkey
     },

@@ -2,7 +2,6 @@
 
 #include "boilerplate/dispatcher.h"
 #include "constants.h"
-#include "handler/get_address.h"
 #include "handler/get_master_fingerprint.h"
 #include "handler/get_pubkey.h"
 #include "handler/get_wallet_address.h"
@@ -14,7 +13,6 @@
  */
 typedef enum {
     GET_PUBKEY = 0x00,
-    GET_ADDRESS = 0x01,
     REGISTER_WALLET = 0x02,
     GET_WALLET_ADDRESS = 0x03,
     SIGN_PSBT = 0x04,
@@ -25,7 +23,6 @@ typedef enum {
  * Union of the global state for all the commands.
  */
 typedef union {
-    get_address_state_t get_address_state;
     get_master_fingerprint_t get_master_fingerprint;
     get_pubkey_state_t get_pubkey_state;
     register_wallet_state_t register_wallet_state;

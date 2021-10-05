@@ -117,34 +117,6 @@ class BitcoinCommand:
 
         return response.decode()
 
-    def get_address(
-        self, address_type: AddressType, bip32_path: str, display: bool = False
-    ) -> str:
-        """Get an address given address type and BIP32 path. Optionally, validate with the user.
-
-        Parameters
-        ----------
-        address_type : AddressType
-            Type of address. Could be AddressType.LEGACY, AddressType.WIT, AddressType.SH_WIT.
-        bip32_path : str
-            BIP32 path of the public key you want.
-        display : bool
-            Whether you want to display address and ask confirmation on the device.
-
-        Returns
-        -------
-        str
-            The requested address.
-        """
-        sw, response = self.make_request(
-            self.builder.get_address(address_type, bip32_path, display)
-        )
-
-        if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
-
-        return response.decode()
-
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
         """Registers a wallet policy with the user. After approval returns the wallet id and hmac to be stored on the client.
 
