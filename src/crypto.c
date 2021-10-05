@@ -142,8 +142,10 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
 
-    // TODO: should fail if I_L is not smaller than the group order n, but the probability is <
-    // 1/2^128
+    // fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
+    if (cx_math_cmp(I_L, secp256k1_n, 32) >= 0) {
+        return -1;
+    }
 
     uint8_t child_uncompressed_pubkey[65];
 
