@@ -94,7 +94,11 @@ typedef union {
     ui_validate_transaction_state_t validate_transaction;
 } ui_state_t;
 
+#ifdef TARGET_NANOS
 ui_state_t __attribute__((section(".new_globals"))) g_ui_state;
+#else
+ui_state_t g_ui_state;
+#endif
 
 /*
     STATELESS STEPS

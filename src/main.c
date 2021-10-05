@@ -50,11 +50,20 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
+#ifdef TARGET_NANOS
+// on NanoS only, we optimize the usage of the globals with a custom linker script
 command_state_t __attribute__((section(".new_globals"))) G_command_state;
 dispatcher_context_t __attribute__((section(".new_globals"))) G_dispatcher_context;
 
 // legacy variables
 btchip_context_t __attribute__((section(".legacy_globals"))) btchip_context_D;
+#else
+command_state_t G_command_state;
+dispatcher_context_t G_dispatcher_context;
+
+// legacy variables
+btchip_context_t btchip_context_D;
+#endif
 
 // shared between legacy and new
 global_context_t *G_coin_config;  // same type as btchip_altcoin_config_t

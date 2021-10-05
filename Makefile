@@ -39,12 +39,10 @@ ifndef COIN
 COIN=bitcoin_testnet
 endif
 
-# Custom linking script to overlay legacy globals and new globals
+# Custom NanoS linking script to overlap legacy globals and new globals
 ifeq ($(TARGET_NAME),TARGET_NANOS)
 SCRIPT_LD:=$(CURDIR)/script-nanos.ld
-else ifeq ($(TARGET_NAME),TARGET_NANOX)
-SCRIPT_LD:=$(CURDIR)/script-nanox.ld
-else
+else ifneq ($(TARGET_NAME),TARGET_NANOX)
 $(error Unknown target: $(TARGET_NAME))
 endif
 
