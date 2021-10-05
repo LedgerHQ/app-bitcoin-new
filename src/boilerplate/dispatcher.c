@@ -77,10 +77,6 @@ static void start_flow(command_processor_t first_processor,
     G_dispatcher_context.machine_context_ptr = subcontext;
 }
 
-static void run_callback(dispatcher_callback_descriptor_t cb, buffer_t *calldata) {
-    cb.fn(cb.state, calldata);
-}
-
 // TODO: refactor code in common with the main apdu loop
 static int process_interruption(dispatcher_context_t *dc) {
     command_t cmd;
@@ -151,7 +147,6 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.pause = pause;
     G_dispatcher_context.run = run;
     G_dispatcher_context.start_flow = start_flow;
-    G_dispatcher_context.run_callback = run_callback;
     G_dispatcher_context.process_interruption = process_interruption;
 
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);

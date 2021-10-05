@@ -58,7 +58,6 @@ struct dispatcher_context_s {
     void (*start_flow)(command_processor_t first_processor,
                        machine_context_t *subcontext,
                        command_processor_t return_processor);
-    void (*run_callback)(dispatcher_callback_descriptor_t callback_descriptor, buffer_t *calldata);
     int (*process_interruption)(dispatcher_context_t *dispatcher_context);
 };
 

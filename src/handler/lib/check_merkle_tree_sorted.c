@@ -42,7 +42,7 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
         if (callback.fn != NULL) {
             // call callback with data
             buffer_t buf = buffer_create(cur_el, cur_el_len);
-            dispatcher_context->run_callback(callback, &buf);
+            callback.fn(callback.state, &buf);
         }
     }
     return 0;
