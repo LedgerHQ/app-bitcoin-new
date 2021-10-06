@@ -614,10 +614,6 @@ CFLAGS    += -include debug-helpers/debug.h
 
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
-ifndef DEBUG
-# Enabling debug PRINTF
-DEBUG:=10
-endif
 ifneq ($(DEBUG),0)
         ifeq ($(DEBUG),10)
                 $(warning Using semihosted PRINTF. Only run with speculos!)
