@@ -15,10 +15,8 @@ typedef struct {
     uint8_t wallet_id[32];
     union {
         uint8_t policy_map_bytes[MAX_POLICY_MAP_BYTES];
-        policy_node_t *policy_map;
+        policy_node_t policy_map;
     };
-    uint16_t n_policy_keys;
-
     size_t n_internal_keys;
 
     uint32_t master_key_fingerprint;

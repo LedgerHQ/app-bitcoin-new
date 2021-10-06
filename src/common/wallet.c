@@ -231,6 +231,8 @@ static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
 //       and that the symbol for "hardened derivation" is "'".
 //       This implies descriptors should be normalized on the client side.
 int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
+    memset(out, 0, sizeof(policy_map_key_info_t));
+
     if (!buffer_can_read(buffer, 1)) {
         return -1;
     }

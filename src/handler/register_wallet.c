@@ -47,6 +47,9 @@ static void finalize_response(dispatcher_context_t *dc);
 
 extern global_context_t *G_coin_config;
 
+static bool is_policy_acceptable(policy_node_t *policy);
+static bool is_policy_name_acceptable(const char *name, size_t name_len);
+
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
@@ -92,14 +95,22 @@ void handler_register_wallet(dispatcher_context_t *dc) {
     // Compute the wallet id (sha256 of the serialization)
     get_policy_wallet_id(&state->wallet_header, state->wallet_id);
 
+    // Verify that the name is acceptable
+    if (!is_policy_name_acceptable(state->wallet_header.name, state->wallet_header.name_len)) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // check if policy is acceptable; only multisig is accepted at this time,
+    // and it must be one of the accepted patterns.
+    if (!is_policy_acceptable(&state->policy_map)) {
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
     state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
     state->next_pubkey_index = 0;
-
-    // TODO: check if policy is acceptable; only multisig should be accepted at this time,
-    //       and it should be one of the accepted patterns.
-
-    // TODO: add restriction on the policy's name
 
     dc->pause();
     ui_display_wallet_header(dc, &state->wallet_header, ui_action_validate_header);
@@ -159,13 +170,13 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
 
     if (!key_info.has_key_origin) {
         PRINTF("Key info without origin unsupported.\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
 
     if (!key_info.has_wildcard) {
         PRINTF("Key info without wildcard unsupported.\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
 
@@ -272,4 +283,40 @@ static void finalize_response(dispatcher_context_t *dc) {
     memset(key, 0, sizeof(key));
 
     SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
+}
+
+static bool is_policy_acceptable(policy_node_t *policy) {
+    policy_node_t *internal_script;
+
+    if (policy->type == TOKEN_SH) {
+        policy_node_t *child_node = ((policy_node_with_script_t *) policy)->script;
+        if (child_node->type == TOKEN_WSH) {
+            // sh(wsh({sorted}multi(@0)))
+            internal_script = ((policy_node_with_script_t *) child_node)->script;
+        } else {
+            // sh({sorted}multi(@0))
+            internal_script = child_node;
+        }
+    } else if (policy->type == TOKEN_WSH) {
+        // wsh({sorted}multi(@0))
+        internal_script = ((policy_node_with_script_t *) policy)->script;
+    } else {
+        return false;  // unexpected policy
+    }
+
+    return internal_script->type == TOKEN_MULTI || internal_script->type == TOKEN_SORTEDMULTI;
+}
+
+static bool is_policy_name_acceptable(const char *name, size_t name_len) {
+    // between 1 and MAX_POLICY_MAP_NAME_LENGTH characters
+    if (name_len == 0 || name_len > MAX_POLICY_MAP_NAME_LENGTH) return false;
+
+    // first and last characters must not be whitespace
+    if (name[0] == ' ' || name[name_len - 1] == ' ') return false;
+
+    // only allow ascii characters in the range from 0x20 to 0x7E (inclusive)
+    for (unsigned int i = 0; i < name_len; i++)
+        if (name[i] < 0x20 || name[i] > 0x7E) return false;
+
+    return true;
 }

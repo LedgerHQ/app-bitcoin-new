@@ -13,9 +13,6 @@ class WalletType(IntEnum):
 # should not be instantiated directly
 class Wallet:
     def __init__(self, name: str, wallet_type: WalletType) -> None:
-        if len(name.encode("latin-1")) > 16:
-            raise ValueError("The length of name must be at most 16 bytes")
-
         self.name = name
         self.type = wallet_type
 

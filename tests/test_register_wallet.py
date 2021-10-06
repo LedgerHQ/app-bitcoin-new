@@ -1,7 +1,8 @@
+from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.common import AddressType
 from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet
+from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
 
 from .utils import automation
 
@@ -93,6 +94,61 @@ def test_register_wallet_reject_header(cmd):
         cmd.register_wallet(wallet)
 
 
-# TODO: add more tests for:
-#  - rejections at different stages
-#  - responses to different types of wrong data from the host
+@automation("automations/register_wallet_accept.json")
+def test_register_wallet_invalid_names(cmd: BitcoinCommand):
+    for invalid_name in [
+        "",  # empty name not allowed
+        "Very long walletz",  # 17 characters is too long
+        " Test", "Test ",  # can't start with spaces
+        "Tæst",  # characters out of allowed range
+    ]:
+        wallet = MultisigWallet(
+            name=invalid_name,
+            address_type=AddressType.WIT,
+            threshold=2,
+            keys_info=[
+                f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+                f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
+            ],
+        )
+
+    with pytest.raises(IncorrectDataError):
+        cmd.register_wallet(wallet)
+
+
+@automation("automations/register_wallet_accept.json")
+def test_register_wallet_unsupported_policy(cmd: BitcoinCommand):
+    # valid policise, but not supported (might change in the future)
+
+    with pytest.raises(NotSupportedError):
+        cmd.register_wallet(PolicyMapWallet(
+            name="Unsupported",
+            policy_map="sh(pkh(@0))",  # unusual script, not in the whitelist
+            keys_info=[
+                f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+            ]
+        ))
+
+    with pytest.raises(NotSupportedError):
+        # Not supporting keys without wildcard
+        cmd.register_wallet(MultisigWallet(
+            name="Cold storage",
+            address_type=AddressType.WIT,
+            threshold=2,
+            keys_info=[
+                f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+                f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            ],
+        ))
+
+    with pytest.raises(NotSupportedError):
+        # Not supporting keys without origin information (even if external)
+        cmd.register_wallet(MultisigWallet(
+            name="Cold storage",
+            address_type=AddressType.WIT,
+            threshold=2,
+            keys_info=[
+                f"tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+                f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
+            ],
+        ))
