@@ -15,7 +15,7 @@ pip install -r requirements.txt
 Build the app as normal from the root folder. For convenience, you probably want to enable DEBUG:
 
 ```
-DEBUG=1 make
+DEBUG=0 make
 ```
 
 Then run all the tests from this folder with:
