@@ -60,6 +60,8 @@ static void pause() {
 
 static void run() {
     G_dispatcher_state.paused = false;
+
+    io_start_processing_timeout();
     dispatcher_loop();
 }
 
@@ -85,10 +87,15 @@ static int process_interruption(dispatcher_context_t *dc) {
     // Reset structured APDU command
     memset(&cmd, 0, sizeof(cmd));
 
+    io_start_interruption_timeout();
+
     // Receive command bytes in G_io_apdu_buffer
     if ((input_len = io_exchange(CHANNEL_APDU, G_output_len)) < 0) {
         return -1;
     }
+
+    io_clear_interruption_timeout();
+
     G_output_len = 0;
 
     // As we are not yet returning anything here, we communicate to io_exchange that the apdu
@@ -192,6 +199,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
             return;
         }
 
+        io_start_processing_timeout();
         handler(&G_dispatcher_context);
     }
 
@@ -206,6 +214,7 @@ static void dispatcher_loop() {
 
     while (true) {
         if (G_dispatcher_state.paused) {
+            io_clear_processing_timeout();
             return;
         }
 
@@ -227,6 +236,8 @@ static void dispatcher_loop() {
                 if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
                     PRINTF("Interruption requested, but the next processor was not set.\n");
                 }
+
+                io_clear_processing_timeout();
                 return;
             }
         } else if (G_dispatcher_context.machine_context_ptr->parent_context != NULL) {
@@ -250,4 +261,6 @@ static void dispatcher_loop() {
     if (G_dispatcher_state.termination_cb != NULL) {
         G_dispatcher_state.termination_cb();
     }
+
+    io_clear_processing_timeout();
 }

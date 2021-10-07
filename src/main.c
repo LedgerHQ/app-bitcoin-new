@@ -44,6 +44,11 @@
 extern unsigned int app_stack_canary;
 #endif
 
+extern struct {
+    bool interruption : 1;
+    bool processing : 1;
+} G_is_timeout_active;
+
 uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
@@ -355,6 +360,10 @@ __attribute__((section(".boot"))) int main(int arg0) {
 
     // ensure exception will work as planned
     os_boot();
+
+    // TODO: hide these in the boilerplate, maybe in an init_dispatcher function
+    G_is_timeout_active.interruption = false;
+    G_is_timeout_active.processing = false;
 
     if (!arg0) {
         // Bitcoin application launched from dashboard
