@@ -37,6 +37,9 @@
 #define MAX_BASE58_PUBKEY_LENGTH 112
 #define MAX_ADDRESS_LENGTH       35
 
+// up to 5 chars for ticker, 1 space, up to 20 digits (20 = digits of 2^64), + 1 decimal separator
+#define MAX_AMOUNT_LENGTH (5 + 1 + 20 + 1)
+
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
 static action_validate_cb g_validate_callback;
@@ -74,11 +77,11 @@ typedef struct {
 typedef struct {
     char index[sizeof("output #999")];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
-    char amount[sizeof("COINID 10000.00000000")];
+    char amount[MAX_AMOUNT_LENGTH + 1];
 } ui_validate_output_state_t;
 
 typedef struct {
-    char fee[sizeof("COINID 10000.00000000")];
+    char fee[sizeof(MAX_AMOUNT_LENGTH + 1)];
 } ui_validate_transaction_state_t;
 
 /**
