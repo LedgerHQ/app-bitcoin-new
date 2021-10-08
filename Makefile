@@ -615,6 +615,10 @@ CFLAGS    += -include debug-helpers/debug.h
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
 ifndef DEBUG
+        DEBUG = 0
+endif
+
+ifeq ($(DEBUG),0)
         DEFINES   += PRINTF\(...\)=
 else
         ifeq ($(DEBUG),10)
