@@ -281,6 +281,24 @@ DEFINES   += COIN_KIND=COIN_KIND_STRATIS
 DEFINES   += COIN_FLAGS=FLAG_PEERCOIN_SUPPORT
 APPNAME ="Stratis"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),xrhodium)
+#Xrhodium
+DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
+DEFINES   += BIP44_COIN_TYPE=10291
+DEFINES   += BIP44_COIN_TYPE_2=10291
+DEFINES   += BIP44_COIN_TYPE_2=10291
+DEFINES   += COIN_P2PKH_VERSION=61
+DEFINES   += COIN_P2SH_VERSION=123
+DEFINES   += COIN_FAMILY=1
+DEFINES   += COIN_COINID=\"xrhodium\"
+DEFINES   += COIN_COINID_HEADER=\"XRHODIUM\"
+DEFINES   += COIN_COLOR_HDR=0xFF9900
+DEFINES   += COIN_COLOR_DB=0xFEEBCE
+DEFINES   += COIN_COINID_NAME=\"xRhodium\"
+DEFINES   += COIN_COINID_SHORT=\"XRC\"
+DEFINES   += COIN_KIND=COIN_KIND_XRHODIUM
+APPNAME ="xRhodium"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else ifeq ($(COIN),peercoin)
 # Peercoin
 DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
@@ -558,9 +576,47 @@ DEFINES   += COIN_COINID_SHORT=\"RVN\"
 DEFINES   += COIN_KIND=COIN_KIND_RAVENCOIN
 APPNAME ="Ravencoin"
 APP_LOAD_PARAMS += --path $(APP_PATH)
+else ifeq ($(COIN),hydra_testnet)
+# Hydra testnet
+DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
+DEFINES   += BIP44_COIN_TYPE=0
+DEFINES   += BIP44_COIN_TYPE_2=0
+DEFINES   += COIN_P2PKH_VERSION=66
+DEFINES   += COIN_P2SH_VERSION=128
+DEFINES   += COIN_FAMILY=3
+DEFINES   += COIN_COINID=\"Hydra\"
+DEFINES   += COIN_COINID_HEADER=\"HYDRA\"
+DEFINES   += COIN_COLOR_HDR=0x2E9AD0
+DEFINES   += COIN_COLOR_DB=0x97CDE8
+DEFINES   += COIN_COINID_NAME=\"HYDRA\"
+DEFINES   += COIN_COINID_SHORT=\"HYDRA\"
+DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"hc\"
+DEFINES   += COIN_KIND=COIN_KIND_HYDRA
+DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="Hydra"
+APP_LOAD_PARAMS += --path "44'/609'"
+else ifeq ($(COIN),hydra)
+# Hydra mainnet
+DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
+DEFINES   += BIP44_COIN_TYPE=0
+DEFINES   += BIP44_COIN_TYPE_2=0
+DEFINES   += COIN_P2PKH_VERSION=40
+DEFINES   += COIN_P2SH_VERSION=63
+DEFINES   += COIN_FAMILY=3
+DEFINES   += COIN_COINID=\"Hydra\"
+DEFINES   += COIN_COINID_HEADER=\"HYDRA\"
+DEFINES   += COIN_COLOR_HDR=0x2E9AD0
+DEFINES   += COIN_COLOR_DB=0x97CDE8
+DEFINES   += COIN_COINID_NAME=\"HYDRA\"
+DEFINES   += COIN_COINID_SHORT=\"HYDRA\"
+DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"hc\"
+DEFINES   += COIN_KIND=COIN_KIND_HYDRA
+DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="Hydra"
+APP_LOAD_PARAMS += --path "44'/609'"
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_testnet_lib, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, firo, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, firo, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin, hydra, hydra_testnet, xrhodium)
 endif
 endif
 
@@ -686,12 +742,12 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_testnet_lib bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium
 
 else
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_testnet_lib bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance hydra hydra_testnet xrhodium
 
 endif
 
