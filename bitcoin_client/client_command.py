@@ -99,8 +99,8 @@ class GetMerkleLeafProofCommand(ClientCommand):
         req = ByteStreamParser(request[1:])
 
         root = req.read_bytes(32)
-        tree_size = req.read_uint(4)
-        leaf_index = req.read_uint(4)
+        tree_size = req.read_varint()
+        leaf_index = req.read_varint()
         req.assert_empty()
 
         if not root in self.known_trees:

@@ -5,6 +5,7 @@
 #include "../../common/buffer.h"
 #include "../../common/write.h"
 #include "../../common/merkle.h"
+#include "../../common/varint.h"
 #include "../../boilerplate/sw.h"
 #include "../client_commands.h"
 
@@ -19,17 +20,17 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
     PRINT_STACK_POINTER();
 
     {  // make sure memory is deallocated as soon as possible
-        uint8_t tmp[4];
+        uint8_t tmp[9];
         tmp[0] = CCMD_GET_MERKLE_LEAF_PROOF;
         dc->add_to_response(tmp, 1);
 
         dc->add_to_response(merkle_root, 32);
 
-        write_u32_be(tmp, 0, tree_size);
-        dc->add_to_response(tmp, 4);
+        int tree_size_len = varint_write(tmp, 0, tree_size);
+        dc->add_to_response(tmp, tree_size_len);
 
-        write_u32_be(tmp, 0, leaf_index);
-        dc->add_to_response(tmp, 4);
+        int leaf_index_len = varint_write(tmp, 0, leaf_index);
+        dc->add_to_response(tmp, leaf_index_len);
 
         dc->finalize_response(SW_INTERRUPTED_EXECUTION);
     }

@@ -294,12 +294,12 @@ The client must respond with an empty message.
 The `GET_PREIMAGE` command requests the client to reveal a SHA-256 preimage.
 
 The request contains:
-- `1` byte: must equal 0, reserved for future usage. (The client should abort if non-zero)
+- `1` byte: must equal 0, reserved for future usage. (The client should abort if non-zero);
 - `32` bytes: a sha-256 hash.
 
 The response must contain:
-- `<var>`: the length of the preimage, encoded as a Bitcoin-style varint
-- `1` byte: a 1-byte unsigned integer `b`, the length of the prefix of the pre-image that is part of the response
+- `<var>`: the length of the preimage, encoded as a Bitcoin-style varint;
+- `1` byte: a 1-byte unsigned integer `b`, the length of the prefix of the pre-image that is part of the response;
 - `b` bytes: corresponding to the first `b` bytes of the preimage.
 
 If the pre-image is too long to be contained in a single response, the client should choose `b` to be as large as possible; subsequent bytes are enqueued as single-byte elements that the Hardware Wallet will request with one ore more `GET_MORE_ELEMENTS` requests.
@@ -311,18 +311,17 @@ If the pre-image is too long to be contained in a single response, the client sh
 The `GET_MERKLE_LEAF_PROOF` command requests the hash of a given leaf of a Merkle tree, together with the Merkle proof.
 
 The request contains:
-- `32` bytes: the Merkle root hash
-<!-- TODO: might change to varint -->
-- `4` bytes: the tree size `n`, encoded as an unsigned 4-byte big-endian integer.
-- `4` bytes: the leaf index `i`, encoded as an unsigned 4-byte big-endian integer.
+- `32` bytes: the Merkle root hash;
+- `<var>` bytes: the tree size `n`, encoded as a Bitcoin-style varint;
+- `<var>` bytes: the leaf index `i`, encoded as a Bitcoin-style varint.
 
 The client must respond with:
-- `32` bytes: the hash of the leaf with index `i` in the requested Merkle tree.
-- `1` byte: the length of the Merkle proof
-- `1` byte: the amount `p` of hashes of the proof that are contained in the response
+- `32` bytes: the hash of the leaf with index `i` in the requested Merkle tree;
+- `1` byte: the length of the Merkle proof;
+- `1` byte: the amount `p` of hashes of the proof that are contained in the response;
 - `32 * p` bytes: the concatenation of the first `p` hashes in the Merkle proof.
 
-If the proof is too long to be contained in a single response, the client should choose `p` to be as large as possible; subsequent bytes are enqueued as 32-byte elements that the Hardware Wallet will request with one ore more `GET_MORE_ELEMENTS` requests.
+If the proof is too long to be contained in a single response, the client should choose `p` to be as large as possible; subsequent bytes are enqueued as 32-byte elements that the Hardware Wallet will request with one or more `GET_MORE_ELEMENTS` requests.
 
 ### GET_MERKLE_LEAF_INDEX
 
@@ -331,12 +330,12 @@ If the proof is too long to be contained in a single response, the client should
 The `GET_MERKLE_LEAF_INDEX` requests the index of a leaf with a certain hash. if multiple leafs have the same hash, the client could respond with either.
 
 The request contains:
-- `32` bytes: the Merkle root hash
-- `32` bytes: the leaf hash
+- `32` bytes: the Merkle root hash;
+- `32` bytes: the leaf hash.
 
 The response contains:
-- `1` byte: `1` if the leaf is found, `0` if matching leaf exists
-- `<var>`: the index of the leaf, encoded as a Bitcoin-style varint
+- `1` byte: `1` if the leaf is found, `0` if matching leaf exists;
+- `<var>`: the index of the leaf, encoded as a Bitcoin-style varint.
 
 ### GET_MORE_ELEMENTS
 
@@ -349,9 +348,9 @@ All of the elements in the queue must all be byte strings of the same length; th
 The request is empty.
 
 The response contains:
-- `1` byte: the number `n` of returned element
-- `1` byte: the size `s` of each returned element
-- `n * s` bytes: the concatenation of the `n` returned elements
+- `1` byte: the number `n` of returned element;
+- `1` byte: the size `s` of each returned element;
+- `n * s` bytes: the concatenation of the `n` returned elements.
 
 
 ## Security considerations
@@ -365,4 +364,4 @@ All the current commands use a commit-and-reveal approach: the APDU that starts 
 - If a Merkle proof is asked via `GET_MERKLE_LEAF_PROOF`, the proof is verified.
 - If the index of a leaf is asked `GET_MERKLE_LEAF_INDEX`, the proof for that element is requested via `GET_MERKLE_LEAF_PROOF` and the proof verified, *even if the leaf value is known*.
 
-Care needs to be taken as the client might lie by omission (for example, fail to revel that a leaf of a Merkle tree is present during a call to `GET_MERKLE_LEAF_INDEX`).
+Care needs to be taken in designing protocols, as the client might lie by omission (for example, fail to reveal that a leaf of a Merkle tree is present during a call to `GET_MERKLE_LEAF_INDEX`).
