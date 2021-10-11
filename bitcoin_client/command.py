@@ -212,7 +212,6 @@ class BitcoinCommand:
 
         return response.decode()
 
-    # TODO: should we return an updated PSBT with signatures, instead?
     def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> Mapping[int, bytes]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 

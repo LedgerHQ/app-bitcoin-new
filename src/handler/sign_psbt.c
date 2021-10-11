@@ -103,7 +103,7 @@ Current assumptions during signing:
   2) all the keys in the wallet have a wildcard (that is, they end with '**'), with at most
      4 derivation steps before it.
 
-Assumption 2 simplifies the handling of pubkeys (and theyr paths) used for signing,
+Assumption 2 simplifies the handling of pubkeys (and their paths) used for signing,
 as all the internal keys will have a path that ends with /change/address_index (BIP44-style).
 
 It would be possible to generalize to more complex scripts, but it makes it more difficult to detect
@@ -432,7 +432,7 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
             // The first time that we encounter a PSBT_IN_BIP32_DERIVATION or
             // PSBT_IN_TAP_BIP32_DERIVATION (handled below) key, we store the pubkey. Since we only
             // use this to identify the change and address_index, it does not matter which of the
-            // keys we use here (if there are multiple), as pet the assumptions above.
+            // keys we use here (if there are multiple), as per the assumptions above.
             state->cur_input.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
@@ -837,7 +837,7 @@ static void process_output_map(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->cur_output_index >= state->n_outputs) {
-        // all inputs already processed
+        // all outputs already processed
         dc->next(confirm_transaction);
         return;
     }
@@ -1086,6 +1086,15 @@ static void confirm_transaction(dispatcher_context_t *dc) {
     if (state->inputs_total_value < state->outputs_total_value) {
         // negative fee transaction is invalid
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    if (state->change_count > 10) {
+        // As the information regarding change outputs is aggregated, we want to prevent the user
+        // from unknowingly signing a transaction that sends the change to too many (possibly
+        // unspendable) outputs.
+        PRINTF("Too many change outputs: %d\n", state->change_count);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
 
