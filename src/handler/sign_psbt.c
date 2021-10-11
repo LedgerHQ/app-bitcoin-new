@@ -1035,7 +1035,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // show this output's address
-    // TODO: handle outputs without an address? (e.g.: OP_RETURN)
+    // TODO: handle outputs without an address (e.g.: OP_RETURN)
     char output_address[MAX_ADDRESS_LENGTH_STR + 1];
     int address_len = get_script_address(state->cur_output.scriptpubkey,
                                          state->cur_output.scriptpubkey_len,
@@ -1043,7 +1043,8 @@ static void output_validate_external(dispatcher_context_t *dc) {
                                          output_address,
                                          sizeof(output_address));
     if (address_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE);  // shouldn't happen
+        PRINTF("Unknown or unsupported script type for output %d\n", state->cur_output_index);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
 
