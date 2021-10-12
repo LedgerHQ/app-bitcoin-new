@@ -667,12 +667,12 @@ static void check_input_owned(dispatcher_context_t *dc) {
                                                       bip32_path);
         }
 
-        // As per wallet policy assumptions, the path must have change and address index
         if (bip32_path_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
+        // As per wallet policy assumptions, the path must have change and address index
         if (bip32_path_len < 2) {
             external = true;
             break;
@@ -933,7 +933,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
             external = true;  // unknown script, definitely external
             break;
         } else if (script_type == SCRIPT_TYPE_P2TR) {
-            // taproot input, use PSBT_IN_TAP_BIP32_DERIVATION
+            // taproot output, use PSBT_IN_TAP_BIP32_DERIVATION
             uint8_t key[1 + 32];
             key[0] = PSBT_OUT_TAP_BIP32_DERIVATION;
             memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 32);
@@ -945,7 +945,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
                                                                   &fingerprint,
                                                                   bip32_path);
         } else {
-            // legacy or segwitv0 input, use PSBT_IN_BIP32_DERIVATION
+            // legacy or segwitv0 output, use PSBT_OUT_BIP32_DERIVATION
             uint8_t key[1 + 33];
             key[0] = PSBT_OUT_BIP32_DERIVATION;
             memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 33);
@@ -958,12 +958,12 @@ static void check_output_owned(dispatcher_context_t *dc) {
                                                       bip32_path);
         }
 
-        // As per wallet policy assumptions, the path must have change and address index
         if (bip32_path_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
+        // As per wallet policy assumptions, the path must have change and address index
         if (bip32_path_len < 2) {
             external = true;
             break;
@@ -1243,13 +1243,12 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     // TODO: add support for other sighash flags
     if (state->cur_input.sighash_type != SIGHASH_ALL) {
         PRINTF("Only SIGHASH_ALL is currently supported\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific SW
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
 
     // get path, obtain change and address_index
 
-    // TODO: refactor common code with check_input_owned
     int bip32_path_len;
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
     uint32_t fingerprint;
@@ -1951,13 +1950,10 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // TODO: force PIN validation before signing (prevention of evil maid attack)
-
     cx_ecfp_private_key_t private_key = {0};
     uint8_t chain_code[32] = {0};
     uint32_t info = 0;
 
-    // TODO: should check the signing pubkey and path matches in the PSBT
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
     for (int i = 0; i < state->our_key_derivation_length; i++) {
         sign_path[i] = state->our_key_derivation[i];
@@ -2023,14 +2019,11 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    // TODO: force PIN validation before signing (prevention of evil maid attack)
-
     cx_ecfp_private_key_t private_key = {0};
     uint8_t *seckey = private_key.d;  // convenience alias (entirely within the private_key struct)
 
     uint8_t chain_code[32] = {0};
 
-    // TODO: should check the signing pubkey and path matches in the PSBT
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
     for (int i = 0; i < state->our_key_derivation_length; i++) {
         sign_path[i] = state->our_key_derivation[i];
@@ -2041,7 +2034,8 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     int sign_path_len = state->our_key_derivation_length + 2;
 
     uint8_t sig[64];
-    size_t sig_len = 72;  // TODO: remove, workaround for bug in cx_ecschnorr_sign_no_throw
+    size_t sig_len = 72;  // TODO: remove once firmware is upgraded, workaround for bug in older
+                          // versions of cx_ecschnorr_sign_no_throw
 
     bool error = false;
     BEGIN_TRY {
