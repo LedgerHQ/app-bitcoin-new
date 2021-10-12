@@ -379,9 +379,10 @@ static void process_global_map(dispatcher_context_t *dc) {
     }
     state->tx_version = read_u32_le(raw_result, 0);
 
-    // Read fallback locktime
-    // TODO: should the client side do the processing for the lock-time, so that we just
-    //       accept the fallback locktime as the correct value, and ignore the input's ones?
+    // Read fallback locktime.
+    // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
+    // preferred height/block locktime. If that's relevant, the client must set the fallback
+    // locktime to the appropriate value before calling sign_psbt.
     result_len = call_get_merkleized_map_value(dc,
                                                &state->global_map,
                                                (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
