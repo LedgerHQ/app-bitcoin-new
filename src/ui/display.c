@@ -383,7 +383,7 @@ UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
 
 // FLOW to display the name and an address of a registered wallet:
 // #1 screen: wallet name
-// #2 screen: wallet address
+// #2 screen: wallet address (paginated)
 // #3 screen: approve button
 // #4 screen: reject button
 UX_FLOW(ux_display_wallet_name_address_flow,
@@ -393,11 +393,10 @@ UX_FLOW(ux_display_wallet_name_address_flow,
         &ux_display_reject_step);
 
 // FLOW to display an address of a canonical wallet:
-// #1 screen: wallet address
+// #1 screen: wallet address (paginated)
 // #2 screen: approve button
 // #3 screen: reject button
 UX_FLOW(ux_display_canonical_wallet_address_flow,
-        &ux_display_receive_in_wallet_step,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
