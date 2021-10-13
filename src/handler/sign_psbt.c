@@ -330,7 +330,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
 
     state->inputs_total_value = 0;
     state->internal_inputs_total_value = 0;
-    state->has_external_inputs = false;
     memset(state->internal_inputs, 0, sizeof state->internal_inputs);
 
     state->master_key_fingerprint = crypto_get_master_key_fingerprint();
@@ -726,7 +725,6 @@ static void check_input_owned(dispatcher_context_t *dc) {
     } while (false);  // executed only once; in a block only to be able to break out of it
 
     if (external) {
-        state->has_external_inputs = true;
         PRINTF("INPUT %d is external\n", state->cur_input_index);
     } else {
         state->internal_inputs[state->cur_input_index] = 1;
@@ -759,9 +757,23 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (!state->has_external_inputs) {
+    size_t count_external_inputs = 0;
+    for (unsigned int i = 0; i < state->n_inputs; i++) {
+        if (!state->internal_inputs[i]) {
+            ++count_external_inputs;
+        }
+    }
+
+    if (count_external_inputs == 0) {
+        // no external inputs
         dc->next(verify_outputs_init);
+    } else if (count_external_inputs == state->n_inputs) {
+        // no internal inputs, nothing to sign
+        PRINTF("No internal inputs. Aborting\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
     } else {
+        // some internal and some external inputs, warn the user first
         dc->pause();
         ui_warn_external_inputs(dc, ui_alert_external_inputs_result);
     }

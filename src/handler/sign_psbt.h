@@ -86,8 +86,6 @@ typedef struct {
 
     uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN];  // TODO: use a bitvector
 
-    bool has_external_inputs;
-
     union {
         struct {
             unsigned int cur_input_index;
