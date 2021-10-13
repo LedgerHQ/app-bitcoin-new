@@ -81,7 +81,7 @@ typedef struct {
 } ui_validate_output_state_t;
 
 typedef struct {
-    char fee[sizeof(MAX_AMOUNT_LENGTH + 1)];
+    char fee[MAX_AMOUNT_LENGTH + 1];
 } ui_validate_transaction_state_t;
 
 /**
