@@ -118,7 +118,7 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     // TODO: support other SIGHASH FLAGS
-    for (int i = 0; i < state->n_outputs; i++) {
+    for (unsigned int i = 0; i < state->n_outputs; i++) {
         // get this output's map
         merkleized_map_commitment_t ith_map;
 
@@ -213,7 +213,7 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
-    state->n_inputs = (size_t) n_inputs;
+    state->n_inputs = (unsigned int) n_inputs;
 
     uint64_t n_outputs;
     if (!buffer_read_varint(&dc->read_buffer, &n_outputs) ||
@@ -221,7 +221,14 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    state->n_outputs = (size_t) n_outputs;
+    state->n_outputs = (unsigned int) n_outputs;
+
+    if (n_outputs > MAX_N_OUTPUTS_CAN_SIGN) {
+        // could remove this limitation; paranoia more than anything else
+        PRINTF("At most %d outputs are supported\n", MAX_N_OUTPUTS_CAN_SIGN);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
 
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
@@ -1350,7 +1357,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
 
     crypto_hash_update_varint(&sighash_context.header, state->n_inputs);
 
-    for (int i = 0; i < state->n_inputs; i++) {
+    for (unsigned int i = 0; i < state->n_inputs; i++) {
         // get this input's map
         merkleized_map_commitment_t ith_map;
 
@@ -1556,7 +1563,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         cx_sha256_init(&sha_prevouts_context);
         cx_sha256_init(&sha_sequences_context);
 
-        for (int i = 0; i < state->n_inputs; i++) {
+        for (unsigned int i = 0; i < state->n_inputs; i++) {
             // get this input's map
             merkleized_map_commitment_t ith_map;
 
@@ -1632,7 +1639,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         cx_sha256_init(&sha_amounts_context);
         cx_sha256_init(&sha_scriptpubkeys_context);
 
-        for (int i = 0; i < state->n_inputs; i++) {
+        for (unsigned int i = 0; i < state->n_inputs; i++) {
             // get this input's map
             merkleized_map_commitment_t ith_map;
 

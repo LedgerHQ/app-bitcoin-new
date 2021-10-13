@@ -3,7 +3,8 @@
 #include "../boilerplate/dispatcher.h"
 #include "../common/merkle.h"
 
-#define MAX_N_INPUTS_CAN_SIGN 32
+#define MAX_N_INPUTS_CAN_SIGN  64
+#define MAX_N_OUTPUTS_CAN_SIGN 256
 
 typedef struct {
     merkleized_map_commitment_t map;
@@ -65,9 +66,9 @@ typedef struct {
     uint32_t tx_version;
     uint32_t locktime;
 
-    int n_inputs;
+    unsigned int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
-    int n_outputs;
+    unsigned int n_outputs;
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
     bool is_wallet_canonical;
@@ -89,11 +90,11 @@ typedef struct {
 
     union {
         struct {
-            int cur_input_index;
+            unsigned int cur_input_index;
             cur_input_info_t cur_input;
         };
         struct {
-            int cur_output_index;
+            unsigned int cur_output_index;
             cur_output_info_t cur_output;
         };
     };
