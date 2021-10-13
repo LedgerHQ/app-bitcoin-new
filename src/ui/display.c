@@ -142,6 +142,15 @@ UX_STEP_CB(ux_display_approve_step,
                "Approve",
            });
 
+// Step with approve button
+UX_STEP_CB(ux_display_continue_step,
+           pb,
+           (*g_validate_callback)(&G_dispatcher_context, true),
+           {
+               &C_icon_validate_14,
+               "Continue",
+           });
+
 // Step with reject button
 UX_STEP_CB(ux_display_reject_step,
            pb,
@@ -239,8 +248,8 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
              pnn,
              {
                  &C_icon_warning,
-                 "Transaction with",
-                 "external inputs!",
+                 "There are",
+                 "external inputs",
              });
 
 // Step with eye icon and "Review" and the output index
@@ -395,23 +404,21 @@ UX_FLOW(ux_display_canonical_wallet_address_flow,
 
 // FLOW to display a registered wallet and authorize spending:
 // #1 screen: wallet name
-// #2 screen: wallet description
-// #3 screen: approve button
-// #4 screen: reject button
+// #2 screen: approve button
+// #3 screen: reject button
 UX_FLOW(ux_display_wallet_for_spending_flow,
         &ux_display_spend_from_wallet_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
 // FLOW to warn about external inputs
-// #1 screen: warning icon + "Transaction with external inputs!"
+// #1 screen: warning icon + "There are external inputs"
 // #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
-// #3 screen: approve button
-// #4 screen: reject button
+// #3 screen: "continue" button
 UX_FLOW(ux_display_warning_external_inputs_flow,
-        &ux_display_spend_from_wallet_step,
-        &ux_display_approve_step,
-        &ux_display_reject_step);
+        &ux_display_warning_external_inputs_step,
+        &ux_display_reject_if_not_sure_step,
+        &ux_display_continue_step);
 
 // FLOW to validate a single output
 // #1 screen: eye icon + "Review" + index of output to validate
