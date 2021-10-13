@@ -443,6 +443,50 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_accept_and_send_step,
         &ux_display_reject_step);
 
+static size_t n_digits(uint64_t number) {
+    size_t count = 0;
+    do {
+        count++;
+        number /= 10;
+    } while (number != 0);
+    return count;
+}
+
+// TODO: document and add unit tests
+static void format_sats_amount(const char *coin_name,
+                               uint64_t amount,
+                               char out[static MAX_AMOUNT_LENGTH + 1]) {
+    size_t coin_name_len = strlen(coin_name);
+    strcpy(out, coin_name);
+    out[coin_name_len] = ' ';
+
+    char *amount_str = out + coin_name_len + 1;
+
+    uint64_t integral_part = amount / 100000000;
+    uint32_t fractional_part = (uint32_t) (amount % 100000000);
+
+    // format the integral part, starting from the least significant digit
+    size_t integral_part_digit_count = n_digits(integral_part);
+    for (unsigned int i = 0; i < integral_part_digit_count; i++) {
+        amount_str[integral_part_digit_count - 1 - i] = '0' + (integral_part % 10);
+        integral_part /= 10;
+    }
+
+    if (fractional_part == 0) {
+        amount_str[integral_part_digit_count] = '\0';
+    } else {
+        // format the fractional part (exactly 8 digits, possibly with trailing zeros)
+        amount_str[integral_part_digit_count] = '.';
+        char *fract_part_str = amount_str + integral_part_digit_count + 1;
+        snprintf(fract_part_str, 8 + 1, "%08u", fractional_part);
+
+        // drop trailing zeros
+        for (int i = 7; i > 0 && fract_part_str[i] == '0'; i--) {
+            fract_part_str[i] = '\0';
+        }
+    }
+}
+
 void ui_display_pubkey(dispatcher_context_t *context,
                        char *bip32_path_str,
                        bool is_path_suspicious,
@@ -596,13 +640,8 @@ void ui_validate_output(dispatcher_context_t *context,
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
     snprintf(state->index, sizeof(state->index), "output #%d", index);
-
     strncpy(state->address, address, sizeof(state->address));
-
-    int whole_part = (int) (amount / 100000000);
-    int fract_part = (int) (amount % 100000000);
-
-    snprintf(state->amount, sizeof(state->amount), "%s %d.%08d", coin_name, whole_part, fract_part);
+    format_sats_amount(coin_name, amount, state->amount);
 
     g_validate_callback = callback;
 
@@ -615,14 +654,11 @@ void ui_validate_transaction(dispatcher_context_t *context,
                              action_validate_cb callback) {
     (void) (context);
 
-    int whole_part = (int) (fee / 100000000);
-    int fract_part = (int) (fee % 100000000);
-
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     g_validate_callback = callback;
 
-    snprintf(state->fee, sizeof(state->fee), "%s %d.%08d", coin_name, whole_part, fract_part);
+    format_sats_amount(coin_name, fee, state->fee);
 
     ux_flow_init(0, ux_accept_transaction_flow, NULL);
 }
