@@ -46,6 +46,9 @@ else ifneq ($(TARGET_NAME),TARGET_NANOX)
 $(error Unknown target: $(TARGET_NAME))
 endif
 
+# Flags: BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
+APP_LOAD_FLAGS = --appFlags 0xa50
+
 # All but bitcoin app use dependency onto the bitcoin app/lib
 DEFINES_LIB = USE_LIB_BITCOIN
 
@@ -68,8 +71,6 @@ DEFINES   += COIN_COINID_SHORT=\"TEST\"
 DEFINES   += COIN_KIND=COIN_KIND_BITCOIN_TESTNET
 DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME = "Bitcoin Test"
-# Flags: BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
-APP_LOAD_FLAGS = --appFlags 0xa50
 
 else ifeq ($(COIN),bitcoin)
 
@@ -90,8 +91,6 @@ DEFINES   += COIN_COINID_SHORT=\"BTC\"
 DEFINES   += COIN_KIND=COIN_KIND_BITCOIN
 DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME = "Bitcoin"
-#Flags: LIBRARY, BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
-APP_LOAD_FLAGS = --appFlags 0xa50
 
 else ifeq ($(COIN),bitcoin_testnet_lib)
 # Bitcoin testnet, but using the library mechanism
