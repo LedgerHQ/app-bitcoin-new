@@ -21,41 +21,41 @@ struct parse_rawtx_state_s;  // forward declaration
 
 typedef struct {
     struct parse_rawtx_state_s *parent_state;  // subparsers can access parent's state
-    int scriptsig_size;                        // max 10_000 bytes
-    int scriptsig_counter;                     // counter of scriptsig bytes already received
+    unsigned int scriptsig_size;               // max 10_000 bytes
+    unsigned int scriptsig_counter;            // counter of scriptsig bytes already received
 } parse_rawtxinput_state_t;
 
 typedef struct {
     struct parse_rawtx_state_s *parent_state;
-    int scriptpubkey_size;     // max 10_000 bytes
-    int scriptpubkey_counter;  // counter of scriptpubkey bytes already received
+    unsigned int scriptpubkey_size;     // max 10_000 bytes
+    unsigned int scriptpubkey_counter;  // counter of scriptpubkey bytes already received
 } parse_rawtxoutput_state_t;
 
 typedef struct parse_rawtx_state_s {
     cx_sha256_t *hash_context;
 
     bool is_segwit;
-    int n_inputs;
-    int n_outputs;
-    int n_witnesses;  // only for segwit tx, serialized according to bip-144
+    unsigned int n_inputs;
+    unsigned int n_outputs;
+    unsigned int n_witnesses;  // only for segwit tx, serialized according to bip-144
 
     union {
         // since the parsing stages of inputs, outputs and witnesses are disjoint, we reuse the same
         // space in memory
         struct {
-            int in_counter;
+            unsigned int in_counter;
             parser_context_t input_parser_context;
             parse_rawtxinput_state_t input_parser_state;
         };
         struct {
-            int out_counter;
+            unsigned int out_counter;
             parser_context_t output_parser_context;
             parse_rawtxoutput_state_t output_parser_state;
         };
         struct {
-            int wit_counter;
-            int cur_witness_length;
-            int cur_witness_bytes_read;
+            unsigned int wit_counter;
+            unsigned int cur_witness_length;
+            unsigned int cur_witness_bytes_read;
         };
     };
 
@@ -67,19 +67,17 @@ typedef struct parse_rawtx_state_s {
 
 typedef struct psbt_parse_rawtx_state_s {
     // internal state
-    uint8_t store[32];      // buffer for unparsed data
-    int store_data_length;  // size of data currently in store
-
+    uint8_t store[32];               // buffer for unparsed data
+    unsigned int store_data_length;  // size of data currently in store
     parse_rawtx_state_t parser_state;
     parser_context_t parser_context;
+    bool parser_error;  // set to true if there was an error during parsing
 } psbt_parse_rawtx_state_t;
 
 /*   PARSER FOR A RAWTX INPUT */
 
 // parses the 32-bytes txid of an input in a rawtx
 static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     uint8_t txid[32];
     bool result = dbuffer_read_bytes(buffers, txid, 32);
     if (result) {
@@ -91,7 +89,6 @@ static int parse_rawtxinput_txid(parse_rawtxinput_state_t *state, buffer_t *buff
 // parses the 4-bytes vout of an input in a rawtx
 // TODO: shares logic with the previous method; try to factor out the shared code
 static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t vout_bytes[4];
     bool result = dbuffer_read_bytes(buffers, vout_bytes, 4);
     if (result) {
@@ -101,12 +98,11 @@ static int parse_rawtxinput_vout(parse_rawtxinput_state_t *state, buffer_t *buff
 }
 
 static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint64_t scriptsig_size;
     bool result = dbuffer_read_varint(buffers, &scriptsig_size);
 
     if (result) {
-        state->scriptsig_size = (int) scriptsig_size;
+        state->scriptsig_size = (unsigned int) scriptsig_size;
 
         crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptsig_size);
     }
@@ -117,15 +113,12 @@ static int parse_rawtxinput_scriptsig_size(parse_rawtxinput_state_t *state, buff
 static int parse_rawtxinput_scriptsig_init(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
     (void) buffers;
 
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     state->scriptsig_counter = 0;
 
     return 1;
 }
 
 static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t data[32];
 
     while (true) {
@@ -151,7 +144,6 @@ static int parse_rawtxinput_scriptsig(parse_rawtxinput_state_t *state, buffer_t 
 }
 
 static int parse_rawtxinput_sequence(parse_rawtxinput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t sequence_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, sequence_bytes, 4);
@@ -176,7 +168,6 @@ const int n_parse_rawtxinput_steps =
 /*   PARSER FOR A RAWTX OUTPUT */
 
 static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t value_bytes[8];
     bool result = dbuffer_read_bytes(buffers, value_bytes, 8);
     if (result) {
@@ -184,9 +175,11 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
 
         crypto_hash_update(&state->parent_state->hash_context->header, value_bytes, 8);
 
-        int relevant_output_index = state->parent_state->output_index;
-        if (state->parent_state->out_counter == relevant_output_index) {
-            state->parent_state->parser_outputs->vout_value = value;
+        if (state->parent_state->output_index != -1) {
+            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+            if (state->parent_state->out_counter == relevant_output_index) {
+                state->parent_state->parser_outputs->vout_value = value;
+            }
         }
     }
     return result;
@@ -194,17 +187,19 @@ static int parse_rawtxoutput_value(parse_rawtxoutput_state_t *state, buffer_t *b
 
 static int parse_rawtxoutput_scriptpubkey_size(parse_rawtxoutput_state_t *state,
                                                buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint64_t scriptpubkey_size;
     bool result = dbuffer_read_varint(buffers, &scriptpubkey_size);
     if (result) {
-        state->scriptpubkey_size = (int) scriptpubkey_size;
+        state->scriptpubkey_size = (unsigned int) scriptpubkey_size;
 
         crypto_hash_update_varint(&state->parent_state->hash_context->header, scriptpubkey_size);
 
-        int relevant_output_index = state->parent_state->output_index;
-        if (state->parent_state->out_counter == relevant_output_index) {
-            state->parent_state->parser_outputs->vout_scriptpubkey_len = (int) scriptpubkey_size;
+        if (state->parent_state->output_index != -1) {
+            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+            if (state->parent_state->out_counter == relevant_output_index) {
+                state->parent_state->parser_outputs->vout_scriptpubkey_len =
+                    (unsigned int) scriptpubkey_size;
+            }
         }
     }
     return result;
@@ -215,13 +210,11 @@ static int parse_rawtxoutput_scriptpubkey_init(parse_rawtxoutput_state_t *state,
                                                buffer_t *buffers[2]) {
     (void) buffers;
 
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->scriptpubkey_counter = 0;
     return 1;
 }
 
 static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t data[32];
 
     while (true) {
@@ -238,15 +231,21 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
 
         crypto_hash_update(&state->parent_state->hash_context->header, data, data_len);
 
-        int relevant_output_index = state->parent_state->output_index;
-        int scriptpubkey_len = state->parent_state->parser_outputs->vout_scriptpubkey_len;
-        // TODO: handle what happens if scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN
-        if (state->parent_state->out_counter == relevant_output_index &&
-            scriptpubkey_len <= MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-            memcpy(state->parent_state->parser_outputs->vout_scriptpubkey +
-                       state->scriptpubkey_counter,
-                   data,
-                   data_len);
+        if (state->parent_state->output_index != -1) {
+            unsigned int relevant_output_index = (unsigned int) state->parent_state->output_index;
+            if (state->parent_state->out_counter == relevant_output_index) {
+                unsigned int scriptpubkey_len =
+                    state->parent_state->parser_outputs->vout_scriptpubkey_len;
+                if (scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+                    return -1;  // not expecting any scriptPubkey larger than
+                                // MAX_PREVOUT_SCRIPTPUBKEY_LEN
+                }
+
+                memcpy(state->parent_state->parser_outputs->vout_scriptpubkey +
+                           state->scriptpubkey_counter,
+                       data,
+                       data_len);
+            }
         }
 
         state->scriptpubkey_counter += data_len;
@@ -270,7 +269,6 @@ const int n_parse_rawtxoutput_steps =
 /*   PARSER FOR A FULL RAWTX */
 
 static int parse_rawtx_version(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     uint8_t version_bytes[4];
 
     bool result = dbuffer_read_bytes(buffers, version_bytes, 4);
@@ -317,12 +315,10 @@ static int parse_rawtx_check_segwit(parse_rawtx_state_t *state, buffer_t *buffer
 }
 
 static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     uint64_t n_inputs;
     bool result = dbuffer_read_varint(buffers, &n_inputs);
     if (result) {
-        state->n_inputs = (int) n_inputs;
+        state->n_inputs = (unsigned int) n_inputs;
 
         crypto_hash_update_varint(&state->hash_context->header, n_inputs);
     }
@@ -332,7 +328,6 @@ static int parse_rawtx_input_count(parse_rawtx_state_t *state, buffer_t *buffers
 static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void) buffers;
 
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     state->in_counter = 0;
 
     parser_init_context(&state->input_parser_context, &state->input_parser_state);
@@ -342,7 +337,6 @@ static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers
 }
 
 static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     while (state->in_counter < state->n_inputs) {
         while (true) {
             bool result = parser_run(parse_rawtxinput_steps,
@@ -367,7 +361,7 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
     uint64_t n_outputs;
     bool result = dbuffer_read_varint(buffers, &n_outputs);
     if (result) {
-        state->n_outputs = (int) n_outputs;
+        state->n_outputs = (unsigned int) n_outputs;
 
         crypto_hash_update_varint(&state->hash_context->header, n_outputs);
     }
@@ -377,8 +371,6 @@ static int parse_rawtx_output_count(parse_rawtx_state_t *state, buffer_t *buffer
 static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     (void) buffers;
 
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     state->out_counter = 0;
     parser_init_context(&state->output_parser_context, &state->output_parser_state);
 
@@ -387,7 +379,6 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
 }
 
 static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
     while (state->out_counter < state->n_outputs) {
         while (true) {
             bool result = parser_run(parse_rawtxoutput_steps,
@@ -409,8 +400,6 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
 }
 
 static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     if (!state->is_segwit) {
         state->n_witnesses = 0;
         state->wit_counter = 0;
@@ -421,7 +410,7 @@ static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffe
     uint64_t n_witnesses;
     bool result = dbuffer_read_varint(buffers, &n_witnesses);
     if (result) {
-        state->n_witnesses = (int) n_witnesses;
+        state->n_witnesses = (unsigned int) n_witnesses;
         state->wit_counter = 0;
         state->cur_witness_length = 0;
     }
@@ -430,8 +419,6 @@ static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffe
 
 // Parses the witness data; currently, no use is made of that data.
 static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     if (!state->is_segwit) {
         return 1;  // no witnesses to parse
     }
@@ -448,7 +435,7 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
             if (!dbuffer_read_varint(buffers, &cur_witness_length)) {
                 return 0;  // incomplete, read more data
             }
-            state->cur_witness_length = (int) cur_witness_length;
+            state->cur_witness_length = (unsigned int) cur_witness_length;
             state->cur_witness_bytes_read = 0;
         }
 
@@ -474,8 +461,6 @@ static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2
 }
 
 static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    // PRINTF("%s:%d\t%s\n", __FILE__, __LINE__, __func__); // TODO: remove
-
     uint8_t locktime_bytes[4];
     bool result = dbuffer_read_bytes(buffers, locktime_bytes, 4);
     if (result) {
@@ -501,6 +486,11 @@ const int n_parse_rawtx_steps = sizeof(parse_rawtx_steps) / sizeof(parse_rawtx_s
 static void cb_process_data(buffer_t *data, void *cb_state) {
     psbt_parse_rawtx_state_t *state = (psbt_parse_rawtx_state_t *) cb_state;
 
+    if (state->parser_error) {
+        // there was already a parsing error, ignore any additional data received
+        return;
+    }
+
     buffer_t store_buf = buffer_create(state->store, state->store_data_length);
     buffer_t *buffers[] = {&store_buf, data};
 
@@ -510,10 +500,8 @@ static void cb_process_data(buffer_t *data, void *cb_state) {
         parser_consolidate_buffers(buffers, sizeof(state->store));
         state->store_data_length = store_buf.size;
     } else if (result < 0) {
-        // TODO: we might want to process other result values; in order to do so, we might need to
-        // change the signature
-        //       of callbacks to return a success value (and abort on failures).
-        PRINTF("Parser error\n");  // TODO: this should be handled somehow
+        PRINTF("Parser error\n");
+        state->parser_error = true;  // abort any remaining parsing
     }
 }
 
@@ -533,6 +521,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
     // init parser
 
     flow_state.store_data_length = 0;
+    flow_state.parser_error = false;
     parser_init_context(&flow_state.parser_context, &flow_state.parser_state);
 
     flow_state.parser_state.output_index = output_index;
@@ -549,7 +538,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
     flow_state.parser_state.parser_outputs = outputs;
 
     res = call_stream_preimage(dispatcher_context, value_hash, NULL, cb_process_data, &flow_state);
-    if (res < 0) {
+    if (res < 0 || flow_state.parser_error) {
         return -1;
     }
 
