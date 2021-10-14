@@ -26,7 +26,7 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
 
 
 class BitcoinInsType(enum.IntEnum):
-    GET_PUBKEY = 0x00
+    GET_EXTENDED_PUBKEY = 0x00
     GET_ADDRESS = 0x01
     REGISTER_WALLET = 0x02
     GET_WALLET_ADDRESS = 0x03
@@ -92,7 +92,7 @@ class BitcoinCommandBuilder:
 
         return {"cla": cla, "ins": ins, "p1": p1, "p2": p2, "data": cdata}
 
-    def get_pubkey(self, bip32_path: List[int], display: bool = False):
+    def get_extended_pubkey(self, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
         cdata: bytes = b"".join([
@@ -103,7 +103,7 @@ class BitcoinCommandBuilder:
 
         return self.serialize(
             cla=self.CLA_BITCOIN,
-            ins=BitcoinInsType.GET_PUBKEY,
+            ins=BitcoinInsType.GET_EXTENDED_PUBKEY,
             cdata=cdata,
         )
 

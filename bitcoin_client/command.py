@@ -94,7 +94,7 @@ class BitcoinCommand:
 
         return sw, response
 
-    def get_pubkey(self, bip32_path: str, display: bool = False) -> str:
+    def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
         """Gets the serialized extended public key for certain BIP32 path. Optionally, validate with the user.
 
         Parameters
@@ -110,10 +110,10 @@ class BitcoinCommand:
             The requested serialized extended public key.
         """
 
-        sw, response = self.make_request(self.builder.get_pubkey(bip32_path, display))
+        sw, response = self.make_request(self.builder.get_extended_pubkey(bip32_path, display))
 
         if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
 
         return response.decode()
 
@@ -308,6 +308,6 @@ class BitcoinCommand:
         sw, response = self.make_request(self.builder.get_master_fingerprint())
 
         if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_PUBKEY)
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
 
         return response

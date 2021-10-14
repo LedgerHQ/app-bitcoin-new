@@ -72,8 +72,8 @@ uint8_t G_app_mode;
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
         .cla = CLA_APP,
-        .ins = GET_PUBKEY,
-        .handler = (command_handler_t)handler_get_pubkey
+        .ins = GET_EXTENDED_PUBKEY,
+        .handler = (command_handler_t)handler_get_extended_pubkey
     },
     {
         .cla = CLA_APP,

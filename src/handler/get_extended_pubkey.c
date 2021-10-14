@@ -118,8 +118,8 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     return true;
 }
 
-void handler_get_pubkey(dispatcher_context_t *dc) {
-    get_pubkey_state_t *state = (get_pubkey_state_t *) &G_command_state;
+void handler_get_extended_pubkey(dispatcher_context_t *dc) {
+    get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
@@ -195,7 +195,7 @@ static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice) {
 }
 
 static void send_response(dispatcher_context_t *dc) {
-    get_pubkey_state_t *state = (get_pubkey_state_t *) &G_command_state;
+    get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 

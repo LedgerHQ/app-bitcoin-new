@@ -3,7 +3,7 @@
 #include "boilerplate/dispatcher.h"
 #include "constants.h"
 #include "handler/get_master_fingerprint.h"
-#include "handler/get_pubkey.h"
+#include "handler/get_extended_pubkey.h"
 #include "handler/get_wallet_address.h"
 #include "handler/register_wallet.h"
 #include "handler/sign_psbt.h"
@@ -12,7 +12,7 @@
  * Enumeration with expected INS of APDU commands.
  */
 typedef enum {
-    GET_PUBKEY = 0x00,
+    GET_EXTENDED_PUBKEY = 0x00,
     REGISTER_WALLET = 0x02,
     GET_WALLET_ADDRESS = 0x03,
     SIGN_PSBT = 0x04,
@@ -24,7 +24,7 @@ typedef enum {
  */
 typedef union {
     get_master_fingerprint_t get_master_fingerprint;
-    get_pubkey_state_t get_pubkey_state;
+    get_extended_pubkey_state_t get_extended_pubkey_state;
     register_wallet_state_t register_wallet_state;
     get_wallet_address_state_t get_wallet_address_state;
     sign_psbt_state_t sign_psbt_state;
