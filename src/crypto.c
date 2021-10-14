@@ -311,10 +311,10 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 // TODO: Split serialization from key derivation?
 //       It might be difficult to have a clean API without wasting memory, as the checksum
 //       needs to be concatenated to the data before base58 serialization.
-size_t get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
-                                              uint8_t bip32_path_len,
-                                              uint32_t bip32_pubkey_version,
-                                              char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
+int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                           uint8_t bip32_path_len,
+                                           uint32_t bip32_pubkey_version,
+                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
     // find parent key's fingerprint and child number
     uint32_t parent_fingerprint = 0;
     uint32_t child_number = 0;
@@ -347,10 +347,12 @@ size_t get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                          ext_pubkey->chain_code);
     crypto_get_checksum((uint8_t *) ext_pubkey, 78, ext_pubkey_check.checksum);
 
-    size_t serialized_pubkey_len =
+    int serialized_pubkey_len =
         base58_encode((uint8_t *) &ext_pubkey_check, 78 + 4, out, MAX_SERIALIZED_PUBKEY_LENGTH);
 
-    out[serialized_pubkey_len] = '\0';
+    if (serialized_pubkey_len > 0) {
+        out[serialized_pubkey_len] = '\0';
+    }
     return serialized_pubkey_len;
 }
 

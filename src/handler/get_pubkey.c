@@ -155,10 +155,15 @@ void handler_get_pubkey(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_NOT_SUPPORTED);
     }
 
-    get_serialized_extended_pubkey_at_path(bip32_path,
-                                           bip32_path_len,
-                                           G_coin_config->bip32_pubkey_version,
-                                           state->serialized_pubkey_str);
+    int serialized_pubkey_len =
+        get_serialized_extended_pubkey_at_path(bip32_path,
+                                               bip32_path_len,
+                                               G_coin_config->bip32_pubkey_version,
+                                               state->serialized_pubkey_str);
+    if (serialized_pubkey_len == -1) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
 
     char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1] = "(Master key)";
     if (bip32_path_len > 0) {

@@ -1179,10 +1179,15 @@ static void sign_init(dispatcher_context_t *dc) {
             // it could be a collision on the fingerprint; we verify that we can actually generate
             // the same pubkey
             char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-            get_serialized_extended_pubkey_at_path(our_key_info.master_key_derivation,
-                                                   our_key_info.master_key_derivation_len,
-                                                   G_coin_config->bip32_pubkey_version,
-                                                   pubkey_derived);
+            int serialized_pubkey_len =
+                get_serialized_extended_pubkey_at_path(our_key_info.master_key_derivation,
+                                                       our_key_info.master_key_derivation_len,
+                                                       G_coin_config->bip32_pubkey_version,
+                                                       pubkey_derived);
+            if (serialized_pubkey_len == -1) {
+                SEND_SW(dc, SW_BAD_STATE);
+                return;
+            }
 
             if (strncmp(our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) ==
                 0) {

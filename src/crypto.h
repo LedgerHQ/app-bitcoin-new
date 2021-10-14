@@ -290,12 +290,12 @@ uint32_t crypto_get_master_key_fingerprint();
  *   Pointer to the output buffer, which must be long enough to contain the result (including the
  * terminating null).
  *
- * @return the length of the output pubkey (not including the null character).
+ * @return the length of the output pubkey (not including the null character), or -1 on error.
  */
-size_t get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
-                                              uint8_t bip32_path_len,
-                                              uint32_t bip32_pubkey_version,
-                                              char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]);
+int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                           uint8_t bip32_path_len,
+                                           uint32_t bip32_pubkey_version,
+                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]);
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.
