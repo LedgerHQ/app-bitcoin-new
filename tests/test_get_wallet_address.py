@@ -1,3 +1,4 @@
+from bitcoin_client.exception.errors import IncorrectDataError
 from bitcoin_client.command import BitcoinCommand
 from bitcoin_client.common import AddressType
 from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
@@ -71,6 +72,72 @@ def test_get_wallet_address_singlesig_taproot(cmd: BitcoinCommand):
 
     res = cmd.get_wallet_address(wallet, None, 1, 9, False)
     assert res == "tb1p98d6s9jkf0la8ras4nnm72zme5r03fexn29e3pgz4qksdy84ndpqgjak72"
+
+
+# Failure cases for default wallets
+
+def test_get_wallet_address_default_fail_wrongkeys(cmd: BitcoinCommand):
+    # 0 keys info should be rejected
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[],
+        ), None, 0,  0, False)
+
+    # more than 1 key should be rejected
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
+            ],
+        ), None, 0,  0, False)
+
+    # wrong BIP44 purpose should be rejected (here using 84' for a P2PKH address)
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[
+                f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
+            ],
+        ), None, 0,  0, False)
+
+    # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended dpubkey for "84'/1'/0'"")
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
+            ],
+        ), None, 0,  0, False)
+
+    # wrong master fingerprint
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[
+                f"[42424242/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
+            ],
+        ), None, 0,  0, False)
+
+    # too large address_index, cannot be done non-silently
+    with pytest.raises(IncorrectDataError):
+        cmd.get_wallet_address(PolicyMapWallet(
+            name="",
+            policy_map="pkh(@0)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
+            ],
+        ), None, 0,  100000, False)
+
+
+# Multisig
 
 
 def test_get_wallet_address_multisig_legacy(cmd: BitcoinCommand):

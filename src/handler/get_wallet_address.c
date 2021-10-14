@@ -22,6 +22,7 @@
 #include "../common/base58.h"
 #include "../common/buffer.h"
 #include "../common/merkle.h"
+#include "../common/read.h"
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"
 #include "../commands.h"
@@ -121,6 +122,82 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
             return;
         }
 
+        if (state->wallet_header.n_keys != 1) {
+            PRINTF("Standard wallets must have exactly 1 key\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        // we check if the key is indeed internal
+        uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
+
+        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        state->wallet_header_keys_info_merkle_root,
+                                                        state->wallet_header_n_keys,
+                                                        0,  // only one key
+                                                        key_info_str,
+                                                        sizeof(key_info_str));
+        if (key_info_len < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+        policy_map_key_info_t key_info;
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        if (read_u32_be(key_info.master_key_fingerprint, 0) != master_key_fingerprint) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        // generate pubkey and check if it matches
+        char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+        int serialized_pubkey_len =
+            get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                                   key_info.master_key_derivation_len,
+                                                   G_coin_config->bip32_pubkey_version,
+                                                   pubkey_derived);
+        if (serialized_pubkey_len == -1) {
+            SEND_SW(dc, SW_BAD_STATE);
+            return;
+        }
+
+        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        // check if derivation path is indeed standard
+
+        // Based on the address type, we set the expected bip44 purpose for this canonical wallet
+        int bip44_purpose = get_bip44_purpose(state->address_type);
+
+        if (key_info.master_key_derivation_len != 3) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+
+        uint32_t bip32_path[5];
+        for (int i = 0; i < 3; i++) {
+            bip32_path[i] = key_info.master_key_derivation[i];
+        }
+        bip32_path[3] = state->is_change ? 1 : 0;
+        bip32_path[4] = state->address_index;
+
+        if (!is_address_path_standard(bip32_path, 5, bip44_purpose, coin_types, 2, -1)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         state->is_wallet_canonical = true;
     } else {
         // Verify hmac
@@ -141,10 +218,6 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific error code
         return;
     }
-
-    // TODO: for canonical wallets, we should check that there is only one key and its path is also
-    // canonical, (matching the expected path based on the address type provided above), account
-    // index not too large.
 
     buffer_t script_buf = buffer_create(state->script, sizeof(state->script));
 

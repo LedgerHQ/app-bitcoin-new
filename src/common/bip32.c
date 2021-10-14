@@ -181,3 +181,18 @@ bool is_address_path_standard(const uint32_t *bip32_path,
     }
     return true;
 }
+
+int get_bip44_purpose(int address_type) {
+    switch (address_type) {
+        case ADDRESS_TYPE_LEGACY:
+            return 44;  // legacy
+        case ADDRESS_TYPE_WIT:
+            return 84;  // native segwit
+        case ADDRESS_TYPE_SH_WIT:
+            return 49;  // wrapped segwit
+        case ADDRESS_TYPE_TR:
+            return 86;  // taproot
+        default:
+            return -1;
+    }
+}

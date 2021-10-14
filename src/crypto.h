@@ -8,18 +8,9 @@
 #include "cx.h"
 #include "constants.h"
 
-#include "./common/write.h"
+#include "./common/bip32.h"
 #include "./common/varint.h"
-
-// Address types (as defined in Bitcoin Core's HWI)
-// Legacy address. P2PKH for single sig, P2SH for scripts.
-#define ADDRESS_TYPE_LEGACY 1
-// Native segwit. P2WPKH for single sig, P2WPSH for scripts.
-#define ADDRESS_TYPE_WIT 2
-// Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
-#define ADDRESS_TYPE_SH_WIT 3
-// Taproot
-#define ADDRESS_TYPE_TR 4
+#include "./common/write.h"
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.

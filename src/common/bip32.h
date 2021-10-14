@@ -31,6 +31,16 @@
 #define MAX_BIP44_ACCOUNT_RECOMMENDED       100
 #define MAX_BIP44_ADDRESS_INDEX_RECOMMENDED 50000
 
+// Address types
+// Legacy address. P2PKH for single sig, P2SH for scripts.
+#define ADDRESS_TYPE_LEGACY 1
+// Native segwit. P2WPKH for single sig, P2WPSH for scripts.
+#define ADDRESS_TYPE_WIT 2
+// Nested segwit. P2SH-P2WPKH for single sig, P2SH-P2WPSH for scripts.
+#define ADDRESS_TYPE_SH_WIT 3
+// Taproot P2TR
+#define ADDRESS_TYPE_TR 4
+
 /**
  * Read BIP32 path from byte buffer.
  *
@@ -143,3 +153,13 @@ bool is_address_path_standard(const uint32_t *bip32_path,
                               const uint32_t expected_coin_types[],
                               size_t expected_coin_types_len,
                               int expected_change);
+
+/**
+ * Returns the appropriate value of the "purpose" step in a supported BIP44-compliant derivation.
+ *
+ * @param[in]  address_type
+ *   One of ADDRESS_TYPE_LEGACY, ADDRESS_TYPE_WIT, ADDRESS_TYPE_SH_WIT, ADDRESS_TYPE_TR.
+ *
+ * @return the correct BIP44 purpose, or -1 if the `address_type` parameter is wrong.
+ */
+int get_bip44_purpose(int address_type);

@@ -296,22 +296,10 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         state->is_wallet_canonical = true;
 
         // Based on the address type, we set the expected bip44 purpose for this canonical wallet
-        switch (state->address_type) {
-            case ADDRESS_TYPE_LEGACY:  // legacy
-                state->bip44_purpose = 44;
-                break;
-            case ADDRESS_TYPE_WIT:  // native segwit
-                state->bip44_purpose = 84;
-                break;
-            case ADDRESS_TYPE_SH_WIT:  // wrapped segwit
-                state->bip44_purpose = 49;
-                break;
-            case ADDRESS_TYPE_TR:  // taproot
-                state->bip44_purpose = 86;
-                break;
-            default:
-                SEND_SW(dc, SW_BAD_STATE);
-                return;
+        state->bip44_purpose = get_bip44_purpose(state->address_type);
+        if (state->bip44_purpose < 0) {
+            SEND_SW(dc, SW_BAD_STATE);
+            return;
         }
 
         // We do not check here that the purpose field, coin_type and account (first three step of
