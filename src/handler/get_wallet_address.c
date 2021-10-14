@@ -41,6 +41,8 @@ extern global_context_t *G_coin_config;
 
 static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
 
+static void compute_address(dispatcher_context_t *dc);
+
 void handler_get_wallet_address(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
@@ -218,6 +220,15 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific error code
         return;
     }
+
+    dc->next(compute_address);
+}
+
+// stack-intensive, split from the previous function to optimize stack usage
+static void compute_address(dispatcher_context_t *dc) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
     buffer_t script_buf = buffer_create(state->script, sizeof(state->script));
 
