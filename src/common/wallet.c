@@ -170,11 +170,10 @@ static int parse_token(buffer_t *buffer) {
 
 /**
  * Parses an unsigned decimal number from buffer, stopping when either the buffer ends, the next
- * character is not a number, or the number is already too big. Leading zeros are allowed.
+ * character is not a number, or the number is already too big. Leading zeros are not allowed.
  * Returns a valid 0 on success, -1 on failure.
  * The read number is saved into *out on success.
  */
-// TODO: disallow non-standard (e.g. extra leading zeros)
 static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
     if (!buffer_can_read(buffer, 1) || !is_digit(buffer->ptr[buffer->offset])) {
         PRINTF("parse_unsigned_decimal: couldn't read byte, or not a digit: %d\n",
@@ -187,6 +186,12 @@ static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
     while ((buffer_can_read(buffer, 1) && is_digit(buffer->ptr[buffer->offset]))) {
         ++digits_read;
         uint8_t next_digit = buffer->ptr[buffer->offset] - '0';
+
+        if (digits_read == 2 && result == 0) {
+            // if the first digit was a 0, than it should be the only digit
+            return -1;
+        }
+
         if (10 * result + next_digit < result) {
             PRINTF("parse_unsigned_decimal: overflow. Current: %d. Next digit: %d\n",
                    result,
