@@ -170,7 +170,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         G_dispatcher_context.machine_context_ptr = top_context;
 
         // Safety measure: reset to 0 the entire context before starting.
-        memset(top_context, 0, top_context_size);
+        explicit_bzero(top_context, top_context_size);
 
         bool cla_found = false, ins_found = false;
         command_handler_t handler;
