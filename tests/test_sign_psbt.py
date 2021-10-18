@@ -1,15 +1,112 @@
+import pytest
+
+import threading
+
+from decimal import Decimal
+
+from typing import List
+
 from pathlib import Path
 
 from bitcoin_client.command import BitcoinCommand
+from bitcoin_client.exception.errors import NotSupportedError
 
 from bitcoin_client.psbt import PSBT
 from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
+from speculos.client import SpeculosClient
+from tests.utils import txmaker
 
 from .utils import automation
 from .utils import bip0340
 
+from embit.script import Script
+from embit.networks import NETWORKS
 
 tests_root: Path = Path(__file__).parent
+
+
+CURRENCY_TICKER = "TEST"
+
+
+def format_amount(ticker: str, amount: int) -> str:
+    """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
+    assert amount >= 0
+
+    return f"{ticker} {str(Decimal(amount) / 100_000_000)}"
+
+
+def should_go_right(event: dict):
+    """Returns true if the current text event implies a "right" button press to proceed."""
+
+    if event["text"].startswith("Review"):
+        return True
+    elif event["text"].startswith("Amount"):
+        return True
+    elif event["text"].startswith("Address"):
+        return True
+    elif event["text"].startswith("Confirm"):
+        return True
+    elif event["text"].startswith("Fees"):
+        return True
+    return False
+
+
+def ux_thread_sign_psbt(client: SpeculosClient, all_events: List[dict]):
+    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
+
+    # press right until the last screen (will press the "right" button more times than needed)
+
+    while True:
+        event = client.get_next_event()
+        all_events.append(event)
+
+        if should_go_right(event):
+            client.press_and_release("right")
+        elif event["text"] == "Approve":
+            client.press_and_release("both")
+        elif event["text"] == "Accept":
+            client.press_and_release("both")
+            break
+
+
+def parse_signing_events(events: List[dict]) -> dict:
+    ret = dict()
+
+    # each of these is True if the _previous_ event was matching (so the next text needs to be recorded)
+    was_amount = False
+    was_address = False
+    was_fees = False
+
+    cur_output_index = -1
+
+    ret["addresses"] = []
+    ret["amounts"] = []
+    ret["fees"] = ""
+
+    for ev in events:
+        if ev["text"].startswith("output #"):
+            idx_str = ev["text"][8:]
+
+            assert int(idx_str) - 1 == cur_output_index + 1  # should not skip outputs
+
+            cur_output_index = int(idx_str) - 1
+
+            ret["addresses"].append("")
+            ret["amounts"].append("")
+
+        if was_address:
+            ret["addresses"][-1] += ev["text"]
+        if was_amount:
+            ret["amounts"][-1] += ev["text"]
+
+        if was_fees:
+            ret["fees"] += ev["text"]
+
+        was_amount = ev["text"].startswith("Amount")
+        was_address = ev["text"].startswith("Address")
+        was_fees = ev["text"].startswith("Fees")
+
+    return ret
 
 
 def open_psbt_from_file(filename: str) -> PSBT:
@@ -242,3 +339,119 @@ def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
     sig0 = result[0][:-1]
 
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+
+
+def test_sign_psbt_singlesig_wpkh_4to3(client: SpeculosClient, cmd: BitcoinCommand):
+    # PSBT for a segwit 4-input 3-output spend (1 change address)
+    # this test also checks that addresses, amounts and fees shown on screen are correct
+
+    if not isinstance(client, SpeculosClient):
+        pytest.skip("Requires speculos")
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    n_ins = 4
+    n_outs = 3
+
+    in_amounts = [10000 + 10000 * i for i in range(n_ins)]
+    out_amounts = [9999 + 9999 * i for i in range(n_outs)]
+
+    change_index = 1
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        in_amounts,
+        out_amounts,
+        [i == change_index for i in range(n_outs)]
+    )
+
+    sum_in = sum(in_amounts)
+    sum_out = sum(out_amounts)
+
+    assert sum_out < sum_in
+
+    fees_amount = sum_in - sum_out
+
+    all_events: List[dict] = []
+
+    x = threading.Thread(target=ux_thread_sign_psbt, args=[client, all_events])
+    x.start()
+    result = cmd.sign_psbt(psbt, wallet, None)
+    x.join()
+
+    assert len(result) == n_ins
+
+    parsed_events = parse_signing_events(all_events)
+
+    assert(parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount))
+
+    shown_out_idx = 0
+    for out_idx in range(n_outs):
+        if out_idx != change_index:
+            out_amt = psbt.tx.vout[out_idx].nValue
+            assert parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)
+
+            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
+            assert parsed_events["addresses"][shown_out_idx] == out_addr
+
+            shown_out_idx += 1
+
+
+@automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_singlesig_wpkh_64to256(cmd: BitcoinCommand, enable_slow_tests: bool):
+    # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
+    # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
+
+    if not enable_slow_tests:
+        pytest.skip()
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        [10000 + 10000 * i for i in range(64)],
+        [999 + 99 * i for i in range(255)],
+        [i == 42 for i in range(255)]
+    )
+
+    result = cmd.sign_psbt(psbt, wallet, None)
+
+    assert len(result) == 64
+
+
+def test_sign_psbt_fail_11_changes(client: SpeculosClient, cmd: BitcoinCommand):
+    # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
+    # before any user interaction
+
+    if not isinstance(client, SpeculosClient):
+        pytest.skip("Requires speculos")
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        [11 * 100_000_000 + 1234],
+        [100_000_000] * 11,
+        [True] * 11,
+    )
+
+    with pytest.raises(NotSupportedError):
+        cmd.sign_psbt(psbt, wallet, None)

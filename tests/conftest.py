@@ -14,6 +14,10 @@ from bitcoin_client.command import BitcoinCommand, HIDClient
 
 from speculos.client import SpeculosClient
 
+import random
+
+random.seed(0)  # make sure tests are repeatable
+
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
 
@@ -21,6 +25,7 @@ conftest_folder_path: Path = Path(__file__).parent
 def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
+    parser.addoption("--enableslowtests", action="store_true")
 
 
 @pytest.fixture(scope="module")
@@ -42,6 +47,11 @@ def hid(pytestconfig):
 @pytest.fixture
 def headless(pytestconfig):
     return pytestconfig.getoption("headless")
+
+
+@pytest.fixture
+def enable_slow_tests(pytestconfig):
+    return pytestconfig.getoption("enableslowtests")
 
 
 @pytest.fixture
