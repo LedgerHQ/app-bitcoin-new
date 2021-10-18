@@ -153,6 +153,7 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc) {
 
     if (!is_safe && !display) {
         SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
     }
 
     int serialized_pubkey_len =
