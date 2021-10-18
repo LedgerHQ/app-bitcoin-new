@@ -255,24 +255,32 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
 
-    keydata.prefix = 0x04;  // uncompressed public keys always start with 04
-    // derive private key according to BIP32 path
-    crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
+    BEGIN_TRY {
+        TRY {
+            keydata.prefix = 0x04;  // uncompressed public keys always start with 04
+            // derive private key according to BIP32 path
+            crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
 
-    if (chain_code != NULL) {
-        memmove(chain_code, keydata.chain_code, 32);
-        explicit_bzero(keydata.chain_code, 32);  // delete sensitive data
+            if (chain_code != NULL) {
+                memmove(chain_code, keydata.chain_code, 32);
+                explicit_bzero(keydata.chain_code, 32);  // delete sensitive data
+            }
+
+            // generate corresponding public key
+            cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
+
+            memmove(keydata.raw_public_key, public_key.W + 1, 64);
+
+            // compute compressed public key
+            crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey);
+        }
+        FINALLY {
+            // delete sensitive data
+            explicit_bzero(keydata.chain_code, 32);
+            explicit_bzero(&private_key, sizeof(private_key));
+        }
     }
-
-    // generate corresponding public key
-    cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
-
-    memmove(keydata.raw_public_key, public_key.W + 1, 64);
-
-    // reset private key
-    explicit_bzero(&private_key, sizeof(private_key));  // delete sensitive data
-    // compute compressed public key
-    crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey);
+    END_TRY;
 }
 
 uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {
