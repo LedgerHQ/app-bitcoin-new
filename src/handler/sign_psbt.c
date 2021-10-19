@@ -725,6 +725,7 @@ static void check_input_owned(dispatcher_context_t *dc) {
         if ((segwit_version == -1 || segwit_version == 0) && !state->cur_input.has_nonWitnessUtxo) {
             PRINTF("Non-witness utxo missing for legacy or segwitv0 input\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
         }
 
         // For all segwit transactions, the witness utxo must be present
@@ -772,10 +773,10 @@ static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accep
 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
-        return;
+    } else {
+        dc->next(verify_outputs_init);
     }
 
-    dc->next(verify_outputs_init);
     dc->run();
 }
 
