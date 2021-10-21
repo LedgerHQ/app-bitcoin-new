@@ -20,11 +20,24 @@
 #define BTCHIP_BASE58_H
 
 #include <stdlib.h>
+#include "../../common/base58.h"
 
-int btchip_decode_base58(const char *in, size_t length,
-                         unsigned char *out, size_t *outlen);
+// proxies to avoid a duplicate implementation of base58 encode/decode between legacy and native app
 
-int btchip_encode_base58(const unsigned char *in, size_t length,
-                         unsigned char *out, size_t *outlen);
+static inline int btchip_decode_base58(const char *in, size_t length, unsigned char *out, size_t *outlen) {
+    int ret = base58_decode(in, length, (uint8_t *)out, *outlen);
+    if (ret >= 0) {
+        *outlen = ret;
+    }
+    return ret;
+}
+
+static inline int btchip_encode_base58(const unsigned char *in, size_t length, unsigned char *out, size_t *outlen) {
+    int ret = base58_encode(in, length, (char *)out, *outlen);
+    if (ret >= 0) {
+        *outlen = ret;
+    }
+    return ret;
+}
 
 #endif
