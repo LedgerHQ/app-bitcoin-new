@@ -122,7 +122,7 @@ int base58_encode(const uint8_t *in, size_t in_len, char *out, size_t out_len) {
     output_size = (in_len - zero_count) * 138 / 100 + 1;
     stop_at = output_size - 1;
     for (size_t start_at = zero_count; start_at < in_len; start_at++) {
-        int carry = in[start_at];
+        unsigned int carry = in[start_at];
         for (j = output_size - 1; (int) j >= 0; j--) {
             carry += 256 * buffer[j];
             buffer[j] = carry % 58;
