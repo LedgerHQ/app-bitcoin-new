@@ -941,7 +941,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
             external = true;  // unknown script, definitely external
             break;
         } else if (script_type == SCRIPT_TYPE_P2TR) {
-            // taproot output, use PSBT_IN_TAP_BIP32_DERIVATION
+            // taproot output, use PSBT_OUT_TAP_BIP32_DERIVATION
             uint8_t key[1 + 32];
             key[0] = PSBT_OUT_TAP_BIP32_DERIVATION;
             memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 32);
