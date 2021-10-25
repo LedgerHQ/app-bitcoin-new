@@ -37,7 +37,6 @@ typedef struct parse_rawtx_state_s {
     bool is_segwit;
     unsigned int n_inputs;
     unsigned int n_outputs;
-    unsigned int n_witnesses;  // only for segwit tx, serialized according to bip-144
 
     union {
         // since the parsing stages of inputs, outputs and witnesses are disjoint, we reuse the same
@@ -53,9 +52,13 @@ typedef struct parse_rawtx_state_s {
             parse_rawtxoutput_state_t output_parser_state;
         };
         struct {
-            unsigned int wit_counter;
-            unsigned int cur_witness_length;
-            unsigned int cur_witness_bytes_read;
+            unsigned int wit_counter;             // index of witness field being read
+            unsigned int wit_stack_el_counter;    // index of the stack element in the witness field
+            unsigned int cur_wit_stack_elements;  // number of stack elements
+            unsigned int cur_wit_elem_len;        // size of the current stack elements
+            unsigned int cur_wit_el_bytes_read;   // number of bytes read of the current element
+            bool is_cur_wit_stack_elements_read;
+            bool is_cur_wit_elem_len_read;
         };
     };
 
@@ -399,63 +402,70 @@ static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2])
     return 1;
 }
 
-static int parse_rawtx_witness_count(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
-    if (!state->is_segwit) {
-        state->n_witnesses = 0;
-        state->wit_counter = 0;
-
-        return 1;  // no witnesses to parse
-    }
-
-    uint64_t n_witnesses;
-    bool result = dbuffer_read_varint(buffers, &n_witnesses);
-    if (result) {
-        state->n_witnesses = (unsigned int) n_witnesses;
-        state->wit_counter = 0;
-        state->cur_witness_length = 0;
-    }
-    return result;
+static int parse_rawtx_witnesses_init(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
+    // only relevant for segwit txs
+    state->wit_counter = 0;
+    state->is_cur_wit_stack_elements_read = false;
+    return 1;
 }
 
 // Parses the witness data; currently, no use is made of that data.
+
 static int parse_rawtx_witnesses(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     if (!state->is_segwit) {
         return 1;  // no witnesses to parse
     }
 
-    if (state->wit_counter >= state->n_witnesses) {
-        return 1;  // all witnesses were already parsed
-    }
-
-    while (state->wit_counter < state->n_witnesses) {
-        // read the witness length if not already read
-        if (state->cur_witness_length == 0) {
-            // the witness length was not yet read.
-            uint64_t cur_witness_length;
-            if (!dbuffer_read_varint(buffers, &cur_witness_length)) {
+    // process n_inputs txinwitness fields
+    while (state->wit_counter < state->n_inputs) {
+        // read the number of stack elements (if not already read)
+        if (!state->is_cur_wit_stack_elements_read) {
+            // read the number of stack elements
+            uint64_t cur_wit_stack_elements;
+            if (!dbuffer_read_varint(buffers, &cur_wit_stack_elements)) {
                 return 0;  // incomplete, read more data
             }
-            state->cur_witness_length = (unsigned int) cur_witness_length;
-            state->cur_witness_bytes_read = 0;
+            state->is_cur_wit_stack_elements_read = true;
+            state->cur_wit_stack_elements = (unsigned int) cur_wit_stack_elements;
+            state->is_cur_wit_elem_len_read = false;
+            state->wit_stack_el_counter = 0;
         }
 
-        while (state->cur_witness_bytes_read < state->cur_witness_length) {
-            uint8_t data[32];
-            int remaining_len = state->cur_witness_length - state->cur_witness_bytes_read;
-
-            // We read in chunks of at most 32 bytes, so that we can always interrupt with less than
-            // 32 unparsed bytes
-            int data_len = MIN(32, remaining_len);
-            if (!dbuffer_read_bytes(buffers, data, data_len)) {
-                return 0;
+        // read cur_wit_stack_elements stack elements
+        while (state->wit_stack_el_counter < state->cur_wit_stack_elements) {
+            // read the length of the current stack element (if not already read)
+            if (!state->is_cur_wit_elem_len_read) {
+                // read the length of the next stack elements
+                uint64_t cur_wit_elem_len;
+                if (!dbuffer_read_varint(buffers, &cur_wit_elem_len)) {
+                    return 0;  // incomplete, read more data
+                }
+                state->is_cur_wit_elem_len_read = true;
+                state->cur_wit_elem_len = (unsigned int) cur_wit_elem_len;
+                state->cur_wit_el_bytes_read = 0;
             }
-            state->cur_witness_bytes_read += data_len;
+
+            while (state->cur_wit_el_bytes_read < state->cur_wit_elem_len) {
+                uint8_t data[32];
+                int remaining_len = state->cur_wit_elem_len - state->cur_wit_el_bytes_read;
+
+                // We read in chunks of at most 32 bytes, so that we can always interrupt with less
+                // than 32 unparsed bytes
+                int data_len = MIN(32, remaining_len);
+                if (!dbuffer_read_bytes(buffers, data, data_len)) {
+                    return 0;
+                }
+
+                state->cur_wit_el_bytes_read += data_len;
+            }
+
+            ++state->wit_stack_el_counter;
+            state->is_cur_wit_elem_len_read = false;
         }
 
-        // move to parsing the next witness (if any)
+        // move to parsing the next witness field (if any)
         ++state->wit_counter;
-        state->cur_witness_length =
-            0;  // reset length to make sure we read the next witness length first
+        state->is_cur_wit_stack_elements_read = false;
     }
     return 1;
 }
@@ -464,6 +474,7 @@ static int parse_rawtx_locktime(parse_rawtx_state_t *state, buffer_t *buffers[2]
     uint8_t locktime_bytes[4];
     bool result = dbuffer_read_bytes(buffers, locktime_bytes, 4);
     if (result) {
+        PRINTF("LOCKTIME: %08X\n", *((uint32_t *) locktime_bytes));
         crypto_hash_update(&state->hash_context->header, locktime_bytes, 4);
     }
     return result;
@@ -477,7 +488,7 @@ static const parsing_step_t parse_rawtx_steps[] = {(parsing_step_t) parse_rawtx_
                                                    (parsing_step_t) parse_rawtx_output_count,
                                                    (parsing_step_t) parse_rawtx_outputs_init,
                                                    (parsing_step_t) parse_rawtx_outputs,
-                                                   (parsing_step_t) parse_rawtx_witness_count,
+                                                   (parsing_step_t) parse_rawtx_witnesses_init,
                                                    (parsing_step_t) parse_rawtx_witnesses,
                                                    (parsing_step_t) parse_rawtx_locktime};
 
