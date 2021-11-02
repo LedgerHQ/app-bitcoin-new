@@ -184,12 +184,16 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 }
 
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
+    PRINT_STACK_POINTER();
+
     cx_ripemd160_t rip_context;
     cx_ripemd160_init(&rip_context);
     cx_hash(&rip_context.header, CX_LAST, in, inlen, out, 20);
 }
 
 void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
+    PRINT_STACK_POINTER();
+
     uint8_t buffer[32];
     cx_hash_sha256(in, inlen, buffer, 32);
     crypto_ripemd160(buffer, 32, out);
@@ -197,6 +201,8 @@ void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
 
 int crypto_get_compressed_pubkey(const uint8_t uncompressed_key[static 65],
                                  uint8_t out[static 33]) {
+    PRINT_STACK_POINTER();
+
     if (uncompressed_key[0] != 0x04) {
         return -1;
     }
@@ -207,6 +213,8 @@ int crypto_get_compressed_pubkey(const uint8_t uncompressed_key[static 65],
 
 int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33],
                                    uint8_t out[static 65]) {
+    PRINT_STACK_POINTER();
+
     uint8_t prefix = compressed_key[0];
     if (prefix != 0x02 && prefix != 0x03) {
         return -1;
@@ -411,7 +419,7 @@ static void crypto_tr_tagged_hash(const uint8_t *tag,
     crypto_hash_digest(&hash_context.header, out, 32);
 }
 
-static int crypto_tr_lift_x(uint8_t x[static 32], uint8_t out[static 65]) {
+static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
     // save memory by reusing output buffer for intermediate results
     uint8_t *y = out + 1 + 32;
     // we use the memory for the x-coordinate of the output as a temporary variable

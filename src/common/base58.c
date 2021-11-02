@@ -43,6 +43,8 @@ char const BASE58_ALPHABET[] = {
 };
 
 int base58_decode(const char *in, size_t in_len, uint8_t *out, size_t out_len) {
+    PRINT_STACK_POINTER();
+
     uint8_t tmp[MAX_DEC_INPUT_SIZE] = {0};
     uint8_t buffer[MAX_DEC_INPUT_SIZE] = {0};
     uint8_t j;
