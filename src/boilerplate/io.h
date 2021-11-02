@@ -42,15 +42,15 @@ void io_clear_interruption_timeout();
 void io_start_processing_timeout();
 
 /**
+ * Removes the timeout started from io_start_processing_timeout.
+ */
+void io_clear_processing_timeout();
+
+/**
  * Clears both the interruption and processing timeouts, and sets G_was_processing_screen_shown to
  * false.
  */
 void io_reset_timeouts();
-
-/**
- * TODO: docs
- */
-void io_clear_processing_timeout();
 
 /**
  * TODO: docs
