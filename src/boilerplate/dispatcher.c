@@ -266,7 +266,7 @@ static void dispatcher_loop() {
         io_send_sw(SW_BAD_STATE);
     }
 
-    // We call the temination callback if given, but only if the UX is "dirty", that is either
+    // We call the termination callback if given, but only if the UX is "dirty", that is either
     // - there was some kind of UX flow with user interaction;
     // - background processing took long enough that the "Processing..." screen was shown.
     bool is_ux_dirty = G_dispatcher_state.had_ux_flow || G_was_processing_screen_shown;
