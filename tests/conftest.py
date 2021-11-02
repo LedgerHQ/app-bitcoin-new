@@ -50,7 +50,8 @@ def client(request, hid) -> Union[HIDClient, SpeculosClient]:
         client = HIDClient()
     else:
         client = SpeculosClient(
-            str(conftest_folder_path.parent.joinpath("bin/app.elf"))
+            str(conftest_folder_path.parent.joinpath("bin/app.elf")),
+            ['--sdk', '2.1']
         )
 
         try:

@@ -28,11 +28,14 @@
 
 extern dispatcher_context_t G_dispatcher_context;
 
+extern bool G_was_processing_screen_shown;
+
 // Private state that is not made accessible from the dispatcher context
 struct {
     void (*termination_cb)(void);
     bool paused;
     uint16_t sw;
+    bool had_ux_flow;  // set to true if there was any UX flow during the APDU processing
 } G_dispatcher_state;
 
 static void dispatcher_loop();
@@ -56,10 +59,16 @@ static void send_response() {
 
 static void pause() {
     G_dispatcher_state.paused = true;
+
+    // pause() is _always_ called for ux flows that wait for user input.
+    // No other flows should exist.
+    G_dispatcher_state.had_ux_flow = true;
 }
 
 static void run() {
     G_dispatcher_state.paused = false;
+
+    io_start_processing_timeout();
     dispatcher_loop();
 }
 
@@ -85,10 +94,15 @@ static int process_interruption(dispatcher_context_t *dc) {
     // Reset structured APDU command
     memset(&cmd, 0, sizeof(cmd));
 
+    io_start_interruption_timeout();
+
     // Receive command bytes in G_io_apdu_buffer
     if ((input_len = io_exchange(CHANNEL_APDU, G_output_len)) < 0) {
         return -1;
     }
+
+    io_clear_interruption_timeout();
+
     G_output_len = 0;
 
     // As we are not yet returning anything here, we communicate to io_exchange that the apdu
@@ -135,6 +149,8 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      const command_t *cmd) {
     // TODO: decide what to do if a command is sent while something was still running
     // currently: wiping everything
+
+    G_dispatcher_state.had_ux_flow = false;
 
     G_dispatcher_state.termination_cb = termination_cb;
     G_dispatcher_state.paused = false;
@@ -192,6 +208,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
             return;
         }
 
+        io_start_processing_timeout();
         handler(&G_dispatcher_context);
     }
 
@@ -206,6 +223,7 @@ static void dispatcher_loop() {
 
     while (true) {
         if (G_dispatcher_state.paused) {
+            io_clear_processing_timeout();
             return;
         }
 
@@ -227,6 +245,8 @@ static void dispatcher_loop() {
                 if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
                     PRINTF("Interruption requested, but the next processor was not set.\n");
                 }
+
+                io_clear_processing_timeout();
                 return;
             }
         } else if (G_dispatcher_context.machine_context_ptr->parent_context != NULL) {
@@ -246,8 +266,13 @@ static void dispatcher_loop() {
         io_send_sw(SW_BAD_STATE);
     }
 
-    // call the termination callback (e.g. to return to main menu), if given
-    if (G_dispatcher_state.termination_cb != NULL) {
+    // We call the termination callback if given, but only if the UX is "dirty", that is either
+    // - there was some kind of UX flow with user interaction;
+    // - background processing took long enough that the "Processing..." screen was shown.
+    bool is_ux_dirty = G_dispatcher_state.had_ux_flow || G_was_processing_screen_shown;
+    if (G_dispatcher_state.termination_cb != NULL && is_ux_dirty) {
         G_dispatcher_state.termination_cb();
     }
+
+    io_clear_processing_timeout();
 }

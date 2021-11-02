@@ -32,10 +32,53 @@
 extern dispatcher_context_t G_dispatcher_context;
 extern command_processor_t G_command_continuation;
 
-uint32_t G_output_len = 0;
+uint16_t G_output_len = 0;
+
+// Counter incremented at every tick
+// The initial value does not matter, as only the difference between timeframes is used.
+uint16_t G_ticks;
+
+struct {
+    bool interruption : 1;
+    bool processing : 1;
+} G_is_timeout_active;
+
+// set to true when the "Processing..." screen is shown, in order for the dispatcher to know if the
+// UX is not in idle state at the end of a command handler.
+bool G_was_processing_screen_shown;
+
+uint16_t G_interruption_timeout_start_tick;
+uint16_t G_processing_timeout_start_tick;
+
+UX_STEP_NOCB(ux_processing_flow_1_step, pn, {&C_icon_processing, "Processing..."});
+UX_FLOW(ux_processing_flow, &ux_processing_flow_1_step);
 
 void io_seproxyhal_display(const bagl_element_t *element) {
     io_seproxyhal_display_default((bagl_element_t *) element);
+}
+
+void io_start_interruption_timeout() {
+    G_interruption_timeout_start_tick = G_ticks;
+    G_is_timeout_active.interruption = true;
+}
+
+void io_clear_interruption_timeout() {
+    G_is_timeout_active.interruption = false;
+}
+
+void io_start_processing_timeout() {
+    G_processing_timeout_start_tick = G_ticks;
+    G_is_timeout_active.processing = true;
+}
+
+void io_clear_processing_timeout() {
+    G_is_timeout_active.processing = false;
+}
+
+void io_reset_timeouts() {
+    io_clear_interruption_timeout();
+    io_clear_processing_timeout();
+    G_was_processing_screen_shown = false;
 }
 
 uint8_t io_event(uint8_t channel) {
@@ -56,6 +99,26 @@ uint8_t io_event(uint8_t channel) {
             UX_DISPLAYED_EVENT({});
             break;
         case SEPROXYHAL_TAG_TICKER_EVENT:
+            ++G_ticks;
+
+            if (G_is_timeout_active.processing &&
+                G_ticks - G_processing_timeout_start_tick >= PROCESSING_TIMEOUT_TICKS) {
+                io_clear_processing_timeout();
+
+                G_was_processing_screen_shown = true;
+                ux_flow_init(0, ux_processing_flow, NULL);
+            }
+
+            if (G_is_timeout_active.interruption &&
+                G_ticks - G_interruption_timeout_start_tick >= INTERRUPTION_TIMEOUT_TICKS) {
+                io_clear_interruption_timeout();
+
+                // TODO: It would be better to have the dispatcher be notified somehow.
+                //       This would require some tampering with the io_exchange in
+                //       process_interruption.
+                THROW(EXCEPTION_IO_RESET);
+            }
+
             UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {});
             break;
         default:

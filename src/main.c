@@ -285,7 +285,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
                 USB_power(0);
                 USB_power(1);
 
-                ui_idle();
+                ui_menu_main();
 
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
@@ -355,6 +355,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
 
     // ensure exception will work as planned
     os_boot();
+
+    io_reset_timeouts();
 
     if (!arg0) {
         // Bitcoin application launched from dashboard

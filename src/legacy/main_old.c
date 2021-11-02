@@ -208,43 +208,43 @@ void settings_submenu_selector(unsigned int idx) {
 }
 
 //////////////////////////////////////////////////////////////////////
-UX_STEP_NOCB(
-    ux_idle_flow_1_step,
-    nn,
-    {
-      "Application",
-      "is ready",
-    });
-UX_STEP_CB(
-    ux_idle_flow_2_step,
-    pb,
-    ux_menulist_init(0, settings_submenu_getter, settings_submenu_selector),
-    {
-      &C_icon_coggle,
-      "Settings",
-    });
-UX_STEP_NOCB(
-    ux_idle_flow_3_step,
-    bn,
-    {
-      "Version",
-      APPVERSION,
-    });
-UX_STEP_CB(
-    ux_idle_flow_4_step,
-    pb,
-    os_sched_exit(-1),
-    {
-      &C_icon_dashboard_x,
-      "Quit",
-    });
-UX_FLOW(ux_idle_flow,
-  &ux_idle_flow_1_step,
-  &ux_idle_flow_2_step,
-  &ux_idle_flow_3_step,
-  &ux_idle_flow_4_step,
-  FLOW_LOOP
-);
+// UX_STEP_NOCB(
+//     ux_idle_flow_1_step,
+//     nn,
+//     {
+//       "Application",
+//       "is ready",
+//     });
+// UX_STEP_CB(
+//     ux_idle_flow_2_step,
+//     pb,
+//     ux_menulist_init(0, settings_submenu_getter, settings_submenu_selector),
+//     {
+//       &C_icon_coggle,
+//       "Settings",
+//     });
+// UX_STEP_NOCB(
+//     ux_idle_flow_3_step,
+//     bn,
+//     {
+//       "Version",
+//       APPVERSION,
+//     });
+// UX_STEP_CB(
+//     ux_idle_flow_4_step,
+//     pb,
+//     os_sched_exit(-1),
+//     {
+//       &C_icon_dashboard_x,
+//       "Quit",
+//     });
+// UX_FLOW(ux_idle_flow,
+//   &ux_idle_flow_1_step,
+//   &ux_idle_flow_2_step,
+//   &ux_idle_flow_3_step,
+//   &ux_idle_flow_4_step,
+//   FLOW_LOOP
+// );
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(
@@ -691,12 +691,17 @@ UX_FLOW(ux_request_segwit_input_approval_flow,
 );
 
 
+void ui_menu_main(); // new app's idle screen
+
 void ui_idle(void) {
-    // reserve a display stack slot if none yet
-    if(G_ux.stack_count == 0) {
-        ux_stack_push();
-    }
-    ux_flow_init(0, ux_idle_flow, NULL);
+    // // reserve a display stack slot if none yet
+    // if(G_ux.stack_count == 0) {
+    //     ux_stack_push();
+    // }
+    // ux_flow_init(0, ux_idle_flow, NULL);
+
+    // Use the new app's idle screen
+    ui_menu_main();
 }
 
 // override point, but nothing more to do

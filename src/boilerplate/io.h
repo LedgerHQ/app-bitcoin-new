@@ -20,6 +20,38 @@ uint8_t io_event(uint8_t channel);
 
 uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len);
 
+#define INTERRUPTION_TIMEOUT_TICKS 50
+#define PROCESSING_TIMEOUT_TICKS   10
+
+/**
+ * Instructs io_event to reset the app if INTERRUPTION_TIMEOUT_TICKS tick events are received before
+ * io_clear_interruption_timeout is called. Used to cause an app reset if the client stop responding
+ * while an APDU is being processed.
+ */
+void io_start_interruption_timeout();
+
+/**
+ * Removes the timeout started from io_start_interruption_timeout.
+ */
+void io_clear_interruption_timeout();
+
+/**
+ * Instructs io_event to show the "Processing..." screen if PROCESSING_TIMEOUT_TICKS tick events are
+ * received before io_clear_interruption_timeout is called.
+ */
+void io_start_processing_timeout();
+
+/**
+ * Removes the timeout started from io_start_processing_timeout.
+ */
+void io_clear_processing_timeout();
+
+/**
+ * Clears both the interruption and processing timeouts, and sets G_was_processing_screen_shown to
+ * false.
+ */
+void io_reset_timeouts();
+
 /**
  * TODO: docs
  */
