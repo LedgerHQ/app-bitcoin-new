@@ -290,7 +290,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
                 USB_power(0);
                 USB_power(1);
 
-                ui_idle();
+                ui_menu_main();
 
 #ifdef HAVE_BLE
                 BLE_power(0, NULL);
