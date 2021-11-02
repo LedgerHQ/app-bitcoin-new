@@ -43,6 +43,10 @@ struct {
     bool processing : 1;
 } G_is_timeout_active;
 
+// set to true when the "Processing..." screen is shown, in order for the dispatcher to know if the
+// UX is not in idle state at the end of a command handler.
+bool G_was_processing_screen_shown;
+
 uint16_t G_interruption_timeout_start_tick;
 uint16_t G_processing_timeout_start_tick;
 
@@ -71,6 +75,12 @@ void io_clear_processing_timeout() {
     G_is_timeout_active.processing = false;
 }
 
+void io_reset_timeouts() {
+    io_clear_interruption_timeout();
+    io_clear_processing_timeout();
+    G_was_processing_screen_shown = false;
+}
+
 uint8_t io_event(uint8_t channel) {
     (void) channel;
 
@@ -95,6 +105,7 @@ uint8_t io_event(uint8_t channel) {
                 G_ticks - G_processing_timeout_start_tick >= PROCESSING_TIMEOUT_TICKS) {
                 io_clear_processing_timeout();
 
+                G_was_processing_screen_shown = true;
                 ux_flow_init(0, ux_processing_flow, NULL);
             }
 
