@@ -124,6 +124,7 @@ SECTIONS
   {
     bss_start = .; 
     *(.legacy_globals)
+    *(.bss.vars) /* legacy global variable not following the G_ convention for globals */
   }  > SRAM = 0x00
   .ol1 bss_start (NOLOAD) : {
     *(.new_globals)
