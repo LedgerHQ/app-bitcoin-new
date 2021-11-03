@@ -607,6 +607,11 @@ DEFINES       += HAVE_WALLET_ID_SDK
 endif
 
 
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+    # enables optimizations using the shared 1K CXRAM region
+    DEFINES   += USE_CXRAM_SECTION
+endif
+
 # debugging helper functions and macros
 CFLAGS    += -include debug-helpers/debug.h
 
