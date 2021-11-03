@@ -21,6 +21,8 @@
 
 #include "base58.h"
 
+#include "../cxram_stash.h"
+
 uint8_t const BASE58_TABLE[] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
@@ -45,8 +47,15 @@ char const BASE58_ALPHABET[] = {
 int base58_decode(const char *in, size_t in_len, uint8_t *out, size_t out_len) {
     PRINT_STACK_POINTER();
 
-    uint8_t tmp[MAX_DEC_INPUT_SIZE] = {0};
-    uint8_t buffer[MAX_DEC_INPUT_SIZE] = {0};
+    // uint8_t tmp[MAX_DEC_INPUT_SIZE] = {0};
+    // uint8_t buffer[MAX_DEC_INPUT_SIZE] = {0};
+
+    // allocate buffers inside the cxram section; safe as there are no syscalls here
+    uint8_t *tmp = get_cxram_buffer();                          // MAX_DEC_INPUT_SIZE bytes buffer
+    uint8_t *buffer = get_cxram_buffer() + MAX_DEC_INPUT_SIZE;  // MAX_DEC_INPUT_SIZE bytes buffer
+    memset(tmp, 0, MAX_DEC_INPUT_SIZE);
+    memset(buffer, 0, MAX_DEC_INPUT_SIZE);
+
     uint8_t j;
     uint8_t start_at;
     uint8_t zero_count = 0;
