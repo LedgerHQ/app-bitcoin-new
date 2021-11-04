@@ -153,10 +153,10 @@ class ByteStreamParser:
         prefix = self.read_uint(1)
 
         if prefix == 253:
-            return self.read_uint(2)
+            return self.read_uint(2, 'little')
         elif prefix == 254:
-            return self.read_uint(4)
+            return self.read_uint(4, 'little')
         elif prefix == 255:
-            return self.read_uint(8)
+            return self.read_uint(8, 'little')
         else:
             return prefix
