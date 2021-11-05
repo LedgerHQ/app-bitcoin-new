@@ -543,3 +543,196 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
 
     return ret;
 }
+
+// BIP0340 Schnorr signatures (TODO: remove once firmware/sdk is upgraded)
+
+/* BIP0340 tags for computing the tagged hashes */
+const uint8_t BIP0340_challenge[] =
+    {'B', 'I', 'P', '0', '3', '4', '0', '/', 'c', 'h', 'a', 'l', 'l', 'e', 'n', 'g', 'e'};
+const uint8_t BIP0340_aux[] = {'B', 'I', 'P', '0', '3', '4', '0', '/', 'a', 'u', 'x'};
+const uint8_t BIP0340_nonce[] = {'B', 'I', 'P', '0', '3', '4', '0', '/', 'n', 'o', 'n', 'c', 'e'};
+
+cx_err_t custom_cx_ecschnorr_sign_no_throw(const cx_ecfp_private_key_t *pv_key,
+                                           uint32_t mode,
+                                           cx_md_t hashID,
+                                           const uint8_t *msg,
+                                           size_t msg_len,
+                                           uint8_t *sig,
+                                           size_t *sig_len) {
+#define CX_MAX_TRIES 100
+
+    cx_sha256_t H;
+
+    size_t size;
+    cx_ecpoint_t Q;
+    cx_bn_t bn_k, bn_d, bn_r, bn_s, bn_n;
+    uint8_t R[33];
+    uint8_t S[32];
+    uint8_t P[32];
+    int odd;
+    uint8_t tries;
+    cx_err_t error;
+    int diff;
+
+    CX_CHECK(cx_ecdomain_parameters_length(pv_key->curve, &size));
+
+    if ((mode & CX_MASK_EC) != CX_ECSCHNORR_BIP0340) {
+        return -1;
+    }
+
+    // Only secp256k1 is allowed when using CX_ECSCHNORR_BIP0340
+    if (pv_key->curve != CX_CURVE_SECP256K1) {
+        return CX_EC_INVALID_CURVE;
+    }
+
+    // WARN: only accept weierstrass 256 bits curve for now
+    if (hashID != CX_SHA256 || size != 32 || !CX_CURVE_RANGE(pv_key->curve, WEIERSTRASS) ||
+        *sig_len < (6 + 2 * (size + 1)) || pv_key->d_len != size) {
+        return CX_INVALID_PARAMETER;
+    }
+
+    CX_CHECK(cx_bn_lock(size, 0));
+    CX_CHECK(cx_bn_alloc(&bn_n, size));
+    CX_CHECK(cx_ecdomain_parameter_bn(pv_key->curve, CX_CURVE_PARAM_Order, bn_n));
+    CX_CHECK(cx_bn_alloc(&bn_k, size));
+    CX_CHECK(cx_bn_alloc(&bn_d, size));
+    CX_CHECK(cx_bn_alloc(&bn_r, size));
+    CX_CHECK(cx_bn_alloc(&bn_s, size));
+    CX_CHECK(cx_ecpoint_alloc(&Q, pv_key->curve));
+
+    if ((mode & CX_MASK_EC) == CX_ECSCHNORR_BIP0340) {
+        // Q = [d].G
+        CX_CHECK(cx_ecdomain_generator_bn(pv_key->curve, &Q));
+        CX_CHECK(cx_ecpoint_rnd_scalarmul(&Q, pv_key->d, size));
+        // If Qy is even use d otherwise use n-d
+        CX_CHECK(cx_bn_init(bn_d, pv_key->d, size));
+        CX_CHECK(cx_ecpoint_export(&Q, NULL, 0, P, size));
+        odd = P[size - 1] & 1;
+        if (odd) {
+            CX_CHECK(cx_bn_sub(bn_d, bn_n, bn_d));
+        }
+        // tag_hash = SHA256("BIP0340/aux")
+        // SHA256(tag_hash || tag_hash || aux_rnd)
+        cx_sha256_init_no_throw(&H);
+        cx_hash_no_throw((cx_hash_t *) &H, CX_LAST, BIP0340_aux, sizeof(BIP0340_aux), R, size);
+        cx_sha256_init_no_throw(&H);
+        cx_hash_no_throw((cx_hash_t *) &H, 0, R, size, NULL, 0);
+        cx_hash_no_throw((cx_hash_t *) &H, 0, R, size, NULL, 0);
+        cx_hash_no_throw((cx_hash_t *) &H, CX_LAST | CX_NO_REINIT, sig, size, R, size);
+        // t = d ^ SHA256(tag_hash || tag_hash || aux_rnd)
+        CX_CHECK(cx_bn_init(bn_k, R, size));
+        CX_CHECK(cx_bn_xor(bn_r, bn_d, bn_k));
+        CX_CHECK(cx_bn_export(bn_r, sig, size));
+        // tag_hash = SHA256("BIP0340/nonce")
+        // SHA256(tag_hash || tag_hash || t || Qx || msg)
+        cx_sha256_init_no_throw(&H);
+        cx_hash_no_throw((cx_hash_t *) &H, CX_LAST, BIP0340_nonce, sizeof(BIP0340_nonce), R, size);
+        cx_sha256_init_no_throw(&H);
+        cx_hash_no_throw((cx_hash_t *) &H, 0, R, size, NULL, 0);
+        cx_hash_no_throw((cx_hash_t *) &H, 0, R, size, NULL, 0);
+        cx_hash_no_throw((cx_hash_t *) &H, 0, sig, size, NULL, 0);
+        CX_CHECK(cx_ecpoint_export(&Q, P, size, NULL, 0));
+        cx_hash_no_throw((cx_hash_t *) &H, 0, P, size, NULL, 0);
+        cx_hash_no_throw((cx_hash_t *) &H, CX_LAST | CX_NO_REINIT, msg, size, sig, size);
+    }
+
+    // generate random
+    tries = 0;
+    // RETRY:
+    if (tries == CX_MAX_TRIES) {
+        goto end;
+    }
+
+    switch (mode & CX_MASK_RND) {
+        case CX_RND_PROVIDED:
+            if (tries) {
+                goto end;
+            }
+            CX_CHECK(cx_bn_init(bn_r, sig, size));
+            CX_CHECK(cx_bn_reduce(bn_k, bn_r, bn_n));
+            break;
+
+        case CX_RND_TRNG:
+            CX_CHECK(cx_bn_rng(bn_k, bn_n));
+            break;
+
+        default:
+            error = CX_INVALID_PARAMETER;
+            goto end;
+    }
+
+    if ((mode & CX_MASK_EC) == CX_ECSCHNORR_BIP0340) {
+        CX_CHECK(cx_bn_cmp_u32(bn_k, 0, &diff));
+        if (diff == 0) {
+            error = CX_INVALID_PARAMETER;
+            goto end;
+        }
+    }
+    CX_CHECK(cx_bn_export(bn_k, sig, size));
+
+    // sign
+    tries++;
+    // RETRY2:
+    CX_CHECK(cx_ecdomain_generator_bn(pv_key->curve, &Q));
+    CX_CHECK(cx_ecpoint_rnd_scalarmul(&Q, sig, size));
+
+    switch (mode & CX_MASK_EC) {
+            /* Schnorr signature with secp256k1 according to BIP0340
+            ** https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki */
+
+        case CX_ECSCHNORR_BIP0340:
+            CX_CHECK(cx_ecpoint_export(&Q, NULL, 0, sig, size));
+            odd = sig[size - 1] & 1;
+            if (odd) {
+                CX_CHECK(cx_bn_sub(bn_k, bn_n, bn_k));
+                CX_CHECK(cx_bn_export(bn_k, sig, size));
+            }
+            // Only take the x-coordinate
+            CX_CHECK(cx_ecpoint_export(&Q, R, size, NULL, 0));
+
+            // tag_hash = SHA256("BIP0340_challenge")
+            // e = SHA256(tag_hash || tag_hash || Rx || Px || msg)
+            cx_sha256_init_no_throw(&H);
+            cx_hash_no_throw((cx_hash_t *) &H,
+                             CX_LAST,
+                             BIP0340_challenge,
+                             sizeof(BIP0340_challenge),
+                             sig,
+                             size);
+            cx_sha256_init_no_throw(&H);
+            cx_hash_no_throw((cx_hash_t *) &H, 0, sig, size, NULL, 0);
+            cx_hash_no_throw((cx_hash_t *) &H, 0, sig, size, NULL, 0);
+            cx_hash_no_throw((cx_hash_t *) &H, 0, R, size, NULL, 0);
+            cx_hash_no_throw((cx_hash_t *) &H, 0, P, size, NULL, 0);
+            cx_hash_no_throw((cx_hash_t *) &H, CX_LAST | CX_NO_REINIT, msg, msg_len, sig, size);
+
+            // e = e % n
+            CX_CHECK(cx_bn_init(bn_s, sig, size));
+            CX_CHECK(cx_bn_reduce(bn_r, bn_s, bn_n));
+
+            // s = (k + e *d) % n
+            CX_CHECK(cx_bn_mod_mul(bn_s, bn_d, bn_r, bn_n));
+            CX_CHECK(cx_bn_mod_add(bn_s, bn_k, bn_s, bn_n));
+
+            CX_CHECK(cx_bn_export(bn_s, S, size));
+            break;
+
+        default:
+            error = CX_INVALID_PARAMETER;
+            goto end;
+    }
+
+end:
+    cx_bn_unlock();
+    if (error == CX_OK) {
+        if ((mode & CX_MASK_EC) == CX_ECSCHNORR_BIP0340) {
+            *sig_len = 64;
+            memcpy(sig, R, 32);
+            memcpy(sig + 32, S, 32);
+        } else {
+            // encoding
+            *sig_len = cx_ecfp_encode_sig_der(sig, *sig_len, R, size, S, size);
+        }
+    }
+    return error;
+}
