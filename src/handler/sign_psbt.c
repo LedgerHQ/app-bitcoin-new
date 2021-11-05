@@ -2047,7 +2047,8 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     int sign_path_len = state->our_key_derivation_length + 2;
 
     uint8_t sig[64];
-    size_t sig_len;
+    size_t sig_len = 72;  // TODO: remove once firmware is upgraded, workaround for bug in older
+                          // versions of cx_ecschnorr_sign_no_throw
 
     bool error = false;
     BEGIN_TRY {
@@ -2055,13 +2056,13 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
             crypto_tr_tweak_seckey(seckey);
 
-            unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
-                                                          CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
-                                                          CX_SHA256,
-                                                          state->sighash,
-                                                          32,
-                                                          sig,
-                                                          &sig_len);
+            unsigned int err = custom_cx_ecschnorr_sign_no_throw(&private_key,
+                                                                 CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
+                                                                 CX_SHA256,
+                                                                 state->sighash,
+                                                                 32,
+                                                                 sig,
+                                                                 &sig_len);
             if (err != CX_OK) {
                 PRINTF("Signature error: %08X\n", err);
                 SEND_SW(dc, SW_BAD_STATE);
