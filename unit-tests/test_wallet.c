@@ -141,7 +141,7 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     int res;
 
-    char *policy = "sh(wsh(sortedmulti(10,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))";
+    char *policy = "sh(wsh(sortedmulti(3,@0,@1,@2,@3,@4)))";
     buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
 
     res = parse_policy_map(&policy_buf, out, sizeof(out));
@@ -156,9 +156,9 @@ static void test_parse_policy_map_multisig_3(void **state) {
     policy_node_multisig_t *inner = (policy_node_multisig_t *) mid->script;
     assert_int_equal(inner->type, TOKEN_SORTEDMULTI);
 
-    assert_int_equal(inner->k, 10);
-    assert_int_equal(inner->n, 15);
-    for (int i = 0; i < 15; i++) assert_int_equal(inner->key_indexes[i], i);
+    assert_int_equal(inner->k, 3);
+    assert_int_equal(inner->n, 5);
+    for (int i = 0; i < 5; i++) assert_int_equal(inner->key_indexes[i], i);
 }
 
 // convenience function to parse as one liners
