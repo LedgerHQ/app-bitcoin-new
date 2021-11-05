@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:2.1.0-rc3
 
     steps:
       - name: Clone
