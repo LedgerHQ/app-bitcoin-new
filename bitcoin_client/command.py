@@ -67,6 +67,9 @@ class HIDClient:
 
 
 class BitcoinCommand:
+    # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
+    _no_clone_psbt: bool = False
+
     def __init__(self, client: HIDClient, debug: bool = False) -> None:
         self.client = client
         self.builder = BitcoinCommandBuilder(debug=debug)
@@ -237,9 +240,13 @@ class BitcoinCommand:
             A mapping that has as keys the indexes of inputs that the Hardware Wallet signed, and the corresponding signatures as values.
         """
         if psbt.version != 2:
-            psbt_v2 = PSBT()
-            psbt_v2.deserialize(psbt.serialize())  # clone psbt
-            psbt_v2.to_psbt_v2()
+            if self._no_clone_psbt:
+                psbt.to_psbt_v2()
+                psbt_v2 = psbt
+            else:
+                psbt_v2 = PSBT()
+                psbt_v2.deserialize(psbt.serialize())  # clone psbt
+                psbt_v2.to_psbt_v2()
         else:
             psbt_v2 = psbt
 

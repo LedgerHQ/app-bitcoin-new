@@ -9,7 +9,7 @@ from typing import List
 from pathlib import Path
 
 from bitcoin_client.command import BitcoinCommand
-from bitcoin_client.exception.errors import NotSupportedError
+from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.psbt import PSBT
 from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
@@ -455,3 +455,37 @@ def test_sign_psbt_fail_11_changes(client: SpeculosClient, cmd: BitcoinCommand):
 
     with pytest.raises(NotSupportedError):
         cmd.sign_psbt(psbt, wallet, None)
+
+
+def test_sign_psbt_fail_wrong_non_witness_utxo(client: SpeculosClient, cmd: BitcoinCommand):
+    # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
+    # before any user interaction
+
+    if not isinstance(client, SpeculosClient):
+        pytest.skip("Requires speculos")
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        [3 * 100_000_000],
+        [1 * 100_000_000, 2 * 100_000_000],
+        [False, True]
+    )
+
+    # Modify the non_witness_utxp so that the txid does not matches
+    wit = psbt.inputs[0].non_witness_utxo
+    wit.nLockTime = wit.nLockTime ^ 1  # change one byt of nLockTime arbitrarily to change the txid
+    wit.rehash()
+    psbt.inputs[0].non_witness_utxo = wit
+
+    cmd._no_clone_psbt = True
+    with pytest.raises(IncorrectDataError):
+        cmd.sign_psbt(psbt, wallet, None)
+    cmd._no_clone_psbt = False
