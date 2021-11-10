@@ -1,7 +1,5 @@
 # Ledger Bitcoin Application
 
-***This application is still experimental. Do not use in production. Breaking changes to the API are likely to happen.***
-
 ## Prerequisite
 
 Be sure to have your environment correctly set up (see [Getting Started](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html)) and [ledgerblue](https://pypi.org/project/ledgerblue/) and installed.
