@@ -47,14 +47,17 @@ $(error Unknown target: $(TARGET_NAME))
 endif
 
 # Flags: BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
-APP_LOAD_FLAGS = --appFlags 0xa50
+# Dependency to Bitcoin app (for altcoins)
+APP_LOAD_FLAGS=--appFlags 0xa50 --dep Bitcoin:$(APPVERSION)
 
 # All but bitcoin app use dependency onto the bitcoin app/lib
 DEFINES_LIB = USE_LIB_BITCOIN
 
 ifeq ($(COIN),bitcoin_testnet)
 
-DEFINES_LIB=# we're not using the lib :)
+# we're not using the lib :)
+DEFINES_LIB=
+APP_LOAD_FLAGS=--appFlags 0xa50
 
 # Bitcoin testnet
 DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
@@ -74,7 +77,9 @@ APPNAME = "Bitcoin Test"
 
 else ifeq ($(COIN),bitcoin)
 
-DEFINES_LIB=# we're not using the lib :)
+# we're not using the lib :)
+DEFINES_LIB=
+APP_LOAD_FLAGS=--appFlags 0xa50
 
 # Bitcoin mainnet
 DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
