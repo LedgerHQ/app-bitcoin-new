@@ -15,7 +15,7 @@
 extern uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
 /**
- * Global variable with the lenght of APDU response to send back.
+ * Global variable with the length of APDU response to send back.
  */
 extern uint16_t G_output_len;
 

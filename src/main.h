@@ -5,6 +5,6 @@
 #define APP_MODE_NEW           2  // state when the app is running new APDUs
 
 /**
- * Keeps track wether the app is running in "legacy" or "new" mode.
+ * Keeps track whether the app is running in "legacy" or "new" mode.
  */
 extern uint8_t G_app_mode;

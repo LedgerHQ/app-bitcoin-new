@@ -10,6 +10,6 @@ def test_random(cmd):
     r = cmd.get_random(n=32)
     assert len(r) == 32
 
-    # max lenght is 248!
+    # max length is 248!
     with pytest.raises(IncorrectLengthError):
         cmd.get_random(n=249)

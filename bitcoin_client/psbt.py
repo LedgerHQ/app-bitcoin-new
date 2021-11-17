@@ -328,17 +328,17 @@ class PartiallySignedInput:
 
             elif key_type == 0x0f:
                 if psbt_version == 0:
-                    raise PSBTSerializationError("input previous ouput index key invalid for psbt version 0")
+                    raise PSBTSerializationError("input previous output index key invalid for psbt version 0")
 
                 if self.output_index is not None:
-                    raise PSBTSerializationError("Duplicate key, input previous ouput index already provided")
+                    raise PSBTSerializationError("Duplicate key, input previous output index already provided")
                 elif len(key) != 1:
-                    raise PSBTSerializationError("input previous ouput index key must be exactly 1 byte long")
+                    raise PSBTSerializationError("input previous output index key must be exactly 1 byte long")
 
                 output_index_bytes = deser_string(f)
 
                 if len(output_index_bytes) != 4:
-                    raise PSBTSerializationError("Input previous ouput index must be exactly 4 bytes long")
+                    raise PSBTSerializationError("Input previous output index must be exactly 4 bytes long")
 
                 self.output_index = struct.unpack("<I", output_index_bytes)[0]
 

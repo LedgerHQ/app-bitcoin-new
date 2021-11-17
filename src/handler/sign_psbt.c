@@ -392,7 +392,7 @@ static void process_global_map(dispatcher_context_t *dc) {
         state->locktime = read_u32_le(raw_result, 0);
     }
 
-    // we alredy know n_inputs and n_outputs, so we skip reading from the global map
+    // we already know n_inputs and n_outputs, so we skip reading from the global map
 
     state->cur_input_index = 0;
     dc->next(process_input_map);
@@ -1454,7 +1454,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
     // outputs
     crypto_hash_update_varint(&sighash_context.header, state->n_outputs);
     if (hash_outputs(dc, &sighash_context.header) == -1) {
-        return;  // response alredy set
+        return;  // response already set
     }
 
     // nLocktime

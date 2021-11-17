@@ -69,7 +69,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  serialized_extended_pubkey_t *child);
 
 /**
- * Convenience wrapper for cx_hash to add some data to an intialized hash context.
+ * Convenience wrapper for cx_hash to add some data to an initialized hash context.
  *
  * @param[in] hash_context
  *   The context of the hash, which must already be initialized.
@@ -276,7 +276,7 @@ uint32_t crypto_get_master_key_fingerprint();
  * @param[in]  bip32_path_len
  *   Number of BIP32 paths in the input buffer.
  * @param[in]  bip32_pubkey_version
- *   Version prefix to use for te pubkey.
+ *   Version prefix to use for the pubkey.
  * @param[out] out
  *   Pointer to the output buffer, which must be long enough to contain the result (including the
  * terminating null).
@@ -295,7 +295,7 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
  * @param[in]  label
  *   Pointer to the label. The first byte of the label must be 0x00 to comply with SLIP-0021.
  * @param[in]  label_len
- *   Length of te label.
+ *   Length of the label.
  * @param[out] key
  *   Pointer to a 32-byte output buffer that will contain the generated key.
  */

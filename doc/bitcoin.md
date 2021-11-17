@@ -53,10 +53,10 @@ Once the user approves, the `REGISTER_WALLET` returns to the client a 32-byte HM
 |--------|------------------------------|-------------|
 | 0x6985 | `SW_DENY`                    | Rejected by user |
 | 0x6A86 | `SW_WRONG_P1P2`              | Either `P1` or `P2` is incorrect |
-| 0x6A87 | `SW_WRONG_DATA_LENGTH`       | `Lc` or minimum APDU lenght is incorrect |
+| 0x6A87 | `SW_WRONG_DATA_LENGTH`       | `Lc` or minimum APDU length is incorrect |
 | 0x6D00 | `SW_INS_NOT_SUPPORTED`       | No command exists with `INS` |
 | 0x6E00 | `SW_CLA_NOT_SUPPORTED`       | Bad `CLA` used for this application |
-| 0xB000 | `SW_WRONG_RESPONSE_LENGTH`   | Wrong response lenght (buffer size problem) |
+| 0xB000 | `SW_WRONG_RESPONSE_LENGTH`   | Wrong response length (buffer size problem) |
 | 0xB007 | `SW_BAD_STATE`               | Abrted because unexpected state reached |
 | 0xB008 | `SW_SIGNATURE_FAIL`          | Invalid signature or HMAC |
 | 0xE000 | `SW_INTERRUPTED_EXECUTION`   | The command is interrupted, and requires the client's response |

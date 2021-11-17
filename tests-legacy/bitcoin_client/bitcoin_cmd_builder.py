@@ -170,7 +170,7 @@ class BitcoinCommandBuilder:
         # - 0x01, display the address
         # - 0x02, display the validation token (unused here)
         p1: int = 0x01 if display else 0x00
-        # P2: type of Bitcoin address in the reponse
+        # P2: type of Bitcoin address in the response
         p2: int = addr_type.value
 
         path: List[bytes] = bip32_path_from_string(bip32_path)

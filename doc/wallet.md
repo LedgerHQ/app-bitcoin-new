@@ -45,10 +45,10 @@ The `/**` in the descriptor template represents all the possible paths used in t
 
 From a descriptor template (and the associated vector of keys), one can therefore obtain the descriptor for receive and change addresses by:
 
-- replacing replacing each key placeholder with the corresponding key / key origin, and then
+- replacing each key placeholder with the corresponding key / key origin, and then
 -  replacing `/**` with either `/0/*` (receive addresses descriptor) or `/1/*` (change addresses descriptor).
 
-For example, the wallet descriptor `pkh(@0)` with key information `["d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/**"]` produces the following two descriptors:
+For example, the wallet descriptor `pkh(@0)` with key information `["[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/**"]` produces the following two descriptors:
 
 - Receive descriptor: `pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*)`
 - Change descriptor: `pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)`
