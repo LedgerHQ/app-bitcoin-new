@@ -66,18 +66,18 @@ class HIDClient:
         self.transport.close()
 
 
-class BitcoinCommand:
+class Client:
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
 
-    def __init__(self, client: HIDClient, debug: bool = False) -> None:
-        self.client = client
+    def __init__(self, comm_client: HIDClient, debug: bool = False) -> None:
+        self.comm_client = comm_client
         self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
 
     def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
         try:
-            return 0x9000, self.client.apdu_exchange(**apdu)
+            return 0x9000, self.comm_client.apdu_exchange(**apdu)
         except ApduException as e:
             return e.sw, e.data
 

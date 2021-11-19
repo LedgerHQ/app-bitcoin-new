@@ -2,13 +2,13 @@ import threading
 
 import pytest
 
-from bitcoin_client.command import BitcoinCommand
+from bitcoin_client.client import Client
 from bitcoin_client.exception import DenyError, NotSupportedError
 
 from speculos.client import SpeculosClient
 
 
-def test_get_extended_pubkey_standard_nodisplay(cmd: BitcoinCommand):
+def test_get_extended_pubkey_standard_nodisplay(client: Client):
     testcases = {
         "m/44'/1'/0'": "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
         "m/44'/1'/10'": "tpubDCwYjpDhUdPGp21gSpVay2QPJVh6WNySWMXPhbcu1DsxH31dF7mY18oibbu5RxCLBc1Szerjscuc3D5HyvfYqfRvc9mesewnFqGmPjney4d",
@@ -20,13 +20,13 @@ def test_get_extended_pubkey_standard_nodisplay(cmd: BitcoinCommand):
     }
 
     for path, pubkey in testcases.items():
-        assert pubkey == cmd.get_extended_pubkey(
+        assert pubkey == client.get_extended_pubkey(
             bip32_path=path,
             display=False
         )
 
 
-def test_get_extended_pubkey_nonstandard_nodisplay(cmd: BitcoinCommand):
+def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
     # as these paths are not standard, the app should reject immediately if display=False
     testcases = [
         "m",  # unusual to export the root key
@@ -46,13 +46,13 @@ def test_get_extended_pubkey_nonstandard_nodisplay(cmd: BitcoinCommand):
 
     for path in testcases:
         with pytest.raises(NotSupportedError):
-            cmd.get_extended_pubkey(
+            client.get_extended_pubkey(
                 bip32_path=path,
                 display=False
             )
 
 
-def test_get_extended_pubkey_non_standard(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard(comm: SpeculosClient, client: Client):
     # Test the successful UX flow for a non-standard path (here, root path)
     # (Slow test, not feasible to repeat it for many paths)
 
@@ -75,7 +75,7 @@ def test_get_extended_pubkey_non_standard(client: SpeculosClient, cmd: BitcoinCo
     x = threading.Thread(target=ux_thread)
     x.start()
 
-    pub_key = cmd.get_extended_pubkey(
+    pub_key = client.get_extended_pubkey(
         bip32_path="m",  # root pubkey
         display=True
     )
@@ -85,7 +85,7 @@ def test_get_extended_pubkey_non_standard(client: SpeculosClient, cmd: BitcoinCo
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
 
 
-def test_get_extended_pubkey_non_standard_reject_early(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard_reject_early(comm: SpeculosClient, client: Client):
     # Test rejecting after the "Reject if you're not sure" warning
     # (Slow test, not feasible to repeat it for many paths)
 
@@ -106,7 +106,7 @@ def test_get_extended_pubkey_non_standard_reject_early(client: SpeculosClient, c
     x.start()
 
     with pytest.raises(DenyError):
-        cmd.get_extended_pubkey(
+        client.get_extended_pubkey(
             bip32_path="m/111'/222'/333'",
             display=True
         )
@@ -114,7 +114,7 @@ def test_get_extended_pubkey_non_standard_reject_early(client: SpeculosClient, c
     x.join()
 
 
-def test_get_extended_pubkey_non_standard_reject(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard_reject(comm: SpeculosClient, client: Client):
     # Test rejecting at the end
     # (Slow test, not feasible to repeat it for many paths)
 
@@ -137,7 +137,7 @@ def test_get_extended_pubkey_non_standard_reject(client: SpeculosClient, cmd: Bi
     x.start()
 
     with pytest.raises(DenyError):
-        cmd.get_extended_pubkey(
+        client.get_extended_pubkey(
             bip32_path="m/111'/222'/333'",
             display=True
         )

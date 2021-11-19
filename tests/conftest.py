@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from bitcoin_client.command import BitcoinCommand, HIDClient
+from bitcoin_client.client import Client, HIDClient
 
 from speculos.client import SpeculosClient
 
@@ -55,7 +55,7 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def client(request, hid) -> Union[HIDClient, SpeculosClient]:
+def comm(request, hid) -> Union[HIDClient, SpeculosClient]:
     if hid:
         client = HIDClient()
     else:
@@ -79,8 +79,8 @@ def client(request, hid) -> Union[HIDClient, SpeculosClient]:
 
 
 @pytest.fixture
-def cmd(client) -> BitcoinCommand:
-    return BitcoinCommand(client=client, debug=False)
+def client(comm) -> Client:
+    return Client(comm_client=comm, debug=False)
 
 
 @dataclass(frozen=True)

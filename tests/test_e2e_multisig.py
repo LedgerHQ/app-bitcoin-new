@@ -1,7 +1,7 @@
 import hmac
 from hashlib import sha256
 
-from bitcoin_client.command import BitcoinCommand
+from bitcoin_client.client import Client
 from bitcoin_client.exception import DenyError
 from bitcoin_client.wallet import MultisigWallet
 from bitcoin_client.common import AddressType
@@ -10,7 +10,7 @@ from .utils import automation
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_and_get_address(cmd: BitcoinCommand, speculos_globals):
+def test_register_and_get_address(client: Client, speculos_globals):
     # test for a native segwit wallet (bech32 address)
 
     wallet = MultisigWallet(
@@ -23,7 +23,7 @@ def test_register_and_get_address(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
@@ -32,6 +32,6 @@ def test_register_and_get_address(cmd: BitcoinCommand, speculos_globals):
         wallet_hmac,
     )
 
-    res = cmd.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
 
     assert res == "tb1qwuxulrpu5d02eag4tphxhamaa24s8sk8d5s7kw340cesr0wf87csks3c9a"
