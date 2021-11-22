@@ -1,18 +1,18 @@
-from typing import Tuple, List, Mapping, Generator, Optional
+from typing import Tuple, List, Mapping, Optional
 import base64
 from io import BytesIO, BufferedReader
 
 from ledgercomm import Transport
 
-from bitcoin_client.command_builder import BitcoinCommandBuilder, BitcoinInsType
-from bitcoin_client.common import AddressType
-from bitcoin_client.exception import DeviceException
+from .command_builder import BitcoinCommandBuilder, BitcoinInsType, DefaultInsType
+from .exception import DeviceException
 
-from bitcoin_client.client_command import ClientCommandInterpreter
+from .client_command import ClientCommandInterpreter
 
-from bitcoin_client.merkle import get_merkleized_map_commitment
-from bitcoin_client.wallet import Wallet, WalletType, PolicyMapWallet
-from bitcoin_client.psbt import PSBT, deser_string
+from .merkle import get_merkleized_map_commitment
+from .wallet import Wallet, WalletType, PolicyMapWallet
+from .psbt import PSBT
+from ._serialize import deser_string
 
 
 try:
@@ -96,6 +96,35 @@ class Client:
             )
 
         return sw, response
+
+    def get_version(self) -> Tuple[str, str, bytes]:
+        """Queries the hardware wallet for the currently running app's name, version and state flags.
+
+        Returns
+        -------
+        Tuple[str, str, bytes]
+            The first element is the app's name, as a short string.
+            The second element is the app's version.
+            The third element is a binary string representing the platform's global state (pin lock etc).
+        """
+
+        sw, response = self.make_request(self.builder.get_version())
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION)
+
+        r = BytesIO(response)
+
+        format = r.read(1)
+
+        app_name = deser_string(r)
+        app_version = deser_string(r)
+        app_flags = deser_string(r)
+
+        if format != b'\1' or app_name == b'' or app_version == b'' or app_flags == b'':
+            raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION, message="Invalid format returned by GET_VERSION")
+
+        return app_name.decode(), app_version.decode(), app_flags
 
     def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
         """Gets the serialized extended public key for certain BIP32 path. Optionally, validate with the user.

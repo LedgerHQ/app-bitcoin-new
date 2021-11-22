@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from tests.utils import automation
-
 import json
 
 from typing import Union
@@ -14,12 +12,32 @@ from bitcoin_client.client import Client, HIDClient
 
 from speculos.client import SpeculosClient
 
+import os
+import re
+
 import random
 
 random.seed(0)  # make sure tests are repeatable
 
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
+
+
+ASSIGNMENT_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*)$', re.MULTILINE)
+
+
+def get_app_version() -> str:
+    makefile_path = conftest_folder_path.parent / "Makefile"
+    if not makefile_path.is_file():
+        raise FileNotFoundError(f"Can't find file: '{makefile_path}'")
+
+    makefile: str = makefile_path.read_text()
+
+    assignments = {
+        identifier: value for identifier, value in ASSIGNMENT_RE.findall(makefile)
+    }
+
+    return f"{assignments['APPVERSION_M']}.{assignments['APPVERSION_N']}.{assignments['APPVERSION_P']}"
 
 
 def pytest_addoption(parser):
@@ -39,6 +57,11 @@ def sw_h_path():
     return sw_h_path
 
 
+@pytest.fixture(scope="module")
+def app_version() -> str:
+    return get_app_version()
+
+
 @pytest.fixture
 def hid(pytestconfig):
     return pytestconfig.getoption("hid")
@@ -55,10 +78,15 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid) -> Union[HIDClient, SpeculosClient]:
+def comm(request, hid, app_version: str) -> Union[HIDClient, SpeculosClient]:
     if hid:
         client = HIDClient()
     else:
+        # We set the app's name before running speculos in order to emulate the expected
+        # behavior of the SDK's GET_VERSION default APDU.
+        # The app name is 'bitcoin' or 'bitcoin_testnet' for mainnet/testnet respectively.
+        # We leave the speculos default 'app' to avoid relying on that value in tests.
+        os.environ['SPECULOS_APPNAME'] = f'app:{app_version}'
         client = SpeculosClient(
             str(conftest_folder_path.parent.joinpath("bin/app.elf")),
             ['--sdk', '2.1']
