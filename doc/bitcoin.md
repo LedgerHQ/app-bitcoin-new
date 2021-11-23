@@ -161,6 +161,7 @@ Get a receive or change a address for a registered or default wallet, after vali
 
 | Length | Name            | Description |
 |--------|-----------------|-------------|
+| `1`    | `display`       | `0` or `1`  |
 | `32`   | `wallet_id`     | The id of the wallet |
 | `32`   | `wallet_hmac`   | The hmac of a registered wallet, or exactly 32 0 bytes |
 | `1`    | `change`        | `0` for a receive address, `1` for a change address |
@@ -179,7 +180,7 @@ For a registered wallet, the hmac must be correct. Once that is validated, this 
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
-<!-- TODO: once the path checking is added for default wallet, document it here -->
+If the `display` parameter is `1`, the resulting wallet address is also shown on the secure screen, and only returns successfully after the user confirms it. If the `display` parameter is `0`, the result is silently returned.
 
 #### Client commands
 
