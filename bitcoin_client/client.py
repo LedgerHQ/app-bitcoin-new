@@ -1,4 +1,4 @@
-from typing import Tuple, List, Mapping, Optional
+from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
@@ -14,6 +14,7 @@ from .wallet import Wallet, WalletType, PolicyMapWallet
 from .psbt import PSBT
 from ._serialize import deser_string
 
+from .client_legacy import LegacyClient
 
 try:
     from speculos.client import ApduException
@@ -67,12 +68,8 @@ class HIDClient:
 
 
 class Client:
-    # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
-    _no_clone_psbt: bool = False
-
     def __init__(self, comm_client: HIDClient, debug: bool = False) -> None:
         self.comm_client = comm_client
-        self.builder = BitcoinCommandBuilder(debug=debug)
         self.debug = debug
 
     def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
@@ -84,18 +81,7 @@ class Client:
     def make_request(
         self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
     ) -> Tuple[int, bytes]:
-        sw, response = self._apdu_exchange(apdu)
-
-        while sw == 0xE000:
-            if not client_intepreter:
-                raise RuntimeError("Unexpected SW_INTERRUPTED_EXECUTION received.")
-
-            command_response = client_intepreter.execute(response)
-            sw, response = self._apdu_exchange(
-                self.builder.continue_interrupted(command_response)
-            )
-
-        return sw, response
+        return self._apdu_exchange(apdu)
 
     def get_version(self) -> Tuple[str, str, bytes]:
         """Queries the hardware wallet for the currently running app's name, version and state flags.
@@ -108,7 +94,7 @@ class Client:
             The third element is a binary string representing the platform's global state (pin lock etc).
         """
 
-        sw, response = self.make_request(self.builder.get_version())
+        sw, response = self.make_request(self.serialize(cla=self.CLA_DEFAULT, ins=DefaultInsType.GET_VERSION, cdata=b''))
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION)
@@ -142,12 +128,7 @@ class Client:
             The requested serialized extended public key.
         """
 
-        sw, response = self.make_request(self.builder.get_extended_pubkey(bip32_path, display))
-
-        if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
-
-        return response.decode()
+        raise NotImplementedError
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
         """Registers a wallet policy with the user. After approval returns the wallet id and hmac to be stored on the client.
@@ -164,27 +145,7 @@ class Client:
             The second element is the hmac.
         """
 
-        if wallet.type != WalletType.POLICYMAP:
-            raise ValueError("wallet type must be POLICYMAP")
-
-        client_intepreter = ClientCommandInterpreter()
-        client_intepreter.add_known_preimage(wallet.serialize())
-        client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
-
-        sw, response = self.make_request(
-            self.builder.register_wallet(wallet), client_intepreter
-        )
-
-        if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
-
-        if len(response) != 64:
-            raise RuntimeError(f"Invalid response length: {len(response)}")
-
-        wallet_id = response[0:32]
-        wallet_hmac = response[32:64]
-
-        return wallet_id, wallet_hmac
+        raise NotImplementedError
 
     def get_wallet_address(
         self,
@@ -219,6 +180,111 @@ class Client:
         str
             The requested address.
         """
+
+        raise NotImplementedError
+
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> Mapping[int, bytes]:
+        """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
+
+        Signature requires explicit approval from the user.
+
+        Parameters
+        ----------
+        psbt : PSBT
+            A PSBT of version 0 or 2, with all the necessary information to sign the inputs already filled in; what the
+            required fields changes depending on the type of input.
+            The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
+            signing (this will change for Taproot inputs).
+
+        wallet : Wallet
+            The registered wallet policy, or a standard wallet policy.
+
+        wallet_hmac: Optional[bytes]
+            For a registered wallet, the hmac obtained at wallet registration. `None` for a standard wallet policy.
+
+        Returns
+        -------
+        Mapping[int, bytes]
+            A mapping that has as keys the indexes of inputs that the Hardware Wallet signed, and the corresponding signatures as values.
+        """
+
+        raise NotImplementedError
+
+    def get_master_fingerprint(self) -> bytes:
+        """Gets the fingerprint of the master public key, as per BIP-32.
+
+        Returns
+        -------
+        bytes
+            The fingerprint of the master public key, as an array of 4 bytes.
+        """
+
+        raise NotImplementedError
+
+
+class NewClient(Client):
+    # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
+    _no_clone_psbt: bool = False
+
+    def __init__(self, comm_client: HIDClient, debug: bool = False) -> None:
+        super().__init__(comm_client, debug)
+        self.builder = BitcoinCommandBuilder(debug=debug)
+
+    def make_request(
+        self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
+    ) -> Tuple[int, bytes]:
+        sw, response = self._apdu_exchange(apdu)
+
+        while sw == 0xE000:
+            if not client_intepreter:
+                raise RuntimeError("Unexpected SW_INTERRUPTED_EXECUTION received.")
+
+            command_response = client_intepreter.execute(response)
+            sw, response = self._apdu_exchange(
+                self.builder.continue_interrupted(command_response)
+            )
+
+        return sw, response
+
+    def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
+        sw, response = self.make_request(self.builder.get_extended_pubkey(bip32_path, display))
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
+
+        return response.decode()
+
+    def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
+        if wallet.type != WalletType.POLICYMAP:
+            raise ValueError("wallet type must be POLICYMAP")
+
+        client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_preimage(wallet.serialize())
+        client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
+
+        sw, response = self.make_request(
+            self.builder.register_wallet(wallet), client_intepreter
+        )
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.REGISTER_WALLET)
+
+        if len(response) != 64:
+            raise RuntimeError(f"Invalid response length: {len(response)}")
+
+        wallet_id = response[0:32]
+        wallet_hmac = response[32:64]
+
+        return wallet_id, wallet_hmac
+
+    def get_wallet_address(
+        self,
+        wallet: Wallet,
+        wallet_hmac: Optional[bytes],
+        change: int,
+        address_index: int,
+        display: bool,
+    ) -> str:
 
         if wallet.type != WalletType.POLICYMAP or not isinstance(
             wallet, PolicyMapWallet
@@ -333,13 +399,6 @@ class Client:
         return {int(res[0]): res[1:] for res in results}
 
     def get_master_fingerprint(self) -> bytes:
-        """Gets the fingerprint of the master public key, as per BIP-32.
-
-        Returns
-        -------
-        bytes
-            The fingerprint of the master public key, as an array of 4 bytes.
-        """
 
         sw, response = self.make_request(self.builder.get_master_fingerprint())
 
@@ -347,3 +406,12 @@ class Client:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
 
         return response
+
+
+def createClient(comm_client: HIDClient, debug: bool = False) -> Union[LegacyClient, NewClient]:
+    base_client = Client(comm_client, debug)
+    _, app_version, _ = base_client.get_version()
+    if app_version >= "2":
+        return NewClient(HIDClient, debug)
+    else:
+        return LegacyClient(HIDClient, debug)

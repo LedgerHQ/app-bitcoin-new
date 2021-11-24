@@ -95,13 +95,6 @@ class BitcoinCommandBuilder:
 
         return {"cla": cla, "ins": ins, "p1": p1, "p2": p2, "data": cdata}
 
-    def get_version(self):
-        return self.serialize(
-            cla=self.CLA_DEFAULT,
-            ins=DefaultInsType.GET_VERSION,
-            cdata=b'',
-        )
-
     def get_extended_pubkey(self, bip32_path: List[int], display: bool = False):
         bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
 
