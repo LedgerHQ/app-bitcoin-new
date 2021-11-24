@@ -1,23 +1,22 @@
 import struct
 
-from bitcoin_client.exception.errors import UnknownDeviceError
 from .client import Client, HIDClient
 
-from typing import List, Tuple, Mapping, Optional
+from typing import List, Tuple, Mapping, Optional, Union
 
 from .common import AddressType, Chain, hash160
 from .key import ExtendedKey, parse_path
 from .psbt import PSBT
 from .wallet import Wallet, PolicyMapWallet
 
-from _script import is_p2sh, is_witness, is_p2wpkh, is_p2wsh
+from ._script import is_p2sh, is_witness, is_p2wpkh, is_p2wsh
 
 from .btchip.btchip import btchip
 from .btchip.btchipUtils import compress_public_key
 from .btchip.bitcoinTransaction import bitcoinTransaction
 
 
-def get_address_type_for_policy(policy: PolicyMapWallet):
+def get_address_type_for_policy(policy: PolicyMapWallet) -> AddressType:
     if policy.policy_map == "pkh(@0)":
         return AddressType.LEGACY
     elif policy.policy_map == "wpkh(@0)":
@@ -28,18 +27,35 @@ def get_address_type_for_policy(policy: PolicyMapWallet):
         raise ValueError("Invalid or unsupported policy")
 
 
+class DongleAdaptor:
+    # TODO: type for comm_client
+    def __init__(self, comm_client):
+        self.comm_client = comm_client
+
+    def exchange(self, apdu: Union[bytes, bytearray]) -> bytearray:
+        cla = apdu[0]
+        ins = apdu[1]
+        p1 = apdu[2]
+        p2 = apdu[3]
+        lc = apdu[4]
+        data = apdu[5:]
+        assert len(data) == lc
+        return bytearray(self.comm_client.apdu_exchange(cla, ins, data, p1, p2))
+
 class LegacyClient(Client):
     """Wrapper for Ledger Bitcoin app before version 2.0.0."""
 
     chain: Chain = Chain.MAIN
 
     def __init__(self, comm_client: HIDClient, debug: bool = False):
-        super().__init__(self, comm_client, debug)
+        super().__init__(comm_client, debug)
 
-        self.app = btchip(self.dongle)
+        self.app = btchip(DongleAdaptor(comm_client))
 
-        if self.app.getAppName() not in ["Bitcoin", "Bitcoin Test", "app"]:
-            raise UnknownDeviceError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
+        print("APP NAME:", self.app.getAppName())
+
+        # if self.app.getAppName() not in ["Bitcoin", "Bitcoin Test", "app"]:
+        #     raise UnknownDeviceError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
 
     def get_extended_pubkey(self, path: str, display: bool = False) -> str:
         path = path[2:]
@@ -126,7 +142,8 @@ class LegacyClient(Client):
 
         tx = psbt
 
-        c_tx = tx.get_unsigned_tx()
+        #c_tx = tx.get_unsigned_tx()
+        c_tx = tx.tx
         tx_bytes = c_tx.serialize_with_witness()
 
         # Master key fingerprint

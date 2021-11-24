@@ -4,7 +4,6 @@ import pytest
 
 from bitcoin_client.client import Client
 from bitcoin_client.exception import DenyError, NotSupportedError
-
 from speculos.client import SpeculosClient
 
 
@@ -52,25 +51,25 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
             )
 
 
-def test_get_extended_pubkey_non_standard(comm: SpeculosClient, client: Client):
+def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test the successful UX flow for a non-standard path (here, root path)
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        event = client.wait_for_text_event("path is unusual")
+        event = comm.wait_for_text_event("path is unusual")
 
         # press right until the last screen (will press the "right" button more times than needed)
         while "Reject" != event["text"]:
-            client.press_and_release("right")
+            comm.press_and_release("right")
 
-            event = client.get_next_event()
+            event = comm.get_next_event()
 
         # go back to the Accept screen, then accept
-        client.press_and_release("left")
-        client.press_and_release("both")
+        comm.press_and_release("left")
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()
@@ -85,22 +84,22 @@ def test_get_extended_pubkey_non_standard(comm: SpeculosClient, client: Client):
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
 
 
-def test_get_extended_pubkey_non_standard_reject_early(comm: SpeculosClient, client: Client):
+def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test rejecting after the "Reject if you're not sure" warning
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        client.wait_for_text_event("path is unusual")
-        client.press_and_release("right")
-        client.wait_for_text_event("Confirm public key")
-        client.press_and_release("right")
-        client.wait_for_text_event("111'/222'/333'")
-        client.press_and_release("right")
-        client.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
-        client.press_and_release("both")
+        comm.wait_for_text_event("path is unusual")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("Confirm public key")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("111'/222'/333'")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()
@@ -114,24 +113,24 @@ def test_get_extended_pubkey_non_standard_reject_early(comm: SpeculosClient, cli
     x.join()
 
 
-def test_get_extended_pubkey_non_standard_reject(comm: SpeculosClient, client: Client):
+def test_get_extended_pubkey_non_standard_reject(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test rejecting at the end
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        event = client.wait_for_text_event("path is unusual")
+        event = comm.wait_for_text_event("path is unusual")
 
         # press right until the last screen (will press the "right" button more times than needed)
         while "Reject" != event["text"]:
-            client.press_and_release("right")
+            comm.press_and_release("right")
 
-            event = client.get_next_event()
+            event = comm.get_next_event()
 
         # finally, reject
-        client.press_and_release("both")
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()

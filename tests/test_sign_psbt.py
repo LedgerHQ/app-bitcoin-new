@@ -51,21 +51,21 @@ def should_go_right(event: dict):
     return False
 
 
-def ux_thread_sign_psbt(comm: SpeculosClient, all_events: List[dict]):
+def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     # press right until the last screen (will press the "right" button more times than needed)
 
     while True:
-        event = client.get_next_event()
+        event = speculos_client.get_next_event()
         all_events.append(event)
 
         if should_go_right(event):
-            client.press_and_release("right")
+            speculos_client.press_and_release("right")
         elif event["text"] == "Approve":
-            client.press_and_release("both")
+            speculos_client.press_and_release("both")
         elif event["text"] == "Accept":
-            client.press_and_release("both")
+            speculos_client.press_and_release("both")
             break
 
 
@@ -341,11 +341,11 @@ def test_sign_psbt_taproot_1to2(client: Client):
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(comm: SpeculosClient, client: Client):
+def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(
@@ -380,7 +380,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(comm: SpeculosClient, client: Client):
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[client, all_events])
+    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
     x.start()
     result = client.sign_psbt(psbt, wallet, None)
     x.join()
@@ -431,12 +431,9 @@ def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: boo
     assert len(result) == 64
 
 
-def test_sign_psbt_fail_11_changes(comm: SpeculosClient, client: Client):
+def test_sign_psbt_fail_11_changes(client: Client):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
-
-    if not isinstance(client, SpeculosClient):
-        pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(
         "",
@@ -457,11 +454,11 @@ def test_sign_psbt_fail_11_changes(comm: SpeculosClient, client: Client):
         client.sign_psbt(psbt, wallet, None)
 
 
-def test_sign_psbt_fail_wrong_non_witness_utxo(comm: SpeculosClient, client: Client):
-    # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
-    # before any user interaction
+def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool):
+    # PSBT for transaction with the wrong non-witness utxo for an input.
+    # It must fail with IncorrectDataError before any user interaction.
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(

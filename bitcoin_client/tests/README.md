@@ -1,0 +1,1 @@
+These tests verify the compatibility layer of the bitcoin_client when ran against the legacy app using the LegacyClient.
