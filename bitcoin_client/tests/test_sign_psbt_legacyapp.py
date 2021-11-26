@@ -1,25 +1,11 @@
-import pytest
-
-import threading
-
-from decimal import Decimal
-
-from typing import List
-
 from pathlib import Path
 
 from bitcoin_client.client import Client
-from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.psbt import PSBT
 from bitcoin_client.wallet import PolicyMapWallet
-from speculos.client import SpeculosClient
-from tests.utils import txmaker
 
 from .utils import automation
-
-from embit.script import Script
-from embit.networks import NETWORKS
 
 tests_root: Path = Path(__file__).parent
 

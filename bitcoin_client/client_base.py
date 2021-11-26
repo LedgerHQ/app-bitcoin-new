@@ -3,6 +3,8 @@ from io import BytesIO
 
 from ledgercomm import Transport
 
+from bitcoin_client.common import Chain
+
 from .command_builder import DefaultInsType
 from .exception import DeviceException
 
@@ -47,8 +49,9 @@ class HIDClient:
 
 
 class Client:
-    def __init__(self, comm_client: HIDClient, debug: bool = False) -> None:
+    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
         self.comm_client = comm_client
+        self.chain = chain
         self.debug = debug
 
     def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
@@ -91,12 +94,12 @@ class Client:
 
         return app_name.decode(), app_version.decode(), app_flags
 
-    def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
+    def get_extended_pubkey(self, path: str, display: bool = False) -> str:
         """Gets the serialized extended public key for certain BIP32 path. Optionally, validate with the user.
 
         Parameters
         ----------
-        bip32_path : str
+        path : str
             BIP32 path of the public key you want.
         display : bool
             Whether you want to display address and ask confirmation on the device.

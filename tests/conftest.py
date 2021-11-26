@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from bitcoin_client.client import HIDClient, Client, createClient
+from bitcoin_client.common import Chain
 
 from speculos.client import SpeculosClient
 
@@ -113,7 +114,7 @@ def is_speculos(comm) -> bool:
 
 @pytest.fixture
 def client(comm) -> Client:
-    return createClient(comm, True)
+    return createClient(comm, Chain.TEST, False)
 
 
 @dataclass(frozen=True)

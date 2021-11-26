@@ -20,7 +20,7 @@ def test_get_extended_pubkey_standard_nodisplay(client: Client):
 
     for path, pubkey in testcases.items():
         assert pubkey == client.get_extended_pubkey(
-            bip32_path=path,
+            path=path,
             display=False
         )
 
@@ -46,7 +46,7 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
     for path in testcases:
         with pytest.raises(NotSupportedError):
             client.get_extended_pubkey(
-                bip32_path=path,
+                path=path,
                 display=False
             )
 
@@ -75,7 +75,7 @@ def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, 
     x.start()
 
     pub_key = client.get_extended_pubkey(
-        bip32_path="m",  # root pubkey
+        path="m",  # root pubkey
         display=True
     )
 
@@ -106,7 +106,7 @@ def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: Spe
 
     with pytest.raises(DenyError):
         client.get_extended_pubkey(
-            bip32_path="m/111'/222'/333'",
+            path="m/111'/222'/333'",
             display=True
         )
 
@@ -137,7 +137,7 @@ def test_get_extended_pubkey_non_standard_reject(client: Client, comm: SpeculosC
 
     with pytest.raises(DenyError):
         client.get_extended_pubkey(
-            bip32_path="m/111'/222'/333'",
+            path="m/111'/222'/333'",
             display=True
         )
 

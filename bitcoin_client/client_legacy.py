@@ -45,14 +45,10 @@ class DongleAdaptor:
 class LegacyClient(Client):
     """Wrapper for Ledger Bitcoin app before version 2.0.0."""
 
-    chain: Chain = Chain.MAIN
-
-    def __init__(self, comm_client: HIDClient, debug: bool = False):
-        super().__init__(comm_client, debug)
+    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False):
+        super().__init__(comm_client, chain, debug)
 
         self.app = btchip(DongleAdaptor(comm_client))
-
-        print("APP NAME:", self.app.getAppName())
 
         # if self.app.getAppName() not in ["Bitcoin", "Bitcoin Test", "app"]:
         #     raise UnknownDeviceError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
@@ -90,7 +86,7 @@ class LegacyClient(Client):
             privkey=None,
             pubkey=compress_public_key(pubkey["publicKey"]),
         )
-        return xpub.serialize()
+        return xpub.to_string()
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
         raise NotImplementedError # legacy app does not have this functionality

@@ -2,6 +2,8 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
+from bitcoin_client.common import Chain
+
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .exception import DeviceException
 
@@ -38,8 +40,8 @@ class NewClient(Client):
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
 
-    def __init__(self, comm_client: HIDClient, debug: bool = False) -> None:
-        super().__init__(comm_client, debug)
+    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
+        super().__init__(comm_client, chain, debug)
         self.builder = BitcoinCommandBuilder(debug=debug)
 
     def make_request(
@@ -58,8 +60,8 @@ class NewClient(Client):
 
         return sw, response
 
-    def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
-        sw, response = self.make_request(self.builder.get_extended_pubkey(bip32_path, display))
+    def get_extended_pubkey(self, path: str, display: bool = False) -> str:
+        sw, response = self.make_request(self.builder.get_extended_pubkey(path, display))
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
@@ -220,11 +222,10 @@ class NewClient(Client):
         return response
 
 
-def createClient(comm_client: HIDClient, debug: bool = False) -> Union[LegacyClient, NewClient]:
-    base_client = Client(comm_client, debug)
+def createClient(comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:
+    base_client = Client(comm_client, chain, debug)
     _, app_version, _ = base_client.get_version()
-    print("Creating client for version:", app_version)
     if app_version >= "2":
-        return NewClient(comm_client, debug)
+        return NewClient(comm_client, chain, debug)
     else:
-        return LegacyClient(comm_client, debug)
+        return LegacyClient(comm_client, chain, debug)
