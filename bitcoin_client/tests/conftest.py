@@ -56,6 +56,7 @@ def comm(request, hid) -> Union[HIDClient, SpeculosClient]:
                 '--sdk', '2.1'
             ]
         )
+        client.start()
 
         try:
             automation_file = request.function.automation_file

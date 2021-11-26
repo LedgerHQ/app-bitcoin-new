@@ -92,6 +92,7 @@ def comm(request, hid, app_version: str) -> Union[HIDClient, SpeculosClient]:
             str(conftest_folder_path.parent.joinpath("bin/app.elf")),
             ['--sdk', '2.1']
         )
+        client.start()
 
         try:
             automation_file = request.function.automation_file
