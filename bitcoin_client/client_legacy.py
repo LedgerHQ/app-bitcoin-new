@@ -134,7 +134,10 @@ class LegacyClient(Client):
         if not isinstance(wallet, PolicyMapWallet):
             raise ValueError("Invalid wallet policy type, it must be PolicyMapWallet")
 
-        # TODO: the rest of the code is basically the HWI code, and it ignores wallet
+        if not wallet.policy_map in ['pkh(@0)', 'wpkh(@0)', 'sh(wpkh(@0))']:
+            raise NotImplementedError("Unsupported policy")
+
+        # the rest of the code is basically the HWI code, and it ignores wallet
 
         tx = psbt
 
