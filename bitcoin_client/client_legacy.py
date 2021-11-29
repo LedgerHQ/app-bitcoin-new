@@ -1,4 +1,14 @@
+"""
+This module provides a compatibility layer between the python client of the Ledger Nano Bitcoin app v2 and the v1.6.5,
+by translating client requests to the API of the app v1.6.5.
+
+The bulk of the code is taken from bitcoin-core/HWI, with the necessary adaptations.
+https://github.com/bitcoin-core/HWI/tree/a109bcd53d24a52e72f26af3ecbabb64b292ff0c,
+"""
+
 import struct
+import re
+import base64
 
 from .client import Client, HIDClient
 
@@ -27,6 +37,22 @@ def get_address_type_for_policy(policy: PolicyMapWallet) -> AddressType:
         raise ValueError("Invalid or unsupported policy")
 
 
+# minimal checking of string keypath
+# taken from HWI
+def check_keypath(key_path: str) -> bool:
+    parts = re.split("/", key_path)
+    if parts[0] != "m":
+        return False
+    # strip hardening chars
+    for index in parts[1:]:
+        index_int = re.sub('[hH\']', '', index)
+        if not index_int.isdigit():
+            return False
+        if int(index_int) > 0x80000000:
+            return False
+    return True
+
+
 class DongleAdaptor:
     # TODO: type for comm_client
     def __init__(self, comm_client):
@@ -50,10 +76,13 @@ class LegacyClient(Client):
 
         self.app = btchip(DongleAdaptor(comm_client))
 
+        # TODO: figure out how to put back this check, if needed
         # if self.app.getAppName() not in ["Bitcoin", "Bitcoin Test", "app"]:
         #     raise UnknownDeviceError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
 
     def get_extended_pubkey(self, path: str, display: bool = False) -> str:
+        # mostly taken from HWI
+
         path = path[2:]
         path = path.replace('h', '\'')
         path = path.replace('H', '\'')
@@ -289,3 +318,27 @@ class LegacyClient(Client):
     def get_master_fingerprint(self) -> bytes:
         master_pubkey = self.app.getWalletPublicKey("")
         return hash160(compress_public_key(master_pubkey["publicKey"]))[:4]
+
+    def sign_message(self, message: Union[str, bytes], keypath: str) -> str:
+        # copied verbatim from HWI
+
+        if not check_keypath(keypath):
+            raise ValueError("Invalid keypath")
+        if isinstance(message, str):
+            message = bytearray(message, 'utf-8')
+        else:
+            message = bytearray(message)
+        keypath = keypath[2:]
+        # First display on screen what address you're signing for
+        self.app.getWalletPublicKey(keypath, True)
+        self.app.signMessagePrepare(keypath, message)
+        signature = self.app.signMessageSign()
+
+        # Make signature into standard bitcoin format
+        rLength = signature[3]
+        r = int.from_bytes(signature[4: 4 + rLength], byteorder="big", signed=True)
+        s = int.from_bytes(signature[4 + rLength + 2:], byteorder="big", signed=True)
+
+        sig = bytearray(chr(27 + 4 + (signature[0] & 0x01)), 'utf8') + r.to_bytes(32, byteorder="big", signed=False) + s.to_bytes(32, byteorder="big", signed=False)
+
+        return base64.b64encode(sig).decode('utf-8')

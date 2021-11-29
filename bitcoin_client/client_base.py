@@ -1,4 +1,4 @@
-from typing import Tuple, Mapping, Optional
+from typing import Tuple, Mapping, Optional, Union
 from io import BytesIO
 
 from ledgercomm import Transport
@@ -201,4 +201,15 @@ class Client:
             The fingerprint of the master public key, as an array of 4 bytes.
         """
 
+        raise NotImplementedError
+
+    def sign_message(self, message: Union[str, bytes], bip32_path: str) -> str:
+        """
+        Sign a message (bitcoin message signing).
+        Signs a message using the legacy Bitcoin Core signed message format.
+        The message is signed with the key at the given path.
+        :param message: The message to be signed. First encoded as bytes if not already.
+        :param bip32_path: The BIP 32 derivation for the key to sign the message with.
+        :return: The signature
+        """
         raise NotImplementedError
