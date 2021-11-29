@@ -1,9 +1,8 @@
 from pathlib import Path
 
-from bitcoin_client.client import Client
+from ledger_bitcoin import Client, PolicyMapWallet
 
-from bitcoin_client.psbt import PSBT
-from bitcoin_client.wallet import PolicyMapWallet
+from ledger_bitcoin.psbt import PSBT
 
 from .utils import automation
 

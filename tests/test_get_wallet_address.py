@@ -1,7 +1,5 @@
-from bitcoin_client.exception.errors import IncorrectDataError
-from bitcoin_client.client import Client
-from bitcoin_client.common import AddressType
-from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
 
 from .utils import automation
 

@@ -2,20 +2,16 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
-from bitcoin_client.common import Chain
-
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
-from .exception import DeviceException
-
+from .common import Chain
 from .client_command import ClientCommandInterpreter
-
+from .client_base import Client, HIDClient
+from .client_legacy import LegacyClient
+from .exception import DeviceException
 from .merkle import get_merkleized_map_commitment
 from .wallet import Wallet, WalletType, PolicyMapWallet
 from .psbt import PSBT
 from ._serialize import deser_string
-
-from .client_base import Client, HIDClient
-from .client_legacy import LegacyClient
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:

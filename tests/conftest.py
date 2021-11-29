@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bitcoin_client.client import HIDClient, Client, createClient
-from bitcoin_client.common import Chain
+from bitcoin_client.ledger_bitcoin import HIDClient, Client, Chain, createClient
 
 from speculos.client import SpeculosClient
 

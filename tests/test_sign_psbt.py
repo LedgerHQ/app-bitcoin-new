@@ -8,11 +8,11 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.client import Client
-from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
+from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
-from bitcoin_client.psbt import PSBT
-from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin.psbt import PSBT
+from bitcoin_client.ledger_bitcoin.wallet import AddressType
 from speculos.client import SpeculosClient
 from tests.utils import txmaker
 

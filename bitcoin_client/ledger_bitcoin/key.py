@@ -1,3 +1,5 @@
+# Original version: https://github.com/bitcoin-core/HWI
+
 #!/usr/bin/env python3
 # Copyright (c) 2020 The HWI developers
 # Distributed under the MIT software license, see the accompanying

@@ -1,4 +1,4 @@
-from bitcoin_client.client import Client
+from ledger_bitcoin import Client
 from conftest import SpeculosGlobals
 
 

@@ -1,8 +1,6 @@
-from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
-from bitcoin_client.client import Client
-from bitcoin_client.common import AddressType
-from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
+from bitcoin_client.ledger_bitcoin.exception import DenyError
 
 from .utils import automation
 

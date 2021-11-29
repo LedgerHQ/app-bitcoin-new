@@ -1,9 +1,9 @@
-from typing import Tuple, Mapping, Optional, Union
+from typing import Tuple, Mapping, Optional, Union, Literal
 from io import BytesIO
 
 from ledgercomm import Transport
 
-from bitcoin_client.common import Chain
+from .common import Chain
 
 from .command_builder import DefaultInsType
 from .exception import DeviceException
@@ -25,9 +25,10 @@ except ImportError:
             self.data = data
 
 
+# TODO: rename this class
 class HIDClient:
-    def __init__(self):
-        self.transport = Transport("hid")  # TODO: other params
+    def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", server: str = "127.0.0.1", port: int = 9999, debug: bool = False):
+        self.transport = Transport(interface, server, port, debug)
 
     def apdu_exchange(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
@@ -76,10 +77,12 @@ class Client:
             The third element is a binary string representing the platform's global state (pin lock etc).
         """
 
-        sw, response = self.make_request({"cla": 0xB0, "ins": DefaultInsType.GET_VERSION, "p1": 0, "p2": 0, "data": b''})
+        sw, response = self.make_request(
+            {"cla": 0xB0, "ins": DefaultInsType.GET_VERSION, "p1": 0, "p2": 0, "data": b''})
 
         if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION)
+            raise DeviceException(
+                error_code=sw, ins=DefaultInsType.GET_VERSION)
 
         r = BytesIO(response)
 
@@ -90,7 +93,8 @@ class Client:
         app_flags = deser_string(r)
 
         if format != b'\1' or app_name == b'' or app_version == b'' or app_flags == b'':
-            raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION, message="Invalid format returned by GET_VERSION")
+            raise DeviceException(error_code=sw, ins=DefaultInsType.GET_VERSION,
+                                  message="Invalid format returned by GET_VERSION")
 
         return app_name.decode(), app_version.decode(), app_flags
 

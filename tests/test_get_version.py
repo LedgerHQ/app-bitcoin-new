@@ -1,4 +1,4 @@
-from bitcoin_client.client import Client
+from bitcoin_client.ledger_bitcoin import Client
 
 
 def test_get_version(client: Client, app_version: str):

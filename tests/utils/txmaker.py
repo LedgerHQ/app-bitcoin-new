@@ -1,10 +1,10 @@
 from random import randint
 
 from typing import List, Tuple
-from bitcoin_client.key import KeyOriginInfo, parse_path
-from bitcoin_client.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
-from bitcoin_client.wallet import PolicyMapWallet, AddressType
+from bitcoin_client.ledger_bitcoin import PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.key import KeyOriginInfo, parse_path
+from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
 
 from embit.descriptor import Descriptor
 from embit.script import Script

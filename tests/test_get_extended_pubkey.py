@@ -2,8 +2,8 @@ import threading
 
 import pytest
 
-from bitcoin_client.client import Client
-from bitcoin_client.exception import DenyError, NotSupportedError
+from bitcoin_client.ledger_bitcoin import Client
+from bitcoin_client.ledger_bitcoin.exception import DenyError, NotSupportedError
 from speculos.client import SpeculosClient
 
 

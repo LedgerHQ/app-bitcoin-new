@@ -1,10 +1,7 @@
 import hmac
 from hashlib import sha256
 
-from bitcoin_client.client import Client
-from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet
-from bitcoin_client.common import AddressType
+from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
 
 from .utils import automation
 
