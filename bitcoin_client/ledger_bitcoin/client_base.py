@@ -60,6 +60,12 @@ class Client:
     def _make_request(self, apdu: dict) -> Tuple[int, bytes]:
         return self._apdu_exchange(apdu)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.transport_client.stop()
+
     def stop(self) -> None:
         """Stops the transport_client."""
 
