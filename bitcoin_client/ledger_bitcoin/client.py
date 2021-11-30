@@ -5,7 +5,7 @@ from io import BytesIO, BufferedReader
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain
 from .client_command import ClientCommandInterpreter
-from .client_base import Client, HIDClient
+from .client_base import Client, TransportClient
 from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .merkle import get_merkleized_map_commitment
@@ -36,11 +36,12 @@ class NewClient(Client):
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
 
-    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
-        super().__init__(comm_client, chain, debug)
-        self.builder = BitcoinCommandBuilder(debug=debug)
+    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN) -> None:
+        super().__init__(comm_client, chain)
+        self.builder = BitcoinCommandBuilder()
 
-    def make_request(
+    # Modifies the behavior of the base method by taking care of SW_INTERRUPTED_EXECUTION responses
+    def _make_request(
         self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
     ) -> Tuple[int, bytes]:
         sw, response = self._apdu_exchange(apdu)
@@ -57,7 +58,7 @@ class NewClient(Client):
         return sw, response
 
     def get_extended_pubkey(self, path: str, display: bool = False) -> str:
-        sw, response = self.make_request(self.builder.get_extended_pubkey(path, display))
+        sw, response = self._make_request(self.builder.get_extended_pubkey(path, display))
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
@@ -72,7 +73,7 @@ class NewClient(Client):
         client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
 
-        sw, response = self.make_request(
+        sw, response = self._make_request(
             self.builder.register_wallet(wallet), client_intepreter
         )
 
@@ -108,7 +109,7 @@ class NewClient(Client):
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
-        sw, response = self.make_request(
+        sw, response = self._make_request(
             self.builder.get_wallet_address(
                 wallet, wallet_hmac, address_index, change, display
             ),
@@ -190,7 +191,7 @@ class NewClient(Client):
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
 
-        sw, _ = self.make_request(
+        sw, _ = self._make_request(
             self.builder.sign_psbt(
                 global_map, input_maps, output_maps, wallet, wallet_hmac
             ),
@@ -210,7 +211,7 @@ class NewClient(Client):
 
     def get_master_fingerprint(self) -> bytes:
 
-        sw, response = self.make_request(self.builder.get_master_fingerprint())
+        sw, response = self._make_request(self.builder.get_master_fingerprint())
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
@@ -218,10 +219,13 @@ class NewClient(Client):
         return response
 
 
-def createClient(comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:
-    base_client = Client(comm_client, chain, debug)
+def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:
+    if comm_client is None:
+        comm_client = TransportClient("hid", debug=debug)
+
+    base_client = Client(comm_client, chain)
     _, app_version, _ = base_client.get_version()
     if app_version >= "2":
-        return NewClient(comm_client, chain, debug)
+        return NewClient(comm_client, chain)
     else:
-        return LegacyClient(comm_client, chain, debug)
+        return LegacyClient(comm_client, chain)

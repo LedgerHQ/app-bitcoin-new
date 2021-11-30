@@ -10,7 +10,7 @@ import struct
 import re
 import base64
 
-from .client import Client, HIDClient
+from .client import Client, TransportClient
 
 from typing import List, Tuple, Mapping, Optional, Union
 
@@ -71,8 +71,8 @@ class DongleAdaptor:
 class LegacyClient(Client):
     """Wrapper for Ledger Bitcoin app before version 2.0.0."""
 
-    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False):
-        super().__init__(comm_client, chain, debug)
+    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN):
+        super().__init__(comm_client, chain)
 
         self.app = btchip(DongleAdaptor(comm_client))
 

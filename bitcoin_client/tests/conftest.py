@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ledger_bitcoin import Client, Chain, HIDClient, createClient
+from ledger_bitcoin import Client, Chain, TransportClient, createClient
 
 from speculos.client import SpeculosClient
 
@@ -43,9 +43,9 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid) -> Union[HIDClient, SpeculosClient]:
+def comm(request, hid) -> Union[TransportClient, SpeculosClient]:
     if hid:
-        client = HIDClient()
+        client = TransportClient("hid")
     else:
         os.environ['SPECULOS_APPNAME'] = 'Bitcoin Test:1.6.5'
         client = SpeculosClient(
@@ -72,16 +72,16 @@ def comm(request, hid) -> Union[HIDClient, SpeculosClient]:
 
 
 @pytest.fixture
-def is_speculos(comm) -> bool:
+def is_speculos(comm: Union[TransportClient, SpeculosClient]) -> bool:
     return isinstance(comm, SpeculosClient)
 
 
-@ pytest.fixture
-def client(comm) -> Client:
-    return createClient(comm, Chain.TEST, False)
+@pytest.fixture
+def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
+    return createClient(comm, chain=Chain.TEST, debug=True)
 
 
-@ dataclass(frozen=True)
+@dataclass(frozen=True)
 class SpeculosGlobals:
     seed = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
     # TODO: those are for testnet; we could compute them for any network from the seed
@@ -96,6 +96,6 @@ class SpeculosGlobals:
     )
 
 
-@ pytest.fixture
+@pytest.fixture
 def speculos_globals() -> SpeculosGlobals:
     return SpeculosGlobals()

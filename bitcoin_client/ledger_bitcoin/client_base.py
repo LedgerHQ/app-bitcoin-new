@@ -8,8 +8,6 @@ from .common import Chain
 from .command_builder import DefaultInsType
 from .exception import DeviceException
 
-from .client_command import ClientCommandInterpreter
-
 from .wallet import Wallet
 from .psbt import PSBT
 from ._serialize import deser_string
@@ -25,10 +23,9 @@ except ImportError:
             self.data = data
 
 
-# TODO: rename this class
-class HIDClient:
+class TransportClient:
     def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", server: str = "127.0.0.1", port: int = 9999, debug: bool = False):
-        self.transport = Transport(interface, server, port, debug)
+        self.transport = Transport('hid', debug=debug) if interface == 'hid' else Transport(interface, server, port, debug)
 
     def apdu_exchange(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
@@ -50,21 +47,23 @@ class HIDClient:
 
 
 class Client:
-    def __init__(self, comm_client: HIDClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
-        self.comm_client = comm_client
+    def __init__(self, transport_client: TransportClient, chain: Chain = Chain.MAIN) -> None:
+        self.transport_client = transport_client
         self.chain = chain
-        self.debug = debug
 
     def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
         try:
-            return 0x9000, self.comm_client.apdu_exchange(**apdu)
+            return 0x9000, self.transport_client.apdu_exchange(**apdu)
         except ApduException as e:
             return e.sw, e.data
 
-    def make_request(
-        self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
-    ) -> Tuple[int, bytes]:
+    def _make_request(self, apdu: dict) -> Tuple[int, bytes]:
         return self._apdu_exchange(apdu)
+
+    def stop(self) -> None:
+        """Stops the transport_client."""
+
+        self.transport_client.stop()
 
     def get_version(self) -> Tuple[str, str, bytes]:
         """Queries the hardware wallet for the currently running app's name, version and state flags.
@@ -77,7 +76,7 @@ class Client:
             The third element is a binary string representing the platform's global state (pin lock etc).
         """
 
-        sw, response = self.make_request(
+        sw, response = self._make_request(
             {"cla": 0xB0, "ins": DefaultInsType.GET_VERSION, "p1": 0, "p2": 0, "data": b''})
 
         if sw != 0x9000:

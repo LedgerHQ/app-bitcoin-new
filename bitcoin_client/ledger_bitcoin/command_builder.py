@@ -41,27 +41,11 @@ class FrameworkInsType(enum.IntEnum):
 
 
 class BitcoinCommandBuilder:
-    """APDU command builder for the Bitcoin application.
-
-    Parameters
-    ----------
-    debug: bool
-        Whether you want to see logging or not.
-
-    Attributes
-    ----------
-    debug: bool
-        Whether you want to see logging or not.
-
-    """
+    """APDU command builder for the Bitcoin application."""
 
     CLA_DEFAULT: int = 0xB0
     CLA_BITCOIN: int = 0xE1
     CLA_FRAMEWORK: int = 0xF8
-
-    def __init__(self, debug: bool = False):
-        """Init constructor."""
-        self.debug = debug
 
     def serialize(
         self,

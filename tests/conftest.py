@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from bitcoin_client.ledger_bitcoin import HIDClient, Client, Chain, createClient
+from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
 
 from speculos.client import SpeculosClient
 
@@ -78,9 +78,9 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid, app_version: str) -> Union[HIDClient, SpeculosClient]:
+def comm(request, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
-        client = HIDClient()
+        client = TransportClient("hid")
     else:
         # We set the app's name before running speculos in order to emulate the expected
         # behavior of the SDK's GET_VERSION default APDU.
@@ -108,13 +108,13 @@ def comm(request, hid, app_version: str) -> Union[HIDClient, SpeculosClient]:
 
 
 @pytest.fixture
-def is_speculos(comm) -> bool:
+def is_speculos(comm: Union[TransportClient, SpeculosClient]) -> bool:
     return isinstance(comm, SpeculosClient)
 
 
 @pytest.fixture
-def client(comm) -> Client:
-    return createClient(comm, Chain.TEST, False)
+def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
+    return createClient(comm, chain=Chain.TEST, debug=True)
 
 
 @dataclass(frozen=True)
