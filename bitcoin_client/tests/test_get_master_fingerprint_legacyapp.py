@@ -1,5 +1,5 @@
 from ledger_bitcoin import Client
-from conftest import SpeculosGlobals
+from .conftest import SpeculosGlobals
 
 
 def test_get_master_fingerprint(client: Client, speculos_globals: SpeculosGlobals):

@@ -94,7 +94,7 @@ def comm(request, hid, app_version: str) -> Union[TransportClient, SpeculosClien
         client.start()
 
         try:
-            automation_file = request.function.automation_file
+            automation_file = conftest_folder_path.joinpath(request.function.automation_file)
         except AttributeError:
             automation_file = None
 
