@@ -1,14 +1,13 @@
 from io import BytesIO, BufferedReader
 from copy import deepcopy
 from typing import List, Optional, Union
-import pprint
 from bitcoinrpc.authproxy import AuthServiceProxy
-from bitcoin_client.descriptor import get_taproot_output_key
-from bitcoin_client.common import hash160
-from bitcoin_client.tx import CTransaction
-from bitcoin_client.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.key import ExtendedKey, KeyOriginInfo
-from bitcoin_client._script import is_p2pkh, is_p2tr
+from bitcoin_client.ledger_bitcoin.descriptor import get_taproot_output_key
+from bitcoin_client.ledger_bitcoin.common import hash160
+from bitcoin_client.ledger_bitcoin.tx import CTransaction
+from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
+from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
+from bitcoin_client.ledger_bitcoin._script import is_p2pkh, is_p2tr
 
 # Change accordingly
 txid = "TODO"

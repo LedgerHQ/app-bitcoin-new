@@ -1,9 +1,9 @@
 import enum
 from typing import List, Tuple, Mapping, Union, Iterator, Optional
 
-from bitcoin_client.common import bip32_path_from_string, AddressType, write_varint
-from bitcoin_client.merkle import get_merkleized_map_commitment, MerkleTree, element_hash
-from bitcoin_client.wallet import Wallet
+from .common import bip32_path_from_string, AddressType, write_varint
+from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
+from .wallet import Wallet
 
 
 def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
@@ -25,6 +25,9 @@ def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
         yield True, data[offset:]
 
 
+class DefaultInsType(enum.IntEnum):
+    GET_VERSION = 0x01
+
 class BitcoinInsType(enum.IntEnum):
     GET_EXTENDED_PUBKEY = 0x00
     GET_ADDRESS = 0x01
@@ -33,32 +36,16 @@ class BitcoinInsType(enum.IntEnum):
     SIGN_PSBT = 0x04
     GET_MASTER_FINGERPRINT = 0x05
 
-
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
 
 
 class BitcoinCommandBuilder:
-    """APDU command builder for the Bitcoin application.
+    """APDU command builder for the Bitcoin application."""
 
-    Parameters
-    ----------
-    debug: bool
-        Whether you want to see logging or not.
-
-    Attributes
-    ----------
-    debug: bool
-        Whether you want to see logging or not.
-
-    """
-
+    CLA_DEFAULT: int = 0xB0
     CLA_BITCOIN: int = 0xE1
     CLA_FRAMEWORK: int = 0xF8
-
-    def __init__(self, debug: bool = False):
-        """Init constructor."""
-        self.debug = debug
 
     def serialize(
         self,

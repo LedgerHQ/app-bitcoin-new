@@ -1,8 +1,6 @@
-from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
-from bitcoin_client.command import BitcoinCommand
-from bitcoin_client.common import AddressType
-from bitcoin_client.exception import DenyError
-from bitcoin_client.wallet import MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
+from bitcoin_client.ledger_bitcoin.exception import DenyError
 
 from .utils import automation
 
@@ -13,7 +11,7 @@ import pytest
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_legacy(cmd: BitcoinCommand, speculos_globals):
+def test_register_wallet_accept_legacy(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.LEGACY,
@@ -24,7 +22,7 @@ def test_register_wallet_accept_legacy(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
@@ -35,7 +33,7 @@ def test_register_wallet_accept_legacy(cmd: BitcoinCommand, speculos_globals):
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_sh_wit(cmd: BitcoinCommand, speculos_globals):
+def test_register_wallet_accept_sh_wit(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.SH_WIT,
@@ -46,7 +44,7 @@ def test_register_wallet_accept_sh_wit(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
@@ -57,7 +55,7 @@ def test_register_wallet_accept_sh_wit(cmd: BitcoinCommand, speculos_globals):
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_wit(cmd: BitcoinCommand, speculos_globals):
+def test_register_wallet_accept_wit(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -68,7 +66,7 @@ def test_register_wallet_accept_wit(cmd: BitcoinCommand, speculos_globals):
         ],
     )
 
-    wallet_id, wallet_hmac = cmd.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
@@ -79,7 +77,7 @@ def test_register_wallet_accept_wit(cmd: BitcoinCommand, speculos_globals):
 
 
 @automation("automations/register_wallet_reject.json")
-def test_register_wallet_reject_header(cmd):
+def test_register_wallet_reject_header(client: Client):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -91,11 +89,11 @@ def test_register_wallet_reject_header(cmd):
     )
 
     with pytest.raises(DenyError):
-        cmd.register_wallet(wallet)
+        client.register_wallet(wallet)
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_invalid_names(cmd: BitcoinCommand):
+def test_register_wallet_invalid_names(client: Client):
     for invalid_name in [
         "",  # empty name not allowed
         "Very long walletz",  # 17 characters is too long
@@ -113,15 +111,15 @@ def test_register_wallet_invalid_names(cmd: BitcoinCommand):
         )
 
     with pytest.raises(IncorrectDataError):
-        cmd.register_wallet(wallet)
+        client.register_wallet(wallet)
 
 
 @automation("automations/register_wallet_accept.json")
-def test_register_wallet_unsupported_policy(cmd: BitcoinCommand):
+def test_register_wallet_unsupported_policy(client: Client):
     # valid policise, but not supported (might change in the future)
 
     with pytest.raises(NotSupportedError):
-        cmd.register_wallet(PolicyMapWallet(
+        client.register_wallet(PolicyMapWallet(
             name="Unsupported",
             policy_map="sh(pkh(@0))",  # unusual script, not in the whitelist
             keys_info=[
@@ -131,7 +129,7 @@ def test_register_wallet_unsupported_policy(cmd: BitcoinCommand):
 
     with pytest.raises(NotSupportedError):
         # Not supporting keys without wildcard
-        cmd.register_wallet(MultisigWallet(
+        client.register_wallet(MultisigWallet(
             name="Cold storage",
             address_type=AddressType.WIT,
             threshold=2,
@@ -143,7 +141,7 @@ def test_register_wallet_unsupported_policy(cmd: BitcoinCommand):
 
     with pytest.raises(NotSupportedError):
         # Not supporting keys without origin information (even if external)
-        cmd.register_wallet(MultisigWallet(
+        client.register_wallet(MultisigWallet(
             name="Cold storage",
             address_type=AddressType.WIT,
             threshold=2,

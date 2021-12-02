@@ -3,8 +3,8 @@ from typing import List, Mapping
 from collections import deque
 from hashlib import sha256
 
-from bitcoin_client.common import ByteStreamParser, sha256, write_varint
-from bitcoin_client.merkle import MerkleTree, element_hash
+from .common import ByteStreamParser, sha256, write_varint
+from .merkle import MerkleTree, element_hash
 
 
 class ClientCommandCode(IntEnum):

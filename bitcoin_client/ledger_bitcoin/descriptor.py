@@ -37,10 +37,6 @@ This implementation only supports ``sh()``, ``wsh()``, ``pkh()``, ``wpkh()``, ``
 Descriptors can be parsed, however the actual scripts are not generated.
 """
 
-
-from .key import ExtendedKey, KeyOriginInfo, get_taproot_output_key, parse_path
-from .common import hash160, sha256
-
 from binascii import unhexlify
 from collections import namedtuple
 from enum import Enum
@@ -50,6 +46,8 @@ from typing import (
     Tuple,
 )
 
+from .key import ExtendedKey, KeyOriginInfo, get_taproot_output_key, parse_path
+from .common import hash160, sha256
 
 ExpandedScripts = namedtuple("ExpandedScripts", ["output_script", "redeem_script", "witness_script"])
 

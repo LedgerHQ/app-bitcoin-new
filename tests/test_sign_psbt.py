@@ -8,11 +8,11 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.command import BitcoinCommand
-from bitcoin_client.exception.errors import IncorrectDataError, NotSupportedError
+from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
-from bitcoin_client.psbt import PSBT
-from bitcoin_client.wallet import PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin.psbt import PSBT
+from bitcoin_client.ledger_bitcoin.wallet import AddressType
 from speculos.client import SpeculosClient
 from tests.utils import txmaker
 
@@ -51,21 +51,21 @@ def should_go_right(event: dict):
     return False
 
 
-def ux_thread_sign_psbt(client: SpeculosClient, all_events: List[dict]):
+def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     # press right until the last screen (will press the "right" button more times than needed)
 
     while True:
-        event = client.get_next_event()
+        event = speculos_client.get_next_event()
         all_events.append(event)
 
         if should_go_right(event):
-            client.press_and_release("right")
+            speculos_client.press_and_release("right")
         elif event["text"] == "Approve":
-            client.press_and_release("both")
+            speculos_client.press_and_release("both")
         elif event["text"] == "Accept":
-            client.press_and_release("both")
+            speculos_client.press_and_release("both")
             break
 
 
@@ -118,7 +118,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_pkh_1to1(cmd: BitcoinCommand):
+def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
@@ -135,7 +135,7 @@ def test_sign_psbt_singlesig_pkh_1to1(cmd: BitcoinCommand):
     # #0:
     #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     assert result == {
         0: bytes.fromhex(
@@ -145,7 +145,7 @@ def test_sign_psbt_singlesig_pkh_1to1(cmd: BitcoinCommand):
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
+def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
@@ -162,7 +162,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
     # #0:
     #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     assert result == {
         0: bytes.fromhex(
@@ -172,7 +172,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(cmd: BitcoinCommand):
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
+def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
@@ -185,7 +185,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
         ],
     )
 
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     # expected sigs
     # #0:
@@ -200,7 +200,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(cmd: BitcoinCommand):
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
+def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
@@ -213,7 +213,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
         ],
     )
 
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     # expected sigs
     # #0:
@@ -233,7 +233,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
     }
 
 
-# def test_sign_psbt_legacy(cmd: BitcoinCommand):
+# def test_sign_psbt_legacy(client: Client):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
 #     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUhIh4AAAA="
@@ -241,12 +241,12 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 #     psbt = PSBT()
 #     psbt.deserialize(unsigned_raw_psbt_base64)
 
-#     result = cmd.sign_psbt(psbt)
+#     result = client.sign_psbt(psbt)
 
 #     print(result)
 
 
-# def test_sign_psbt_legacy_p2pkh(cmd: BitcoinCommand):
+# def test_sign_psbt_legacy_p2pkh(client: Client):
 #     # test from app-bitcoin
 
 #     # legacy address
@@ -258,13 +258,13 @@ def test_sign_psbt_singlesig_wpkh_2to2(cmd: BitcoinCommand):
 #     psbt = PSBT()
 #     psbt.deserialize(unsigned_raw_psbt_base64)
 
-#     result = cmd.sign_psbt(psbt)
+#     result = client.sign_psbt(psbt)
 
 #     print(result)
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
+def test_sign_psbt_multisig_wsh(client: Client):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -281,7 +281,7 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
-    result = cmd.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
 
     assert result == {
         0: bytes.fromhex(
@@ -290,7 +290,7 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
     }
 
 
-# def test_sign_psbt_legacy_wrong_non_witness_utxo(cmd: BitcoinCommand):
+# def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
 #     # The spend is valid, but the non-witness utxo is wrong; therefore, it should fail the hash test
@@ -301,11 +301,11 @@ def test_sign_psbt_multisig_wsh(cmd: BitcoinCommand):
 #     psbt.deserialize(unsigned_raw_psbt_base64)
 
 #     with pytest.raises(IncorrectDataError):
-#         cmd.sign_psbt(psbt)
+#         client.sign_psbt(psbt)
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
+def test_sign_psbt_taproot_1to2(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
@@ -318,7 +318,7 @@ def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
         ],
     )
 
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
     # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
@@ -341,11 +341,11 @@ def test_sign_psbt_taproot_1to2(cmd: BitcoinCommand):
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(client: SpeculosClient, cmd: BitcoinCommand):
+def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(
@@ -380,9 +380,9 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: SpeculosClient, cmd: BitcoinComma
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[client, all_events])
+    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
     x.start()
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
     x.join()
 
     assert len(result) == n_ins
@@ -404,7 +404,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: SpeculosClient, cmd: BitcoinComma
 
 
 @automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_64to256(cmd: BitcoinCommand, enable_slow_tests: bool):
+def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
@@ -426,17 +426,14 @@ def test_sign_psbt_singlesig_wpkh_64to256(cmd: BitcoinCommand, enable_slow_tests
         [i == 42 for i in range(255)]
     )
 
-    result = cmd.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None)
 
     assert len(result) == 64
 
 
-def test_sign_psbt_fail_11_changes(client: SpeculosClient, cmd: BitcoinCommand):
+def test_sign_psbt_fail_11_changes(client: Client):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
-
-    if not isinstance(client, SpeculosClient):
-        pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(
         "",
@@ -454,14 +451,14 @@ def test_sign_psbt_fail_11_changes(client: SpeculosClient, cmd: BitcoinCommand):
     )
 
     with pytest.raises(NotSupportedError):
-        cmd.sign_psbt(psbt, wallet, None)
+        client.sign_psbt(psbt, wallet, None)
 
 
-def test_sign_psbt_fail_wrong_non_witness_utxo(client: SpeculosClient, cmd: BitcoinCommand):
-    # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
-    # before any user interaction
+def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool):
+    # PSBT for transaction with the wrong non-witness utxo for an input.
+    # It must fail with IncorrectDataError before any user interaction.
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     wallet = PolicyMapWallet(
@@ -485,7 +482,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: SpeculosClient, cmd: Bitc
     wit.rehash()
     psbt.inputs[0].non_witness_utxo = wit
 
-    cmd._no_clone_psbt = True
+    client._no_clone_psbt = True
     with pytest.raises(IncorrectDataError):
-        cmd.sign_psbt(psbt, wallet, None)
-    cmd._no_clone_psbt = False
+        client.sign_psbt(psbt, wallet, None)
+    client._no_clone_psbt = False

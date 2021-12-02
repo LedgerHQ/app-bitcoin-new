@@ -1,29 +1,18 @@
-from typing import Tuple, List, Mapping, Generator, Optional
+from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
-from ledgercomm import Transport
+from .command_builder import BitcoinCommandBuilder, BitcoinInsType
+from .common import Chain
+from .client_command import ClientCommandInterpreter
+from .client_base import Client, TransportClient
+from .client_legacy import LegacyClient
+from .exception import DeviceException
+from .merkle import get_merkleized_map_commitment
+from .wallet import Wallet, WalletType, PolicyMapWallet
+from .psbt import PSBT
+from ._serialize import deser_string
 
-from bitcoin_client.command_builder import BitcoinCommandBuilder, BitcoinInsType
-from bitcoin_client.common import AddressType
-from bitcoin_client.exception import DeviceException
-
-from bitcoin_client.client_command import ClientCommandInterpreter
-
-from bitcoin_client.merkle import get_merkleized_map_commitment
-from bitcoin_client.wallet import Wallet, WalletType, PolicyMapWallet
-from bitcoin_client.psbt import PSBT, deser_string
-
-
-try:
-    from speculos.client import ApduException
-except ImportError:
-    # Speculos package not available, we use our own class
-    class ApduException(Exception):
-        def __init__(self, sw: int, data: bytes) -> None:
-            super().__init__(f"Exception: invalid status 0x{sw:x}")
-            self.sw = sw
-            self.data = data
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     result = {}
@@ -43,45 +32,16 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     return result
 
 
-class HIDClient:
-    def __init__(self):
-        self.transport = Transport("hid")  # TODO: other params
-
-    def apdu_exchange(
-        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
-    ) -> bytes:
-        sw, data = self.transport.exchange(cla, ins, p1, p2, None, data)
-
-        if sw != 0x9000:
-            raise ApduException(sw, data)
-
-        return data
-
-    def apdu_exchange_nowait(
-        self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
-    ):
-        raise NotImplementedError()
-
-    def stop(self) -> None:
-        self.transport.close()
-
-
-class BitcoinCommand:
+class NewClient(Client):
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
 
-    def __init__(self, client: HIDClient, debug: bool = False) -> None:
-        self.client = client
-        self.builder = BitcoinCommandBuilder(debug=debug)
-        self.debug = debug
+    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN) -> None:
+        super().__init__(comm_client, chain)
+        self.builder = BitcoinCommandBuilder()
 
-    def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
-        try:
-            return 0x9000, self.client.apdu_exchange(**apdu)
-        except ApduException as e:
-            return e.sw, e.data
-
-    def make_request(
+    # Modifies the behavior of the base method by taking care of SW_INTERRUPTED_EXECUTION responses
+    def _make_request(
         self, apdu: dict, client_intepreter: ClientCommandInterpreter = None
     ) -> Tuple[int, bytes]:
         sw, response = self._apdu_exchange(apdu)
@@ -97,23 +57,8 @@ class BitcoinCommand:
 
         return sw, response
 
-    def get_extended_pubkey(self, bip32_path: str, display: bool = False) -> str:
-        """Gets the serialized extended public key for certain BIP32 path. Optionally, validate with the user.
-
-        Parameters
-        ----------
-        bip32_path : str
-            BIP32 path of the public key you want.
-        display : bool
-            Whether you want to display address and ask confirmation on the device.
-
-        Returns
-        -------
-        str
-            The requested serialized extended public key.
-        """
-
-        sw, response = self.make_request(self.builder.get_extended_pubkey(bip32_path, display))
+    def get_extended_pubkey(self, path: str, display: bool = False) -> str:
+        sw, response = self._make_request(self.builder.get_extended_pubkey(path, display))
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
@@ -121,20 +66,6 @@ class BitcoinCommand:
         return response.decode()
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
-        """Registers a wallet policy with the user. After approval returns the wallet id and hmac to be stored on the client.
-
-        Parameters
-        ----------
-        wallet : Wallet
-            The Wallet policy to register on the device.
-
-        Returns
-        -------
-        Tuple[bytes, bytes]
-            The first element the tuple is the 32-bytes wallet id.
-            The second element is the hmac.
-        """
-
         if wallet.type != WalletType.POLICYMAP:
             raise ValueError("wallet type must be POLICYMAP")
 
@@ -142,7 +73,7 @@ class BitcoinCommand:
         client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
 
-        sw, response = self.make_request(
+        sw, response = self._make_request(
             self.builder.register_wallet(wallet), client_intepreter
         )
 
@@ -165,31 +96,6 @@ class BitcoinCommand:
         address_index: int,
         display: bool,
     ) -> str:
-        """For a given wallet that was already registered on the device (or a standard wallet that does not need registration),
-        returns the address for a certain `change`/`address_index` combination.
-
-        Parameters
-        ----------
-        wallet : Wallet
-            The registered wallet policy, or a standard wallet policy.
-
-        wallet_hmac: Optional[bytes]
-            For a registered wallet, the hmac obtained at wallet registration. `None` for a standard wallet policy.
-
-        change: int
-            0 for a standard receive address, 1 for a change address. Other values are invalid.
-
-        address_index: int
-            The address index in the last step of the BIP32 derivation.
-
-        display: bool
-            Whether you want to display address and ask confirmation on the device.
-
-        Returns
-        -------
-        str
-            The requested address.
-        """
 
         if wallet.type != WalletType.POLICYMAP or not isinstance(
             wallet, PolicyMapWallet
@@ -203,7 +109,7 @@ class BitcoinCommand:
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
-        sw, response = self.make_request(
+        sw, response = self._make_request(
             self.builder.get_wallet_address(
                 wallet, wallet_hmac, address_index, change, display
             ),
@@ -285,7 +191,7 @@ class BitcoinCommand:
         client_intepreter.add_known_list(input_commitments)
         client_intepreter.add_known_list(output_commitments)
 
-        sw, _ = self.make_request(
+        sw, _ = self._make_request(
             self.builder.sign_psbt(
                 global_map, input_maps, output_maps, wallet, wallet_hmac
             ),
@@ -304,17 +210,22 @@ class BitcoinCommand:
         return {int(res[0]): res[1:] for res in results}
 
     def get_master_fingerprint(self) -> bytes:
-        """Gets the fingerprint of the master public key, as per BIP-32.
 
-        Returns
-        -------
-        bytes
-            The fingerprint of the master public key, as an array of 4 bytes.
-        """
-
-        sw, response = self.make_request(self.builder.get_master_fingerprint())
+        sw, response = self._make_request(self.builder.get_master_fingerprint())
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
 
         return response
+
+
+def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:
+    if comm_client is None:
+        comm_client = TransportClient("hid", debug=debug)
+
+    base_client = Client(comm_client, chain)
+    _, app_version, _ = base_client.get_version()
+    if app_version >= "2":
+        return NewClient(comm_client, chain)
+    else:
+        return LegacyClient(comm_client, chain)

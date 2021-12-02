@@ -2,13 +2,12 @@ import threading
 
 import pytest
 
-from bitcoin_client.command import BitcoinCommand
-from bitcoin_client.exception import DenyError, NotSupportedError
-
+from bitcoin_client.ledger_bitcoin import Client
+from bitcoin_client.ledger_bitcoin.exception import DenyError, NotSupportedError
 from speculos.client import SpeculosClient
 
 
-def test_get_extended_pubkey_standard_nodisplay(cmd: BitcoinCommand):
+def test_get_extended_pubkey_standard_nodisplay(client: Client):
     testcases = {
         "m/44'/1'/0'": "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
         "m/44'/1'/10'": "tpubDCwYjpDhUdPGp21gSpVay2QPJVh6WNySWMXPhbcu1DsxH31dF7mY18oibbu5RxCLBc1Szerjscuc3D5HyvfYqfRvc9mesewnFqGmPjney4d",
@@ -20,13 +19,13 @@ def test_get_extended_pubkey_standard_nodisplay(cmd: BitcoinCommand):
     }
 
     for path, pubkey in testcases.items():
-        assert pubkey == cmd.get_extended_pubkey(
-            bip32_path=path,
+        assert pubkey == client.get_extended_pubkey(
+            path=path,
             display=False
         )
 
 
-def test_get_extended_pubkey_nonstandard_nodisplay(cmd: BitcoinCommand):
+def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
     # as these paths are not standard, the app should reject immediately if display=False
     testcases = [
         "m",  # unusual to export the root key
@@ -46,37 +45,37 @@ def test_get_extended_pubkey_nonstandard_nodisplay(cmd: BitcoinCommand):
 
     for path in testcases:
         with pytest.raises(NotSupportedError):
-            cmd.get_extended_pubkey(
-                bip32_path=path,
+            client.get_extended_pubkey(
+                path=path,
                 display=False
             )
 
 
-def test_get_extended_pubkey_non_standard(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test the successful UX flow for a non-standard path (here, root path)
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        event = client.wait_for_text_event("path is unusual")
+        event = comm.wait_for_text_event("path is unusual")
 
         # press right until the last screen (will press the "right" button more times than needed)
         while "Reject" != event["text"]:
-            client.press_and_release("right")
+            comm.press_and_release("right")
 
-            event = client.get_next_event()
+            event = comm.get_next_event()
 
         # go back to the Accept screen, then accept
-        client.press_and_release("left")
-        client.press_and_release("both")
+        comm.press_and_release("left")
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()
 
-    pub_key = cmd.get_extended_pubkey(
-        bip32_path="m",  # root pubkey
+    pub_key = client.get_extended_pubkey(
+        path="m",  # root pubkey
         display=True
     )
 
@@ -85,60 +84,60 @@ def test_get_extended_pubkey_non_standard(client: SpeculosClient, cmd: BitcoinCo
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
 
 
-def test_get_extended_pubkey_non_standard_reject_early(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test rejecting after the "Reject if you're not sure" warning
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        client.wait_for_text_event("path is unusual")
-        client.press_and_release("right")
-        client.wait_for_text_event("Confirm public key")
-        client.press_and_release("right")
-        client.wait_for_text_event("111'/222'/333'")
-        client.press_and_release("right")
-        client.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
-        client.press_and_release("both")
+        comm.wait_for_text_event("path is unusual")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("Confirm public key")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("111'/222'/333'")
+        comm.press_and_release("right")
+        comm.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()
 
     with pytest.raises(DenyError):
-        cmd.get_extended_pubkey(
-            bip32_path="m/111'/222'/333'",
+        client.get_extended_pubkey(
+            path="m/111'/222'/333'",
             display=True
         )
 
     x.join()
 
 
-def test_get_extended_pubkey_non_standard_reject(client: SpeculosClient, cmd: BitcoinCommand):
+def test_get_extended_pubkey_non_standard_reject(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test rejecting at the end
     # (Slow test, not feasible to repeat it for many paths)
 
-    if not isinstance(client, SpeculosClient):
+    if not is_speculos:
         pytest.skip("Requires speculos")
 
     def ux_thread():
-        event = client.wait_for_text_event("path is unusual")
+        event = comm.wait_for_text_event("path is unusual")
 
         # press right until the last screen (will press the "right" button more times than needed)
         while "Reject" != event["text"]:
-            client.press_and_release("right")
+            comm.press_and_release("right")
 
-            event = client.get_next_event()
+            event = comm.get_next_event()
 
         # finally, reject
-        client.press_and_release("both")
+        comm.press_and_release("both")
 
     x = threading.Thread(target=ux_thread)
     x.start()
 
     with pytest.raises(DenyError):
-        cmd.get_extended_pubkey(
-            bip32_path="m/111'/222'/333'",
+        client.get_extended_pubkey(
+            path="m/111'/222'/333'",
             display=True
         )
 

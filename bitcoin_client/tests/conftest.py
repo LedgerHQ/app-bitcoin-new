@@ -8,16 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
+from ledger_bitcoin import Client, Chain, TransportClient, createClient
 
 from speculos.client import SpeculosClient
 
 import os
 import re
-
-import random
-
-random.seed(0)  # make sure tests are repeatable
 
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
@@ -26,40 +22,9 @@ conftest_folder_path: Path = Path(__file__).parent
 ASSIGNMENT_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*)$', re.MULTILINE)
 
 
-def get_app_version() -> str:
-    makefile_path = conftest_folder_path.parent / "Makefile"
-    if not makefile_path.is_file():
-        raise FileNotFoundError(f"Can't find file: '{makefile_path}'")
-
-    makefile: str = makefile_path.read_text()
-
-    assignments = {
-        identifier: value for identifier, value in ASSIGNMENT_RE.findall(makefile)
-    }
-
-    return f"{assignments['APPVERSION_M']}.{assignments['APPVERSION_N']}.{assignments['APPVERSION_P']}"
-
-
 def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
-    parser.addoption("--enableslowtests", action="store_true")
-
-
-@pytest.fixture(scope="module")
-def sw_h_path():
-    # sw.h should be in src/boilerplate/sw.h
-    sw_h_path = conftest_folder_path.parent / "src" / "boilerplate" / "sw.h"
-
-    if not sw_h_path.is_file():
-        raise FileNotFoundError(f"Can't find sw.h: '{sw_h_path}'")
-
-    return sw_h_path
-
-
-@pytest.fixture(scope="module")
-def app_version() -> str:
-    return get_app_version()
 
 
 @pytest.fixture
@@ -78,18 +43,17 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
+def comm(request, hid) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
-        # We set the app's name before running speculos in order to emulate the expected
-        # behavior of the SDK's GET_VERSION default APDU.
-        # The app name is 'Bitcoin' or 'Bitcoin Test' for mainnet/testnet respectively.
-        # We leave the speculos default 'app' to avoid relying on that value in tests.
-        os.environ['SPECULOS_APPNAME'] = f'app:{app_version}'
+        os.environ['SPECULOS_APPNAME'] = 'Bitcoin Test:1.6.5'
         client = SpeculosClient(
-            str(conftest_folder_path.parent.joinpath("bin/app.elf")),
-            ['--sdk', '2.1']
+            str(conftest_folder_path.joinpath("app-binaries/bitcoin-testnet-1.6.5.elf")),
+            [
+                '-l', f"Bitcoin:{str(conftest_folder_path.joinpath('app-binaries/bitcoin-1.6.5.elf'))}",
+                '--sdk', '2.1'
+            ]
         )
         client.start()
 
