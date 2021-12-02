@@ -22,17 +22,45 @@ $ pip install ledger_bitcoin[hid]
 
 ## Getting started
 
-### Library
+The main method exported by the library is `createClient`, which queries the hardware wallet for the version of the running app, and then returns the appropriate implementation of the `Client` class.
+
+See the documentation of the class and the example below for the supported methods.
+
+When running on a legacy version of the app (below version `2.0.0`), only the features that were available on the app are supported. Any unsopported method (e.g.: multisig registration or addresses, taproot addresses) will raise a `NotImplementedError`.
+
+### Running with speculos
+
+It is possible to run the app and the library with the [speculos](https://github.com/LedgerHQ/speculos) emulator.
+
+⚠️ Currently, speculos does not correctly emulate the version of the app, always returning a dummy value; in order to use the library, it is necessary to set the `SPECULOS_APPNAME` environment variable before starting speculos, for example with:
+
+```
+$ export SPECULOS_APPNAME="Bitcoin Test:2.0.0"
+```
+
+Similarly, to test the library behavior on a legacy version of the app, one can set the version to `1.6.5` (the final version of the 1.X series).
+
+### Example
+
+The following example showcases all the main methods of the `Client`'s interface.
+
+If you are not using the context manager syntax when creating the client, remember to call the `stop()` method to release the communication channel.
+
+Testing the `sign_psbt` method requires producing a valid PSBT (with any external tool that supports either PSBTv0 or PSBTv2), and provide the corresponding wallet policy; it is skipped by default in the following example.
+
 
 ```python
 from typing import Optional
-from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, PolicyMapWallet, AddressType
+from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, PolicyMapWallet, AddressType, TransportClient
 from ledger_bitcoin.psbt import PSBT
 
 
 def main():
-    with createClient(chain=Chain.TEST) as client:
+    # speculos on default host/port
+    # with createClient(TransportClient(), chain=Chain.TEST) as client:
 
+    # Ledger Nano connected via USB
+    with createClient(chain=Chain.TEST) as client:
         # ==> Get the master key fingerprint
 
         fpr = client.get_master_fingerprint().hex()
@@ -105,5 +133,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 ```
