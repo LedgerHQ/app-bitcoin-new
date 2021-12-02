@@ -40,6 +40,8 @@ $ export SPECULOS_APPNAME="Bitcoin Test:2.0.0"
 
 Similarly, to test the library behavior on a legacy version of the app, one can set the version to `1.6.5` (the final version of the 1.X series).
 
+The expected application name is `Bitcoin` for mainnet, `Bitcoin Test` for testnet.
+
 ### Example
 
 The following example showcases all the main methods of the `Client`'s interface.
