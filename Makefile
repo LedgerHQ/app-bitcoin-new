@@ -575,9 +575,24 @@ DEFINES   += COIN_KIND=COIN_KIND_HYDRA
 DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Hydra"
 APP_LOAD_PARAMS += --path "44'/609'"
+else ifeq ($(COIN),sapphire)
+# Sapphire
+DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
+DEFINES   += BIP44_COIN_TYPE=832
+DEFINES   += BIP44_COIN_TYPE_2=832
+DEFINES   += COIN_P2PKH_VERSION=63
+DEFINES   += COIN_P2SH_VERSION=18
+DEFINES   += COIN_FAMILY=1
+DEFINES   += COIN_COINID=\"DarkNet\"
+DEFINES   += COIN_COINID_HEADER=\"SAPPHIRE\"
+DEFINES   += COIN_COINID_NAME=\"Sapphire\"
+DEFINES   += COIN_COINID_SHORT=\"SAPP\"
+DEFINES   += COIN_KIND=COIN_KIND_SAPPHIRE
+APPNAME ="Sapphire"
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, firo, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin, hydra, hydra_testnet, xrhodium)
+$(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, firo, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin, hydra, hydra_testnet, xrhodium, sapphire)
 endif
 endif
 
@@ -712,12 +727,12 @@ dep/%.d: %.c Makefile
 ifeq ($(TARGET_NAME),TARGET_NANOX)
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin hydra hydra_testnet xrhodium sapphire
 
 else
 
 listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance hydra hydra_testnet xrhodium
+	@echo VARIANTS COIN bitcoin_testnet bitcoin bitcoin_cash bitcoin_gold litecoin dogecoin dash zcash horizen komodo stratis peercoin pivx viacoin vertcoin stealth digibyte qtum bitcoin_private firo gamecredits zclassic xsn nix lbry ravencoin resistance hydra hydra_testnet xrhodium sapphire
 
 endif
 
