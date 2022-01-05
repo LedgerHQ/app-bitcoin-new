@@ -71,8 +71,8 @@ class DongleAdaptor:
 class LegacyClient(Client):
     """Wrapper for Ledger Bitcoin app before version 2.0.0."""
 
-    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN):
-        super().__init__(comm_client, chain)
+    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN, debug: bool = False):
+        super().__init__(comm_client, chain, debug)
 
         self.app = btchip(DongleAdaptor(comm_client))
 

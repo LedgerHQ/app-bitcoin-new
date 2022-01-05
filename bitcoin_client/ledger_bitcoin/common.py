@@ -1,5 +1,5 @@
 from io import BytesIO
-from typing import List, Optional, Literal, Union
+from typing import List, Optional, Literal
 from enum import Enum, IntEnum
 
 import hashlib
