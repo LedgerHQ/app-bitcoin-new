@@ -1,3 +1,4 @@
+from sys import byteorder
 from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
@@ -36,8 +37,8 @@ class NewClient(Client):
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
 
-    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN) -> None:
-        super().__init__(comm_client, chain)
+    def __init__(self, comm_client: TransportClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
+        super().__init__(comm_client, chain, debug)
         self.builder = BitcoinCommandBuilder()
 
     # Modifies the behavior of the base method by taking care of SW_INTERRUPTED_EXECUTION responses
@@ -221,11 +222,11 @@ class NewClient(Client):
 
 def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:
     if comm_client is None:
-        comm_client = TransportClient("hid", debug=debug)
+        comm_client = TransportClient("hid")
 
-    base_client = Client(comm_client, chain)
+    base_client = Client(comm_client, chain, debug)
     _, app_version, _ = base_client.get_version()
     if app_version >= "2":
-        return NewClient(comm_client, chain)
+        return NewClient(comm_client, chain, debug)
     else:
-        return LegacyClient(comm_client, chain)
+        return LegacyClient(comm_client, chain, debug)

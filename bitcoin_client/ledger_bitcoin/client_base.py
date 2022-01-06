@@ -45,16 +45,41 @@ class TransportClient:
     def stop(self) -> None:
         self.transport.close()
 
+def print_apdu(apdu_dict: dict) -> None:
+    serialized_apdu = b''.join([
+        apdu_dict["cla"].to_bytes(1, byteorder='big'),
+        apdu_dict["ins"].to_bytes(1, byteorder='big'),
+        apdu_dict["p1"].to_bytes(1, byteorder='big'),
+        apdu_dict["p2"].to_bytes(1, byteorder='big'),
+        len(apdu_dict["data"]).to_bytes(1, byteorder='big'),
+        apdu_dict["data"]
+    ])
+    print(f"=> {serialized_apdu.hex()}")
+
+def print_response(sw: int, data: bytes) -> None:
+    print(f"<= {data.hex()}{sw.to_bytes(2, byteorder='big').hex()}")
+
 
 class Client:
-    def __init__(self, transport_client: TransportClient, chain: Chain = Chain.MAIN) -> None:
+    def __init__(self, transport_client: TransportClient, chain: Chain = Chain.MAIN, debug: bool = False) -> None:
         self.transport_client = transport_client
         self.chain = chain
+        self.debug = debug
 
     def _apdu_exchange(self, apdu: dict) -> Tuple[int, bytes]:
         try:
-            return 0x9000, self.transport_client.apdu_exchange(**apdu)
+            if self.debug:
+                print_apdu(apdu)
+
+            response = self.transport_client.apdu_exchange(**apdu)
+            if self.debug:
+                print_response(0x9000, response)
+
+            return 0x9000, response
         except ApduException as e:
+            if self.debug:
+                print_response(e.sw, e.data)
+
             return e.sw, e.data
 
     def _make_request(self, apdu: dict) -> Tuple[int, bytes]:
