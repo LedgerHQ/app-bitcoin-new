@@ -407,6 +407,50 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
     return base58_encode(tmp, version_len + 20 + 4, out, out_len);
 }
 
+int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
+                                           size_t bip32_path_len,
+                                           const uint8_t hash[static 32],
+                                           uint8_t out[static MAX_DER_SIG_LEN],
+                                           uint32_t *info) {
+    cx_ecfp_private_key_t private_key = {0};
+    uint8_t chain_code[32] = {0};
+    uint32_t info_internal = 0;
+
+    int sig_len = 0;
+    bool error = false;
+    BEGIN_TRY {
+        TRY {
+            crypto_derive_private_key(&private_key, chain_code, bip32_path, bip32_path_len);
+            sig_len = cx_ecdsa_sign(&private_key,
+                                    CX_RND_RFC6979,
+                                    CX_SHA256,
+                                    hash,
+                                    32,
+                                    out,
+                                    MAX_DER_SIG_LEN,
+                                    &info_internal);
+        }
+        CATCH_ALL {
+            error = true;
+        }
+        FINALLY {
+            explicit_bzero(&private_key, sizeof(private_key));
+        }
+    }
+    END_TRY;
+
+    if (error) {
+        // unexpected error when signing
+        return -1;
+    }
+
+    if (info != NULL) {
+        *info = info_internal;
+    }
+
+    return sig_len;
+}
+
 void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len) {
     // we recycle the input to save memory (will reinit later)
     cx_sha256_init(hash_context);

@@ -120,39 +120,16 @@ static void send_response(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t chain_code[32] = {0};
-    uint32_t info = 0;
-
     uint8_t sig[MAX_DER_SIG_LEN];
 
-    int sig_len = 0;
-    bool error = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_private_key(&private_key,
-                                      chain_code,
-                                      state->bip32_path,
-                                      state->bip32_path_len);
-            sig_len = cx_ecdsa_sign(&private_key,
-                                    CX_RND_RFC6979,
-                                    CX_SHA256,
-                                    state->bsm_digest,
-                                    32,
-                                    sig,
-                                    MAX_DER_SIG_LEN,
-                                    &info);
-        }
-        CATCH_ALL {
-            error = true;
-        }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
+    uint32_t info;
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(state->bip32_path,
+                                                         state->bip32_path_len,
+                                                         state->bsm_digest,
+                                                         sig,
+                                                         &info);
 
-    if (error) {
+    if (sig_len < 0) {
         // unexpected error when signing
         SEND_SW(dc, SW_BAD_STATE);
         return;
