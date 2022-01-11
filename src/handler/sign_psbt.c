@@ -2063,9 +2063,7 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
                                                           sig,
                                                           &sig_len);
             if (err != CX_OK) {
-                PRINTF("Signature error: %08X\n", err);
-                SEND_SW(dc, SW_BAD_STATE);
-                return;
+                error = true;
             }
         }
         CATCH_ALL {
