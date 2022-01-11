@@ -23,6 +23,11 @@ void ui_display_pubkey(dispatcher_context_t *dispatcher_context,
                        action_validate_cb callback);
 
 // TODO: docs
+void ui_display_message_hash(dispatcher_context_t *context,
+                             char *bip32_path_str,
+                             char *message_hash,
+                             action_validate_cb callback);
+
 void ui_display_address(dispatcher_context_t *dispatcher_context,
                         char *address,
                         bool is_path_suspicious,

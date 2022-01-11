@@ -7,7 +7,7 @@ Bitcoin application : Technical Specifications
 
 ### APDUs
 
-The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` and `P2` fields are not used and must be set to `0` in all messages.
+The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` and `P2` fields are reserved for future use and must be set to `0` in all messages.
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
@@ -17,6 +17,7 @@ The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that u
 |  E1 |  02 | REGISTER_WALLET     | Registers a wallet on the device (with user's approval) |
 |  E1 |  03 | GET_WALLET_ADDRESS  | Return and show on screen an address for a registered or default wallet |
 |  E1 |  04 | SIGN_PSBT           | Signs a PSBT with a registered or default wallet |
+|  E1 |  10 | SIGN_MESSAGE        | Sign a message with a key from a BIP32 path (Bitcoin Message Signing) |
 
 The `CLA = 0xF8` is used for framework-specific (rather than app-specific) APDUs; at this time, only one command is present.
 
@@ -228,13 +229,12 @@ For a registered wallet, the hmac must be correct.
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
-<!-- TODO: once the path checking is added for default wallet, document it here -->
 
 #### Client commands
 
 `GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
 
-The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` for all the Merkle trees in the input, including each of the Merkle trees for keys and values of the Merkleized map commitments of each of the inputs/outputs maps of the psbt.
+The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` queries for all the Merkle trees in the input, including each of the Merkle trees for keys and values of the Merkleized map commitments of each of the inputs/outputs maps of the psbt.
 
 The `GET_MORE_ELEMENTS` command must be handled.
 
@@ -267,6 +267,56 @@ No input data.
 The fingerprint is necessary to fill the key origin information for some PSBT fields, or to create wallet descriptors.
 
 User interaction is not required for this command.
+
+
+### SIGN_MESSAGE
+
+Signs a message, according to the standard Bitcoin Message Signing.
+
+The device shows on its secure screen the BIP-32 path used for signing, and the SHA256 hash of the message; the hash should be verified by the user using an external tool if the client is untrusted.
+
+#### Encoding
+
+**Command**
+
+| *CLA* | *INS* |
+|-------|-------|
+| E1    | 10    |
+
+**Input data**
+
+| Length  | Name              | Description |
+|---------|-------------------|-------------|
+| `1`     | `n`               | Number of derivation steps (maximum 6) |
+| `4`     | `bip32_path[0]`   | First derivation step (big endian) |
+| `4`     | `bip32_path[1]`   | Second derivation step (big endian) |
+|         | ...               |             |
+| `4`     | `bip32_path[n-1]` | `n`-th derivation step (big endian) |
+| `<var>` | `msg_length`      | The byte length of the message to sign (Bitcoin-style varint) |
+| `32`    | `msg_merkle_root` | The Merkle root of the message, split in 64-byte chunks |
+
+The message to be signed is split into `ceil(msg_length/64)` chunks of 64 bytes (except the last chunk that could be smaller); `msg_merkle_root` is the root of the Merkle tree of the corresponding list of chunks.
+
+The theoretical maximum valid length of the message is 2<sup>32</sup>-1 = 4&nbsp;294&nbsp;967&nbsp;295 bytes.
+
+**Output data**
+
+| Length | Description |
+|--------|-------------|
+| `65`   | The returned signature, encoded in the standard Bitcoin message signing format |
+
+The signature is returned as a 65-byte binary string (1 byte equal to 32 or 33, followed by `r` and `s`, each of them represented as a 32-byte big-endian integer).
+
+#### Description
+
+The digest being signed is the double-SHA256 of the message, after prefix ing the message with:
+
+- the magic string `"\x18Bitcoin Signed Message:\n"` (equal to `18426974636f696e205369676e6564204d6573736167653a0a` in hexadecimal)
+- the length of the message, encoded as a Bitcoin-style variable length integer.
+
+#### Client commands
+
+The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` queries for the Merkle tree of the list of chunks in the message.
 
 ## Client commands reference
 

@@ -1,7 +1,7 @@
 import enum
 from typing import List, Tuple, Mapping, Union, Iterator, Optional
 
-from .common import bip32_path_from_string, AddressType, write_varint
+from .common import bip32_path_from_string, AddressType, sha256, hash256, write_varint
 from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
 from .wallet import Wallet
 
@@ -30,11 +30,11 @@ class DefaultInsType(enum.IntEnum):
 
 class BitcoinInsType(enum.IntEnum):
     GET_EXTENDED_PUBKEY = 0x00
-    GET_ADDRESS = 0x01
     REGISTER_WALLET = 0x02
     GET_WALLET_ADDRESS = 0x03
     SIGN_PSBT = 0x04
     GET_MASTER_FINGERPRINT = 0x05
+    SIGN_MESSAGE = 0x10
 
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
@@ -79,13 +79,13 @@ class BitcoinCommandBuilder:
 
         return {"cla": cla, "ins": ins, "p1": p1, "p2": p2, "data": cdata}
 
-    def get_extended_pubkey(self, bip32_path: List[int], display: bool = False):
-        bip32_paths: List[bytes] = bip32_path_from_string(bip32_path)
+    def get_extended_pubkey(self, bip32_path: str, display: bool = False):
+        bip32_path: List[bytes] = bip32_path_from_string(bip32_path)
 
         cdata: bytes = b"".join([
             b'\1' if display else b'\0',
-            len(bip32_paths).to_bytes(1, byteorder="big"),
-            *bip32_paths
+            len(bip32_path).to_bytes(1, byteorder="big"),
+            *bip32_path
         ])
 
         return self.serialize(
@@ -166,6 +166,28 @@ class BitcoinCommandBuilder:
         return self.serialize(
             cla=self.CLA_BITCOIN,
             ins=BitcoinInsType.GET_MASTER_FINGERPRINT
+        )
+
+    def sign_message(self, message: bytes, bip32_path: str):
+        cdata = bytearray()
+
+        bip32_path: List[bytes] = bip32_path_from_string(bip32_path)
+
+        # split message in 64-byte chunks (last chunk can be smaller)
+        n_chunks = (len(message) + 63) // 64
+        chunks = [message[64 * i: 64 * i + 64] for i in range(n_chunks)]
+
+        cdata += len(bip32_path).to_bytes(1, byteorder="big")
+        cdata += b''.join(bip32_path)
+
+        cdata += write_varint(len(message))
+
+        cdata += MerkleTree(element_hash(c) for c in chunks).root
+
+        return self.serialize(
+            cla=self.CLA_BITCOIN,
+            ins=BitcoinInsType.SIGN_MESSAGE,
+            cdata=bytes(cdata)
         )
 
     def continue_interrupted(self, cdata: bytes):
