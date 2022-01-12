@@ -7,55 +7,57 @@
 #include "../../common/base58.h"
 #include "../../common/segwit_addr.h"
 
-/**
- * Convenience structure to optimize the size of parameters passed to a recursive function.
- */
+extern global_context_t G_context;
+
+#define MAX_POLICY_DEPTH 3
+
+#define MODE_OUT_BYTES 0
+#define MODE_OUT_HASH  1
+
+typedef struct {
+    const policy_node_t *policy_node;
+
+    // Only one of the two is used, depending on the `mode`
+    union {
+        cx_sha256_t *hash_context;
+        buffer_t *out_buf;
+    };
+
+    // used to identify the stage of execution for nodes that require multiple rounds
+    uint8_t step;
+
+    // MODE_OUT_BYTES if the current node is outputting the actual script bytes, or MODE_OUT_HASH
+    // if it is outputting the script hash
+    uint8_t mode;
+} policy_parser_node_state_t;
+
 typedef struct {
     dispatcher_context_t *dispatcher_context;
     const uint8_t *keys_merkle_root;
     uint32_t n_keys;
     bool change;
     size_t address_index;
-    buffer_t *mem;
-} _policy_parser_args_t;
 
-extern global_context_t G_context;
+    policy_parser_node_state_t nodes[MAX_POLICY_DEPTH];  // stack of nodes being processed
+    int node_stack_eos;  // index of node being processed within nodes; will be set -1 at the end of
+                         // processing
+
+    cx_sha256_t hash_context;  // shared among all the nodes; there are never two concurrent hash
+                               // computations in process.
+    uint8_t hash[32];  // when a node processed in hash mode is popped, the hash is computed here
+} policy_parser_state_t;
 
 // comparator for pointers to compressed pubkeys
 static int cmp_compressed_pubkeys(const void *a, const void *b) {
-    const uint8_t **key_a = (const uint8_t **) a;
-    const uint8_t **key_b = (const uint8_t **) b;
+    const uint8_t *key_a = (const uint8_t *) a;
+    const uint8_t *key_b = (const uint8_t *) b;
     for (int i = 0; i < 33; i++) {
-        int diff = (*key_a)[i] - (*key_b)[i];
+        int diff = key_a[i] - key_b[i];
         if (diff != 0) {
             return diff;
         }
     }
     return 0;
-}
-
-static void update_output(buffer_t *out_buf_ptr,
-                          cx_hash_t *hash_context,
-                          const uint8_t *data,
-                          size_t data_len) {
-    if (out_buf_ptr != NULL) {
-        buffer_write_bytes(out_buf_ptr, data, data_len);
-    }
-
-    if (hash_context != NULL) {
-        crypto_hash_update(hash_context, data, data_len);
-    }
-}
-
-static void update_output_u8(buffer_t *out_buf_ptr, cx_hash_t *hash_context, const uint8_t data) {
-    update_output(out_buf_ptr, hash_context, &data, 1);
-}
-
-// Returns true iff the type corresponds to a script that is known to be at most 34 bytes.
-// Used for some memory optimizations when computing script hashes (e.g. for `sh(wsh(...))`
-// policies).
-static bool is_script_type_short(PolicyNodeType type) {
-    return (type == TOKEN_PKH || type == TOKEN_WPKH || type == TOKEN_SH || type == TOKEN_WSH);
 }
 
 // p2pkh                     ==> legacy address (start with 1 on mainnet, m or n on testnet)
@@ -64,8 +66,9 @@ static bool is_script_type_short(PolicyNodeType type) {
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
-static int __attribute__((noinline))
-get_extended_pubkey(_policy_parser_args_t *args, int key_index, serialized_extended_pubkey_t *out) {
+static int __attribute__((noinline)) get_extended_pubkey(policy_parser_state_t *state,
+                                                         int key_index,
+                                                         serialized_extended_pubkey_t *out) {
     PRINT_STACK_POINTER();
 
     policy_map_key_info_t key_info;
@@ -73,9 +76,9 @@ get_extended_pubkey(_policy_parser_args_t *args, int key_index, serialized_exten
     {
         char key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
-        int key_info_len = call_get_merkle_leaf_element(args->dispatcher_context,
-                                                        args->keys_merkle_root,
-                                                        args->n_keys,
+        int key_info_len = call_get_merkle_leaf_element(state->dispatcher_context,
+                                                        state->keys_merkle_root,
+                                                        state->n_keys,
                                                         key_index,
                                                         (uint8_t *) key_info_str,
                                                         sizeof(key_info_str));
@@ -108,12 +111,12 @@ get_extended_pubkey(_policy_parser_args_t *args, int key_index, serialized_exten
     return key_info.has_wildcard ? 1 : 0;
 }
 
-static int get_derived_pubkey(_policy_parser_args_t *args, int key_index, uint8_t out[static 33]) {
+static int get_derived_pubkey(policy_parser_state_t *state, int key_index, uint8_t out[static 33]) {
     PRINT_STACK_POINTER();
 
     serialized_extended_pubkey_t ext_pubkey;
 
-    int ret = get_extended_pubkey(args, key_index, &ext_pubkey);
+    int ret = get_extended_pubkey(state, key_index, &ext_pubkey);
     if (ret < 0) {
         return -1;
     }
@@ -121,8 +124,8 @@ static int get_derived_pubkey(_policy_parser_args_t *args, int key_index, uint8_
     if (ret == 1) {
         // we derive the /0/i child of this pubkey
         // we reuse the same memory of ext_pubkey
-        bip32_CKDpub(&ext_pubkey, args->change, &ext_pubkey);
-        bip32_CKDpub(&ext_pubkey, args->address_index, &ext_pubkey);
+        bip32_CKDpub(&ext_pubkey, state->change, &ext_pubkey);
+        bip32_CKDpub(&ext_pubkey, state->address_index, &ext_pubkey);
     }
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
@@ -130,17 +133,66 @@ static int get_derived_pubkey(_policy_parser_args_t *args, int key_index, uint8_
     return 0;
 }
 
-// forward-declaration
-int _call_get_wallet_script(_policy_parser_args_t *args,
-                            policy_node_t *policy,
-                            buffer_t *out_buf,
-                            cx_hash_t *hash_context);
+/**
+ * Pushes a node onto the stack. Returns 0 on success, -1 if the stack is exhausted.
+ */
+static int state_stack_push(policy_parser_state_t *state, policy_node_t *policy_node) {
+    ++state->node_stack_eos;
 
-static int get_pkh_wpkh_script(_policy_parser_args_t *args,
-                               policy_node_t *policy,
-                               buffer_t *out_buf,
-                               cx_hash_t *hash_context) {
-    policy_node_with_key_t *root = (policy_node_with_key_t *) policy;
+    if (state->node_stack_eos >= MAX_POLICY_DEPTH) {
+        return -1;
+    }
+
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+    cx_sha256_init(&state->hash_context);
+    node->policy_node = policy_node;
+    node->step = 0;
+    node->mode = MODE_OUT_HASH;
+    node->hash_context = &state->hash_context;
+
+    return 0;
+}
+
+/**
+ * Pops a node the stack. If the node is in HASH mode, computes the hash.
+ * Returns 0 on success, -1 on error.
+ */
+static int state_stack_pop(policy_parser_state_t *state) {
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+
+    if (state->node_stack_eos >= MAX_POLICY_DEPTH || state->node_stack_eos <= -1) {
+        return -1;
+    }
+
+    if (node->mode == MODE_OUT_HASH) {
+        crypto_hash_digest(&state->hash_context.header, state->hash, 32);
+    }
+
+    --state->node_stack_eos;
+    return 0;
+}
+
+static void update_output(policy_parser_state_t *state, const uint8_t *data, size_t data_len) {
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+    if (node->mode == MODE_OUT_BYTES) {
+        buffer_write_bytes(node->out_buf, data, data_len);
+    } else {
+        crypto_hash_update(&node->hash_context->header, data, data_len);
+    }
+}
+
+static void update_output_u8(policy_parser_state_t *state, const uint8_t data) {
+    update_output(state, &data, 1);
+}
+
+static int process_pkh_wpkh_node(policy_parser_state_t *state) {
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+
+    if (node->step != 0) {
+        return -1;
+    }
+
+    policy_node_with_key_t *policy = (policy_node_with_key_t *) node->policy_node;
 
     unsigned int out_len;
     if (policy->type == TOKEN_PKH) {
@@ -148,365 +200,251 @@ static int get_pkh_wpkh_script(_policy_parser_args_t *args,
     } else {
         out_len = 2 + 20;
     }
-    if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
+
+    if (node->mode == MODE_OUT_BYTES && !buffer_can_read(node->out_buf, out_len)) {
         return -1;
+    }
+
+    uint8_t compressed_pubkey[33];
+
+    if (node->mode == MODE_OUT_HASH) {
+        cx_sha256_init(&state->hash_context);
     }
 
     int result;
-    buffer_snapshot_t snap = buffer_snapshot(args->mem);
+    if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+        return -1;
+    } else if (policy->type == TOKEN_PKH) {
+        update_output_u8(state, 0x76);
+        update_output_u8(state, 0xa9);
+        update_output_u8(state, 0x14);
 
-    // memory block taking 33 bytes
-    {
-        uint8_t *compressed_pubkey = (uint8_t *) buffer_alloc(args->mem, 33, false);
+        crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+        update_output(state, compressed_pubkey, 20);
 
-        if (compressed_pubkey == NULL) {
-            result = -1;
-        } else if (-1 == get_derived_pubkey(args, root->key_index, compressed_pubkey)) {
-            result = -1;
-        } else if (policy->type == TOKEN_PKH) {
-            update_output_u8(out_buf, hash_context, 0x76);
-            update_output_u8(out_buf, hash_context, 0xa9);
-            update_output_u8(out_buf, hash_context, 0x14);
+        update_output_u8(state, 0x88);
+        update_output_u8(state, 0xac);
 
-            crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
-            update_output(out_buf, hash_context, compressed_pubkey, 20);
+        result = 3 + 20 + 2;
+    } else {  // policy->type == TOKEN_WPKH
+        update_output_u8(state, 0x00);
+        update_output_u8(state, 0x14);
 
-            update_output_u8(out_buf, hash_context, 0x88);
-            update_output_u8(out_buf, hash_context, 0xac);
+        crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+        update_output(state, compressed_pubkey, 20);
 
-            result = 3 + 20 + 2;
-        } else {  // policy->type == TOKEN_WPKH
-            update_output_u8(out_buf, hash_context, 0x00);
-            update_output_u8(out_buf, hash_context, 0x14);
-
-            crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
-            update_output(out_buf, hash_context, compressed_pubkey, 20);
-
-            result = 2 + 20;
-        }
+        result = 2 + 20;
     }
-    buffer_restore(args->mem, snap);
+
+    if (-1 == state_stack_pop(state)) {
+        return -1;
+    }
     return result;
 }
 
-static int get_sh_wsh_script(_policy_parser_args_t *args,
-                             policy_node_t *policy,
-                             buffer_t *out_buf,
-                             cx_hash_t *hash_context) {
-    policy_node_with_script_t *root = (policy_node_with_script_t *) policy;
+static int process_sh_wsh_node(policy_parser_state_t *state) {
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
-    uint8_t *script_hash;
+    policy_node_with_script_t *policy = (policy_node_with_script_t *) node->policy_node;
+
+    if (node->step != 0 && node->step != 1) {
+        return -1;
+    }
+
+    if (node->step == 0) {
+        // process child in HASH mode
+        if (-1 == state_stack_push(state, policy->script)) {
+            return -1;
+        }
+        ++node->step;
+        return 0;
+    }
+
+    // child already computed
+
+    if (node->mode == MODE_OUT_HASH) {
+        cx_sha256_init(&state->hash_context);
+    }
 
     int result;
-    buffer_snapshot_t snap = buffer_snapshot(args->mem);
+    if (policy->type == TOKEN_SH) {
+        update_output_u8(state, 0xa9);
+        update_output_u8(state, 0x14);
 
-    // memory block; will take up to:
-    // - sizeof(cx_sha256_t) + 32 = 108 + 32 = 140 bytes if the inner script is long/unknown
-    // - 34 + 32 = 66 bytes for known standard scripts
-    do {
-        // Memory optimization: as the script_hash_context is expensive (>100 bytes), if we know
-        // that the internal script is short, we are better off computing the full internal script
-        // (rather than its hash).
-        if (is_script_type_short(root->script->type)) {
-            uint8_t *internal_script = buffer_alloc(args->mem, 34, false);
-            if (internal_script == NULL) {
-                result = -1;
-                break;
-            }
+        crypto_ripemd160(state->hash, 32, state->hash);  // reuse memory
+        update_output(state, state->hash, 20);
 
-            buffer_t internal_script_buf = buffer_create(internal_script, 34);
+        update_output_u8(state, 0x87);
 
-            int internal_script_len =
-                _call_get_wallet_script(args, root->script, &internal_script_buf, NULL);
-            if (internal_script_len == -1) {
-                result = -1;
-                break;
-            }
+        result = 2 + 20 + 1;
+    } else {  // policy->type == TOKEN_WSH
+        update_output_u8(state, 0x00);
+        update_output_u8(state, 0x20);
 
-            script_hash = (uint8_t *) buffer_alloc(args->mem, 32, false);  // sha256 of the script
-            if (script_hash == NULL) {
-                result = -1;
-                break;
-            }
+        update_output(state, state->hash, 32);
 
-            cx_hash_sha256(internal_script, internal_script_len, script_hash, 32);
-        } else {
-            cx_sha256_t *script_hash_context =
-                (cx_sha256_t *) buffer_alloc(args->mem, sizeof(cx_sha256_t), true);
-            if (script_hash_context == NULL) {
-                result = -1;
-                break;
-            }
+        result = 2 + 32;
+    }
 
-            cx_sha256_init(script_hash_context);
-
-            int res =
-                _call_get_wallet_script(args, root->script, NULL, &script_hash_context->header);
-            if (res == -1) {
-                result = -1;
-                break;
-            }
-
-            script_hash = (uint8_t *) buffer_alloc(args->mem, 32, false);  // sha256 of the script
-            if (script_hash == NULL) {
-                result = -1;
-                break;
-            }
-
-            crypto_hash_digest(&script_hash_context->header, script_hash, 32);
-        }
-
-        if (policy->type == TOKEN_SH) {
-            update_output_u8(out_buf, hash_context, 0xa9);
-            update_output_u8(out_buf, hash_context, 0x14);
-
-            crypto_ripemd160(script_hash, 32, script_hash);  // reuse memory
-            update_output(out_buf, hash_context, script_hash, 20);
-
-            update_output_u8(out_buf, hash_context, 0x87);
-
-            result = 2 + 20 + 1;
-        } else {  // policy->type == TOKEN_WSH
-            update_output_u8(out_buf, hash_context, 0x00);
-            update_output_u8(out_buf, hash_context, 0x20);
-
-            update_output(out_buf, hash_context, script_hash, 32);
-
-            result = 2 + 32;
-        }
-    } while (false);
-
-    buffer_restore(args->mem, snap);
+    if (-1 == state_stack_pop(state)) {
+        return -1;
+    }
     return result;
 }
 
-int get_multi_script(_policy_parser_args_t *args,
-                     policy_node_t *policy,
-                     buffer_t *out_buf,
-                     cx_hash_t *hash_context) {
+static int process_multi_sortedmulti_node(policy_parser_state_t *state) {
     PRINT_STACK_POINTER();
 
-    policy_node_multisig_t *root = (policy_node_multisig_t *) policy;
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+
+    if (node->step != 0) {
+        return -1;
+    }
+
+    policy_node_multisig_t *policy = (policy_node_multisig_t *) node->policy_node;
 
     // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
-    unsigned int out_len = 1 + 34 * root->n + 1 + 1;
+    unsigned int out_len = 1 + 34 * policy->n + 1 + 1;
 
-    if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
+    if (node->mode == MODE_OUT_BYTES && !buffer_can_read(node->out_buf, out_len)) {
         return -1;
     }
 
-    update_output_u8(out_buf, hash_context, 0x50 + root->k);  // OP_k
-
-    int result = 0;
-    buffer_snapshot_t snap = buffer_snapshot(args->mem);
-
-    do {
-        uint8_t *compressed_pubkey = (uint8_t *) buffer_alloc(args->mem, 33, false);
-        if (compressed_pubkey == NULL) {
-            result = -1;
-            break;
-        }
-
-        for (unsigned int i = 0; i < root->n; i++) {
-            if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkey)) {
-                result = -1;
-                break;
-            }
-            // push <i-th pubkey> (33 = 0x21 bytes)
-            update_output_u8(out_buf, hash_context, 0x21);
-            update_output(out_buf, hash_context, compressed_pubkey, 33);
-        }
-        if (result == -1) {
-            break;
-        }
-
-        update_output_u8(out_buf, hash_context, 0x50 + root->n);  // OP_n
-        update_output_u8(out_buf, hash_context, 0xae);            // OP_CHECKMULTISIG
-
-        result = out_len;
-    } while (false);
-
-    buffer_restore(args->mem, snap);
-    return result;
-}
-
-int get_sortedmulti_script(_policy_parser_args_t *args,
-                           policy_node_t *policy,
-                           buffer_t *out_buf,
-                           cx_hash_t *hash_context) {
-    PRINT_STACK_POINTER();
-
-    policy_node_multisig_t *root = (policy_node_multisig_t *) policy;
-
-    // TODO: replace with the maximum we can afford
-    if (root->n > 5) {
-        return -1;
+    if (node->mode == MODE_OUT_HASH) {
+        cx_sha256_init(&state->hash_context);
     }
 
-    // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
-    unsigned int out_len = 1 + 34 * root->n + 1 + 1;
+    update_output_u8(state, 0x50 + policy->k);  // OP_k
 
-    if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
-        return -1;
+    // derive each key
+    uint8_t compressed_pubkeys[MAX_POLICY_MAP_KEYS][33];
+    for (unsigned int i = 0; i < policy->n; i++) {
+        if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkeys[i])) {
+            return -1;
+        }
     }
 
-    update_output_u8(out_buf, hash_context, 0x50 + root->k);  // OP_k
-
-    // total size occupation n * (4 + 33)
-    //   = 185 for n = 5.
-
-    int result = 0;
-    buffer_snapshot_t snap = buffer_snapshot(args->mem);
-
-    do {
-        uint8_t **compressed_pubkeys =
-            (uint8_t **) buffer_alloc(args->mem, root->n * sizeof(uint8_t *), true);
-        if (compressed_pubkeys == NULL) {
-            result = -1;
-            break;
-        }
-
-        // allocate space for, and derive each key
-        for (unsigned int i = 0; i < root->n; i++) {
-            compressed_pubkeys[i] = (uint8_t *) buffer_alloc(args->mem, 33, false);
-            if (compressed_pubkeys[i] == NULL) {
-                result = -1;
-                break;
-            }
-
-            if (-1 == get_derived_pubkey(args, root->key_indexes[i], compressed_pubkeys[i])) {
-                result = -1;
-                break;
-            }
-        }
-        if (result == -1) {
-            break;
-        }
-
-        // sort the pubkey pointers (we avoid use qsort, as it takes ~700 bytes in binary size)
-
-        // qsort(compressed_pubkeys, root->n, sizeof(uint8_t *), cmp_compressed_pubkeys);
+    if (policy->type == TOKEN_SORTEDMULTI) {
+        // sort the pubkeys (we avoid using qsort, as it takes ~700 bytes in binary size)
 
         // bubble sort
         bool swapped;
         do {
             swapped = false;
-            for (unsigned int i = 1; i < root->n; i++) {
-                if (cmp_compressed_pubkeys(&compressed_pubkeys[i - 1], &compressed_pubkeys[i]) >
-                    0) {
+            for (unsigned int i = 1; i < policy->n; i++) {
+                if (cmp_compressed_pubkeys(compressed_pubkeys[i - 1], compressed_pubkeys[i]) > 0) {
                     swapped = true;
 
-                    uint8_t *t = compressed_pubkeys[i - 1];
-                    compressed_pubkeys[i - 1] = compressed_pubkeys[i];
-                    compressed_pubkeys[i] = t;
+                    for (int j = 0; j < 33; j++) {
+                        uint8_t t = compressed_pubkeys[i - 1][j];
+                        compressed_pubkeys[i - 1][j] = compressed_pubkeys[i][j];
+                        compressed_pubkeys[i][j] = t;
+                    }
                 }
             }
         } while (swapped);
+    }
 
-        for (unsigned int i = 0; i < root->n; i++) {
-            // push <i-th pubkey> (33 = 0x21 bytes)
-            update_output_u8(out_buf, hash_context, 0x21);
-            update_output(out_buf, hash_context, compressed_pubkeys[i], 33);
-        }
+    for (unsigned int i = 0; i < policy->n; i++) {
+        // push <i-th pubkey> (33 = 0x21 bytes)
+        update_output_u8(state, 0x21);
+        update_output(state, compressed_pubkeys[i], 33);
+    }
 
-        update_output_u8(out_buf, hash_context, 0x50 + root->n);  // OP_n
-        update_output_u8(out_buf, hash_context, 0xae);            // OP_CHECKMULTISIG
+    update_output_u8(state, 0x50 + policy->n);  // OP_n
+    update_output_u8(state, 0xae);              // OP_CHECKMULTISIG
 
-        result = out_len;
-    } while (false);
-
-    buffer_restore(args->mem, snap);
-    return result;
+    if (-1 == state_stack_pop(state)) {
+        return -1;
+    }
+    return out_len;
 }
 
-static int get_tr_script(_policy_parser_args_t *args,
-                         policy_node_t *policy,
-                         buffer_t *out_buf,
-                         cx_hash_t *hash_context) {
-    policy_node_with_key_t *root = (policy_node_with_key_t *) policy;
+static int process_tr_node(policy_parser_state_t *state) {
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+
+    if (node->step != 0) {
+        return -1;
+    }
+
+    policy_node_with_key_t *policy = (policy_node_with_key_t *) node->policy_node;
 
     unsigned int out_len = 2 + 32;
-    if (out_buf != NULL && !buffer_can_read(out_buf, out_len)) {
+
+    if (node->mode == MODE_OUT_BYTES && !buffer_can_read(node->out_buf, out_len)) {
         return -1;
     }
 
     int result;
-    buffer_snapshot_t snap = buffer_snapshot(args->mem);
 
-    // memory block taking 33+32 bytes
-    {
-        uint8_t *compressed_pubkey = (uint8_t *) buffer_alloc(args->mem, 33, false);
-        uint8_t *tweaked_key = (uint8_t *) buffer_alloc(args->mem, 32, false);
+    uint8_t compressed_pubkey[33];
+    uint8_t tweaked_key[32];
 
-        if (compressed_pubkey == NULL || tweaked_key == NULL) {
-            result = -1;
-        } else if (-1 == get_derived_pubkey(args, root->key_index, compressed_pubkey)) {
-            result = -1;
-        } else {
-            update_output_u8(out_buf, hash_context, 0x51);
-            update_output_u8(out_buf, hash_context, 0x20);
+    if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+        return -1;
+    } else {
+        update_output_u8(state, 0x51);
+        update_output_u8(state, 0x20);
 
-            uint8_t parity;
-            crypto_tr_tweak_pubkey(compressed_pubkey + 1, &parity, tweaked_key);
+        uint8_t parity;
+        crypto_tr_tweak_pubkey(compressed_pubkey + 1, &parity, tweaked_key);
 
-            update_output(out_buf, hash_context, tweaked_key, 32);
+        update_output(state, tweaked_key, 32);
 
-            result = 2 + 32;
-        }
+        result = 2 + 32;
     }
-    buffer_restore(args->mem, snap);
+
+    if (-1 == state_stack_pop(state)) {
+        return -1;
+    }
     return result;
 }
 
-int _call_get_wallet_script(_policy_parser_args_t *args,
-                            policy_node_t *policy,
-                            buffer_t *out_buf,
-                            cx_hash_t *hash_context) {
-    PRINT_STACK_POINTER();
-
-    switch (policy->type) {
-        case TOKEN_PKH:
-        case TOKEN_WPKH:
-            return get_pkh_wpkh_script(args, policy, out_buf, hash_context);
-        case TOKEN_SH:
-        case TOKEN_WSH:
-            return get_sh_wsh_script(args, policy, out_buf, hash_context);
-        case TOKEN_MULTI:
-            return get_multi_script(args, policy, out_buf, hash_context);
-        case TOKEN_SORTEDMULTI:
-            return get_sortedmulti_script(args, policy, out_buf, hash_context);
-        case TOKEN_TR:
-            return get_tr_script(args, policy, out_buf, hash_context);
-        default:
-            return -1;
-    }
-}
-
 int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
-                           policy_node_t *policy,
+                           const policy_node_t *policy,
                            const uint8_t keys_merkle_root[static 32],
                            uint32_t n_keys,
                            bool change,
                            size_t address_index,
-                           buffer_t *out_buf,
-                           cx_hash_t *hash_context) {
-    // Estimated worst case memory used for sh(wsh(sortedmulti(5, ...)))
-    //   34 + 108 + 5 * 37 = 327
-    //
+                           buffer_t *out_buf) {
+    policy_parser_state_t state = {.dispatcher_context = dispatcher_context,
+                                   .keys_merkle_root = keys_merkle_root,
+                                   .n_keys = n_keys,
+                                   .change = change,
+                                   .address_index = address_index,
+                                   .node_stack_eos = 0};
 
-    uint8_t mem[328];
-    buffer_t mem_buf = buffer_create(mem, sizeof(mem));
+    state.nodes[0] = (policy_parser_node_state_t){.mode = MODE_OUT_BYTES,
+                                                  .step = 0,
+                                                  .policy_node = policy,
+                                                  .out_buf = out_buf};
 
-    _policy_parser_args_t args = {.dispatcher_context = dispatcher_context,
-                                  .keys_merkle_root = keys_merkle_root,
-                                  .n_keys = n_keys,
-                                  .change = change,
-                                  .address_index = address_index,
-                                  .mem = &mem_buf};
-    return _call_get_wallet_script(&args, policy, out_buf, hash_context);
+    int ret;
+    do {
+        switch (state.nodes[state.node_stack_eos].policy_node->type) {
+            case TOKEN_PKH:
+            case TOKEN_WPKH:
+                ret = process_pkh_wpkh_node(&state);
+                break;
+            case TOKEN_SH:
+            case TOKEN_WSH:
+                ret = process_sh_wsh_node(&state);
+                break;
+            case TOKEN_MULTI:
+            case TOKEN_SORTEDMULTI:
+                ret = process_multi_sortedmulti_node(&state);
+                break;
+            case TOKEN_TR:
+                ret = process_tr_node(&state);
+                break;
+            default:
+                ret = -1;
+        }
+    } while (ret >= 0 && state.node_stack_eos >= 0);
+    return ret;
 }
 
-int get_policy_address_type(policy_node_t *policy) {
+int get_policy_address_type(const policy_node_t *policy) {
     // legacy, native segwit, wrapped segwit, or taproot
     switch (policy->type) {
         case TOKEN_PKH:
@@ -526,7 +464,7 @@ int get_policy_address_type(policy_node_t *policy) {
     }
 }
 
-bool check_wallet_hmac(uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
+bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_hmac[static 32]) {
     uint8_t key[32];
     uint8_t correct_hmac[32];
 
@@ -537,7 +475,9 @@ bool check_wallet_hmac(uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 
 
             cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
 
-            result = os_secure_memcmp(wallet_hmac, correct_hmac, 32) == 0;
+            // It is important to use a constant-time function to compare the hmac,
+            // to avoid timing-attack that could be exploited to extract it.
+            result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
         }
         FINALLY {
             explicit_bzero(key, sizeof(key));

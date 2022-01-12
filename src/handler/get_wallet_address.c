@@ -238,8 +238,7 @@ static void compute_address(dispatcher_context_t *dc) {
                                             state->wallet_header_n_keys,
                                             state->is_change,
                                             state->address_index,
-                                            &script_buf,
-                                            NULL);
+                                            &script_buf);
     if (script_len < 0) {
         SEND_SW(dc, SW_BAD_STATE);  // unexpected
         return;
