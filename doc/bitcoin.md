@@ -309,7 +309,7 @@ The signature is returned as a 65-byte binary string (1 byte equal to 32 or 33, 
 
 #### Description
 
-The digest being signed is the double-SHA256 of the message, after prefix ing the message with:
+The digest being signed is the double-SHA256 of the message, after prefixing the message with:
 
 - the magic string `"\x18Bitcoin Signed Message:\n"` (equal to `18426974636f696e205369676e6564204d6573736167653a0a` in hexadecimal)
 - the length of the message, encoded as a Bitcoin-style variable length integer.
