@@ -95,6 +95,11 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
         .ins = GET_MASTER_FINGERPRINT,
         .handler = (command_handler_t)handler_get_master_fingerprint
     },
+    {
+        .cla = CLA_APP,
+        .ins = SIGN_MESSAGE,
+        .handler = (command_handler_t)handler_sign_message
+    },
 };
 // clang-format on
 

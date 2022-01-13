@@ -64,6 +64,11 @@ typedef struct {
 } ui_path_and_address_state_t;
 
 typedef struct {
+    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
+    char hash_hex[64 + 1];
+} ui_path_and_hash_state_t;
+
+typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
     char policy_map[MAX_POLICY_MAP_STR_LENGTH];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
@@ -90,6 +95,7 @@ typedef struct {
 typedef union {
     ui_path_and_pubkey_state_t path_and_pubkey;
     ui_path_and_address_state_t path_and_address;
+    ui_path_and_hash_state_t path_and_hash;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
@@ -288,6 +294,47 @@ UX_STEP_CB(ux_accept_and_send_step,
            pbb,
            (*g_validate_callback)(&G_dispatcher_context, true),
            {&C_icon_validate_14, "Accept", "and send"});
+
+//////////////////////////////////////////////////////////////////////
+UX_STEP_NOCB(ux_sign_message_step,
+             pnn,
+             {
+                 &C_icon_certificate,
+                 "Sign",
+                 "message",
+             });
+
+UX_STEP_NOCB(ux_message_sign_display_path_step,
+             bnnn_paging,
+             {
+                 .title = "Path",
+                 .text = g_ui_state.path_and_hash.bip32_path_str,
+             });
+
+UX_STEP_NOCB(ux_message_hash_step,
+             bnnn_paging,
+             {
+                 .title = "Message hash",
+                 .text = g_ui_state.path_and_hash.hash_hex,
+             });
+
+UX_STEP_CB(ux_sign_message_accept,
+           pbb,
+           (*g_validate_callback)(&G_dispatcher_context, true),
+           {&C_icon_validate_14, "Sign", "message"});
+
+// FLOW to display BIP32 path and a message hash to sign:
+// #1 screen: certificate icon + "Sign message"
+// #2 screen: display BIP32 Path
+// #3 screen: display message hash
+// #4 screen: "Sign message" and approve button
+// #5 screen: reject button
+UX_FLOW(ux_sign_message_flow,
+        &ux_sign_message_step,
+        &ux_message_sign_display_path_step,
+        &ux_message_hash_step,
+        &ux_sign_message_accept,
+        &ux_display_reject_step);
 
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
@@ -506,6 +553,22 @@ void ui_display_pubkey(dispatcher_context_t *context,
     } else {
         ux_flow_init(0, ux_display_pubkey_suspicious_flow, NULL);
     }
+}
+
+void ui_display_message_hash(dispatcher_context_t *context,
+                             char *bip32_path_str,
+                             char *message_hash,
+                             action_validate_cb callback) {
+    (void) (context);
+
+    ui_path_and_hash_state_t *state = (ui_path_and_hash_state_t *) &g_ui_state;
+
+    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
+    strncpy(state->hash_hex, message_hash, sizeof(state->hash_hex));
+
+    g_validate_callback = callback;
+
+    ux_flow_init(0, ux_sign_message_flow, NULL);
 }
 
 void ui_display_address(dispatcher_context_t *context,

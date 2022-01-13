@@ -7,6 +7,7 @@
 #include "handler/get_wallet_address.h"
 #include "handler/register_wallet.h"
 #include "handler/sign_psbt.h"
+#include "handler/sign_message.h"
 
 /**
  * Enumeration with expected INS of APDU commands.
@@ -17,6 +18,7 @@ typedef enum {
     GET_WALLET_ADDRESS = 0x03,
     SIGN_PSBT = 0x04,
     GET_MASTER_FINGERPRINT = 0x05,
+    SIGN_MESSAGE = 0x10,
 } command_e;
 
 /**
@@ -28,6 +30,7 @@ typedef union {
     register_wallet_state_t register_wallet_state;
     get_wallet_address_state_t get_wallet_address_state;
     sign_psbt_state_t sign_psbt_state;
+    sign_message_state_t sign_message_state;
 } command_state_t;
 
 /**

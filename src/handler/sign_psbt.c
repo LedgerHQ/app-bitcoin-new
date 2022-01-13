@@ -1963,10 +1963,6 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t chain_code[32] = {0};
-    uint32_t info = 0;
-
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
     for (int i = 0; i < state->our_key_derivation_length; i++) {
         sign_path[i] = state->our_key_derivation[i];
@@ -1978,30 +1974,9 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
 
     uint8_t sig[MAX_DER_SIG_LEN];
 
-    int sig_len = 0;
-    bool error = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
-            sig_len = cx_ecdsa_sign(&private_key,
-                                    CX_RND_RFC6979,
-                                    CX_SHA256,
-                                    state->sighash,
-                                    32,
-                                    sig,
-                                    MAX_DER_SIG_LEN,
-                                    &info);
-        }
-        CATCH_ALL {
-            error = true;
-        }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
-
-    if (error) {
+    int sig_len =
+        crypto_ecdsa_sign_sha256_hash_with_key(sign_path, sign_path_len, state->sighash, sig, NULL);
+    if (sig_len < 0) {
         // unexpected error when signing
         SEND_SW(dc, SW_BAD_STATE);
         return;
@@ -2063,9 +2038,7 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
                                                           sig,
                                                           &sig_len);
             if (err != CX_OK) {
-                PRINTF("Signature error: %08X\n", err);
-                SEND_SW(dc, SW_BAD_STATE);
-                return;
+                error = true;
             }
         }
         CATCH_ALL {

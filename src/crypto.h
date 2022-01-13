@@ -272,9 +272,9 @@ uint32_t crypto_get_master_key_fingerprint();
  * Computes the base58check-encoded extended pubkey at a given path.
  *
  * @param[in]  bip32_path
- *   Pointer to 32-bit integer input buffer.
+ *   Pointer to 32-bit array of BIP-32 derivation steps.
  * @param[in]  bip32_path_len
- *   Number of BIP32 paths in the input buffer.
+ *   Number of steps in the BIP32 derivation.
  * @param[in]  bip32_pubkey_version
  *   Version prefix to use for the pubkey.
  * @param[out] out
@@ -322,7 +322,39 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
 
 /**
- * TODO: docs
+ * Signs a SHA-256 hash using the ECDSA with deterministic nonce accordin to RFC6979; the signing
+ * private key is the one derived at the given BIP-32 path. The signature is returned in the
+ * conventional DER encoding.
+ *
+ * @param[in]  bip32_path
+ *   Pointer to 32-bit array of BIP-32 derivation steps.
+ * @param[in]  bip32_path_len
+ *   Number of steps in the BIP32 derivation.
+ * @param[in]  hash
+ *   Pointer to a 32-byte SHA-256 hash digest.
+ * @param[out]  out
+ *   The pointer to the output array to contain the signature, that must be of length
+ * `MAX_DER_SIG_LEN`.
+ * @param[out]  info
+ *   Pointer to contain the `info` variable returned by `cx_ecdsa_sign`, or `NULL` if not needed.
+ *
+ * @return the length of the signature on success, or -1 in case of error.
+ */
+int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
+                                           size_t bip32_path_len,
+                                           const uint8_t hash[static 32],
+                                           uint8_t out[static MAX_DER_SIG_LEN],
+                                           uint32_t *info);
+
+/**
+ * Initializes the "tagged" SHA256 hash with the given tag, as defined by BIP-0340.
+ *
+ * @param[out]  hash_context
+ *   Pointer to 32-bit array of BIP-32 derivation steps.
+ * @param[in]  tag
+ *   Pointer to an array containing the tag of the tagged hash.
+ * @param[in]  tag_len
+ *   Length of the tag.
  */
 void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len);
 

@@ -5,9 +5,9 @@ from dataclasses import dataclass
 
 from typing import List, Mapping, Optional
 
-from ledger_bitcoin.client_command import ClientCommandCode
-from ledger_bitcoin.command_builder import BitcoinInsType, FrameworkInsType, BitcoinCommandBuilder
-from ledger_bitcoin.common import ByteStreamParser, sha256
+from bitcoin_client.ledger_bitcoin.client_command import ClientCommandCode
+from bitcoin_client.ledger_bitcoin.command_builder import BitcoinInsType, FrameworkInsType, BitcoinCommandBuilder
+from bitcoin_client.ledger_bitcoin.common import ByteStreamParser, sha256
 
 """
 Parses from standard input a transcript of a complete APDU exchange with the app, formatted as following:
@@ -37,6 +37,8 @@ and produces a more human-readable representation of the transcript:
 <= ⏸ GET_PREIMAGE(hash=1ff8e5d0d3724c1bc905b0ff9ed0ae11980391e98f4e692cf48b3b342876f5bf)
 => ▶ <preimage_len:138><payload_size: 138><payload:005b66356163633266642f3438272f31272f30272f31275d747075624446417145474e7961643335596748387a787678465a714e556f507472356d446f6a7337777a6258514248545a347848655658473677324876734b766a4270615270546d6a59446a64506735773263365776753851426b794d44726d4257644379716b444d3772655373592f2a2a>)
 <= a47f78a76a965d19df634511401803db2af6c5883033bb8d1f1249f93317cdc9ff96c09cfacf89f836ded409b7315b9d7f242db8033e4de4db1cb4c275153988 9000
+
+It must be run from the root of the repository.
 """
 
 
@@ -141,12 +143,12 @@ def format_merkle_root(root: bytes, context: CommandContext) -> str:
 class BitcoinCommandFormatter:
     ins_type: BitcoinInsType
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         raise NotImplementedError
 
-    @classmethod
-    def format_response(cls, response: bytes, sw: int, context: CommandContext):
+    @staticmethod
+    def format_response(response: bytes, sw: int, context: CommandContext):
         if len(response) == 0:
             print("<= {:04x}".format(sw))
         else:
@@ -156,8 +158,8 @@ class BitcoinCommandFormatter:
 class GetExtendedPubkeyCommandFormatter(BitcoinCommandFormatter):
     ins_type = BitcoinInsType.GET_EXTENDED_PUBKEY
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         assert len(apdu.data) >= 2
         assert apdu.p1 == 0 and apdu.p2 == 0
 
@@ -178,8 +180,8 @@ class GetExtendedPubkeyCommandFormatter(BitcoinCommandFormatter):
 class RegisterWalletCommandFormatter(BitcoinCommandFormatter):
     ins_type = BitcoinInsType.REGISTER_WALLET
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         assert len(apdu.data) >= 1
         wallet_len = apdu.data[0]
         assert len(apdu.data) == 1 + wallet_len
@@ -190,8 +192,8 @@ class RegisterWalletCommandFormatter(BitcoinCommandFormatter):
 class GetWalletAddressCommandFormatter(BitcoinCommandFormatter):
     ins_type = BitcoinInsType.GET_WALLET_ADDRESS
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         assert len(apdu.data) == 1 + 32 + 32 + 1 + 4
 
         display = apdu.data[0]
@@ -209,8 +211,8 @@ class GetWalletAddressCommandFormatter(BitcoinCommandFormatter):
 class SignPsbtCommandFormatter(BitcoinCommandFormatter):
     ins_type = BitcoinInsType.SIGN_PSBT
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         global_map_commitment_size = stream.read_varint()
         global_map_commitment_keys_root = stream.read_bytes(32)
         global_map_commitment_values_root = stream.read_bytes(32)
@@ -235,14 +237,31 @@ class SignPsbtCommandFormatter(BitcoinCommandFormatter):
 class GetMasterFingerprintCommandFormatter(BitcoinCommandFormatter):
     ins_type = BitcoinInsType.GET_MASTER_FINGERPRINT
 
-    @classmethod
-    def format_request(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         assert len(apdu.data) == 0
         print("=> GET_MASTER_FINGERPRINT()")
 
 
+class SignMessageCommandFormatter(BitcoinCommandFormatter):
+    ins_type = BitcoinInsType.SIGN_MESSAGE
+
+    @staticmethod
+    def format_request(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+        bip32_path_len = stream.read_bytes(1)[0]
+        bip32_path = [stream.read_uint(4, 'big')
+                      for _ in range(bip32_path_len)]
+
+        message_length = stream.read_varint()
+        message_merkle_root = stream.read_bytes(32)
+        stream.assert_empty()
+
+        print(
+            f"=> SIGN_MESSAGE(path=\"{format_bip32_path(bip32_path)}\",message_length={message_length},message_tree_hash={format_merkle_root(message_merkle_root, context)})")
+
+
 bitcoin_command_formatters: List[BitcoinCommandFormatter] = [GetExtendedPubkeyCommandFormatter, RegisterWalletCommandFormatter,
-                                                             GetWalletAddressCommandFormatter, SignPsbtCommandFormatter, GetMasterFingerprintCommandFormatter]
+                                                             GetWalletAddressCommandFormatter, SignPsbtCommandFormatter, GetMasterFingerprintCommandFormatter, SignMessageCommandFormatter]
 bitcoin_command_formatters_map: Mapping[BitcoinInsType, BitcoinCommandFormatter] = {
     f.ins_type: f for f in bitcoin_command_formatters
 }
@@ -251,24 +270,24 @@ bitcoin_command_formatters_map: Mapping[BitcoinInsType, BitcoinCommandFormatter]
 class ClientCommandFormatter:
     code: ClientCommandCode
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         raise NotImplementedError
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         raise NotImplementedError
 
 
 class YieldClientCommandFormatter(ClientCommandFormatter):
     code = ClientCommandCode.YIELD
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         print(f"<= ⏸ YIELD({response[1:].hex()})")
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         assert len(apdu.data) == 0
         print(f"=> ▶")
 
@@ -276,8 +295,8 @@ class YieldClientCommandFormatter(ClientCommandFormatter):
 class GetPreimageClientCommandFormatter(ClientCommandFormatter):
     code = ClientCommandCode.GET_PREIMAGE
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         # skip first byte, but it must be 0
         if stream.read_bytes(1) != b'\0':
             raise RuntimeError(
@@ -288,8 +307,8 @@ class GetPreimageClientCommandFormatter(ClientCommandFormatter):
 
         print(f"<= ⏸ GET_PREIMAGE(hash={context.get_preimage__hash.hex()})")
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         preimage_len = stream.read_varint()
         payload_size = stream.read_bytes(1)[0]
         payload = stream.read_bytes(payload_size)
@@ -340,8 +359,8 @@ class GetPreimageClientCommandFormatter(ClientCommandFormatter):
 class GetMerkleLeafProofClientCommandFormatter(ClientCommandFormatter):
     code = ClientCommandCode.GET_MERKLE_LEAF_PROOF
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         root = stream.read_bytes(32)
         tree_size = stream.read_varint()
         leaf_index = stream.read_varint()
@@ -353,8 +372,8 @@ class GetMerkleLeafProofClientCommandFormatter(ClientCommandFormatter):
         print(
             f"<= ⏸ GET_MERKLE_LEAF_PROOF(root={format_merkle_root(root, context)},tree_size={tree_size},leaf_index={leaf_index})")
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         leaf_hash = stream.read_bytes(32)
         proof_length = stream.read_bytes(1)[0]
         n_proof_elements = stream.read_bytes(1)[0]
@@ -391,8 +410,8 @@ class GetMerkleLeafProofClientCommandFormatter(ClientCommandFormatter):
 class GetMerkleLeafIndexClientCommandFormatter(ClientCommandFormatter):
     code = ClientCommandCode.GET_MERKLE_LEAF_INDEX
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         root = stream.read_bytes(32)
         leaf_hash = stream.read_bytes(32)
         stream.assert_empty()
@@ -400,8 +419,8 @@ class GetMerkleLeafIndexClientCommandFormatter(ClientCommandFormatter):
         print(
             f"<= ⏸ GET_MERKLE_LEAF_INDEX(root={format_merkle_root(root, context)},leaf_hash={format_hash_image(leaf_hash, context)})")
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         found = stream.read_bytes(1)[0]
         assert 0 <= found <= 1
         leaf_index = stream.read_varint()
@@ -411,13 +430,13 @@ class GetMerkleLeafIndexClientCommandFormatter(ClientCommandFormatter):
 class GetMoreElementsClientCommandFormatter(ClientCommandFormatter):
     code = ClientCommandCode.GET_MORE_ELEMENTS
 
-    @classmethod
-    def format_cmd_request(cls, response: bytes, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_request(response: bytes, stream: ByteStreamParser, context: CommandContext):
         stream.assert_empty()
         print(f"<= ⏸ GET_MORE_ELEMENTS()")
 
-    @classmethod
-    def format_cmd_response(cls, apdu: APDU, stream: ByteStreamParser, context: CommandContext):
+    @staticmethod
+    def format_cmd_response(apdu: APDU, stream: ByteStreamParser, context: CommandContext):
         n_elems = stream.read_bytes(1)[0]
         elem_len = stream.read_bytes(1)[0]
         elements = [stream.read_bytes(elem_len)
