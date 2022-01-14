@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from mnemonic import Mnemonic
+from bip32 import BIP32
+
 from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
+from bitcoin_client.ledger_bitcoin.common import hash160
+from utils.slip21 import Slip21Node
 
 from speculos.client import SpeculosClient
 
@@ -17,10 +22,16 @@ import re
 
 import random
 
+mnemo = Mnemonic("english")
+
 random.seed(0)  # make sure tests are repeatable
 
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
+
+DEFAULT_SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
+
+WALLET_POLICY_SLIP21_LABEL = b"LEDGER-Wallet policy"
 
 
 ASSIGNMENT_RE = re.compile(r'^\s*([a-zA-Z_][a-zA-Z_0-9]*)\s*=\s*(.*)$', re.MULTILINE)
@@ -117,19 +128,17 @@ def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
     return createClient(comm, chain=Chain.TEST, debug=True)
 
 
-@dataclass(frozen=True)
 class SpeculosGlobals:
-    seed = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
-    # TODO: those are for testnet; we could compute them for any network from the seed
-    master_extended_privkey = "tprv8ZgxMBicQKsPfDTA8ufnUdCDy8qXUDnxd8PYWprimNdtVSk4mBMdkAPF6X1cemMjf6LyznfhwbPCsxfiof4BM4DkE8TQtV3HBw2krSqFqHA"
-    master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
-    master_key_fingerprint = 0xF5ACC2FD
-    master_compressed_pubkey = bytes.fromhex(
-        "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db"
-    )
-    wallet_registration_key = bytes.fromhex(
-        "7463d6d1a82f4647ead048c625ae0c27fe40b6d0d5f2d24104009ae9d3b7963c"
-    )
+    def __init__(self, network: str = "test"):
+        self.mnemonic = DEFAULT_SPECULOS_SEED
+        self.seed = mnemo.to_seed(self.mnemonic)
+        bip32 = BIP32.from_seed(self.seed, network)
+        self.master_extended_privkey = bip32.get_xpriv()
+        self.master_extended_pubkey = bip32.get_xpub()
+        self.master_key_fingerprint = int.from_bytes(hash160(bip32.pubkey)[0:4], byteorder="big")
+        self.master_compressed_pubkey = bip32.pubkey.hex()
+        slip21_root = Slip21Node.from_seed(self.seed)
+        self.wallet_registration_key = slip21_root.derive_child(WALLET_POLICY_SLIP21_LABEL).key
 
 
 @pytest.fixture
