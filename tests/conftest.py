@@ -13,6 +13,8 @@ from bip32 import BIP32
 
 from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
 from bitcoin_client.ledger_bitcoin.common import hash160
+
+from utils import default_settings
 from utils.slip21 import Slip21Node
 
 from speculos.client import SpeculosClient
@@ -28,8 +30,6 @@ random.seed(0)  # make sure tests are repeatable
 
 # path with tests
 conftest_folder_path: Path = Path(__file__).parent
-
-DEFAULT_SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
 
 WALLET_POLICY_SLIP21_LABEL = b"LEDGER-Wallet policy"
 
@@ -74,6 +74,14 @@ def app_version() -> str:
 
 
 @pytest.fixture
+def settings(request) -> dict:
+    try:
+        return request.function.test_settings
+    except AttributeError:
+        return default_settings.copy()
+
+
+@pytest.fixture
 def hid(pytestconfig):
     return pytestconfig.getoption("hid")
 
@@ -89,7 +97,7 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
+def comm(settings, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
@@ -104,12 +112,8 @@ def comm(request, hid, app_version: str) -> Union[TransportClient, SpeculosClien
         )
         client.start()
 
-        try:
-            automation_file = conftest_folder_path.joinpath(request.function.automation_file)
-        except AttributeError:
-            automation_file = None
-
-        if automation_file:
+        if settings["automation_file"]:
+            automation_file = conftest_folder_path.joinpath(settings["automation_file"])
             rules = json.load(open(automation_file))
             client.set_automation_rules(rules)
 
@@ -129,9 +133,9 @@ def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
 
 
 class SpeculosGlobals:
-    def __init__(self, network: str = "test"):
-        self.mnemonic = DEFAULT_SPECULOS_SEED
-        self.seed = mnemo.to_seed(self.mnemonic)
+    def __init__(self, mnemonic: str, network: str = "test"):
+        self.mnemonic = mnemonic
+        self.seed = mnemo.to_seed(mnemonic)
         bip32 = BIP32.from_seed(self.seed, network)
         self.master_extended_privkey = bip32.get_xpriv()
         self.master_extended_pubkey = bip32.get_xpub()
@@ -142,5 +146,5 @@ class SpeculosGlobals:
 
 
 @pytest.fixture
-def speculos_globals() -> SpeculosGlobals:
-    return SpeculosGlobals()
+def speculos_globals(settings: dict) -> SpeculosGlobals:
+    return SpeculosGlobals(mnemonic=settings["mnemonic"])
