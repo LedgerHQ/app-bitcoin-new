@@ -94,6 +94,24 @@ def enable_slow_tests(pytestconfig):
     return pytestconfig.getoption("enableslowtests")
 
 
+class SpeculosGlobals:
+    def __init__(self, mnemonic: str, network: str = "test"):
+        self.mnemonic = mnemonic
+        self.seed = mnemo.to_seed(mnemonic)
+        bip32 = BIP32.from_seed(self.seed, network)
+        self.master_extended_privkey = bip32.get_xpriv()
+        self.master_extended_pubkey = bip32.get_xpub()
+        self.master_key_fingerprint = int.from_bytes(hash160(bip32.pubkey)[0:4], byteorder="big")
+        self.master_compressed_pubkey = bip32.pubkey.hex()
+        slip21_root = Slip21Node.from_seed(self.seed)
+        self.wallet_registration_key = slip21_root.derive_child(WALLET_POLICY_SLIP21_LABEL).key
+
+
+@pytest.fixture
+def speculos_globals(settings: dict) -> SpeculosGlobals:
+    return SpeculosGlobals(mnemonic=settings["mnemonic"], network="main")
+
+
 @pytest.fixture
 def comm(settings, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
@@ -106,7 +124,7 @@ def comm(settings, hid, app_version: str) -> Union[TransportClient, SpeculosClie
         os.environ['SPECULOS_APPNAME'] = f'app:{app_version}'
         client = SpeculosClient(
             str(conftest_folder_path.parent.joinpath("bin/app.elf")),
-            ['--sdk', '2.1']
+            ['--sdk', '2.1', '--seed', f'{settings["mnemonic"]}']
         )
         client.start()
 
@@ -127,22 +145,4 @@ def is_speculos(comm: Union[TransportClient, SpeculosClient]) -> bool:
 
 @pytest.fixture
 def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
-    return createClient(comm, chain=Chain.TEST, debug=True)
-
-
-class SpeculosGlobals:
-    def __init__(self, mnemonic: str, network: str = "test"):
-        self.mnemonic = mnemonic
-        self.seed = mnemo.to_seed(mnemonic)
-        bip32 = BIP32.from_seed(self.seed, network)
-        self.master_extended_privkey = bip32.get_xpriv()
-        self.master_extended_pubkey = bip32.get_xpub()
-        self.master_key_fingerprint = int.from_bytes(hash160(bip32.pubkey)[0:4], byteorder="big")
-        self.master_compressed_pubkey = bip32.pubkey.hex()
-        slip21_root = Slip21Node.from_seed(self.seed)
-        self.wallet_registration_key = slip21_root.derive_child(WALLET_POLICY_SLIP21_LABEL).key
-
-
-@pytest.fixture
-def speculos_globals(settings: dict) -> SpeculosGlobals:
-    return SpeculosGlobals(mnemonic=settings["mnemonic"])
+    return createClient(comm, chain=Chain.MAIN, debug=True)
