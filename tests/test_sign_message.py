@@ -3,7 +3,7 @@ import pytest
 from bitcoin_client.ledger_bitcoin import Client
 from bitcoin_client.ledger_bitcoin.exception.errors import DenyError
 
-from .utils import automation
+from test_utils import automation
 
 
 @automation("automations/sign_message_accept.json")

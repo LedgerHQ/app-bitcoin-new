@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import json
 
 from typing import Union
@@ -7,6 +5,8 @@ from typing import Union
 from pathlib import Path
 
 import pytest
+
+from test_utils import SpeculosGlobals, default_settings
 
 from ledger_bitcoin import Client, Chain, TransportClient, createClient
 
@@ -43,7 +43,15 @@ def enable_slow_tests(pytestconfig):
 
 
 @pytest.fixture
-def comm(request, hid) -> Union[TransportClient, SpeculosClient]:
+def settings(request) -> dict:
+    try:
+        return request.function.test_settings
+    except AttributeError:
+        return default_settings.copy()
+
+
+@pytest.fixture
+def comm(settings, hid) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
@@ -57,12 +65,8 @@ def comm(request, hid) -> Union[TransportClient, SpeculosClient]:
         )
         client.start()
 
-        try:
-            automation_file = conftest_folder_path.joinpath(request.function.automation_file)
-        except AttributeError:
-            automation_file = None
-
-        if automation_file:
+        if settings["automation_file"]:
+            automation_file = conftest_folder_path.joinpath(settings["automation_file"])
             rules = json.load(open(automation_file))
             client.set_automation_rules(rules)
 
@@ -81,21 +85,6 @@ def client(comm: Union[TransportClient, SpeculosClient]) -> Client:
     return createClient(comm, chain=Chain.TEST, debug=True)
 
 
-@dataclass(frozen=True)
-class SpeculosGlobals:
-    seed = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
-    # TODO: those are for testnet; we could compute them for any network from the seed
-    master_extended_privkey = "tprv8ZgxMBicQKsPfDTA8ufnUdCDy8qXUDnxd8PYWprimNdtVSk4mBMdkAPF6X1cemMjf6LyznfhwbPCsxfiof4BM4DkE8TQtV3HBw2krSqFqHA"
-    master_extended_pubkey = "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
-    master_key_fingerprint = 0xF5ACC2FD
-    master_compressed_pubkey = bytes.fromhex(
-        "0251ec84e33a3119486461a44240e906ff94bf40cf807b025b1ca43332b80dc9db"
-    )
-    wallet_registration_key = bytes.fromhex(
-        "7463d6d1a82f4647ead048c625ae0c27fe40b6d0d5f2d24104009ae9d3b7963c"
-    )
-
-
 @pytest.fixture
-def speculos_globals() -> SpeculosGlobals:
-    return SpeculosGlobals()
+def speculos_globals(settings) -> SpeculosGlobals:
+    return SpeculosGlobals(mnemonic=settings["mnemonic"])

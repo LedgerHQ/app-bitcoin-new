@@ -6,14 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from mnemonic import Mnemonic
-from bip32 import BIP32
-
 from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
-from bitcoin_client.ledger_bitcoin.common import hash160
 
-from utils import default_settings
-from utils.slip21 import Slip21Node
+from test_utils import default_settings, SpeculosGlobals
 
 from speculos.client import SpeculosClient
 
@@ -21,8 +16,6 @@ import os
 import re
 
 import random
-
-mnemo = Mnemonic("english")
 
 random.seed(0)  # make sure tests are repeatable
 
@@ -92,19 +85,6 @@ def headless(pytestconfig):
 @pytest.fixture
 def enable_slow_tests(pytestconfig):
     return pytestconfig.getoption("enableslowtests")
-
-
-class SpeculosGlobals:
-    def __init__(self, mnemonic: str, network: str = "test"):
-        self.mnemonic = mnemonic
-        self.seed = mnemo.to_seed(mnemonic)
-        bip32 = BIP32.from_seed(self.seed, network)
-        self.master_extended_privkey = bip32.get_xpriv()
-        self.master_extended_pubkey = bip32.get_xpub()
-        self.master_key_fingerprint = int.from_bytes(hash160(bip32.pubkey)[0:4], byteorder="big")
-        self.master_compressed_pubkey = bip32.pubkey.hex()
-        slip21_root = Slip21Node.from_seed(self.seed)
-        self.wallet_registration_key = slip21_root.derive_child(WALLET_POLICY_SLIP21_LABEL).key
 
 
 @pytest.fixture

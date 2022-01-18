@@ -1,6 +1,6 @@
 from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
 
-from .utils import mnemonic
+from test_utils import mnemonic
 
 MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 

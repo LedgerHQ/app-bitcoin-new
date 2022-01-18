@@ -4,7 +4,7 @@ from ledger_bitcoin import Client, PolicyMapWallet
 
 from ledger_bitcoin.psbt import PSBT
 
-from .utils import automation
+from test_utils import automation
 
 tests_root: Path = Path(__file__).parent
 

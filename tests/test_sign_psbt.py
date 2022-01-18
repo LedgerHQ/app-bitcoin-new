@@ -14,10 +14,8 @@ from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, N
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 from bitcoin_client.ledger_bitcoin.wallet import AddressType
 from speculos.client import SpeculosClient
-from tests.utils import txmaker
 
-from .utils import automation
-from .utils import bip0340
+from test_utils import automation, bip0340, txmaker
 
 from embit.script import Script
 from embit.networks import NETWORKS

@@ -1,6 +1,6 @@
 from ledger_bitcoin import Client
 
-from .utils import automation
+from test_utils import automation
 
 
 @automation("automations/sign_message.json")
