@@ -3,8 +3,7 @@
 #include "../../boilerplate/dispatcher.h"
 
 /**
- * Call the get_merkle_preimage flow.
- * TODO: more precise docs
+ * TODO: docs
  */
 int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
                                size_t size,

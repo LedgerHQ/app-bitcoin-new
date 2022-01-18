@@ -21,6 +21,7 @@
 #include <stdbool.h>  // bool
 #include <stdio.h>    // snprintf
 #include <string.h>   // memset
+#include <stdint.h>
 
 #include "os.h"
 #include "ux.h"
@@ -490,11 +491,45 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_accept_and_send_step,
         &ux_display_reject_step);
 
+// Division and modulus operators over uint64_t causes the inclusion of the __udivmoddi4 and other
+// library functions that occupy more than 400 bytes. Since performance is not critical and division
+// by 10 is sufficient, we avoid it with a binary search instead.
+static uint64_t div10(uint64_t n) {
+    if (n < 10) return 0;  // special case needed to make sure that n - 10 is safe
+
+    // Since low, mid and high are always <= UINT64_MAX / 10, there is no risk of overflow
+    uint64_t low = 0, high = UINT64_MAX / 10;
+
+    while (true) {
+        uint64_t mid = (low + high) / 2;
+
+        // the result equals mid if and only if mid * 10 <= n < mid * 10 + 10
+        // care is taken to make sure overflows and underflows are impossible
+        if (mid * 10 > n - 10 && n >= mid * 10) {
+            return mid;
+        } else if (n < mid * 10) {
+            high = mid - 1;
+        } else /* n >= 10 * mid + 10 */ {
+            low = mid + 1;
+        }
+    }
+}
+
+static uint64_t div100000000(n) {
+    uint64_t res = n;
+    for (int i = 0; i < 8; i++) res = div10(res);
+    return res;
+}
+
 static size_t n_digits(uint64_t number) {
     size_t count = 0;
     do {
         count++;
-        number /= 10;
+
+        // HACK: avoid __udivmoddi4
+        // number /= 10;
+
+        number = div10(number);
     } while (number != 0);
     return count;
 }
@@ -509,14 +544,23 @@ static void format_sats_amount(const char *coin_name,
 
     char *amount_str = out + coin_name_len + 1;
 
-    uint64_t integral_part = amount / 100000000;
-    uint32_t fractional_part = (uint32_t) (amount % 100000000);
+    // HACK: avoid __udivmoddi4
+    // uint64_t integral_part = amount / 100000000;
+    // uint32_t fractional_part = (uint32_t) (amount % 100000000);
+    uint64_t integral_part = div100000000(amount);
+    uint32_t fractional_part = (uint32_t) (amount - integral_part * 100000000);
 
     // format the integral part, starting from the least significant digit
     size_t integral_part_digit_count = n_digits(integral_part);
     for (unsigned int i = 0; i < integral_part_digit_count; i++) {
-        amount_str[integral_part_digit_count - 1 - i] = '0' + (integral_part % 10);
-        integral_part /= 10;
+        // HACK: avoid __udivmoddi4
+        // amount_str[integral_part_digit_count - 1 - i] = '0' + (integral_part % 10);
+        // integral_part /= 10;
+
+        uint64_t tmp_quotient = div10(integral_part);
+        char tmp_remainder = (char) (integral_part - 10 * tmp_quotient);
+        amount_str[integral_part_digit_count - 1 - i] = '0' + tmp_remainder;
+        integral_part = tmp_quotient;
     }
 
     if (fractional_part == 0) {
