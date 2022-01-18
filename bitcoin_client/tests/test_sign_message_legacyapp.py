@@ -1,4 +1,4 @@
-from ledger_bitcoin import Client
+from bitcoin_client.ledger_bitcoin import Client
 
 from test_utils import automation
 

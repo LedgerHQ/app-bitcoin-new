@@ -60,6 +60,9 @@ def hash256(s: bytes) -> bytes:
 
 class SpeculosGlobals:
     def __init__(self, mnemonic: str, network: str = "test"):
+        if network not in ["main", "test"]:
+            raise ValueError(f"Invalid network: {network}")
+
         self.mnemonic = mnemonic
         self.seed = mnemo.to_seed(mnemonic)
         bip32 = BIP32.from_seed(self.seed, network)
