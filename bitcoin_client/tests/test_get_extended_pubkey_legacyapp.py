@@ -1,4 +1,4 @@
-from ledger_bitcoin import Client
+from bitcoin_client.ledger_bitcoin import Client
 
 
 def test_get_extended_pubkey_standard_nodisplay(client: Client):

@@ -1,12 +1,10 @@
 from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
 
-from .utils import automation
 
 import pytest
 
 # TODO: add tests with UI
-# TODO: UI does not currently work
 
 
 def test_get_wallet_address_singlesig_legacy(client: Client):

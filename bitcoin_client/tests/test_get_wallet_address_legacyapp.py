@@ -1,4 +1,4 @@
-from ledger_bitcoin import Client, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
 
 
 def test_get_wallet_address_singlesig_legacy(client: Client):

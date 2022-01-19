@@ -3,7 +3,7 @@ from hashlib import sha256
 
 from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
 
-from .utils import automation
+from test_utils import automation
 
 
 @automation("automations/register_wallet_accept.json")

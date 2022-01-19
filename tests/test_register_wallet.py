@@ -2,7 +2,7 @@ from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, P
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.exception import DenyError
 
-from .utils import automation
+from test_utils import automation
 
 import hmac
 from hashlib import sha256
