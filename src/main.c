@@ -33,10 +33,27 @@
 
 #include "commands.h"
 
+// common declarations between legacy and new code; will refactor it out later
+#include "legacy/include/btchip_context.h"
+#include "legacy/include/swap_lib_calls.h"
+#include "legacy/include/swap_lib_calls.h"
+
+#ifndef DISABLE_LEGACY_SUPPORT
 #include "legacy/main_old.h"
 #include "legacy/btchip_display_variables.h"
-#include "legacy/include/swap_lib_calls.h"
-#include "legacy/include/btchip_context.h"
+#else
+// we don't import main_old.h in legacy-only mode, but we still need libargs_s; will refactor later
+struct libargs_s {
+    unsigned int id;
+    unsigned int command;
+    btchip_altcoin_config_t *coin_config;
+    union {
+        check_address_parameters_t *check_address;
+        create_transaction_parameters_t *create_transaction;
+        get_printable_amount_parameters_t *get_printable_amount;
+    };
+};
+#endif
 
 #include "main.h"
 
@@ -53,14 +70,18 @@ bolos_ux_params_t G_ux_params;
 command_state_t __attribute__((section(".new_globals"))) G_command_state;
 dispatcher_context_t __attribute__((section(".new_globals"))) G_dispatcher_context;
 
+#ifndef DISABLE_LEGACY_SUPPORT
 // legacy variables
 btchip_context_t __attribute__((section(".legacy_globals"))) btchip_context_D;
-#else
+#endif  // DISABLE_LEGACY_SUPPORT
+#else   // #ifndef TARGET_NANOS
 command_state_t G_command_state;
 dispatcher_context_t G_dispatcher_context;
 
 // legacy variables
+#ifndef DISABLE_LEGACY_SUPPORT
 btchip_context_t btchip_context_D;
+#endif  // DISABLE_LEGACY_SUPPORT
 #endif
 
 // shared between legacy and new
@@ -106,28 +127,21 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 void init_coin_config(btchip_altcoin_config_t *coin_config) {
     memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
 
-    // new app
+    // new app only
     coin_config->bip32_pubkey_version = BIP32_PUBKEY_VERSION;
 
-    // legacy
+    // new app and legacy
     coin_config->bip44_coin_type = BIP44_COIN_TYPE;
     coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
     coin_config->p2pkh_version = COIN_P2PKH_VERSION;
     coin_config->p2sh_version = COIN_P2SH_VERSION;
-    coin_config->family = COIN_FAMILY;
 
-    _Static_assert(sizeof(COIN_COINID) <= sizeof(coin_config->coinid), "COIN_COINID too large");
-    strcpy(coin_config->coinid, COIN_COINID);
-
-    _Static_assert(sizeof(COIN_COINID_NAME) <= sizeof(coin_config->name),
-                   "COIN_COINID_NAME too large");
-
-    strcpy(coin_config->name, COIN_COINID_NAME);
     // we assume in display.c that the ticker size is at most 5 characters (+ null)
     _Static_assert(sizeof(COIN_COINID_SHORT) <= 6, "COIN_COINID_SHORT too large");
     _Static_assert(sizeof(COIN_COINID_SHORT) <= sizeof(coin_config->name_short),
                    "COIN_COINID_SHORT too large");
     strcpy(coin_config->name_short, COIN_COINID_SHORT);
+
 #ifdef COIN_NATIVE_SEGWIT_PREFIX
     _Static_assert(
         sizeof(COIN_NATIVE_SEGWIT_PREFIX) <= sizeof(coin_config->native_segwit_prefix_val),
@@ -137,6 +151,18 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
 #else
     coin_config->native_segwit_prefix = 0;
 #endif  // #ifdef COIN_NATIVE_SEGWIT_PREFIX
+
+#ifndef DISABLE_LEGACY_SUPPORT
+    // legacy only
+    coin_config->family = COIN_FAMILY;
+
+    _Static_assert(sizeof(COIN_COINID) <= sizeof(coin_config->coinid), "COIN_COINID too large");
+    strcpy(coin_config->coinid, COIN_COINID);
+
+    _Static_assert(sizeof(COIN_COINID_NAME) <= sizeof(coin_config->name),
+                   "COIN_COINID_NAME too large");
+
+    strcpy(coin_config->name, COIN_COINID_NAME);
 #ifdef COIN_FORKID
     coin_config->forkid = COIN_FORKID;
 #endif  // COIN_FORKID
@@ -147,6 +173,7 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
     coin_config->flags = COIN_FLAGS;
 #endif  // COIN_FLAGS
     coin_config->kind = COIN_KIND;
+#endif
 }
 
 void app_main() {
@@ -168,6 +195,7 @@ void app_main() {
             return;
         }
 
+#ifndef DISABLE_LEGACY_SUPPORT
         if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
             if (G_app_mode != APP_MODE_LEGACY) {
                 explicit_bzero(&btchip_context_D, sizeof(btchip_context_D));
@@ -190,6 +218,7 @@ void app_main() {
                 os_sched_exit(0);
             }
         } else {
+#endif
             if (G_app_mode != APP_MODE_NEW) {
                 explicit_bzero(&G_command_state, sizeof(G_command_state));
 
@@ -224,7 +253,9 @@ void app_main() {
                             ui_menu_main,
                             &cmd);
         }
+#ifndef DISABLE_LEGACY_SUPPORT
     }
+#endif
 }
 
 /**
@@ -383,8 +414,12 @@ __attribute__((section(".boot"))) int main(int arg0) {
                 coin_main(args->coin_config);
             break;
         default:
+#ifndef DISABLE_LEGACY_SUPPORT
             // called as bitcoin or altcoin library
             library_main(args);
+#else
+            app_exit();
+#endif
     }
 #endif  // USE_LIB_BITCOIN
     return 0;

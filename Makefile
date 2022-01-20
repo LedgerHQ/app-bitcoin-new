@@ -118,6 +118,43 @@ APPNAME ="Bitcoin Test (legacy)"
 
 APP_LOAD_PARAMS += --path $(APP_PATH)
 
+else ifeq ($(COIN),bitcoin_lite)
+
+# we're not using the lib :)
+DEFINES_LIB=
+APP_LOAD_FLAGS=--appFlags 0xa50
+
+DEFINES   += DISABLE_LEGACY_SUPPORT
+
+# Bitcoin mainnet, no legacy support
+DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
+DEFINES   += BIP44_COIN_TYPE=0
+DEFINES   += BIP44_COIN_TYPE_2=0
+DEFINES   += COIN_P2PKH_VERSION=0
+DEFINES   += COIN_P2SH_VERSION=5
+DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
+DEFINES   += COIN_COINID_SHORT=\"BTC\"
+
+APPNAME = "Bitcoin (Lite)"
+
+else ifeq ($(COIN),bitcoin_testnet_lite)
+
+# we're not using the lib :)
+DEFINES_LIB=
+APP_LOAD_FLAGS=--appFlags 0xa50
+
+DEFINES   += DISABLE_LEGACY_SUPPORT
+
+# Bitcoin testnet, no legacy support
+DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
+DEFINES   += BIP44_COIN_TYPE=1
+DEFINES   += BIP44_COIN_TYPE_2=1
+DEFINES   += COIN_P2PKH_VERSION=111
+DEFINES   += COIN_P2SH_VERSION=196
+DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
+DEFINES   += COIN_COINID_SHORT=\"TEST\"
+APPNAME = "Bitcoin Test (Lite)"
+
 else ifeq ($(COIN),bitcoin_cash)
 # Bitcoin cash
 # Initial fork from Bitcoin, public key access is authorized. Signature is different thanks to the forkId
