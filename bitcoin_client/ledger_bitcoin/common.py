@@ -57,7 +57,7 @@ def bip32_path_from_string(path: str) -> List[bytes]:
 
 
 def write_varint(n: int) -> bytes:
-    if n < 0xFC:
+    if n <= 0xFC:
         return n.to_bytes(1, byteorder="little")
 
     if n <= UINT16_MAX:
