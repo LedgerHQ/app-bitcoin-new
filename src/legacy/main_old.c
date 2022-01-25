@@ -37,12 +37,12 @@
 
 #include "ux.h"
 #include "btchip_display_variables.h"
-#include "swap_lib_calls.h"
 
-#include "swap_lib_calls.h"
-#include "handle_swap_sign_transaction.h"
-#include "handle_get_printable_amount.h"
-#include "handle_check_address.h"
+#include "../swap/swap_lib_calls.h"
+#include "../swap/btchip_bcd.h"
+#include "../swap/handle_swap_sign_transaction.h"
+#include "../swap/handle_get_printable_amount.h"
+#include "../swap/handle_check_address.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)

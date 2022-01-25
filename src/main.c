@@ -35,8 +35,7 @@
 
 // common declarations between legacy and new code; will refactor it out later
 #include "legacy/include/btchip_context.h"
-#include "legacy/include/swap_lib_calls.h"
-#include "legacy/include/swap_lib_calls.h"
+#include "swap/swap_lib_calls.h"
 
 #ifndef DISABLE_LEGACY_SUPPORT
 #include "legacy/main_old.h"
