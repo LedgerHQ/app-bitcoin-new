@@ -32,7 +32,10 @@ void handler_get_master_fingerprint(dispatcher_context_t *dc) {
     }
 
     uint8_t master_pubkey[33];
-    crypto_get_compressed_pubkey_at_path((uint32_t[]){}, 0, master_pubkey, NULL);
+    if (!crypto_get_compressed_pubkey_at_path((uint32_t[]){}, 0, master_pubkey, NULL)) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return;
+    }
 
     uint8_t master_fingerprint_be[4];
     write_u32_be(master_fingerprint_be, 0, crypto_get_key_fingerprint(master_pubkey));

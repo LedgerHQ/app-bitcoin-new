@@ -268,7 +268,7 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     memmove(out, buffer, 4);
 }
 
-void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
+bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
                                           uint8_t bip32_path_len,
                                           uint8_t pubkey[static 33],
                                           uint8_t chain_code[]) {
@@ -281,6 +281,7 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
 
+    bool result = true;
     BEGIN_TRY {
         TRY {
             keydata.prefix = 0x04;  // uncompressed public keys always start with 04
@@ -289,7 +290,6 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
 
             if (chain_code != NULL) {
                 memmove(chain_code, keydata.chain_code, 32);
-                explicit_bzero(keydata.chain_code, 32);  // delete sensitive data
             }
 
             // generate corresponding public key
@@ -298,7 +298,12 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
             memmove(keydata.raw_public_key, public_key.W + 1, 64);
 
             // compute compressed public key
-            crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey);
+            if (crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey) < 0) {
+                result = false;
+            }
+        }
+        CATCH_ALL {
+            result = false;
         }
         FINALLY {
             // delete sensitive data
@@ -307,6 +312,7 @@ void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
         }
     }
     END_TRY;
+    return result;
 }
 
 uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {

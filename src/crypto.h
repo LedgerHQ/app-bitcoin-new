@@ -244,8 +244,10 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
  *   A pointer to a 33-bytes buffer that will receive the compressed public key.
  * @param[out]  chaincode
  *   Either NULL, or a pointer to a 32-bytes buffer that will receive the chain code.
+ *
+ * @return true on success, false in case of error.
  */
-void crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
+bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
                                           uint8_t bip32_path_len,
                                           uint8_t pubkey[static 33],
                                           uint8_t chain_code[]);
@@ -314,7 +316,7 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
  * @param[out]  out
  *   The pointer to the output array.
  * @param[in]  out_len
- *   The 1-byte, 2-byte or 4-byte version prefix.
+ *   The length of the output array.
  *
  * @return the length of the encoded output on success, -1 on failure (that is, if the output
  *   would be longer than out_len).
