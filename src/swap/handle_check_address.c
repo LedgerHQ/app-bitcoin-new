@@ -6,10 +6,7 @@
 #include "bip32_path.h"
 
 #include "../common/segwit_addr.h"
-
-#include "../legacy/include/btchip_helpers.h"
-#include "../legacy/include/btchip_ecc.h"
-#include "../legacy/btchip_apdu_get_wallet_public_key.h"
+#include "../crypto.h"
 
 #ifndef DISABLE_LEGACY_SUPPORT
 #include "../legacy/cashaddr.h"
@@ -17,33 +14,15 @@
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-bool derive_private_key(unsigned char* serialized_path,
-                        unsigned char serialized_path_length,
-                        cx_ecfp_private_key_t* privKey) {
-    unsigned char privateComponent[32];
-    bip32_path_t path;
-    if (!parse_serialized_path(&path, serialized_path, serialized_path_length)) {
-        PRINTF("Can't parse path\n");
-        return false;
-    }
-    os_perso_derive_node_bip32(CX_CURVE_256K1, path.path, path.length, privateComponent, NULL);
-    cx_ecdsa_init_private_key(BTCHIP_CURVE, privateComponent, 32, privKey);
-    return true;
-}
+// constants previously defined in btchip_apdu_get_wallet_public_key.h
+#define P1_NO_DISPLAY    0x00
+#define P1_DISPLAY       0x01
+#define P1_REQUEST_TOKEN 0x02
 
-bool derive_compressed_public_key(unsigned char* serialized_path,
-                                  unsigned char serialized_path_length,
-                                  unsigned char* public_key,
-                                  unsigned char public_key_length) {
-    cx_ecfp_private_key_t privKey;
-    if (!derive_private_key(serialized_path, serialized_path_length, &privKey)) return false;
-    cx_ecfp_public_key_t pubKey;
-
-    cx_ecfp_generate_pair(BTCHIP_CURVE, &pubKey, &privKey, 1);
-    btchip_compress_public_key_value(pubKey.W);
-    os_memcpy(public_key, pubKey.W, 33);
-    return true;
-}
+#define P2_LEGACY        0x00
+#define P2_SEGWIT        0x01
+#define P2_NATIVE_SEGWIT 0x02
+#define P2_CASHADDR      0x03
 
 bool get_address_from_compressed_public_key(unsigned char format,
                                             unsigned char* compressed_pub_key,
@@ -56,46 +35,49 @@ bool get_address_from_compressed_public_key(unsigned char format,
     bool nativeSegwit = (format == P2_NATIVE_SEGWIT);
     int address_length;
 
+    // clang-format off
 #ifndef DISABLE_LEGACY_SUPPORT
     bool cashAddr = (format == P2_CASHADDR);
     if (cashAddr) {
         uint8_t tmp[20];
-        btchip_public_key_hash160(compressed_pub_key,  // IN
-                                  33,                  // INLEN
-                                  tmp);
+        crypto_hash160(compressed_pub_key,  // IN
+                         33,                  // INLEN
+                         tmp);
         if (!cashaddr_encode(tmp, 20, (uint8_t*) address, max_address_length, CASHADDR_P2PKH))
             return false;
     } else
 #endif
-        if (!(segwit || nativeSegwit)) {
-        // btchip_public_key_to_encoded_base58 doesn't add terminating 0,
-        // so we will do this ourself
-        address_length = btchip_public_key_to_encoded_base58(compressed_pub_key,      // IN
-                                                             33,                      // INLEN
-                                                             (uint8_t*) address,      // OUT
-                                                             max_address_length - 1,  // MAXOUTLEN
-                                                             payToAddressVersion,
-                                                             0);
+    if (!(segwit || nativeSegwit)) {
+        // clang-format on
+        uint8_t tmp[20];
+        crypto_hash160(compressed_pub_key, 33, tmp);
+        address_length =
+            base58_encode_address(tmp, payToAddressVersion, address, max_address_length - 1);
+        if (address_length < 0) {
+            return false;
+        }
         address[address_length] = 0;
     } else {
-        uint8_t tmp[22];
-        tmp[0] = 0x00;
-        tmp[1] = 0x14;
-        btchip_public_key_hash160(compressed_pub_key,  // IN
-                                  33,                  // INLEN
-                                  tmp + 2              // OUT
+        uint8_t script[22];
+        script[0] = 0x00;
+        script[1] = 0x14;
+        crypto_hash160(compressed_pub_key,  // IN
+                       33,                  // INLEN
+                       script + 2           // OUT
         );
         if (!nativeSegwit) {
-            address_length = btchip_public_key_to_encoded_base58(tmp,                 // IN
-                                                                 22,                  // INLEN
-                                                                 (uint8_t*) address,  // OUT
-                                                                 150,                 // MAXOUTLEN
-                                                                 payToScriptHashVersion,
-                                                                 0);
+            uint8_t tmp[20];
+            crypto_hash160(script, 22, tmp);
+            // wrapped segwit
+            address_length =
+                base58_encode_address(tmp, payToScriptHashVersion, address, max_address_length - 1);
+            if (address_length < 0) {
+                return false;
+            }
             address[address_length] = 0;
         } else {
             if (!native_segwit_prefix) return false;
-            if (!segwit_addr_encode(address, native_segwit_prefix, 0, tmp + 2, 20)) {
+            if (!segwit_addr_encode(address, native_segwit_prefix, 0, script + 2, 20)) {
                 return false;
             }
         }
@@ -117,13 +99,20 @@ int handle_check_address(check_address_parameters_t* params, btchip_altcoin_conf
         PRINTF("Address to check == 0\n");
         return 0;
     }
-    if (!derive_compressed_public_key(params->address_parameters + 1,
-                                      params->address_parameters_length - 1,
-                                      compressed_public_key,
-                                      sizeof(compressed_public_key))) {
-        return 0;
+    bip32_path_t path;
+    if (!parse_serialized_path(&path,
+                               params->address_parameters + 1,
+                               params->address_parameters_length - 1)) {
+        PRINTF("Can't parse path\n");
+        return false;
     }
 
+    if (!crypto_get_compressed_pubkey_at_path(path.path,
+                                              path.length,
+                                              compressed_public_key,
+                                              NULL)) {
+        return 0;
+    }
     char address[51];
     if (!get_address_from_compressed_public_key(params->address_parameters[0],
                                                 compressed_public_key,
