@@ -531,10 +531,16 @@ int get_script_address(const uint8_t script[],
         case SCRIPT_TYPE_P2PKH:
             addr_len =
                 base58_encode_address(script + 3, coin_config->p2pkh_version, out, out_len - 1);
+            if (addr_len < 0) {
+                return -1;
+            }
             break;
         case SCRIPT_TYPE_P2SH:
             addr_len =
                 base58_encode_address(script + 2, coin_config->p2sh_version, out, out_len - 1);
+            if (addr_len < 0) {
+                return -1;
+            }
             break;
         case SCRIPT_TYPE_P2WPKH:
         case SCRIPT_TYPE_P2WSH:
@@ -569,7 +575,9 @@ int get_script_address(const uint8_t script[],
         default:
             return -1;
     }
-    out[addr_len] = '\0';
+    if (addr_len >= 0) {
+        out[addr_len] = '\0';
+    }
     return addr_len;
 }
 
