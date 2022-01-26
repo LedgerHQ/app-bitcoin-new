@@ -132,7 +132,7 @@ unsigned short btchip_apdu_hash_input_start() {
         && IS_INPUT()
         && !IS_INPUT_TRUSTED())
     {
-        if(btchip_context_D.called_from_swap){
+        if(G_swap_state.called_from_swap){
             /* There is no point in displaying a warning when the app is signing
             in silent mode, as its UI is hidden behind the exchange app*/
             return BTCHIP_SW_SWAP_WITHOUT_TRUSTED_INPUTS;

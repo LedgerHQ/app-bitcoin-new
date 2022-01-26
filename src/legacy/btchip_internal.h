@@ -27,4 +27,6 @@
 #include "btchip_helpers.h"
 #include "btchip_transaction.h"
 
+#include "../swap/swap_globals.h"
+
 #endif

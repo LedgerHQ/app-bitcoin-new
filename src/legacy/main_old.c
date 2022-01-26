@@ -1071,7 +1071,7 @@ unsigned int btchip_silent_confirm_single_output() {
 }
 
 unsigned int btchip_bagl_confirm_single_output() {
-    if (btchip_context_D.called_from_swap) {
+    if (G_swap_state.called_from_swap) {
         return btchip_silent_confirm_single_output();
     }
     if (!prepare_single_output()) {
@@ -1087,7 +1087,7 @@ unsigned int btchip_bagl_confirm_single_output() {
 }
 
 unsigned int btchip_bagl_finalize_tx() {
-    if (btchip_context_D.called_from_swap) {
+    if (G_swap_state.called_from_swap) {
         return check_fee_swap();
     }
 

@@ -36,6 +36,7 @@
 // common declarations between legacy and new code; will refactor it out later
 #include "legacy/include/btchip_context.h"
 #include "swap/swap_lib_calls.h"
+#include "swap/swap_globals.h"
 
 #ifndef DISABLE_LEGACY_SUPPORT
 #include "legacy/main_old.h"
@@ -204,7 +205,7 @@ void app_main() {
                 G_app_mode = APP_MODE_LEGACY;
             }
 
-            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
                 btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
             }
 
@@ -213,7 +214,7 @@ void app_main() {
 
             app_dispatch();
 
-            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
                 os_sched_exit(0);
             }
         } else {

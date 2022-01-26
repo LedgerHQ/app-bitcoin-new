@@ -9,6 +9,7 @@
 #include "../legacy/btchip_public_ram_variables.h"
 
 #include "../main.h"
+#include "../swap/swap_globals.h"
 
 bool copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
     // first copy parameters to stack, and then to global data.
@@ -43,7 +44,7 @@ void handle_swap_sign_transaction(btchip_altcoin_config_t* config) {
 
     G_coin_config = config;
     btchip_context_init();
-    btchip_context_D.called_from_swap = 1;
+    G_swap_state.called_from_swap = 1;
 
     G_app_mode = APP_MODE_LEGACY;
 

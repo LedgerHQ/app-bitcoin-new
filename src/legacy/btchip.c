@@ -117,7 +117,7 @@ void app_dispatch(void) {
 #endif // IO_APP_ACTIVITY
 
         sendSW:
-            if (btchip_context_D.called_from_swap) {
+            if (G_swap_state.called_from_swap) {
                 btchip_context_D.io_flags &= ~IO_ASYNCH_REPLY;
                 if(btchip_context_D.sw != BTCHIP_SW_OK) {
                     vars.swap_data.should_exit = 1;
@@ -164,7 +164,7 @@ void app_dispatch(void) {
 
 //         // os_memset(G_io_apdu_buffer, 0, 255); // paranoia
 
-//         if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+//         if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
 //             btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
 //         }
 
@@ -174,7 +174,7 @@ void app_dispatch(void) {
 //                         // use the previous outlength as the reply
 //                         btchip_context_D.outLength);
 
-//         if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+//         if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
 //             os_sched_exit(0);
 //         }
 

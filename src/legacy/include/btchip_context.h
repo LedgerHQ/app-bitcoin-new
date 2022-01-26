@@ -239,7 +239,7 @@ struct btchip_context_s {
     unsigned char sigHashType[4];
 
     /*Is swap mode*/
-    unsigned char called_from_swap;
+    // unsigned char called_from_swap;
 };
 typedef struct btchip_context_s btchip_context_t;
 
