@@ -23,6 +23,8 @@
 #include "cx.h"
 #include "stdbool.h"
 
+#include "../../crypto.h"
+
 #define OUTPUT_SCRIPT_REGULAR_PRE_LENGTH 4
 #define OUTPUT_SCRIPT_REGULAR_POST_LENGTH 2
 #define OUTPUT_SCRIPT_P2SH_PRE_LENGTH 3
@@ -54,8 +56,10 @@ void btchip_perform_double_hash(unsigned char *in, unsigned short inlen,
                                 unsigned char hash1Algorithm,
                                 unsigned char hash2Algorithm);
 
-void btchip_public_key_hash160(unsigned char *in, unsigned short inlen,
-                               unsigned char *out);
+static inline void btchip_public_key_hash160(unsigned char *in, unsigned short inlen, unsigned char *out) {
+    crypto_hash160(in, inlen, out);
+};
+
 unsigned short btchip_public_key_to_encoded_base58(
     unsigned char *in, unsigned short inlen, unsigned char *out,
     unsigned short outlen, unsigned short version, unsigned char alreadyHashed);
