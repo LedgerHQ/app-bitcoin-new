@@ -784,6 +784,12 @@ void ui_idle(void) {
 //     return 1;
 // }
 
+static unsigned char btchip_convert_hex_amount_to_displayable(unsigned char* amount) {
+    return btchip_convert_hex_amount_to_displayable_no_globals(amount,
+                                                               G_coin_config->flags,
+                                                               btchip_context_D.tmp);
+}
+
 uint8_t check_fee_swap() {
     unsigned char fees[8];
     unsigned char borrow;

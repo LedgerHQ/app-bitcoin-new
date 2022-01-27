@@ -15,7 +15,10 @@
  *  limitations under the License.
  ********************************************************************************/
 
-#include "../legacy/btchip_internal.h"  // TODO
+#ifndef DISABLE_LEGACY_SUPPORT
+// only needed for FLAG_PEERCOIN_UNITS below
+#include "../legacy/include/btchip_context.h"
+#endif  // DISABLE_LEGACY_SUPPORT
 
 #define SCRATCH_SIZE 21
 
@@ -102,10 +105,4 @@ unsigned char btchip_convert_hex_amount_to_displayable_no_globals(unsigned char*
         out[targetOffset++] = scratch[offset++] + '0';
     }
     return targetOffset;
-}
-
-unsigned char btchip_convert_hex_amount_to_displayable(unsigned char* amount) {
-    return btchip_convert_hex_amount_to_displayable_no_globals(amount,
-                                                               G_coin_config->flags,
-                                                               btchip_context_D.tmp);
 }

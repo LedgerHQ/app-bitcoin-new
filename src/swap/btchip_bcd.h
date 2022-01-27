@@ -20,5 +20,3 @@
 unsigned char btchip_convert_hex_amount_to_displayable_no_globals(unsigned char *amount,
                                                                   unsigned int config_flag,
                                                                   unsigned char *out);
-
-unsigned char btchip_convert_hex_amount_to_displayable(unsigned char *amount);
