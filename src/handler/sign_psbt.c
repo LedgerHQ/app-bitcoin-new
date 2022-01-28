@@ -47,6 +47,8 @@
 #include "sign_psbt/get_fingerprint_and_path.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
+#include "../swap/swap_globals.h"
+
 extern global_context_t *G_coin_config;
 
 // UI callbacks
@@ -316,6 +318,13 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         state->is_wallet_canonical = false;
     }
 
+    // Swap feature: check that wallet is canonical
+    if (G_swap_state.called_from_swap && !state->is_wallet_canonical) {
+        PRINTF("Must be a canonical wallet for swap feature\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
     state->inputs_total_value = 0;
     state->internal_inputs_total_value = 0;
     memset(state->internal_inputs, 0, sizeof state->internal_inputs);
@@ -475,6 +484,7 @@ static void process_input_map(dispatcher_context_t *dc) {
         make_callback(state, (dispatcher_callback_t) input_keys_callback),
         &state->cur_input.map);
     if (res < 0) {
+        PRINTF("Failed to process input map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -515,6 +525,7 @@ static void process_input_map(dispatcher_context_t *dc) {
                                     prevout_n,
                                     &parser_outputs);
         if (res < 0) {
+            PRINTF("Parsing rawtx failed\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -662,6 +673,7 @@ static void check_input_owned(dispatcher_context_t *dc) {
         }
 
         if (bip32_path_len < 0) {
+            PRINTF("Couldn't read derivation path\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -699,6 +711,8 @@ static void check_input_owned(dispatcher_context_t *dc) {
                                                 state->cur_input.prevout_scriptpubkey,
                                                 state->cur_input.prevout_scriptpubkey_len);
         if (res < 0) {
+            PRINTF("Script didn't match\n");
+
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         } else if (res == 0) {
@@ -762,6 +776,13 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     } else {
+        // Swap feature: no external inputs allowed
+        if (G_swap_state.called_from_swap) {
+            PRINTF("External inputs not allowed in swap transactions\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         // some internal and some external inputs, warn the user first
         dc->pause();
         ui_warn_external_inputs(dc, ui_alert_external_inputs_result);
@@ -1057,13 +1078,32 @@ static void output_validate_external(dispatcher_context_t *dc) {
         return;
     }
 
-    dc->pause();
-    ui_validate_output(dc,
-                       state->external_outputs_count,
-                       output_address,
-                       G_coin_config->name_short,
-                       state->cur_output.value,
-                       ui_action_validate_output);
+    if (G_swap_state.called_from_swap) {
+        // Swap feature: do not show the address to the user, but double check it matches the
+        // request from app-exchange; it must be the only external output (checked elsewhere).
+        int swap_addr_len = strlen(G_swap_state.destination_address);
+        if (swap_addr_len != address_len ||
+            0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
+            // address did not match
+            PRINTF("Mismatching address for swap\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        } else {
+            // no need for user vaidation during swap
+            dc->next(output_next);
+            return;
+        }
+    } else {
+        // Show address to the user
+        dc->pause();
+        ui_validate_output(dc,
+                           state->external_outputs_count,
+                           output_address,
+                           G_coin_config->name_short,
+                           state->cur_output.value,
+                           ui_action_validate_output);
+        return;
+    }
 }
 
 static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
@@ -1087,13 +1127,15 @@ static void output_next(dispatcher_context_t *dc) {
     dc->next(process_output_map);
 }
 
-// Show fees and confirm transaction with the user
+// Performs any final checks if needed, then show the confirmation UI to the user
+// (except during swap)
 static void confirm_transaction(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->inputs_total_value < state->outputs_total_value) {
+        PRINTF("Negative fee is invalid\n");
         // negative fee transaction is invalid
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -1110,8 +1152,33 @@ static void confirm_transaction(dispatcher_context_t *dc) {
 
     uint64_t fee = state->inputs_total_value - state->outputs_total_value;
 
-    dc->pause();
-    ui_validate_transaction(dc, G_coin_config->name_short, fee, ui_action_validate_transaction);
+    if (G_swap_state.called_from_swap) {
+        // Swap feature: check total amount and fees are as expected; moreover, only one external
+        // output
+        if (state->external_outputs_count != 1) {
+            PRINTF("Swap transaction must have exactly 1 external output\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        if (fee != G_swap_state.fees) {
+            PRINTF("Mismatching fee for swap\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+        uint64_t spent_amount = state->outputs_total_value - state->change_outputs_total_value;
+        if (spent_amount != G_swap_state.amount) {
+            PRINTF("Mismatching spent amount for swap\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+        // No user validation required during swap
+        dc->next(sign_init);
+    } else {
+        // Show final user validation UI
+        dc->pause();
+        ui_validate_transaction(dc, G_coin_config->name_short, fee, ui_action_validate_transaction);
+    }
 }
 
 static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept) {
