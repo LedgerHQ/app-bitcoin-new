@@ -1,5 +1,3 @@
-#pragma once
-
 #include "get_merkle_leaf_element.h"
 
 #include "get_merkle_leaf_hash.h"
