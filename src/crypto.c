@@ -203,7 +203,7 @@ static size_t cx_hash_ripemd160(const uint8_t *in, size_t in_len, uint8_t *out, 
     explicit_bzero((cx_ripemd160_t *) &G_cx, sizeof(cx_sha256_t));
     return CX_RIPEMD160_SIZE;
 }
-#endif // _NR_cx_hash_ripemd160
+#endif  // _NR_cx_hash_ripemd160
 
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_hash_ripemd160(in, inlen, out, 20);
