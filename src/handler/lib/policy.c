@@ -185,7 +185,9 @@ static void update_output_u8(policy_parser_state_t *state, const uint8_t data) {
     update_output(state, &data, 1);
 }
 
-static int process_pkh_wpkh_node(policy_parser_state_t *state) {
+static int __attribute__((noinline)) process_pkh_wpkh_node(policy_parser_state_t *state) {
+    PRINT_STACK_POINTER();
+
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     if (node->step != 0) {
@@ -242,7 +244,9 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state) {
     return result;
 }
 
-static int process_sh_wsh_node(policy_parser_state_t *state) {
+static int __attribute__((noinline)) process_sh_wsh_node(policy_parser_state_t *state) {
+    PRINT_STACK_POINTER();
+
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     policy_node_with_script_t *policy = (policy_node_with_script_t *) node->policy_node;
@@ -292,7 +296,7 @@ static int process_sh_wsh_node(policy_parser_state_t *state) {
     return result;
 }
 
-static int process_multi_sortedmulti_node(policy_parser_state_t *state) {
+static int __attribute__((noinline)) process_multi_sortedmulti_node(policy_parser_state_t *state) {
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
@@ -360,7 +364,9 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state) {
     return out_len;
 }
 
-static int process_tr_node(policy_parser_state_t *state) {
+static int __attribute__((noinline)) process_tr_node(policy_parser_state_t *state) {
+    PRINT_STACK_POINTER();
+
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     if (node->step != 0) {
