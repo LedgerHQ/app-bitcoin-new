@@ -74,12 +74,12 @@ void ui_menu_main() {
         ux_stack_push();
     }
 
-    if (G_coin_config->kind == COIN_KIND_BITCOIN) {
+    if (G_coin_config->bip32_pubkey_version == 0x0488B21E) {  // mainnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin, NULL);
-    } else if (G_coin_config->kind == COIN_KIND_BITCOIN_TESTNET) {
+    } else if (G_coin_config->bip32_pubkey_version == 0x0488B21E) {  // testnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin_testnet, NULL);
     } else {
-        ux_flow_init(0, ux_menu_main_flow_altcoin, NULL);
+        ux_flow_init(0, ux_menu_main_flow_altcoin, NULL);  // some altcoin
     }
 }
 
