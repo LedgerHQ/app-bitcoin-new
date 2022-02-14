@@ -21,8 +21,9 @@
 
 #define P2_LEGACY        0x00
 #define P2_SEGWIT        0x01
-#define P2_NATIVE_SEGWIT 0x02
+#define P2_NATIVE_SEGWIT 0x02  // bech32
 #define P2_CASHADDR      0x03
+#define P2_TAPROOT       0x04  // bech32m
 
 bool get_address_from_compressed_public_key(unsigned char format,
                                             unsigned char* compressed_pub_key,
@@ -31,8 +32,6 @@ bool get_address_from_compressed_public_key(unsigned char format,
                                             const char* native_segwit_prefix,
                                             char* address,
                                             unsigned char max_address_length) {
-    bool segwit = (format == P2_SEGWIT);
-    bool nativeSegwit = (format == P2_NATIVE_SEGWIT);
     int address_length;
 
     // clang-format off
@@ -41,13 +40,13 @@ bool get_address_from_compressed_public_key(unsigned char format,
     if (cashAddr) {
         uint8_t tmp[20];
         crypto_hash160(compressed_pub_key,  // IN
-                         33,                  // INLEN
-                         tmp);
+                       33,                  // INLEN
+                       tmp);
         if (!cashaddr_encode(tmp, 20, (uint8_t*) address, max_address_length, CASHADDR_P2PKH))
             return false;
     } else
 #endif
-    if (!(segwit || nativeSegwit)) {
+    if (format == P2_LEGACY) {
         // clang-format on
         uint8_t tmp[20];
         crypto_hash160(compressed_pub_key, 33, tmp);
@@ -65,7 +64,8 @@ bool get_address_from_compressed_public_key(unsigned char format,
                        33,                  // INLEN
                        script + 2           // OUT
         );
-        if (!nativeSegwit) {
+        if (format == P2_SEGWIT) {
+            // wrapped segwit
             uint8_t tmp[20];
             crypto_hash160(script, 22, tmp);
             // wrapped segwit
@@ -75,9 +75,23 @@ bool get_address_from_compressed_public_key(unsigned char format,
                 return false;
             }
             address[address_length] = 0;
-        } else {
+        } else {  // native segwit or taproot
             if (!native_segwit_prefix) return false;
-            if (!segwit_addr_encode(address, native_segwit_prefix, 0, script + 2, 20)) {
+            if (format == P2_NATIVE_SEGWIT) {
+                if (!segwit_addr_encode(address, native_segwit_prefix, 0, script + 2, 20)) {
+                    return false;
+                }
+            } else if (format == P2_TAPROOT) {
+                uint8_t tweaked_key[32];
+
+                uint8_t parity;
+                crypto_tr_tweak_pubkey(compressed_pub_key + 1, &parity, tweaked_key);
+
+                if (!segwit_addr_encode(address, native_segwit_prefix, 1, tweaked_key, 32)) {
+                    return false;
+                }
+            } else {
+                PRINTF("Expected native segwit or taproot address\n");
                 return false;
             }
         }
@@ -113,7 +127,7 @@ int handle_check_address(check_address_parameters_t* params, btchip_altcoin_conf
                                               NULL)) {
         return 0;
     }
-    char address[51];
+    char address[MAX_ADDRESS_LENGTH_STR + 1];
     if (!get_address_from_compressed_public_key(params->address_parameters[0],
                                                 compressed_public_key,
                                                 coin_config->p2pkh_version,
