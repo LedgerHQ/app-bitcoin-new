@@ -271,7 +271,10 @@ void app_main() {
                             ui_menu_main,
                             &cmd);
 
-            // TODO: make sure the app exits once signing is done during swap
+            if (G_swap_state.called_from_swap && G_swap_state.should_exit) {
+                os_sched_exit(0);
+            }
+
 #ifndef DISABLE_LEGACY_SUPPORT
         }
 #endif
@@ -467,7 +470,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     os_boot();
 
     io_reset_timeouts();
-    G_swap_state.called_from_swap = 0;
+    memset(&G_swap_state, 0, sizeof(G_swap_state));
 
     if (!arg0) {
         // Bitcoin application launched from dashboard

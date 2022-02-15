@@ -2156,5 +2156,10 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
 static void finalize(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    // Only if called from swap, the app should terminate after sending the response
+    if (G_swap_state.called_from_swap) {
+        G_swap_state.should_exit = true;
+    }
+
     SEND_SW(dc, SW_OK);
 }
