@@ -515,7 +515,7 @@ static uint64_t div10(uint64_t n) {
     }
 }
 
-static uint64_t div100000000(n) {
+static uint64_t div100000000(uint64_t n) {
     uint64_t res = n;
     for (int i = 0; i < 8; i++) res = div10(res);
     return res;
