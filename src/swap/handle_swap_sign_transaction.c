@@ -49,6 +49,8 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
 
 #ifndef DISABLE_LEGACY_SUPPORT
     // fill vars.swap_data, used by the legacy app only
+    memset(&vars.swap_data, 0, sizeof(vars.swap_data));
+
     _Static_assert(sizeof(vars.swap_data.destination_address) == sizeof(destination_address),
                    "Wrong size");
     _Static_assert(sizeof(vars.swap_data.amount) == 8, "Wrong size");
@@ -66,36 +68,4 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
            destination_address,
            sizeof(G_swap_state.destination_address));
     return true;
-}
-
-void handle_swap_sign_transaction(btchip_altcoin_config_t* config) {
-    G_coin_config = config;
-#ifndef DISABLE_LEGACY_SUPPORT
-    // We make sure to initialize the app in "legacy" mode, otherwise the state
-    // would be wiped in app_main
-    memset(&btchip_context_D, 0, sizeof(btchip_context_D));
-    btchip_context_init();
-    G_app_mode = APP_MODE_LEGACY;
-#else
-    G_app_mode = APP_MODE_UNINITIALIZED;
-#endif
-    G_swap_state.called_from_swap = 1;
-
-    io_seproxyhal_init();
-    UX_INIT();
-    ux_stack_push();
-
-    USB_power(0);
-    USB_power(1);
-    // ui_idle();
-    PRINTF("USB power ON/OFF\n");
-#ifdef TARGET_NANOX
-    // grab the current plane mode setting
-    G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
-#endif  // TARGET_NANOX
-#ifdef HAVE_BLE
-    BLE_power(0, NULL);
-    BLE_power(1, "Nano X");
-#endif  // HAVE_BLE
-    app_main();
 }
