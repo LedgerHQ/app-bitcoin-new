@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.0.3] - 19-02-2022
+
+### Changed
+
+Fix bug in visualization of large transaction amounts.
+
 ## [2.0.2] - 19-01-2022
 
 ### Added
