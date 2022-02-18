@@ -401,6 +401,49 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             shown_out_idx += 1
 
 
+def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool):
+    # Test with a transaction with an extremely large amount
+
+    if not is_speculos:
+        pytest.skip("Requires speculos")
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    in_amounts = [21_000_000*100_000_000]
+    out_amounts = [21_000_000*100_000_000 - 100_000]
+
+    psbt = txmaker.createPsbt(wallet, in_amounts, out_amounts, [False])
+
+    sum_in = sum(in_amounts)
+    sum_out = sum(out_amounts)
+
+    assert sum_out < sum_in
+
+    fees_amount = sum_in - sum_out
+
+    all_events: List[dict] = []
+
+    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+    x.start()
+    result = client.sign_psbt(psbt, wallet, None)
+    x.join()
+
+    assert len(result) == 1
+
+    parsed_events = parse_signing_events(all_events)
+
+    assert(parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount))
+
+    out_amt = psbt.tx.vout[0].nValue
+    assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
+
+
 @automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
