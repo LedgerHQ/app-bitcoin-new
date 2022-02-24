@@ -60,7 +60,7 @@ unsigned short btchip_apdu_get_wallet_public_key() {
     bool segwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_SEGWIT);
     bool nativeSegwit = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_NATIVE_SEGWIT);
     bool cashAddr = (G_io_apdu_buffer[ISO_OFFSET_P2] == P2_CASHADDR);
-    if (display && btchip_context_D.called_from_swap) {
+    if (display && G_swap_state.called_from_swap) {
         return BTCHIP_SW_INCORRECT_DATA;
     }
     switch (G_io_apdu_buffer[ISO_OFFSET_P1]) {

@@ -1,8 +1,8 @@
 from random import randint
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from bitcoin_client.ledger_bitcoin import PolicyMapWallet
-from bitcoin_client.ledger_bitcoin.key import KeyOriginInfo, parse_path
+from bitcoin_client.ledger_bitcoin.key import KeyOriginInfo, parse_path, get_taproot_output_key
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
 
@@ -10,6 +10,7 @@ from embit.descriptor import Descriptor
 from embit.script import Script
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
+
 
 SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
 master_key = HDKey.from_seed(mnemonic_to_seed(SPECULOS_SEED))
@@ -23,7 +24,8 @@ def random_numbers_with_sum(n: int, s: int) -> List[int]:
     separators = list(sorted([randint(0, s) for _ in range(n - 1)]))
     return [
         separators[0],
-        *[separators[i + 1] - separators[i] for i in range(len(separators) - 1)],
+        *[separators[i + 1] - separators[i]
+            for i in range(len(separators) - 1)],
         s - separators[-1]
     ]
 
@@ -78,13 +80,15 @@ def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: in
             vout.append(CTxOut(output_amount, scriptPubKey))
         else:
             # could use any other script for the other outputs; doesn't really matter
-            scriptPubKey: bytes = getScriptPubkeyFromWallet(wallet, randint(0, 1), randint(0, 10_000)).data
+            scriptPubKey: bytes = getScriptPubkeyFromWallet(
+                wallet, randint(0, 1), randint(0, 10_000)).data
             vout.append(CTxOut(randint(0, 100_000_000), scriptPubKey))
 
     vin: List[CTxIn] = []
     for _ in range(n_inputs):
         txIn = CTxIn()
-        txIn.prevout = COutPoint(uint256_from_str(random_txid()), randint(0, 20))
+        txIn.prevout = COutPoint(
+            uint256_from_str(random_txid()), randint(0, 20))
         txIn.nSequence = 0
         txIn.scriptSig = random_bytes(80)  # dummy
         vin.append(txIn)
@@ -111,8 +115,12 @@ def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: in
     return tx, selected_output_index, selected_output_change, selected_output_address_index
 
 
-def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool]) -> PSBT:
+def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool], output_wallet: Optional[List[Optional[PolicyMapWallet]]] = None) -> PSBT:
+    if output_wallet is None:
+        output_wallet = [None] * len(output_amounts)
+
     assert len(output_amounts) == len(output_is_change)
+    assert len(output_amounts) == len(output_wallet)
     assert sum(output_amounts) <= sum(input_amounts)
 
     # TODO: add support for wrapped segwit wallets
@@ -133,7 +141,8 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
     for i, prevout_amount in enumerate(input_amounts):
         n_inputs = randint(1, 10)
         n_outputs = randint(1, 10)
-        prevout, idx, is_change, addr_idx = createFakeWalletTransaction(n_inputs, n_outputs, prevout_amount, wallet)
+        prevout, idx, is_change, addr_idx = createFakeWalletTransaction(
+            n_inputs, n_outputs, prevout_amount, wallet)
         prevouts.append(prevout)
         prevout_ns.append(idx)
         prevout_path_change.append(is_change)
@@ -155,8 +164,9 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
     psbt.outputs = [PartiallySignedOutput() for _ in output_amounts]
 
     # simplification; good enough for the scripts we support now, but will need more work
-    is_legacy = "pkh("
-    is_segwitv0 = wallet.policy_map.startswith("wpkh(") or wallet.policy_map.startswith("sh(wpkh(")
+    is_legacy = wallet.policy_map.startswith("pkh(")
+    is_segwitv0 = wallet.policy_map.startswith(
+        "wpkh(") or wallet.policy_map.startswith("sh(wpkh(")
     is_taproot = wallet.policy_map.startswith("tr(")
 
     key_origin = wallet.keys_info[0][1:wallet.keys_info[0].index("]")]
@@ -177,18 +187,22 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
 
         # add key and path info
         if is_legacy or is_segwitv0:
-            psbt.inputs[i].hd_keypaths[input_key] = KeyOriginInfo(master_key_fpr, path)
+            psbt.inputs[i].hd_keypaths[input_key] = KeyOriginInfo(
+                master_key_fpr, path)
         elif is_taproot:
-            psbt.inputs[i].tap_hd_keypaths[input_key[1:]] = (list(), KeyOriginInfo(master_key_fpr, path))
+            tweaked_key = get_taproot_output_key(input_key)
+            psbt.inputs[i].tap_hd_keypaths[tweaked_key] = (
+                list(), KeyOriginInfo(master_key_fpr, path))
         else:
             raise RuntimeError("Unexpected state: unknown transaction type")
 
     for i, output_amount in enumerate(output_amounts):
-        # TODO: we could use a completely different script/wallet for non-change outputs
-        # Since we don't add path information for non-change output, the wallet will consider them external,
-        # so it works for now.
+        wallet_i = output_wallet[i]
+        if output_is_change[i] or wallet_i is None:
+            script = getScriptPubkeyFromWallet(wallet, output_is_change[i], i)
+        else:
+            script = getScriptPubkeyFromWallet(wallet_i, 0, i)
 
-        script = getScriptPubkeyFromWallet(wallet, output_is_change[i], i)
         tx.vout[i].scriptPubKey = script.data
         tx.vout[i].nValue = output_amount
 
@@ -199,9 +213,12 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
 
             # add key and path information for change output
             if is_legacy or is_segwitv0:
-                psbt.outputs[i].hd_keypaths[output_key] = KeyOriginInfo(master_key_fpr, path)
+                psbt.outputs[i].hd_keypaths[output_key] = KeyOriginInfo(
+                    master_key_fpr, path)
             elif is_taproot:
-                psbt.outputs[i].tap_hd_keypaths[output_key[1:]] = (list(), KeyOriginInfo(master_key_fpr, path))
+                tweaked_key = get_taproot_output_key(output_key)
+                psbt.outputs[i].tap_hd_keypaths[tweaked_key] = (
+                    list(), KeyOriginInfo(master_key_fpr, path))
 
     psbt.tx = tx
 

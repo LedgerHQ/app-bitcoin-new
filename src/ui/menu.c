@@ -69,21 +69,24 @@ UX_FLOW(ux_menu_main_flow_altcoin,
         &ux_menu_exit_step,
         FLOW_LOOP);
 
+#define BIP32_PUBKEY_VERSION_MAINNET 0x0488B21E
+#define BIP32_PUBKEY_VERSION_TESTNET 0x043587CF
+
 void ui_menu_main() {
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
 
-    if (G_coin_config->kind == COIN_KIND_BITCOIN) {
+    if (G_coin_config->bip32_pubkey_version == BIP32_PUBKEY_VERSION_MAINNET) {  // mainnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin, NULL);
-    } else if (G_coin_config->kind == COIN_KIND_BITCOIN_TESTNET) {
+    } else if (G_coin_config->bip32_pubkey_version == BIP32_PUBKEY_VERSION_TESTNET) {  // testnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin_testnet, NULL);
     } else {
-        ux_flow_init(0, ux_menu_main_flow_altcoin, NULL);
+        ux_flow_init(0, ux_menu_main_flow_altcoin, NULL);  // some altcoin
     }
 }
 
-UX_STEP_NOCB(ux_menu_info_step, bn, {"Bitcoin App", "(c) 2021 Ledger"});
+UX_STEP_NOCB(ux_menu_info_step, bn, {"Bitcoin App", "(c) 2022 Ledger"});
 UX_STEP_CB(ux_menu_back_step, pb, ui_menu_main(), {&C_icon_back, "Back"});
 
 // FLOW for the about submenu:

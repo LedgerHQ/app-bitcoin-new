@@ -147,6 +147,9 @@ int get_script_type(const uint8_t script[], size_t script_len);
 
 #ifndef SKIP_FOR_CMOCKA
 
+/**
+ * TODO: docs
+ */
 int get_script_address(const uint8_t script[],
                        size_t script_len,
                        global_context_t *coin_config,

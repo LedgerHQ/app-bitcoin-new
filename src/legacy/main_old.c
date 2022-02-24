@@ -37,12 +37,9 @@
 
 #include "ux.h"
 #include "btchip_display_variables.h"
-#include "swap_lib_calls.h"
 
-#include "swap_lib_calls.h"
-#include "handle_swap_sign_transaction.h"
-#include "handle_get_printable_amount.h"
-#include "handle_check_address.h"
+#include "../swap/swap_lib_calls.h"
+#include "../swap/btchip_bcd.h"
 
 #define __NAME3(a, b, c) a##b##c
 #define NAME3(a, b, c) __NAME3(a, b, c)
@@ -784,6 +781,12 @@ void ui_idle(void) {
 //     return 1;
 // }
 
+static unsigned char btchip_convert_hex_amount_to_displayable(unsigned char* amount) {
+    return btchip_convert_hex_amount_to_displayable_no_globals(amount,
+                                                               G_coin_config->flags,
+                                                               btchip_context_D.tmp);
+}
+
 uint8_t check_fee_swap() {
     unsigned char fees[8];
     unsigned char borrow;
@@ -1071,7 +1074,7 @@ unsigned int btchip_silent_confirm_single_output() {
 }
 
 unsigned int btchip_bagl_confirm_single_output() {
-    if (btchip_context_D.called_from_swap) {
+    if (G_swap_state.called_from_swap) {
         return btchip_silent_confirm_single_output();
     }
     if (!prepare_single_output()) {
@@ -1087,7 +1090,7 @@ unsigned int btchip_bagl_confirm_single_output() {
 }
 
 unsigned int btchip_bagl_finalize_tx() {
-    if (btchip_context_D.called_from_swap) {
+    if (G_swap_state.called_from_swap) {
         return check_fee_swap();
     }
 
@@ -1146,59 +1149,3 @@ void btchip_bagl_request_segwit_input_approval()
     ux_flow_init(0, ux_request_segwit_input_approval_flow, NULL);
 }
 
-
-static void library_main_helper(struct libargs_s *args) {
-    check_api_level(CX_COMPAT_APILEVEL);
-    PRINTF("Inside a library \n");
-    switch (args->command) {
-        case CHECK_ADDRESS:
-            // ensure result is zero if an exception is thrown
-            args->check_address->result = 0;
-            args->check_address->result =
-                handle_check_address(args->check_address, args->coin_config);
-            break;
-        case SIGN_TRANSACTION:
-            if (copy_transaction_parameters(args->create_transaction)) {
-                // never returns
-                handle_swap_sign_transaction(args->coin_config);
-            }
-            break;
-        case GET_PRINTABLE_AMOUNT:
-            // ensure result is zero if an exception is thrown (compatibility breaking, disabled
-            // until LL is ready)
-            // args->get_printable_amount->result = 0;
-            // args->get_printable_amount->result =
-            handle_get_printable_amount(args->get_printable_amount, args->coin_config);
-            break;
-        default:
-            break;
-    }
-}
-
-
-void init_coin_config(btchip_altcoin_config_t *coin_config);
-
-void library_main(struct libargs_s *args) {
-    btchip_altcoin_config_t coin_config;
-    if (args->coin_config == NULL) {
-        init_coin_config(&coin_config);
-        args->coin_config = &coin_config;
-    }
-    bool end = false;
-    /* This loop ensures that library_main_helper and os_lib_end are called
-     * within a try context, even if an exception is thrown */
-    while (1) {
-        BEGIN_TRY {
-            TRY {
-                if (!end) {
-                    library_main_helper(args);
-                }
-                os_lib_end();
-            }
-            FINALLY {
-                end = true;
-            }
-        }
-        END_TRY;
-    }
-}

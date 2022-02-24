@@ -35,8 +35,11 @@
 
 // common declarations between legacy and new code; will refactor it out later
 #include "legacy/include/btchip_context.h"
-#include "legacy/include/swap_lib_calls.h"
-#include "legacy/include/swap_lib_calls.h"
+#include "swap/swap_lib_calls.h"
+#include "swap/swap_globals.h"
+#include "swap/handle_swap_sign_transaction.h"
+#include "swap/handle_get_printable_amount.h"
+#include "swap/handle_check_address.h"
 
 #ifndef DISABLE_LEGACY_SUPPORT
 #include "legacy/main_old.h"
@@ -205,7 +208,7 @@ void app_main() {
                 G_app_mode = APP_MODE_LEGACY;
             }
 
-            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
                 btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
             }
 
@@ -214,11 +217,19 @@ void app_main() {
 
             app_dispatch();
 
-            if (btchip_context_D.called_from_swap && vars.swap_data.should_exit) {
+            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
                 os_sched_exit(0);
             }
         } else {
 #endif
+            // if not Bitcoin or Bitcoin-testnet, we only support the legacy APDUS.
+            // to be removed once the apps are split
+            if (G_coin_config->bip32_pubkey_version != 0x0488B21E &&
+                G_coin_config->bip32_pubkey_version != 0x043587CF) {
+                io_send_sw(SW_CLA_NOT_SUPPORTED);
+                return;
+            }
+
             if (G_app_mode != APP_MODE_NEW) {
                 explicit_bzero(&G_command_state, sizeof(G_command_state));
 
@@ -245,6 +256,13 @@ void app_main() {
             }
             PRINTF("\n");
 
+            if (G_swap_state.called_from_swap &&
+                (cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT)) {
+                PRINTF("Only SIGN_PSBT and GET_MASTER_FINGERPRINT can be called during swap\n");
+                io_send_sw(SW_INS_NOT_SUPPORTED);
+                return;
+            }
+
             // Dispatch structured APDU command to handler
             apdu_dispatcher(COMMAND_DESCRIPTORS,
                             sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
@@ -252,10 +270,15 @@ void app_main() {
                             sizeof(G_command_state),
                             ui_menu_main,
                             &cmd);
-        }
+
+            if (G_swap_state.called_from_swap && G_swap_state.should_exit) {
+                os_sched_exit(0);
+            }
+
 #ifndef DISABLE_LEGACY_SUPPORT
-    }
+        }
 #endif
+    }
 }
 
 /**
@@ -272,16 +295,25 @@ void app_exit() {
     END_TRY_L(exit);
 }
 
+static void initialize_app_globals() {
+    io_reset_timeouts();
+    memset(&G_swap_state, 0, sizeof(G_swap_state));
+}
+
 /**
  * Handle APDU command received and send back APDU response using handlers.
  */
 void coin_main(btchip_altcoin_config_t *coin_config) {
     PRINT_STACK_POINTER();
 
+    initialize_app_globals();
+
     // assumptions on the length of data structures
 
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
+
+    G_app_mode = APP_MODE_UNINITIALIZED;
 
     btchip_altcoin_config_t config;
     if (coin_config == NULL) {
@@ -297,7 +329,9 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
 
 #ifdef HAVE_SEMIHOSTED_PRINTF
     PRINTF("APDU State size: %d\n", sizeof(command_state_t));
+#ifndef DISABLE_LEGACY_SUPPORT
     PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
+#endif
 #endif
 
     // Reset dispatcher state
@@ -347,18 +381,98 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     app_exit();
 }
 
-__attribute__((section(".boot"))) int main(int arg0) {
-    G_app_mode = APP_MODE_UNINITIALIZED;
+static void swap_library_main_helper(struct libargs_s *args) {
+    check_api_level(CX_COMPAT_APILEVEL);
+    PRINTF("Inside a library \n");
+    switch (args->command) {
+        case CHECK_ADDRESS:
+            // ensure result is zero if an exception is thrown
+            args->check_address->result = 0;
+            args->check_address->result =
+                handle_check_address(args->check_address, args->coin_config);
+            break;
+        case SIGN_TRANSACTION:
+            initialize_app_globals();
+            if (copy_transaction_parameters(args->create_transaction)) {
+                // never returns
 
+                G_coin_config = args->coin_config;
+#ifndef DISABLE_LEGACY_SUPPORT
+                // We make sure to initialize the app in "legacy" mode, otherwise the state
+                // would be wiped in app_main
+                memset(&btchip_context_D, 0, sizeof(btchip_context_D));
+                btchip_context_init();
+                G_app_mode = APP_MODE_LEGACY;
+#else
+                G_app_mode = APP_MODE_UNINITIALIZED;
+#endif
+                G_swap_state.called_from_swap = 1;
+
+                io_seproxyhal_init();
+                UX_INIT();
+                ux_stack_push();
+
+                USB_power(0);
+                USB_power(1);
+                // ui_idle();
+                PRINTF("USB power ON/OFF\n");
+#ifdef TARGET_NANOX
+                // grab the current plane mode setting
+                G_io_app.plane_mode = os_setting_get(OS_SETTING_PLANEMODE, NULL, 0);
+#endif  // TARGET_NANOX
+#ifdef HAVE_BLE
+                BLE_power(0, NULL);
+                BLE_power(1, "Nano X");
+#endif  // HAVE_BLE
+                app_main();
+            }
+            break;
+        case GET_PRINTABLE_AMOUNT:
+            // ensure result is zero if an exception is thrown (compatibility breaking, disabled
+            // until LL is ready)
+            // args->get_printable_amount->result = 0;
+            // args->get_printable_amount->result =
+            handle_get_printable_amount(args->get_printable_amount, args->coin_config);
+            break;
+        default:
+            break;
+    }
+}
+
+void init_coin_config(btchip_altcoin_config_t *coin_config);
+
+void swap_library_main(struct libargs_s *args) {
+    btchip_altcoin_config_t coin_config;
+    if (args->coin_config == NULL) {
+        init_coin_config(&coin_config);
+        args->coin_config = &coin_config;
+    }
+    bool end = false;
+    /* This loop ensures that swap_library_main_helper and os_lib_end are called
+     * within a try context, even if an exception is thrown */
+    while (1) {
+        BEGIN_TRY {
+            TRY {
+                if (!end) {
+                    swap_library_main_helper(args);
+                }
+                os_lib_end();
+            }
+            FINALLY {
+                end = true;
+            }
+        }
+        END_TRY;
+    }
+}
+
+__attribute__((section(".boot"))) int main(int arg0) {
 #ifdef USE_LIB_BITCOIN
     BEGIN_TRY {
         TRY {
             unsigned int libcall_params[5];
             btchip_altcoin_config_t coin_config;
             init_coin_config(&coin_config);
-
-            G_app_mode =
-                APP_MODE_LEGACY;  // in library mode, we currently only run with legacy APDUs
 
             PRINTF("Hello from litecoin\n");
             check_api_level(CX_COMPAT_APILEVEL);
@@ -392,8 +506,6 @@ __attribute__((section(".boot"))) int main(int arg0) {
     // ensure exception will work as planned
     os_boot();
 
-    io_reset_timeouts();
-
     if (!arg0) {
         // Bitcoin application launched from dashboard
         coin_main(NULL);
@@ -414,12 +526,8 @@ __attribute__((section(".boot"))) int main(int arg0) {
                 coin_main(args->coin_config);
             break;
         default:
-#ifndef DISABLE_LEGACY_SUPPORT
-            // called as bitcoin or altcoin library
-            library_main(args);
-#else
-            app_exit();
-#endif
+            // called as bitcoin or altcoin library during swap
+            swap_library_main(args);
     }
 #endif  // USE_LIB_BITCOIN
     return 0;
