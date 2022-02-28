@@ -28,22 +28,32 @@ function smallEndianToBigint(
   return result;
 }
 
+/**
+ * Converts a `bigint` to a `number` if it non-negative and at most MAX_SAFE_INTEGER; throws `RangeError` otherwise.
+ * Used when converting a Bitcoin-style varint to a `number`, since varints could be larger than what the `Number`
+ * class can represent without loss of precision.
+ *
+ * @param n the number to convert
+ * @returns `n` as a `number`
+ */
+ export function sanitizeBigintToNumber(n: number | bigint): number {
+  if (n < 0) throw RangeError('Negative bigint is not a valid varint');
+  if (n > Number.MAX_SAFE_INTEGER) throw RangeError('Too large for a Number');
+
+  return Number(n);
+}
+
 function getVarintSize(value: number | bigint): 1 | 3 | 5 | 9 {
   if (typeof value == 'number') {
-    if (value > Number.MAX_SAFE_INTEGER) {
-      throw new Error(
-        "createVarint with a 'number' input only support inputs not bigger than MAX_SAFE_INTEGER"
-      );
-    }
-    value = BigInt(value);
+    value = sanitizeBigintToNumber(value);
   }
 
   if (value < BigInt(0)) {
-    throw new Error('Negative numbers are not supported');
+    throw new RangeError('Negative numbers are not supported');
   }
 
   if (value >= BigInt(1) << BigInt(64)) {
-    throw new Error('Too large for a Bitcoin-style varint');
+    throw new RangeError('Too large for a Bitcoin-style varint');
   }
 
   if (value < BigInt(0xfd)) return 1;
@@ -52,10 +62,25 @@ function getVarintSize(value: number | bigint): 1 | 3 | 5 | 9 {
   else return 9;
 }
 
+/**
+ * Parses a Bitcoin-style variable length integer from a buffer, starting at the given `offset`. Returns a pair
+ * containing the parsed `BigInt`, and its length in bytes from the buffer.
+ *
+ * @param data the `Buffer` from which the variable-length integer is read
+ * @param offset a non-negative offset to read from
+ * @returns a pair where the first element is the parsed BigInt, and the second element is the length in bytes parsed
+ * from the buffer.
+ *
+ * @throws `RangeError` if offset is negative.
+ * @throws `Error` if the buffer's end is reached withut parsing being completed.
+ */
 export function parseVarint(
   data: Buffer,
   offset: number
 ): readonly [bigint, number] {
+  if (offset < 0) {
+    throw RangeError("Negative offset is invalid");
+  }
   if (data[offset] == undefined) {
     throw Error('Buffer too small');
   }
@@ -73,6 +98,10 @@ export function parseVarint(
 }
 
 export function createVarint(value: number | bigint): Buffer {
+  if (typeof value == 'number') {
+    value = sanitizeBigintToNumber(value);
+  }
+
   const size = getVarintSize(value);
 
   value = BigInt(value);
@@ -88,11 +117,4 @@ export function createVarint(value: number | bigint): Buffer {
     bigintToSmallEndian(value, size - 1, buffer, 1);
   }
   return buffer;
-}
-
-export function sanitizeVarintToNumber(n: bigint): number {
-  if (n < 0) throw Error('Negative bigint is not a valid varint');
-  if (n > Number.MAX_SAFE_INTEGER) throw Error('Too large for a Number');
-
-  return Number(n);
 }

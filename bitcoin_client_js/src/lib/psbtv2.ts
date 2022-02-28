@@ -6,7 +6,7 @@ import {
   unsafeFrom64bitLE,
   unsafeTo64bitLE,
 } from './buffertools';
-import { sanitizeVarintToNumber } from './varint';
+import { sanitizeBigintToNumber } from './varint';
 
 export enum psbtGlobal {
   TX_VERSION = 0x02,
@@ -365,7 +365,7 @@ export class PsbtV2 {
     }
   }
   private readKeyPair(map: Map<string, Buffer>, buf: BufferReader): boolean {
-    const keyLen = sanitizeVarintToNumber(buf.readVarInt());
+    const keyLen = sanitizeBigintToNumber(buf.readVarInt());
     if (keyLen == 0) {
       return false;
     }
@@ -494,7 +494,7 @@ export class PsbtV2 {
     readonly path: readonly number[];
   } {
     const buf = new BufferReader(buffer);
-    const hashCount = sanitizeVarintToNumber(buf.readVarInt());
+    const hashCount = sanitizeBigintToNumber(buf.readVarInt());
     const hashes: Buffer[] = [];
     for (let i = 0; i < hashCount; i++) {
       hashes.push(buf.readSlice(32));
@@ -594,5 +594,5 @@ function varint(n: number): Buffer {
   return buf.buffer();
 }
 function fromVarint(buf: Buffer): number {
-  return sanitizeVarintToNumber(new BufferReader(buf).readVarInt());
+  return sanitizeBigintToNumber(new BufferReader(buf).readVarInt());
 }

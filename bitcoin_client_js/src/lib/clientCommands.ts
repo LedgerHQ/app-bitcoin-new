@@ -3,7 +3,7 @@ import { crypto } from 'bitcoinjs-lib';
 import { BufferReader } from './buffertools';
 import { hashLeaf, Merkle } from './merkle';
 import { MerkleMap } from './merkleMap';
-import { createVarint, sanitizeVarintToNumber } from './varint';
+import { createVarint, sanitizeBigintToNumber } from './varint';
 
 enum ClientCommandCode {
   YIELD = 0x10,
@@ -124,8 +124,8 @@ export class GetMerkleLeafProofCommand extends ClientCommand {
     let tree_size: number;
     let leaf_index: number;
     try {
-      tree_size = sanitizeVarintToNumber(reqBuf.readVarInt());
-      leaf_index = sanitizeVarintToNumber(reqBuf.readVarInt());
+      tree_size = sanitizeBigintToNumber(reqBuf.readVarInt());
+      leaf_index = sanitizeBigintToNumber(reqBuf.readVarInt());
     } catch (e) {
       throw new Error(
         "Invalid request, couldn't parse tree_size or leaf_index"

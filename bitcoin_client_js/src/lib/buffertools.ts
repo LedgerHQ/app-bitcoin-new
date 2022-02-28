@@ -1,4 +1,4 @@
-import { createVarint, parseVarint, sanitizeVarintToNumber } from './varint';
+import { createVarint, parseVarint, sanitizeBigintToNumber } from './varint';
 
 export function unsafeTo64bitLE(n: number): Buffer {
   // we want to represent the input as a 8-bytes array
@@ -121,7 +121,7 @@ export class BufferReader {
   }
 
   readVarSlice(): Buffer {
-    const n = sanitizeVarintToNumber(this.readVarInt());
+    const n = sanitizeBigintToNumber(this.readVarInt());
     return this.readSlice(n);
   }
 
