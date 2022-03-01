@@ -101,6 +101,8 @@ describe("test AppClient", () => {
   });
 
   afterEach(async () => {
+    await transport.close();
+    sp.removeAllListeners();
     sp.kill('SIGTERM');
   });
 
