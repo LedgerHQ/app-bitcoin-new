@@ -1,6 +1,6 @@
 import Transport from '@ledgerhq/hw-transport';
 
-import { pathElementsToBuffer } from './bip32';
+import { pathElementsToBuffer, pathStringToArray } from './bip32';
 import { ClientCommandInterpreter } from './clientCommands';
 import { MerkelizedPsbt } from './merkelizedPsbt';
 import { hashLeaf, Merkle } from './merkle';
@@ -68,10 +68,22 @@ export class AppClient {
     return response.slice(0, -2); // drop the status word (can only be 0x9000 at this point)
   }
 
+  /**
+   * Requests the BIP-32 extended pubkey to the hardware wallet.
+   * If `display` is `false`, only standard paths will be accepted; an error is returned if an unusual path is
+   * requested.
+   * If `display` is `true`, the requested path is shown on screen for user verification; unusual paths can be
+   * requested, and a warning is shown to the user in that case.
+   *
+   * @param path the requested BIP-32 path as a string
+   * @param display `false` to silently retrieve a pubkey for a standard path, `true` to display the path on screen
+   * @returns the base58-encoded serialized extended pubkey (xpub)
+   */
   async getExtendedPubkey(
-    display: boolean,
-    pathElements: readonly number[]
+    path: string,
+    display: boolean = false
   ): Promise<string> {
+    const pathElements = pathStringToArray(path);
     if (pathElements.length > 6) {
       throw new Error('Path too long. At most 6 levels allowed.');
     }
@@ -85,6 +97,15 @@ export class AppClient {
     return response.toString('ascii');
   }
 
+  /**
+   * Registers a `WalletPolicy`, after interactive verification from the user.
+   * On success, after user's approval, this function returns the id (which is the same that can be computed with
+   * `walletPolicy.getid()`), followed by the 32-byte hmac. The client should store the hmac to use it for future
+   * requests to `getWalletAddress` or `signPsbt` using this `WalletPolicy`.
+   *
+   * @param walletPolicy the `WalletPolicy` to register
+   * @returns a pair of two 32-byte arrays: the id of the Wallet Policy, followed by the policy hmac
+   */
   async registerWallet(
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
@@ -114,6 +135,17 @@ export class AppClient {
     return [response.subarray(0, 32), response.subarray(32)];
   }
 
+  /**
+   * Returns the address of `walletPolicy` for the given `change` and `addressIndex`.
+   *
+   * @param walletPolicy the `WalletPolicy` to use
+   * @param walletHMAC the 32-byte hmac returned during wallet registration for a registered policy; otherwise
+   * `null` for a standard policy
+   * @param change `0` for a normal receive address, `1` for a change address
+   * @param addressIndex the address index to retrieve
+   * @param display `True` to show the address on screen, `False` to retrieve it silently
+   * @returns the address, as an ascii string.
+   */
   async getWalletAddress(
     walletPolicy: WalletPolicy,
     walletHMAC: Buffer | null,
@@ -143,7 +175,7 @@ export class AppClient {
       BitcoinIns.GET_WALLET_ADDRESS,
       Buffer.concat([
         Buffer.from(display ? [1] : [0]),
-        walletPolicy.getWalletId(),
+        walletPolicy.getId(),
         walletHMAC || Buffer.alloc(32, 0),
         Buffer.from([change]),
         addressIndexBuffer,
@@ -154,6 +186,18 @@ export class AppClient {
     return response.toString('ascii');
   }
 
+  /**
+   * Signs a psbt using a (standard or registered) `WalletPolicy`. This is an interactive command, as user validation
+   * is necessary using the device's secure screen.
+   * On success, a map of input indexes and signatures is returned.
+   * @param psbt an instance of `PsbtV2`
+   * @param walletPolicy the `WalletPolicy` to use for signing
+   * @param walletHMAC the 32-byte hmac obtained during wallet policy registration, or `null` for a standard policy
+   * @param progressCallback optionally, a callback that will be called every time a signature is produced during
+   * the signing process. The callback does not receive any argument, but can be used to track progress.
+   * @returns a map from numbers to signatures. For each input index `i` that is a key of the returned map, the
+   * corresponding value is the signature for the `i`-th input of the `psbt`.
+   */
   async signPsbt(
     psbt: PsbtV2,
     walletPolicy: WalletPolicy,
@@ -199,7 +243,7 @@ export class AppClient {
         inputMapsRoot,
         createVarint(merkelizedPsbt.getGlobalOutputCount()),
         outputMapsRoot,
-        walletPolicy.getWalletId(),
+        walletPolicy.getId(),
         walletHMAC || Buffer.alloc(32, 0),
       ]),
       clientInterpreter
@@ -214,14 +258,32 @@ export class AppClient {
     return ret;
   }
 
-  async getMasterFingerprint(): Promise<Buffer> {
-    return this.makeRequest(BitcoinIns.GET_MASTER_FINGERPRINT, Buffer.from([]));
+  /**
+   * Returns the fingerprint of the master public key, as per BIP-32 standard.
+   * @returns the master key fingerprint as a string of 8 hexadecimal digits.
+   */
+  async getMasterFingerprint(): Promise<string> {
+    const fpr = await this.makeRequest(BitcoinIns.GET_MASTER_FINGERPRINT, Buffer.from([]));
+    return fpr.toString("hex");
   }
 
+  /**
+   * Signs a message using the legacy Bitcoin Message Signing standard. The signed message is
+   * the double-sha256 hash of the concatenation of:
+   * - "\x18Bitcoin Signed Message:\n";
+   * - the length of `message`, encoded as a Bitcoin-style variable length integer;
+   * - `message`.
+   *
+   * @param message the serialized message to sign
+   * @param path the BIP-32 path of the key used to sign the message
+   * @returns base64-encoded signature of the message.
+   */
   async signMessage(
     message: Buffer,
-    pathElements: readonly number[]
+    path: string
   ): Promise<string> {
+    const pathElements = pathStringToArray(path);
+
     const clientInterpreter = new ClientCommandInterpreter();
 
     // prepare ClientCommandInterpreter

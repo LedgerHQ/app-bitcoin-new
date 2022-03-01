@@ -61,14 +61,6 @@ async function setSpeculosAutomation(transport: SpeculosTransport, automationObj
     });
 }
 
-// Hardened derivation
-function H(n: number) {
-  if (n < 0 || n >= 0x80000000) {
-    throw new Error("n should be non-negative and strictly smaller than 0x80000000")
-  }
-  return n + 0x80000000;
-}
-
 
 describe("test AppClient", () => {
   let sp: ChildProcessWithoutNullStreams;
@@ -115,13 +107,11 @@ describe("test AppClient", () => {
 
   it("can retrieve the master fingerprint", async () => {
     const result = await app.getMasterFingerprint();
-    expect(result).toEqual(Buffer.from("f5acc2fd", "hex"));
+    expect(result).toEqual("f5acc2fd");
   });
 
   it("can get an extended pubkey", async () => {
-    const result = await app.getExtendedPubkey(
-      false, [H(49), H(1), H(1), 1, 3]
-    );
+    const result = await app.getExtendedPubkey("m/49'/1'/1'/1/3", false);
 
     expect(result).toEqual("tpubDGnetmJDCL18TyaaoyRAYbkSE9wbHktSdTS4mfsR6inC8c2r6TjdBt3wkqEQhHYPtXpa46xpxDaCXU2PRNUGVvDzAHPG6hHRavYbwAGfnFr")
   });
@@ -237,7 +227,7 @@ describe("test AppClient", () => {
 
     const [walletId, walletHmac] = await app.registerWallet(walletPolicy);
 
-    expect(walletId).toEqual(walletPolicy.getWalletId());
+    expect(walletId).toEqual(walletPolicy.getId());
     expect(walletHmac.length).toEqual(32);
   });
 
@@ -273,7 +263,7 @@ describe("test AppClient", () => {
 
   it("can sign a message", async () => {
     const msg = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible.";
-    const path = [H(84), H(1), H(0), 0, 8];
+    const path = "m/84'/1'/0'/0/8";
 
     const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_message_accept.json').toString());
     await setSpeculosAutomation(transport, automation);
