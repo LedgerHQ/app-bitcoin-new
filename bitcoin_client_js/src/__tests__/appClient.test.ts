@@ -1,6 +1,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import process from 'process';
 
 import { ChildProcessWithoutNullStreams, spawn } from "child_process";
 
@@ -47,6 +48,27 @@ async function openSpeculosAndWait(opts: SpeculosHttpTransportOpts = {}): Promis
     }
     await sleep(100);
   }
+}
+
+// Convenience method to send the kill signal and wait for the process to completely terminate
+async function killProcess(proc: ChildProcessWithoutNullStreams, signal: NodeJS.Signals = 'SIGTERM', timeout = 10000) {
+  return new Promise<void>((resolve, reject) => {
+    const pid = proc.pid;
+    process.kill(pid, signal);
+    let count = 0;
+    const intervalHandler = setInterval(() => {
+      try {
+        process.kill(pid, signal);
+      } catch (e) {
+        clearInterval(intervalHandler);
+        resolve();
+      }
+      if ((count += 100) > timeout) {
+        clearInterval(intervalHandler);
+        reject(new Error("Timeout process kill"))
+      }
+    }, 100)
+  });
 }
 
 // Sets the speculos automation file using the REST api.
@@ -102,8 +124,7 @@ describe("test AppClient", () => {
 
   afterEach(async () => {
     await transport.close();
-    sp.removeAllListeners();
-    sp.kill('SIGTERM');
+    await killProcess(sp);
   });
 
 
