@@ -16,13 +16,18 @@ export function bip32asBuffer(path: string): Buffer {
 }
 
 export function pathArrayToString(pathElements: readonly number[]): string {
-  // Limitation: bippath can't handle and empty path. It shouldn't affect us
-  // right now, but might in the future.
-  // TODO: Fix support for empty path.
+  // bippath doesn't handle an empty path.
+  if (pathElements.length == 0) {
+    return "m";
+  }
   return bippath.fromPathArray(pathElements).toString();
 }
 
 export function pathStringToArray(path: string): readonly number[] {
+  // bippath doesn't handle an empty path.
+  if (path == "m" || path == "") {
+    return [];
+  }
   return bippath.fromString(path).toPathArray();
 }
 
