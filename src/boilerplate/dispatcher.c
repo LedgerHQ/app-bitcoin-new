@@ -147,9 +147,6 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      size_t top_context_size,
                      void (*termination_cb)(void),
                      const command_t *cmd) {
-    // TODO: decide what to do if a command is sent while something was still running
-    // currently: wiping everything
-
     G_dispatcher_state.had_ux_flow = false;
 
     G_dispatcher_state.termination_cb = termination_cb;
