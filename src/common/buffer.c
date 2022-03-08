@@ -25,17 +25,6 @@
 #include "varint.h"
 #include "bip32.h"
 
-/*
-TODO: simplify buffer functions.
- - delete buffer_read_u64
- - remove endianness parameter, we always use big-endian
-*/
-
-// TODO: add functions to:
-// - get pointer to ptr[offset]
-// - peek the next byte
-// - buffer_read_char for convenience
-
 bool buffer_can_read(const buffer_t *buffer, size_t n) {
     return buffer->size - buffer->offset >= n;
 }
@@ -80,6 +69,16 @@ bool buffer_read_u8(buffer_t *buffer, uint8_t *value) {
 
     *value = buffer->ptr[buffer->offset];
     buffer_seek_cur(buffer, 1);
+
+    return true;
+}
+
+bool buffer_peek(const buffer_t *buffer, uint8_t *value) {
+    if (!buffer_can_read(buffer, 1)) {
+        return false;
+    }
+
+    *value = buffer->ptr[buffer->offset];
 
     return true;
 }
@@ -167,7 +166,6 @@ bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n) {
     return true;
 }
 
-// TODO: unit tests for the buffer_write_* functions
 bool buffer_write_u8(buffer_t *buffer, uint8_t value) {
     if (!buffer_can_read(buffer, 1)) {
         return false;
@@ -235,7 +233,6 @@ bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n) {
     return true;
 }
 
-// TODO: write unit tests
 void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
     size_t padding_size = 0;
 

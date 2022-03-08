@@ -22,7 +22,9 @@
 #include "btchip_bagl_extensions.h"
 #include "btchip_display_variables.h"
 
+#ifndef SIGHASH_ALL
 #define SIGHASH_ALL 0x01
+#endif
 
 unsigned short btchip_apdu_hash_sign() {
     unsigned long int lockTime;

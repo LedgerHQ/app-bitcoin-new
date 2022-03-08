@@ -42,6 +42,29 @@ static void test_buffer_seek(void **state) {
     assert_false(buffer_seek_set(&buf, 21));  // can't seek at offset 21
 }
 
+static void test_buffer_get_cur(void **state) {
+    (void) state;
+
+    // clang-format off
+    uint8_t temp[6] = {
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55
+    };
+    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
+
+    uint8_t *result;
+
+    result = buffer_get_cur(&buf);
+    assert_ptr_equal(temp, result);
+
+    buffer_seek_set(&buf, 3);
+    result = buffer_get_cur(&buf);
+    assert_ptr_equal(temp + 3, result);
+
+    buffer_seek_set(&buf, 5);
+    result = buffer_get_cur(&buf);
+    assert_ptr_equal(temp + 5, result);
+}
+
 static void test_buffer_read(void **state) {
     (void) state;
 
@@ -122,7 +145,6 @@ static void test_buffer_read(void **state) {
         0xFD, 0x00, 0x01, // 2 bytes varint
         0xFE, 0x00, 0x01, 0x02, 0x03,  // 4 bytes varint
         0xFF, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 // 8 bytes varint
-
     };
     buffer_t buf_varint = {.ptr = temp_varint, .size = sizeof(temp_varint), .offset = 0};
     uint64_t varint = 0;
@@ -135,6 +157,38 @@ static void test_buffer_read(void **state) {
     assert_true(buffer_read_varint(&buf_varint, &varint));
     assert_int_equal(varint, 0x0706050403020100);
     assert_false(buffer_read_varint(&buf_varint, &varint));
+}
+
+static void test_buffer_peek(void **state) {
+    (void) state;
+
+    uint8_t temp[6] = {
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55
+    };
+    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
+
+    bool result;
+    uint8_t c;
+
+    result = buffer_peek(&buf, &c);
+    assert_true(result);
+    assert_int_equal(c, 0x00);
+
+    buf.offset += 3;
+
+    result = buffer_peek(&buf, &c);
+    assert_true(result);
+    assert_int_equal(c, 0x33);
+
+    buf.offset += 2;
+    result = buffer_peek(&buf, &c);
+    assert_true(result);
+    assert_int_equal(c, 0x55);
+
+    buf.offset += 1; // buffer is now empty
+    result = buffer_peek(&buf, &c);
+    assert_false(result);
+    assert_int_equal(c, 0x55); // unchanged because of failure
 }
 
 static void test_buffer_write(void **state) {
@@ -272,12 +326,104 @@ static void test_buffer_create(void **state) {
 }
 
 
+static void test_buffer_alloc(void **state) {
+    (void) state;
+
+    // declare as uint32 to make sure it is aligned in memory
+    uint32_t data_uint32[32];
+    uint8_t *data = (uint8_t *)data_uint32;
+
+    buffer_t buf;
+    void *result;
+
+    // tests with aligned memory buffer
+    for (int size = 1; size <= 10; size++) {
+        buf = buffer_create(data, 32 * sizeof(uint32_t));
+        result = buffer_alloc(&buf, size, false);
+        assert_ptr_equal(result, data);
+        assert_int_equal(buf.offset, size);
+
+        buf = buffer_create(data, 32 * sizeof(uint32_t));
+        // aligned = true doesn't make a difference, since the buffer is aligned
+        result = buffer_alloc(&buf, 1, true);
+        assert_ptr_equal(result, data);
+        assert_int_equal(buf.offset, 1);
+    }
+
+    // unaligned memory buffer, by 1 to 3 bytes
+    for (int offset = 1; offset <= 3; offset++) {
+        for (int size = 1; size <= 10; size++) {
+            buf = buffer_create(data + offset, 32 * sizeof(uint32_t) - offset);
+            result = buffer_alloc(&buf, size, false);
+            assert_ptr_equal(result, data + offset);
+            assert_int_equal(buf.offset, size);
+
+            buf = buffer_create(data + offset, 32 * sizeof(uint32_t) - offset);
+            // aligned = true doesn't make a difference, since the buffer is aligned
+            result = buffer_alloc(&buf, size, true);
+            assert_ptr_equal(result, data + 4);
+            assert_int_equal(buf.offset, (4 - offset) + size);
+        }
+    }
+
+    // can allocate the whole buffer
+    buf = buffer_create(data, 7);
+    result = buffer_alloc(&buf, 7, false);
+    assert_ptr_equal(result, data);
+    assert_int_equal(buf.offset, 7);
+
+    // test with buffer too small
+    buf = buffer_create(data, 7);
+    result = buffer_alloc(&buf, 8, false);
+    assert_ptr_equal(result, NULL);
+    assert_int_equal(buf.offset, 0);
+
+    // test with buffer too small (can only allocate 3 bytes because 3 are lost because of the memory alignment)
+    buf = buffer_create(data + 1, 6);
+    result = buffer_alloc(&buf, 4, true);
+    assert_ptr_equal(result, NULL);
+    assert_int_equal(buf.offset, 0);
+
+    // allocate maximum size, accounting for memory alignment
+    buf = buffer_create(data + 1, 7);
+    result = buffer_alloc(&buf, 3, true);
+    assert_ptr_equal(result, data+4);
+    assert_int_equal(buf.offset, 3+3);
+}
+
+// tests the buffer_snapshot/buffer_restore functions
+static void test_buffer_snapshot_restore(void **state) {
+    (void) state;
+
+    uint8_t data[32];
+
+    buffer_snapshot_t snap;
+    buffer_t buf;
+    buffer_t buf_correct;
+
+    buf = buffer_create(data, sizeof(data));
+    buf_correct = buf;
+
+    snap = buffer_snapshot(&buf);
+    buffer_alloc(&buf, 11, false);
+    buffer_restore(&buf, snap);
+
+    assert_int_equal(buf.offset, buf_correct.offset);
+    assert_ptr_equal(buf.ptr, buf_correct.ptr);
+    assert_int_equal(buf.size, buf_correct.size);
+}
+
+
 int main() {
     const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_can_read),
                                        cmocka_unit_test(test_buffer_seek),
+                                       cmocka_unit_test(test_buffer_get_cur),
                                        cmocka_unit_test(test_buffer_read),
+                                       cmocka_unit_test(test_buffer_peek),
                                        cmocka_unit_test(test_buffer_write),
-                                       cmocka_unit_test(test_buffer_create)};
+                                       cmocka_unit_test(test_buffer_create),
+                                       cmocka_unit_test(test_buffer_alloc),
+                                       cmocka_unit_test(test_buffer_snapshot_restore)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
