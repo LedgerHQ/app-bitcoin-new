@@ -269,20 +269,35 @@ static inline buffer_t buffer_create(void *ptr, size_t size) {
 
 /**
  * Returns a pointer to the current position in the buffer if at least `size` bytes are available in
- * the buffer, or NULL otherwise. On success, the buffer is advanced by `size` bytes. If aligned ==
- * true, the returned pointer is 32-bit aligned (adding up to three padding bytes if necessary).
+ * the buffer (possibly after skipping some bytes to guarantee alignment), or NULL otherwise. On
+ * success, the buffer is advanced by `size` bytes. If `aligned == true`, the returned pointer is
+ * 32-bit aligned (adding up to three padding bytes if necessary). The buffer is not advanced in
+ * case of failure.
+ *
+ * @param[inout]  buffer The buffer in which the memory is to be allocated.
+ * @param[in]  size The number of bytes allocated within `buffer`.
+ * @param[in]  aligned If `true`, makes sure that the returned pointer is 32-bit aligned.
+ *
+ * @return a pointer to the allocated memory within the buffer.
  */
 void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned);
 
 /**
- * TODO: docs
+ * Saves a snapshot of the current position within the buffer.
+ *
+ * @param[in] buffer The buffer whose position is saved.
+ *
+ * @return a snapshot that can be restored with `buffer_restore`.
  */
-static inline buffer_snapshot_t buffer_snapshot(buffer_t *buffer) {
+static inline buffer_snapshot_t buffer_snapshot(const buffer_t *buffer) {
     return buffer->offset;
 }
 
 /**
- * TODO: docs
+ * Restores a previously taken snapshot of the buffer.
+ *
+ * @param[in] snapshot The snapshot previously returned by a call to `buffer_snapshot` on the same
+ * buffer. The behavior is undefined if any other value is passed as `snapshot`.
  */
 static inline void buffer_restore(buffer_t *buffer, buffer_snapshot_t snapshot) {
     buffer->offset = snapshot;
