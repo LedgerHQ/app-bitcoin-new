@@ -610,6 +610,23 @@ DEFINES   += COIN_KIND=COIN_KIND_HYDRA
 DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
 APPNAME ="Hydra"
 APP_LOAD_PARAMS += --path "44'/609'"
+else ifeq ($(COIN),bitcoin_gold)
+# Cducoin
+# Initial fork from Bitcoin,
+DEFINES   += BIP32_PUBKEY_VERSION=0x00000000 # unused
+DEFINES   += BIP44_COIN_TYPE=156
+DEFINES   += BIP44_COIN_TYPE_2=0
+DEFINES   += COIN_P2PKH_VERSION=38
+DEFINES   += COIN_P2SH_VERSION=23
+DEFINES   += COIN_FAMILY=1
+DEFINES   += COIN_COINID=\"Cducoin\"
+DEFINES   += COIN_COINID_HEADER=\"CDUCOIN\"
+DEFINES   += COIN_COINID_NAME=\"Cducoin\"
+DEFINES   += COIN_COINID_SHORT=\"CDU\"
+DEFINES   += COIN_KIND=COIN_KIND_CDUCOIN
+DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME ="Cducoin
+APP_LOAD_PARAMS += --path $(APP_PATH)
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
 $(error Unsupported COIN - use bitcoin_testnet, bitcoin, bitcoin_cash, bitcoin_gold, litecoin, dogecoin, dash, zcash, horizen, komodo, stratis, peercoin, pivx, viacoin, vertcoin, stealth, digibyte, qtum, bitcoin_private, firo, gamecredits, zclassic, xsn, nix, lbry, resistance, ravencoin, hydra, hydra_testnet, xrhodium)
