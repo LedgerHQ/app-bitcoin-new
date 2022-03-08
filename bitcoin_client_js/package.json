@@ -1,0 +1,74 @@
+{
+  "name": "ledger-bitcoin",
+  "version": "0.0.1",
+  "description": "Ledger Hardware Wallet Bitcoin Application Client",
+  "main": "build/main/index.js",
+  "typings": "build/main/index.d.ts",
+  "repository": "https://github.com/LedgerHW/app-bitcoin-new",
+  "license": "Apache-2.0",
+  "keywords": [
+    "Ledger",
+    "LedgerWallet",
+    "btc",
+    "Bitcoin",
+    "NanoS",
+    "NanoX",
+    "Hardware Wallet"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "fix": "run-s fix:*",
+    "fix:prettier": "prettier \"src/**/*.ts\" --write",
+    "fix:lint": "eslint src --ext .ts --fix",
+    "test": "jest --detectOpenHandles --verbose",
+    "doc": "run-s doc:html && open-cli build/docs/index.html",
+    "doc:html": "typedoc src/ --exclude **/*.test.ts --target ES6 --mode file --out build/docs",
+    "doc:json": "typedoc src/ --exclude **/*.test.ts --target ES6 --mode file --json build/docs/typedoc.json"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "dependencies": {
+    "@ledgerhq/hw-transport": "^6.20.0",
+    "bip32-path": "^0.4.2",
+    "bitcoinjs-lib": "^6.0.1",
+    "tiny-secp256k1": "^2.1.2"
+  },
+  "devDependencies": {
+    "@ledgerhq/hw-transport-node-speculos-http": "^6.24.1",
+    "@ledgerhq/logs": "^6.10.0",
+    "@types/jest": "^27.4.0",
+    "@types/node": "^17.0.10",
+    "@typescript-eslint/eslint-plugin": "^4.0.1",
+    "@typescript-eslint/parser": "^4.0.1",
+    "codecov": "^3.5.0",
+    "cspell": "^4.1.0",
+    "eslint": "^7.8.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-eslint-comments": "^3.2.0",
+    "eslint-plugin-functional": "^3.0.2",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-jest": "^26.1.1",
+    "jest": "^27.5.1",
+    "npm-run-all": "^4.1.5",
+    "open-cli": "^6.0.1",
+    "prettier": "^2.1.1",
+    "standard-version": "^9.0.0",
+    "ts-jest": "^27.1.3",
+    "ts-node": "^9.0.0",
+    "typedoc": "^0.19.0",
+    "typescript": "^4.5.5"
+  },
+  "files": [
+    "build/main",
+    "!**/*.spec.*",
+    "!**/*.test.*",
+    "!**/*.json",
+    "!**/__tests__/*",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "prettier": {
+    "singleQuote": true
+  }
+}
