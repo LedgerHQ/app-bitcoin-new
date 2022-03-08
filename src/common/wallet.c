@@ -186,7 +186,7 @@ static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
 
     size_t result = 0;
     int digits_read = 0;
-    while ((buffer_peek(buffer, &c) && is_digit(c))) {
+    while (buffer_peek(buffer, &c) && is_digit(c)) {
         ++digits_read;
         uint8_t next_digit = c - '0';
 

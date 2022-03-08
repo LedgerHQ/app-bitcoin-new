@@ -11,7 +11,8 @@ static uint64_t div10(uint64_t n) {
     if (n < 10) return 0;  // special case needed to make sure that n - 10 is safe
 
     // Since low, mid and high are always <= UINT64_MAX / 10, there is no risk of overflow
-    uint64_t low = 0, high = UINT64_MAX / 10;
+    uint64_t low = 0;
+    uint64_t high = UINT64_MAX / 10;
 
     while (true) {
         uint64_t mid = (low + high) / 2;
