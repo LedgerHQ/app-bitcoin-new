@@ -25,10 +25,6 @@
 #include "varint.h"
 #include "bip32.h"
 
-// TODO: add functions to:
-// - get pointer to ptr[offset]
-// - peek the next byte
-
 bool buffer_can_read(const buffer_t *buffer, size_t n) {
     return buffer->size - buffer->offset >= n;
 }
@@ -73,6 +69,16 @@ bool buffer_read_u8(buffer_t *buffer, uint8_t *value) {
 
     *value = buffer->ptr[buffer->offset];
     buffer_seek_cur(buffer, 1);
+
+    return true;
+}
+
+bool buffer_peek(const buffer_t *buffer, uint8_t *value) {
+    if (!buffer_can_read(buffer, 1)) {
+        return false;
+    }
+
+    *value = buffer->ptr[buffer->offset];
 
     return true;
 }
