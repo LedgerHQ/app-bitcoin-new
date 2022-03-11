@@ -1,4 +1,4 @@
-name: Build custom ledger-app-builder-bitcoin image
+name: Build custom speculos-bitcoin image
 
 on:
   push:
@@ -20,11 +20,11 @@ jobs:
     - name: Clone
       uses: actions/checkout@v2
 
-    - name: Build and push ledger-app-builder-bitcoin to GitHub Packages
+    - name: Build and push speculos-bitcoin to GitHub Packages
       uses: docker/build-push-action@v1
       with:
         dockerfile: .github/workflows/Dockerfile
-        repository: ledgerhq/app-bitcoin-new/ledger-app-builder-bitcoin
+        repository: ledgerhq/app-bitcoin-new/speculos-bitcoin
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
