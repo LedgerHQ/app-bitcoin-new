@@ -2,7 +2,7 @@ from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, P
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.exception import DenyError
 
-from test_utils import automation
+from test_utils import has_automation
 
 import hmac
 from hashlib import sha256
@@ -10,7 +10,7 @@ from hashlib import sha256
 import pytest
 
 
-@automation("automations/register_wallet_accept.json")
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_legacy(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
@@ -32,7 +32,7 @@ def test_register_wallet_accept_legacy(client: Client, speculos_globals):
     )
 
 
-@automation("automations/register_wallet_accept.json")
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_sh_wit(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
@@ -54,7 +54,7 @@ def test_register_wallet_accept_sh_wit(client: Client, speculos_globals):
     )
 
 
-@automation("automations/register_wallet_accept.json")
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_wit(client: Client, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
@@ -76,7 +76,7 @@ def test_register_wallet_accept_wit(client: Client, speculos_globals):
     )
 
 
-@automation("automations/register_wallet_reject.json")
+@has_automation("automations/register_wallet_reject.json")
 def test_register_wallet_reject_header(client: Client):
     wallet = MultisigWallet(
         name="Cold storage",
@@ -92,7 +92,7 @@ def test_register_wallet_reject_header(client: Client):
         client.register_wallet(wallet)
 
 
-@automation("automations/register_wallet_accept.json")
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_invalid_names(client: Client):
     for invalid_name in [
         "",  # empty name not allowed
@@ -114,7 +114,7 @@ def test_register_wallet_invalid_names(client: Client):
         client.register_wallet(wallet)
 
 
-@automation("automations/register_wallet_accept.json")
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_unsupported_policy(client: Client):
     # valid policise, but not supported (might change in the future)
 

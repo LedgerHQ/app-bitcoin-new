@@ -2,7 +2,6 @@ import pytest
 
 from typing import Dict
 import hmac
-import json
 from hashlib import sha256
 from decimal import Decimal
 
@@ -15,6 +14,7 @@ from bitcoin_client.ledger_bitcoin._script import is_p2sh, is_p2wsh, parse_multi
 from test_utils import SpeculosGlobals
 
 from speculos.client import SpeculosClient
+from test_utils.speculos import automation
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
 
@@ -97,9 +97,8 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
         ],
     )
 
-    comm.set_automation_rules(json.load(open("automations/register_wallet_accept.json")))
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
-    comm.set_automation_rules({"version": 1, "rules": []})
+    with automation(comm, "automations/register_wallet_accept.json"):
+        wallet_id, wallet_hmac = client.register_wallet(wallet)
 
     assert wallet_id == wallet.id
 
@@ -169,9 +168,8 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
 
     pubkeys = extract_our_pubkeys(psbt, speculos_globals.master_key_fingerprint.to_bytes(4, byteorder="big"))
 
-    comm.set_automation_rules(json.load(open("automations/sign_with_wallet_accept.json")))
-    hww_sigs = client.sign_psbt(psbt, wallet, wallet_hmac)
-    comm.set_automation_rules({"version": 1, "rules": []})
+    with automation(comm, "automations/sign_with_wallet_accept.json"):
+        hww_sigs = client.sign_psbt(psbt, wallet, wallet_hmac)
 
     assert len(hww_sigs) == len(pubkeys)  # should be true as long as all inputs are internal
 

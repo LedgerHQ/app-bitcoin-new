@@ -30,7 +30,7 @@ def test_settings(s: dict):
     return decorator
 
 
-def automation(filename: str):
+def has_automation(filename: str):
     """Adds the automation_file setting to use `filename` as the Speculos automation file."""
     return test_settings({"automation_file": filename})
 

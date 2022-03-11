@@ -4,7 +4,7 @@ from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 
-from test_utils import automation
+from test_utils import has_automation
 
 tests_root: Path = Path(__file__).parent
 
@@ -20,7 +20,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
     return psbt
 
 
-@automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     # PSBT for a legacy 1-input 1-output spend (no change address)
@@ -47,7 +47,7 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     }
 
 
-@automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
@@ -74,7 +74,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     }
 
 
-@automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
@@ -102,7 +102,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     }
 
 
-@automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
