@@ -133,7 +133,7 @@ class NewClient(Client):
             A PSBT of version 0 or 2, with all the necessary information to sign the inputs already filled in; what the
             required fields changes depending on the type of input.
             The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
-            signing (this will change for Taproot inputs).
+            signing. This is not required for Taproot inputs.
 
         wallet : Wallet
             The registered wallet policy, or a standard wallet policy.
@@ -148,12 +148,12 @@ class NewClient(Client):
         """
         if psbt.version != 2:
             if self._no_clone_psbt:
-                psbt.to_psbt_v2()
+                psbt.convert_to_v2()
                 psbt_v2 = psbt
             else:
                 psbt_v2 = PSBT()
                 psbt_v2.deserialize(psbt.serialize())  # clone psbt
-                psbt_v2.to_psbt_v2()
+                psbt_v2.convert_to_v2()
         else:
             psbt_v2 = psbt
 
@@ -174,13 +174,13 @@ class NewClient(Client):
         client_intepreter.add_known_mapping(global_map)
 
         input_maps: List[Mapping[bytes, bytes]] = []
-        for _ in range(psbt_v2.input_count):
+        for _ in range(len(psbt_v2.inputs)):
             input_maps.append(parse_stream_to_map(f))
         for m in input_maps:
             client_intepreter.add_known_mapping(m)
 
         output_maps: List[Mapping[bytes, bytes]] = []
-        for _ in range(psbt_v2.output_count):
+        for _ in range(len(psbt_v2.outputs)):
             output_maps.append(parse_stream_to_map(f))
         for m in output_maps:
             client_intepreter.add_known_mapping(m)

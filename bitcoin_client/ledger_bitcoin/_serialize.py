@@ -1,3 +1,5 @@
+# Original version: https://raw.githubusercontent.com/bitcoin-core/HWI/3fe369d0379212fae1c72729a179d133b0adc872/hwilib/_serialize.py
+#
 #!/usr/bin/env python3
 # Copyright (c) 2010 ArtForz -- public domain half-a-node
 # Copyright (c) 2012 Jeff Garzik

@@ -1,34 +1,11 @@
 
 """
-Original version: https://github.com/bitcoin-core/HWI
-
-
-MIT License
-
-Copyright (c) 2017 Andrew Chow
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-
+Original version: https://github.com/bitcoin-core/HWI/blob/3fe369d0379212fae1c72729a179d133b0adc872/hwilib/descriptor.py
+Distributed under the MIT License.
 
 Output Script Descriptors
 *************************
+
 
 HWI has a more limited implementation of descriptors.
 See `Bitcoin Core's documentation <https://github.com/bitcoin/bitcoin/blob/master/doc/descriptors.md>`_ for more details on descriptors.
@@ -36,6 +13,10 @@ See `Bitcoin Core's documentation <https://github.com/bitcoin/bitcoin/blob/maste
 This implementation only supports ``sh()``, ``wsh()``, ``pkh()``, ``wpkh()``, ``multi()``, and ``sortedmulti()`` descriptors.
 Descriptors can be parsed, however the actual scripts are not generated.
 """
+
+
+from .key import ExtendedKey, KeyOriginInfo, parse_path
+from .common import hash160, sha256
 
 from binascii import unhexlify
 from collections import namedtuple
@@ -46,8 +27,9 @@ from typing import (
     Tuple,
 )
 
-from .key import ExtendedKey, KeyOriginInfo, get_taproot_output_key, parse_path
-from .common import hash160, sha256
+
+MAX_TAPROOT_NODES = 128
+
 
 ExpandedScripts = namedtuple("ExpandedScripts", ["output_script", "redeem_script", "witness_script"])
 
@@ -74,7 +56,6 @@ def PolyMod(c: int, val: int) -> int:
 def DescriptorChecksum(desc: str) -> str:
     """
     Compute the checksum for a descriptor
-
     :param desc: The descriptor string to compute a checksum for
     :return: A checksum
     """
@@ -109,7 +90,6 @@ def DescriptorChecksum(desc: str) -> str:
 def AddChecksum(desc: str) -> str:
     """
     Compute and attach the checksum for a descriptor
-
     :param desc: The descriptor string to add a checksum to
     :return: Descriptor with checksum
     """
@@ -151,7 +131,6 @@ class PubkeyProvider(object):
     def parse(cls, s: str) -> 'PubkeyProvider':
         """
         Deserialize a key expression from the string into a ``PubkeyProvider``.
-
         :param s: String containing the key expression
         :return: A new ``PubkeyProvider`` containing the details given by ``s``
         """
@@ -174,7 +153,6 @@ class PubkeyProvider(object):
     def to_string(self) -> str:
         """
         Serialize the pubkey expression to a string to be used in a descriptor
-
         :return: The pubkey expression as a string
         """
         s = ""
@@ -190,7 +168,7 @@ class PubkeyProvider(object):
             if self.deriv_path is not None:
                 path_str = self.deriv_path[1:]
                 if path_str[-1] == "*":
-                    path_str = path_str[:-1] + str(pos)
+                    path_str = path_str[-1] + str(pos)
                 path = parse_path(path_str)
                 child_key = self.extkey.derive_pub_path(path)
                 return child_key.pubkey
@@ -236,40 +214,38 @@ class PubkeyProvider(object):
 class Descriptor(object):
     r"""
     An abstract class for Descriptors themselves.
-    Descriptors can contain multiple :class:`PubkeyProvider`\ s and no more than one ``Descriptor`` as a subdescriptor.
+    Descriptors can contain multiple :class:`PubkeyProvider`\ s and multiple ``Descriptor`` as subdescriptors.
     """
 
     def __init__(
         self,
         pubkeys: List['PubkeyProvider'],
-        subdescriptor: Optional['Descriptor'],
+        subdescriptors: List['Descriptor'],
         name: str
     ) -> None:
         r"""
         :param pubkeys: The :class:`PubkeyProvider`\ s that are part of this descriptor
-        :param subdescriptor: The ``Descriptor`` that is part of this descriptor
+        :param subdescriptor: The ``Descriptor``s that are part of this descriptor
         :param name: The name of the function for this descriptor
         """
         self.pubkeys = pubkeys
-        self.subdescriptor = subdescriptor
+        self.subdescriptors = subdescriptors
         self.name = name
 
     def to_string_no_checksum(self) -> str:
         """
         Serializes the descriptor as a string without the descriptor checksum
-
         :return: The descriptor string
         """
         return "{}({}{})".format(
             self.name,
             ",".join([p.to_string() for p in self.pubkeys]),
-            self.subdescriptor.to_string_no_checksum() if self.subdescriptor else ""
+            self.subdescriptors[0].to_string_no_checksum() if len(self.subdescriptors) > 0 else ""
         )
 
     def to_string(self) -> str:
         """
-        Serializes the descriptor as a string wtih the checksum
-
+        Serializes the descriptor as a string with the checksum
         :return: The descriptor with a checksum
         """
         return AddChecksum(self.to_string_no_checksum())
@@ -279,6 +255,21 @@ class Descriptor(object):
         Returns the scripts for a descriptor at the given `pos` for ranged descriptors.
         """
         raise NotImplementedError("The Descriptor base class does not implement this method")
+
+
+class PKDescriptor(Descriptor):
+    """
+    A descriptor for ``pk()`` descriptors
+    """
+
+    def __init__(
+        self,
+        pubkey: 'PubkeyProvider'
+    ) -> None:
+        """
+        :param pubkey: The :class:`PubkeyProvider` for this descriptor
+        """
+        super().__init__([pubkey], [], "pk")
 
 
 class PKHDescriptor(Descriptor):
@@ -293,7 +284,7 @@ class PKHDescriptor(Descriptor):
         """
         :param pubkey: The :class:`PubkeyProvider` for this descriptor
         """
-        super().__init__([pubkey], None, "pkh")
+        super().__init__([pubkey], [], "pkh")
 
     def expand(self, pos: int) -> "ExpandedScripts":
         script = b"\x76\xa9\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos)) + b"\x88\xac"
@@ -312,7 +303,7 @@ class WPKHDescriptor(Descriptor):
         """
         :param pubkey: The :class:`PubkeyProvider` for this descriptor
         """
-        super().__init__([pubkey], None, "wpkh")
+        super().__init__([pubkey], [], "wpkh")
 
     def expand(self, pos: int) -> "ExpandedScripts":
         script = b"\x00\x14" + hash160(self.pubkeys[0].get_pubkey_bytes(pos))
@@ -335,7 +326,7 @@ class MultisigDescriptor(Descriptor):
         :param thresh: The number of keys required to sign this multisig
         :param is_sorted: Whether this is a ``sortedmulti()`` descriptor
         """
-        super().__init__(pubkeys, None, "sortedmulti" if is_sorted else "multi")
+        super().__init__(pubkeys, [], "sortedmulti" if is_sorted else "multi")
         self.thresh = thresh
         self.is_sorted = is_sorted
         if self.is_sorted:
@@ -368,16 +359,16 @@ class SHDescriptor(Descriptor):
 
     def __init__(
         self,
-        subdescriptor: Optional['Descriptor']
+        subdescriptor: 'Descriptor'
     ) -> None:
         """
         :param subdescriptor: The :class:`Descriptor` that is a sub-descriptor for this descriptor
         """
-        super().__init__([], subdescriptor, "sh")
+        super().__init__([], [subdescriptor], "sh")
 
     def expand(self, pos: int) -> "ExpandedScripts":
-        assert self.subdescriptor
-        redeem_script, _, witness_script = self.subdescriptor.expand(pos)
+        assert len(self.subdescriptors) == 1
+        redeem_script, _, witness_script = self.subdescriptors[0].expand(pos)
         script = b"\xa9\x14" + hash160(redeem_script) + b"\x87"
         return ExpandedScripts(script, redeem_script, witness_script)
 
@@ -389,45 +380,61 @@ class WSHDescriptor(Descriptor):
 
     def __init__(
         self,
-        subdescriptor: Optional['Descriptor']
+        subdescriptor: 'Descriptor'
     ) -> None:
         """
-        :param pubkey: The :class:`Descriptor` that is a sub-descriptor for this descriptor
+        :param subdescriptor: The :class:`Descriptor` that is a sub-descriptor for this descriptor
         """
-        super().__init__([], subdescriptor, "wsh")
+        super().__init__([], [subdescriptor], "wsh")
 
     def expand(self, pos: int) -> "ExpandedScripts":
-        assert self.subdescriptor
-        witness_script, _, _ = self.subdescriptor.expand(pos)
+        assert len(self.subdescriptors) == 1
+        witness_script, _, _ = self.subdescriptors[0].expand(pos)
         script = b"\x00\x20" + sha256(witness_script)
         return ExpandedScripts(script, None, witness_script)
 
 
 class TRDescriptor(Descriptor):
     """
-    A descriptor for ``tr()`` descriptors. Only supports ``tr(KEY)``, and ``KEY`` must not be an x-only key
+    A descriptor for ``tr()`` descriptors
     """
 
     def __init__(
         self,
-        pubkey: 'PubkeyProvider'
+        internal_key: 'PubkeyProvider',
+        subdescriptors: List['Descriptor'] = [],
+        depths: List[int] = []
     ) -> None:
         """
-        :param pubkey: The :class:`PubkeyProvider` for this descriptor
+        :param internal_key: The :class:`PubkeyProvider` that is the internal key for this descriptor
+        :param subdescriptors: The :class:`Descriptor`s that are the leaf scripts for this descriptor
+        :param depths: The depths of the leaf scripts in the same order as `subdescriptors`
         """
-        super().__init__([pubkey], None, "tr")
+        super().__init__([internal_key], subdescriptors, "tr")
+        self.depths = depths
 
-    def expand(self, pos: int) -> "ExpandedScripts":
-        internal_key = self.pubkeys[0].get_pubkey_bytes(pos)
-
-        script = b"\x51\x20" + get_taproot_output_key(internal_key)
-        return ExpandedScripts(script, None, None)
-
+    def to_string_no_checksum(self) -> str:
+        r = f"{self.name}({self.pubkeys[0].to_string()}"
+        path: List[bool] = [] # Track left or right for each depth
+        for p, depth in enumerate(self.depths):
+            r += ","
+            while len(path) <= depth:
+                if len(path) > 0:
+                    r += "{"
+                path.append(False)
+            r += self.subdescriptors[p].to_string_no_checksum()
+            while len(path) > 0 and path[-1]:
+                if len(path) > 0:
+                    r += "}"
+                path.pop()
+            if len(path) > 0:
+                path[-1] = True
+        r += ")"
+        return r
 
 def _get_func_expr(s: str) -> Tuple[str, str]:
     """
     Get the function name and then the expression inside
-
     :param s: The string that begins with a function name
     :return: The function name as the first element of the tuple, and the expression contained within the function as the second element
     :raises: ValueError: if a matching pair of parentheses cannot be found
@@ -437,10 +444,41 @@ def _get_func_expr(s: str) -> Tuple[str, str]:
     return s[0:start], s[start + 1:end]
 
 
+def _get_const(s: str, const: str) -> str:
+    """
+    Get the first character of the string, make sure it is the expected character,
+    and return the rest of the string
+    :param s: The string that begins with a constant character
+    :param const: The constant character
+    :return: The remainder of the string without the constant character
+    :raises: ValueError: if the first character is not the constant character
+    """
+    if s[0] != const:
+        raise ValueError(f"Expected '{const}' but got '{s[0]}'")
+    return s[1:]
+
+
+def _get_expr(s: str) -> Tuple[str, str]:
+    """
+    Extract the expression that ``s`` begins with.
+    This will return the initial part of ``s``, up to the first comma or closing brace,
+    skipping ones that are surrounded by braces.
+    :param s: The string to extract the expression from
+    :return: A pair with the first item being the extracted expression and the second the rest of the string
+    """
+    level: int = 0
+    for i, c in enumerate(s):
+        if c in ["(", "{"]:
+            level += 1
+        elif level > 0 and c in [")", "}"]:
+            level -= 1
+        elif level == 0 and c in [")", "}", ","]:
+            break
+    return s[0:i], s[i:]
+
 def parse_pubkey(expr: str) -> Tuple['PubkeyProvider', str]:
     """
     Parses an individual pubkey expression from a string that may contain more than one pubkey expression.
-
     :param expr: The expression to parse a pubkey expression from
     :return: The :class:`PubkeyProvider` that is parsed as the first item of a tuple, and the remainder of the expression as the second item.
     """
@@ -456,7 +494,6 @@ def parse_pubkey(expr: str) -> Tuple['PubkeyProvider', str]:
 class _ParseDescriptorContext(Enum):
     """
     :meta private:
-
     Enum representing the level that we are in when parsing a descriptor.
     Some expressions aren't allowed at certain levels, this helps us track those.
     """
@@ -470,26 +507,36 @@ class _ParseDescriptorContext(Enum):
     P2WSH = 3
     """Within a ``wsh()`` descriptor"""
 
+    P2TR = 4
+    """Within a ``tr()`` descriptor"""
+
 
 def _parse_descriptor(desc: str, ctx: '_ParseDescriptorContext') -> 'Descriptor':
     """
     :meta private:
-
     Parse a descriptor given the context level we are in.
     Used recursively to parse subdescriptors
-
     :param desc: The descriptor string to parse
     :param ctx: The :class:`_ParseDescriptorContext` indicating the level we are in
     :return: The parsed descriptor
     :raises: ValueError: if the descriptor is malformed
     """
     func, expr = _get_func_expr(desc)
+    if func == "pk":
+        pubkey, expr = parse_pubkey(expr)
+        if expr:
+            raise ValueError("more than one pubkey in pk descriptor")
+        return PKDescriptor(pubkey)
     if func == "pkh":
+        if not (ctx == _ParseDescriptorContext.TOP or ctx == _ParseDescriptorContext.P2SH or ctx == _ParseDescriptorContext.P2WSH):
+            raise ValueError("Can only have pkh at top level, in sh(), or in wsh()")
         pubkey, expr = parse_pubkey(expr)
         if expr:
             raise ValueError("More than one pubkey in pkh descriptor")
         return PKHDescriptor(pubkey)
     if func == "sortedmulti" or func == "multi":
+        if not (ctx == _ParseDescriptorContext.TOP or ctx == _ParseDescriptorContext.P2SH or ctx == _ParseDescriptorContext.P2WSH):
+            raise ValueError("Can only have multi/sortedmulti at top level, in sh(), or in wsh()")
         is_sorted = func == "sortedmulti"
         comma_idx = expr.index(",")
         thresh = int(expr[:comma_idx])
@@ -507,34 +554,64 @@ def _parse_descriptor(desc: str, ctx: '_ParseDescriptorContext') -> 'Descriptor'
         if ctx == _ParseDescriptorContext.TOP and len(pubkeys) > 3:
             raise ValueError("Cannot have {} pubkeys in bare multisig: only at most 3 pubkeys")
         return MultisigDescriptor(pubkeys, thresh, is_sorted)
-    if ctx != _ParseDescriptorContext.P2WSH and func == "wpkh":
+    if func == "wpkh":
+        if not (ctx == _ParseDescriptorContext.TOP or ctx == _ParseDescriptorContext.P2SH):
+            raise ValueError("Can only have wpkh() at top level or inside sh()")
         pubkey, expr = parse_pubkey(expr)
         if expr:
             raise ValueError("More than one pubkey in pkh descriptor")
         return WPKHDescriptor(pubkey)
-    elif ctx == _ParseDescriptorContext.P2WSH and func == "wpkh":
-        raise ValueError("Cannot have wpkh within wsh")
-    if ctx == _ParseDescriptorContext.TOP and func == "sh":
+    if func == "sh":
+        if ctx != _ParseDescriptorContext.TOP:
+            raise ValueError("Can only have sh() at top level")
         subdesc = _parse_descriptor(expr, _ParseDescriptorContext.P2SH)
         return SHDescriptor(subdesc)
-    elif ctx != _ParseDescriptorContext.TOP and func == "sh":
-        raise ValueError("Cannot have sh in non-top level")
-    if ctx != _ParseDescriptorContext.P2WSH and func == "wsh":
+    if func == "wsh":
+        if not (ctx == _ParseDescriptorContext.TOP or ctx == _ParseDescriptorContext.P2SH):
+            raise ValueError("Can only have wsh() at top level or inside sh()")
         subdesc = _parse_descriptor(expr, _ParseDescriptorContext.P2WSH)
         return WSHDescriptor(subdesc)
-    elif ctx == _ParseDescriptorContext.P2WSH and func == "wsh":
-        raise ValueError("Cannot have wsh within wsh")
+    if func == "tr":
+        if ctx != _ParseDescriptorContext.TOP:
+            raise ValueError("Can only have tr at top level")
+        internal_key, expr = parse_pubkey(expr)
+        subscripts = []
+        depths = []
+        if expr:
+            # Path from top of the tree to what we're currently processing.
+            # branches[i] == False: left branch in the i'th step from the top
+            # branches[i] == true: right branch
+            branches = []
+            while True:
+                # Process open braces
+                while True:
+                    try:
+                        expr = _get_const(expr, "{")
+                        branches.append(False)
+                    except ValueError:
+                        break
+                    if len(branches) > MAX_TAPROOT_NODES:
+                        raise ValueError("tr() supports at most {MAX_TAPROOT_NODES} nesting levels")
+                # Process script expression
+                sarg, expr = _get_expr(expr)
+                subscripts.append(_parse_descriptor(sarg, _ParseDescriptorContext.P2TR))
+                depths.append(len(branches))
+                # Process closing braces
+                while len(branches) > 0 and branches[-1]:
+                    expr = _get_const(expr, "}")
+                    branches.pop()
+                # If we're at the end of a left branch, expect a comma
+                if len(branches) > 0 and not branches[-1]:
+                    expr = _get_const(expr, ",")
+                    branches[-1] = True
+
+                if len(branches) == 0:
+                    break
+        return TRDescriptor(internal_key, subscripts, depths)
     if ctx == _ParseDescriptorContext.P2SH:
         raise ValueError("A function is needed within P2SH")
     elif ctx == _ParseDescriptorContext.P2WSH:
         raise ValueError("A function is needed within P2WSH")
-    if ctx == _ParseDescriptorContext.TOP and func == "tr":
-        pubkey, expr = parse_pubkey(expr)
-        if expr:
-            raise ValueError("TREE expressions are not yet supported in tr descriptor")
-        return TRDescriptor(pubkey)
-    elif ctx != _ParseDescriptorContext.TOP and func == "tr":
-        raise ValueError("Cannot have tr in non-top level")
     raise ValueError("{} is not a valid descriptor function".format(func))
 
 
@@ -542,7 +619,6 @@ def parse_descriptor(desc: str) -> 'Descriptor':
     """
     Parse a descriptor string into a :class:`Descriptor`.
     Validates the checksum if one is provided in the string
-
     :param desc: The descriptor string
     :return: The parsed :class:`Descriptor`
     :raises: ValueError: if the descriptor string is malformed

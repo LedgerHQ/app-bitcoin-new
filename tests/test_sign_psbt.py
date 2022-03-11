@@ -517,9 +517,9 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
         [False, True]
     )
 
-    # Modify the non_witness_utxp so that the txid does not matches
+    # Modify the non_witness_utxo so that the txid does not matches
     wit = psbt.inputs[0].non_witness_utxo
-    wit.nLockTime = wit.nLockTime ^ 1  # change one byt of nLockTime arbitrarily to change the txid
+    wit.nLockTime = wit.nLockTime ^ 1  # change one bit of nLockTime arbitrarily to change the txid
     wit.rehash()
     psbt.inputs[0].non_witness_utxo = wit
 

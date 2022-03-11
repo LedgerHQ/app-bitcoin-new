@@ -26,7 +26,7 @@ def extract_our_pubkeys(psbt: PSBT, master_fp: bytes) -> Dict[int, bytes]:
     psbt2 = PSBT()
     psbt2.deserialize(psbt.serialize())
     if (psbt2.version is None or psbt.version == 0):
-        psbt2.to_psbt_v2()
+        psbt2.convert_to_v2()
 
     pubkeys: Dict[int, bytes] = {}
     for input_num, psbt_in in enumerate(psbt2.inputs):
@@ -35,9 +35,8 @@ def extract_our_pubkeys(psbt: PSBT, master_fp: bytes) -> Dict[int, bytes]:
         if psbt_in.witness_utxo:
             utxo = psbt_in.witness_utxo
         if psbt_in.non_witness_utxo:
-            print(psbt_in.output_index)
-            assert psbt_in.output_index is not None
-            utxo = psbt_in.non_witness_utxo.vout[psbt_in.output_index]
+            assert psbt_in.prev_out is not None
+            utxo = psbt_in.non_witness_utxo.vout[psbt_in.prev_out]
         if utxo is None:
             continue
         scriptcode = utxo.scriptPubKey
