@@ -93,7 +93,7 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
         threshold=2,
         keys_info=[
             f"{core_xpub_orig}/**",
-            f"[{'{0:08x}'.format(speculos_globals.master_key_fingerprint)}/48'/1'/0'/2']{internal_xpub}/**",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/48'/1'/0'/2']{internal_xpub}/**",
         ],
     )
 
@@ -166,7 +166,7 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    pubkeys = extract_our_pubkeys(psbt, speculos_globals.master_key_fingerprint.to_bytes(4, byteorder="big"))
+    pubkeys = extract_our_pubkeys(psbt, speculos_globals.master_key_fingerprint)
 
     with automation(comm, "automations/sign_with_wallet_accept.json"):
         hww_sigs = client.sign_psbt(psbt, wallet, wallet_hmac)
