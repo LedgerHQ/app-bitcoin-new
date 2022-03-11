@@ -123,7 +123,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest
+          cd tests && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
 
   job_test_mainnet:
     name: Tests on mainnet
@@ -153,7 +153,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests_mainnet && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest
+          cd tests_mainnet && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
 
   job_test_js_lib:
     name: Tests with the JS library
