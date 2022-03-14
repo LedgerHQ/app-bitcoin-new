@@ -57,7 +57,7 @@ ifeq ($(COIN),bitcoin_testnet)
 DEFINES_LIB=
 APP_LOAD_FLAGS=--appFlags 0xa50
 
-# Bitcoin testnet
+# Bitcoin testnet (can also be used for signet)
 DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
 DEFINES   += BIP44_COIN_TYPE=1
 DEFINES   += BIP44_COIN_TYPE_2=1
@@ -153,6 +153,28 @@ DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
 DEFINES   += COIN_COINID_SHORT=\"TEST\"
 APPNAME = "Bitcoin Test (Lite)"
 
+else ifeq ($(COIN),bitcoin_regtest)
+# This target can be used to compile a version of the app that uses regtest addresses
+
+# we're not using the lib :)
+DEFINES_LIB=
+APP_LOAD_FLAGS=--appFlags 0xa50
+
+# Bitcoin regtest test network
+DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
+DEFINES   += BIP44_COIN_TYPE=1
+DEFINES   += BIP44_COIN_TYPE_2=1
+DEFINES   += COIN_P2PKH_VERSION=111
+DEFINES   += COIN_P2SH_VERSION=196
+DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bcrt\"
+DEFINES   += COIN_FAMILY=1
+DEFINES   += COIN_COINID=\"Bitcoin\"
+DEFINES   += COIN_COINID_HEADER=\"BITCOIN\"
+DEFINES   += COIN_COINID_NAME=\"Bitcoin\"
+DEFINES   += COIN_COINID_SHORT=\"TEST\"
+DEFINES   += COIN_KIND=COIN_KIND_BITCOIN_TESTNET
+DEFINES   += COIN_FLAGS=FLAG_SEGWIT_CHANGE_SUPPORT
+APPNAME = "Bitcoin Regtest"
 else ifeq ($(COIN),bitcoin_cash)
 # Bitcoin cash
 # Initial fork from Bitcoin, public key access is authorized. Signature is different thanks to the forkId
