@@ -123,7 +123,9 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          cd tests
+          pip install -r requirements.txt
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
 
   job_test_mainnet:
     name: Tests on mainnet
@@ -153,7 +155,9 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests_mainnet && pip install -r requirements.txt && PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          cd tests_mainnet
+          pip install -r requirements.txt
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
 
   job_test_js_lib:
     name: Tests with the JS library
@@ -192,7 +196,9 @@ jobs:
 
       - name: Run tests
         run: |
-          cd bitcoin_client_js && yarn install && pwd && LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
+          cd bitcoin_client_js
+          yarn install
+          LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
 
   job_test_legacy_native:
     name: Legacy tests
@@ -222,7 +228,9 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests-legacy && pip install -r requirements.txt && PATH=$PATH:/speculos pytest
+          cd tests-legacy
+          pip install -r requirements.txt
+          PATH=$PATH:/speculos pytest
 
 
   job_test_legacy_lib:
@@ -260,4 +268,6 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests-legacy && pip install -r requirements.txt && PATH=$PATH:/speculos pytest
+          cd tests-legacy
+          pip install -r requirements.txt
+          PATH=$PATH:/speculos pytest
