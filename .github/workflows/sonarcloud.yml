@@ -33,6 +33,10 @@ jobs:
         env:
           SONAR_SCANNER_DOWNLOAD_URL: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${{ env.SONAR_SCANNER_VERSION }}-linux.zip
         run: |
+          apt-get update -y
+          apt-get upgrade -y
+          apt-get install -y
+          curl -sL https://deb.nodesource.com/setup_16.x | bash -
           apt-get install -y gcovr nodejs unzip
           mkdir -p $HOME/.sonar
           curl -sSLo $HOME/.sonar/sonar-scanner.zip ${{ env.SONAR_SCANNER_DOWNLOAD_URL }} 
