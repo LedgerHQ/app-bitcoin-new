@@ -99,7 +99,7 @@ def root_directory(request):
 
 
 @pytest.fixture
-def comm(settings, root_directory, hid, app_version: str) -> Union[TransportClient, SpeculosClient]:
+def comm(settings, root_directory, hid, headless, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
@@ -123,7 +123,9 @@ def comm(settings, root_directory, hid, app_version: str) -> Union[TransportClie
 
         client = SpeculosClient(
             app_binary,
-            ['--sdk', '2.1', '--seed', f'{settings["mnemonic"]}'] + lib_params
+            ['--sdk', '2.1', '--seed', f'{settings["mnemonic"]}']
+            + ["--display", "qt" if not headless else "headless"]
+            + lib_params
         )
         client.start()
 

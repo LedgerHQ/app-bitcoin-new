@@ -62,6 +62,14 @@ class PolicyMapWallet(Wallet):
             MerkleTree(keys_info_hashes).root
         ])
 
+    def get_descriptor(self, change: bool) -> str:
+        desc = self.policy_map
+        for i in reversed(range(self.n_keys)):
+            key = self.keys_info[i]
+            if "/**" in key:
+                key = key.replace("/**", f"/{1 if change else 0}/*")
+            desc = desc.replace(f"@{i}", key)
+        return desc
 
 class MultisigWallet(PolicyMapWallet):
     def __init__(self, name: str, address_type: AddressType, threshold: int, keys_info: List[str], sorted: bool = True) -> None:

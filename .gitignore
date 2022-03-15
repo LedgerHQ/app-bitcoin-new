@@ -14,6 +14,9 @@ unit-tests/coverage.info
 tests-legacy/bitcoin-bin
 tests-legacy/bitcoin-testnet-bin
 
+# temporary folder used during tests
+tests/.test_bitcoin
+
 # Fuzzing
 fuzzing/build/
 

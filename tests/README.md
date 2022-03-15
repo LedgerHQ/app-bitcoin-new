@@ -10,12 +10,18 @@ Python dependencies are listed in [requirements.txt](requirements.txt), install 
 pip install -r requirements.txt
 ```
 
+Some tests require the `bitcoind 22.0` binary to be in the `$PATH` variable, or alternatively to be set as the `BITCOIND` environment variable in the shell running the tests:
+
+```
+export BITCOIND=/path/to/my/bitcoind
+```
+
 ## Launch with Speculos
 
 Build the app as normal from the root folder. For convenience, you probably want to enable DEBUG:
 
 ```
-DEBUG=0 make
+DEBUG=1 make
 ```
 
 Then run all the tests from this folder with:

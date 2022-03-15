@@ -1,4 +1,4 @@
-# Original version: https://github.com/bitcoin-core/HWI
+# Original version: https://github.com/bitcoin-core/HWI/blob/3fe369d0379212fae1c72729a179d133b0adc872/hwilib/key.py
 
 #!/usr/bin/env python3
 # Copyright (c) 2020 The HWI developers
@@ -12,7 +12,7 @@ Key Classes and Utilities
 Classes and utilities for working with extended public keys, key origins, and other key related things.
 """
 
-from . import base58
+from . import _base58 as base58
 from .common import (
     AddressType,
     Chain,
@@ -171,6 +171,15 @@ class ExtendedKey(object):
         :param xpub: The Base58 check encoded xpub
         """
         data = base58.decode(xpub)[:-4] # Decoded xpub without checksum
+        return cls.from_bytes(data)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> 'ExtendedKey':
+        """
+        Create an :class:`~ExtendedKey` from a serialized xpub
+
+        :param xpub: The serialized xpub
+        """
 
         version = data[0:4]
         if version not in [ExtendedKey.MAINNET_PRIVATE, ExtendedKey.MAINNET_PUBLIC, ExtendedKey.TESTNET_PRIVATE, ExtendedKey.TESTNET_PUBLIC]:
@@ -456,6 +465,8 @@ def get_bip44_purpose(addrtype: AddressType) -> int:
         return 49
     elif addrtype == AddressType.WIT:
         return 84
+    elif addrtype == AddressType.TAP:
+        return 86
     else:
         raise ValueError("Unknown address type")
 

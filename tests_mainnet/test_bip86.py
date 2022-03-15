@@ -1,15 +1,15 @@
 from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
 
-from test_utils import mnemonic
+from test_utils import SpeculosGlobals, mnemonic
 
 MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 
 
 @mnemonic(MNEMONIC)
-def test_bip86(client: Client, speculos_globals):
+def test_bip86(client: Client, speculos_globals: SpeculosGlobals):
     # Test vectors for BIP-0086: https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki
 
-    fpr = "{0:0{1}x}".format(speculos_globals.master_key_fingerprint, 8)
+    fpr = speculos_globals.master_key_fingerprint.hex()
 
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 

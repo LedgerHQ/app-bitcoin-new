@@ -160,8 +160,8 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
     tx.vout = vout
     tx.wit = CTxWitness()
 
-    psbt.inputs = [PartiallySignedInput() for _ in input_amounts]
-    psbt.outputs = [PartiallySignedOutput() for _ in output_amounts]
+    psbt.inputs = [PartiallySignedInput(0) for _ in input_amounts]
+    psbt.outputs = [PartiallySignedOutput(0) for _ in output_amounts]
 
     # simplification; good enough for the scripts we support now, but will need more work
     is_legacy = wallet.policy_map.startswith("pkh(")
@@ -191,7 +191,7 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
                 master_key_fpr, path)
         elif is_taproot:
             tweaked_key = get_taproot_output_key(input_key)
-            psbt.inputs[i].tap_hd_keypaths[tweaked_key] = (
+            psbt.inputs[i].tap_bip32_paths[tweaked_key] = (
                 list(), KeyOriginInfo(master_key_fpr, path))
         else:
             raise RuntimeError("Unexpected state: unknown transaction type")
@@ -217,7 +217,10 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
                     master_key_fpr, path)
             elif is_taproot:
                 tweaked_key = get_taproot_output_key(output_key)
-                psbt.outputs[i].tap_hd_keypaths[tweaked_key] = (
+                psbt.outputs[i].tap_bip32_paths[tweaked_key] = (
+                    list(), KeyOriginInfo(master_key_fpr, path))
+
+                psbt.outputs[i].tap_bip32_paths[tweaked_key] = (
                     list(), KeyOriginInfo(master_key_fpr, path))
 
     psbt.tx = tx

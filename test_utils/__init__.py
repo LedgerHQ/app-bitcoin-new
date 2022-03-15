@@ -30,7 +30,7 @@ def test_settings(s: dict):
     return decorator
 
 
-def automation(filename: str):
+def has_automation(filename: str):
     """Adds the automation_file setting to use `filename` as the Speculos automation file."""
     return test_settings({"automation_file": filename})
 
@@ -68,8 +68,7 @@ class SpeculosGlobals:
         bip32 = BIP32.from_seed(self.seed, network)
         self.master_extended_privkey = bip32.get_xpriv()
         self.master_extended_pubkey = bip32.get_xpub()
-        self.master_key_fingerprint = int.from_bytes(
-            hash160(bip32.pubkey)[0:4], byteorder="big")
+        self.master_key_fingerprint = hash160(bip32.pubkey)[0:4]
         self.master_compressed_pubkey = bip32.pubkey.hex()
         slip21_root = Slip21Node.from_seed(self.seed)
         self.wallet_registration_key = slip21_root.derive_child(

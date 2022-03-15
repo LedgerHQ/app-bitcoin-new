@@ -10,7 +10,7 @@ from ecdsa.util import sigdecode_der
 
 from bitcoin_client.hwi.serialization import CTransaction
 from bitcoin_client.exception import ConditionOfUseNotSatisfiedError
-from utils import automation
+from utils import has_automation
 
 
 def sign_from_json(cmd, filepath: Path):
@@ -65,25 +65,25 @@ def test_untrusted_hash_sign_fail_short_payload(cmd, transport):
     assert sw == 0x6700
 
 
-@automation("automations/accept.json")
+@has_automation("automations/accept.json")
 def test_sign_p2wpkh_accept(cmd):
     for filepath in Path("data").rglob("p2wpkh/tx.json"):
         sign_from_json(cmd, filepath)
 
 
-@automation("automations/accept.json")
+@has_automation("automations/accept.json")
 def test_sign_p2sh_p2wpkh_accept(cmd):
     for filepath in Path("data").rglob("p2sh-p2wpkh/tx.json"):
         sign_from_json(cmd, filepath)
 
 
-@automation("automations/accept.json")
+@has_automation("automations/accept.json")
 def test_sign_p2pkh_accept(cmd):
     for filepath in Path("data").rglob("p2pkh/tx.json"):
         sign_from_json(cmd, filepath)
 
 
-@automation("automations/reject.json")
+@has_automation("automations/reject.json")
 def test_sign_fail_p2pkh_reject(cmd):
     with pytest.raises(ConditionOfUseNotSatisfiedError):
         sign_from_json(cmd, "./data/one-to-one/p2pkh/tx.json")

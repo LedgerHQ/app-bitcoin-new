@@ -164,7 +164,7 @@ def fill_p2tr_inout(scriptPubKey: bytes, inout: Union[PartiallySignedInput, Part
     inout.tap_internal_key = internal_pubkey
 
     koo = KeyOriginInfo(speculos_master_key_fingerprint, path)
-    inout.tap_hd_keypaths[internal_pubkey] = (list(), koo)
+    inout.tap_bip32_paths[internal_pubkey] = (list(), koo)
 
 
 def run():
@@ -176,10 +176,6 @@ def run():
 
     psbt = PSBT()
     psbt.deserialize(psbt_raw)
-
-    # pp = pprint.PrettyPrinter(indent=2, compact=False, width=128)
-
-    # pp.pprint(psbt_to_dict(psbt))
 
     for i in range(len(psbt.tx.vin)):
         print(f"Input #{i}")
