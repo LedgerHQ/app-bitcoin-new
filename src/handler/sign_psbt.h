@@ -53,7 +53,7 @@ typedef struct {
                                    // not the correct length.
 
     uint64_t value;
-    uint8_t scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    uint8_t scriptpubkey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
     int scriptpubkey_len;
 
 } cur_output_info_t;

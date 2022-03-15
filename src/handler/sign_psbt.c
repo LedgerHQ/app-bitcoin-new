@@ -146,7 +146,7 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
 
         // get output's scriptPubKey
 
-        uint8_t out_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+        uint8_t out_script[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
         int out_script_len = call_get_merkleized_map_value(dc,
                                                            &ith_map,
                                                            (uint8_t[]){PSBT_OUT_SCRIPT},
@@ -913,8 +913,6 @@ static void process_output_map(dispatcher_context_t *dc) {
     state->outputs_total_value += value;
 
     // Read the output's scriptPubKey
-
-    // Read the output's amount
     result_len = call_get_merkleized_map_value(dc,
                                                &state->cur_output.map,
                                                (uint8_t[]){PSBT_OUT_SCRIPT},
@@ -1065,17 +1063,28 @@ static void output_validate_external(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     // show this output's address
-    // TODO: handle outputs without an address (e.g.: OP_RETURN)
-    char output_address[MAX_ADDRESS_LENGTH_STR + 1];
+    char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     int address_len = get_script_address(state->cur_output.scriptpubkey,
                                          state->cur_output.scriptpubkey_len,
                                          G_coin_config,
                                          output_address,
                                          sizeof(output_address));
     if (address_len < 0) {
-        PRINTF("Unknown or unsupported script type for output %d\n", state->cur_output_index);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
+        // script does not have an address; check if OP_RETURN
+        if (is_opreturn(state->cur_output.scriptpubkey, state->cur_output.scriptpubkey_len)) {
+            int res = format_opscript_script(state->cur_output.scriptpubkey,
+                                             state->cur_output.scriptpubkey_len,
+                                             output_address);
+            if (res == -1) {
+                PRINTF("Invalid or unsupported OP_RETURN for output %d\n", state->cur_output_index);
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return;
+            }
+        } else {
+            PRINTF("Unknown or unsupported script type for output %d\n", state->cur_output_index);
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return;
+        }
     }
 
     if (G_swap_state.called_from_swap) {

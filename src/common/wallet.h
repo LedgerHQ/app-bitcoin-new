@@ -113,14 +113,6 @@ typedef struct {
     size_t *key_indexes;  // pointer to array of exactly n key indexes
 } policy_node_multisig_t;
 
-typedef enum {
-    SCRIPT_TYPE_P2PKH = 0x00,
-    SCRIPT_TYPE_P2SH = 0x01,
-    SCRIPT_TYPE_P2WPKH = 0x02,
-    SCRIPT_TYPE_P2WSH = 0x03,
-    SCRIPT_TYPE_P2TR = 0x04
-} script_type_e;
-
 /**
  * TODO: docs
  */
@@ -143,30 +135,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
  */
 int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
 
-int get_script_type(const uint8_t script[], size_t script_len);
-
 #ifndef SKIP_FOR_CMOCKA
-
-/**
- * TODO: docs
- */
-int get_script_address(const uint8_t script[],
-                       size_t script_len,
-                       global_context_t *coin_config,
-                       char *out,
-                       size_t out_len);
-
-// /**
-//  * TODO: docs
-//  */
-// void hash_update_append_wallet_header(cx_hash_t *hash_context, multisig_wallet_header_t *header);
-
-// /**
-//  * Parses a policy map for the supported wallet types, filling the 'out' buffer.
-//  * Fails if any parsing error occurs, or if the buffer is not exhausted exactly.
-//  * Returns -1 on failure
-//  */
-// int buffer_read_multisig_policy_map(buffer_t *buffer, multisig_wallet_policy_t *out);
 
 /**
  * TODO: docs

@@ -23,6 +23,7 @@
 #include "../common/buffer.h"
 #include "../common/merkle.h"
 #include "../common/read.h"
+#include "../common/script.h"
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"
 #include "../commands.h"

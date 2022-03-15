@@ -34,10 +34,8 @@
 #include "../boilerplate/sw.h"
 #include "../common/bip32.h"
 #include "../common/format.h"
+#include "../common/script.h"
 #include "../constants.h"
-
-#define MAX_BASE58_PUBKEY_LENGTH 112
-#define MAX_ADDRESS_LENGTH       35
 
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
@@ -80,7 +78,7 @@ typedef struct {
 
 typedef struct {
     char index[sizeof("output #999")];
-    char address[MAX_ADDRESS_LENGTH_STR + 1];
+    char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_AMOUNT_LENGTH + 1];
 } ui_validate_output_state_t;
 
@@ -279,7 +277,7 @@ UX_STEP_NOCB(ux_validate_address_step,
              bnnn_paging,
              {
                  .title = "Address",
-                 .text = g_ui_state.validate_output.address,
+                 .text = g_ui_state.validate_output.address_or_description,
              });
 
 UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
@@ -649,7 +647,7 @@ void ui_warn_external_inputs(dispatcher_context_t *context, action_validate_cb c
 
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
-                        char *address,
+                        char *address_or_description,
                         char *coin_name,
                         uint64_t amount,
                         action_validate_cb callback) {
@@ -658,7 +656,9 @@ void ui_validate_output(dispatcher_context_t *context,
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
     snprintf(state->index, sizeof(state->index), "output #%d", index);
-    strncpy(state->address, address, sizeof(state->address));
+    strncpy(state->address_or_description,
+            address_or_description,
+            sizeof(state->address_or_description));
     format_sats_amount(coin_name, amount, state->amount);
 
     g_validate_callback = callback;
