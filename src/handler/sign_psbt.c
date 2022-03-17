@@ -45,6 +45,7 @@
 
 #include "sign_psbt/compare_wallet_script_at_path.h"
 #include "sign_psbt/get_fingerprint_and_path.h"
+#include "sign_psbt/is_in_out_internal.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
@@ -425,38 +426,39 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         uint8_t key_type;
         buffer_read_u8(data, &key_type);
         if (key_type == PSBT_IN_WITNESS_UTXO) {
-            state->cur_input.has_witnessUtxo = true;
+            state->cur.input.has_witnessUtxo = true;
         } else if (key_type == PSBT_IN_NON_WITNESS_UTXO) {
-            state->cur_input.has_nonWitnessUtxo = true;
+            state->cur.input.has_nonWitnessUtxo = true;
         } else if (key_type == PSBT_IN_REDEEM_SCRIPT) {
-            state->cur_input.has_redeemScript = true;
+            state->cur.input.has_redeemScript = true;
         } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
-            state->cur_input.has_sighash_type = true;
-        } else if (key_type == PSBT_IN_BIP32_DERIVATION && !state->cur_input.has_bip32_derivation) {
+            state->cur.input.has_sighash_type = true;
+        } else if (key_type == PSBT_IN_BIP32_DERIVATION &&
+                   !state->cur.in_out.has_bip32_derivation) {
             // The first time that we encounter a PSBT_IN_BIP32_DERIVATION or
             // PSBT_IN_TAP_BIP32_DERIVATION (handled below) key, we store the pubkey. Since we only
             // use this to identify the change and address_index, it does not matter which of the
             // keys we use here (if there are multiple), as per the assumptions above.
-            state->cur_input.has_bip32_derivation = true;
+            state->cur.in_out.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
-                                   state->cur_input.bip32_derivation_pubkey,
+                                   state->cur.in_out.bip32_derivation_pubkey,
                                    33)       // read compressed pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
-                state->cur_input.unexpected_pubkey_error = true;
+                state->cur.in_out.unexpected_pubkey_error = true;
             }
         } else if (key_type == PSBT_IN_TAP_BIP32_DERIVATION &&
-                   !state->cur_input.has_bip32_derivation) {
+                   !state->cur.in_out.has_bip32_derivation) {
             // See comment above
-            state->cur_input.has_bip32_derivation = true;
+            state->cur.in_out.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
-                                   state->cur_input.bip32_derivation_pubkey,
+                                   state->cur.in_out.bip32_derivation_pubkey,
                                    32)       // read x-only pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
-                state->cur_input.unexpected_pubkey_error = true;
+                state->cur.in_out.unexpected_pubkey_error = true;
             }
         }
     }
@@ -473,8 +475,8 @@ static void process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    // Reset cur_input struct
-    memset(&state->cur_input, 0, sizeof(state->cur_input));
+    // Reset cur struct
+    memset(&state->cur, 0, sizeof(state->cur));
 
     int res = call_get_merkleized_map_with_callback(
         dc,
@@ -482,14 +484,14 @@ static void process_input_map(dispatcher_context_t *dc) {
         state->n_inputs,
         state->cur_input_index,
         make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur_input.map);
+        &state->cur.in_out.map);
     if (res < 0) {
         PRINTF("Failed to process input map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    if (state->cur_input.unexpected_pubkey_error) {
+    if (state->cur.in_out.unexpected_pubkey_error) {
         PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -498,7 +500,7 @@ static void process_input_map(dispatcher_context_t *dc) {
     // Read the prevout index
     uint32_t prevout_n;
     if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                  &state->cur_input.map,
+                                                  &state->cur.in_out.map,
                                                   (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                   1,
                                                   &prevout_n)) {
@@ -507,7 +509,7 @@ static void process_input_map(dispatcher_context_t *dc) {
     }
 
     // either witness utxo or non-witness utxo (or both) must be present.
-    if (!state->cur_input.has_nonWitnessUtxo && !state->cur_input.has_witnessUtxo) {
+    if (!state->cur.input.has_nonWitnessUtxo && !state->cur.input.has_witnessUtxo) {
         PRINTF("No witness utxo nor non-witness utxo present in input.\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -515,11 +517,11 @@ static void process_input_map(dispatcher_context_t *dc) {
 
     // validate non-witness utxo (if present) and witness utxo (if present)
 
-    if (state->cur_input.has_nonWitnessUtxo) {
+    if (state->cur.input.has_nonWitnessUtxo) {
         txid_parser_outputs_t parser_outputs;
         // request non-witness utxo, and get the prevout's value and scriptpubkey
         res = call_psbt_parse_rawtx(dc,
-                                    &state->cur_input.map,
+                                    &state->cur.in_out.map,
                                     (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
                                     1,
                                     prevout_n,
@@ -535,7 +537,7 @@ static void process_input_map(dispatcher_context_t *dc) {
         // check if the prevout_hash of the transaction matches the computed one from the
         // non-witness utxo
         res = call_get_merkleized_map_value(dc,
-                                            &state->cur_input.map,
+                                            &state->cur.in_out.map,
                                             (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                             1,
                                             prevout_hash,
@@ -552,27 +554,27 @@ static void process_input_map(dispatcher_context_t *dc) {
 
         state->inputs_total_value += prevout_value;
 
-        state->cur_input.prevout_amount = prevout_value;
+        state->cur.input.prevout_amount = prevout_value;
 
-        state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
+        state->cur.in_out.scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
 
-        if (state->cur_input.prevout_scriptpubkey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+        if (state->cur.in_out.scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
             PRINTF("Prevout's scriptPubKey too long: %d bytes.\n",
-                   state->cur_input.prevout_scriptpubkey_len);
+                   state->cur.in_out.scriptPubKey_len);
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
-        memcpy(state->cur_input.prevout_scriptpubkey,
+        memcpy(state->cur.in_out.scriptPubKey,
                parser_outputs.vout_scriptpubkey,
-               state->cur_input.prevout_scriptpubkey_len);
+               state->cur.in_out.scriptPubKey_len);
     }
 
-    if (state->cur_input.has_witnessUtxo) {
+    if (state->cur.input.has_witnessUtxo) {
         uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
         int wit_utxo_len = call_get_merkleized_map_value(dc,
-                                                         &state->cur_input.map,
+                                                         &state->cur.in_out.map,
                                                          (uint8_t[]){PSBT_IN_WITNESS_UTXO},
                                                          1,
                                                          raw_witnessUtxo,
@@ -595,13 +597,13 @@ static void process_input_map(dispatcher_context_t *dc) {
 
         uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
 
-        if (state->cur_input.has_nonWitnessUtxo) {
+        if (state->cur.input.has_nonWitnessUtxo) {
             // we already know the scriptPubKey, but we double check that it matches
-            if (state->cur_input.prevout_scriptpubkey_len != wit_utxo_scriptPubkey_len ||
-                memcmp(state->cur_input.prevout_scriptpubkey,
+            if (state->cur.in_out.scriptPubKey_len != wit_utxo_scriptPubkey_len ||
+                memcmp(state->cur.in_out.scriptPubKey,
                        wit_utxo_scriptPubkey,
                        wit_utxo_scriptPubkey_len) != 0 ||
-                state->cur_input.prevout_amount != wit_utxo_prevout_amount) {
+                state->cur.input.prevout_amount != wit_utxo_prevout_amount) {
                 PRINTF(
                     "scriptPubKey or amount in non-witness utxo doesn't match with witness utxo\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
@@ -610,9 +612,9 @@ static void process_input_map(dispatcher_context_t *dc) {
             // we extract the scriptPubKey and prevout amount from the witness utxo
             state->inputs_total_value += wit_utxo_prevout_amount;
 
-            state->cur_input.prevout_amount = wit_utxo_prevout_amount;
-            state->cur_input.prevout_scriptpubkey_len = wit_utxo_scriptPubkey_len;
-            memcpy(state->cur_input.prevout_scriptpubkey,
+            state->cur.input.prevout_amount = wit_utxo_prevout_amount;
+            state->cur.in_out.scriptPubKey_len = wit_utxo_scriptPubkey_len;
+            memcpy(state->cur.in_out.scriptPubKey,
                    wit_utxo_scriptPubkey,
                    wit_utxo_scriptPubkey_len);
         }
@@ -626,124 +628,30 @@ static void check_input_owned(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    int script_type = get_script_type(state->cur_input.prevout_scriptpubkey,
-                                      state->cur_input.prevout_scriptpubkey_len);
+    int is_internal = is_in_out_internal(dc, state, &state->cur.in_out, true);
 
-    bool external = false;
-
-    do {
-        if (!state->cur_input.has_bip32_derivation) {
-            external = true;
-            break;
-        }
-
-        // get path, obtain change and address_index,
-
-        int bip32_path_len;
-        uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-        uint32_t fingerprint;
-
-        if (script_type == -1) {
-            external = true;  // unknown script, definitely external
-            break;
-        } else if (script_type == SCRIPT_TYPE_P2TR) {
-            // taproot input, use PSBT_IN_TAP_BIP32_DERIVATION
-            uint8_t key[1 + 32];
-            key[0] = PSBT_IN_TAP_BIP32_DERIVATION;
-            memcpy(key + 1, state->cur_input.bip32_derivation_pubkey, 32);
-
-            bip32_path_len = get_emptyhashes_fingerprint_and_path(dc,
-                                                                  &state->cur_input.map,
-                                                                  key,
-                                                                  sizeof(key),
-                                                                  &fingerprint,
-                                                                  bip32_path);
-        } else {
-            // legacy or segwitv0 input, use PSBT_IN_BIP32_DERIVATION
-            uint8_t key[1 + 33];
-            key[0] = PSBT_IN_BIP32_DERIVATION;
-            memcpy(key + 1, state->cur_input.bip32_derivation_pubkey, 33);
-
-            bip32_path_len = get_fingerprint_and_path(dc,
-                                                      &state->cur_input.map,
-                                                      key,
-                                                      sizeof(key),
-                                                      &fingerprint,
-                                                      bip32_path);
-        }
-
-        if (bip32_path_len < 0) {
-            PRINTF("Couldn't read derivation path\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // As per wallet policy assumptions, the path must have change and address index
-        if (bip32_path_len < 2) {
-            external = true;
-            break;
-        }
-
-        if (state->is_wallet_canonical) {
-            // check if path is as expected
-            uint32_t coin_types[2] = {G_coin_config->bip44_coin_type,
-                                      G_coin_config->bip44_coin_type2};
-            if (!is_address_path_standard(bip32_path,
-                                          bip32_path_len,
-                                          state->bip44_purpose,
-                                          coin_types,
-                                          2,
-                                          -1)) {
-                external = true;
-                break;
-            }
-        }
-
-        uint32_t change = bip32_path[bip32_path_len - 2];
-        uint32_t address_index = bip32_path[bip32_path_len - 1];
-
-        int res = compare_wallet_script_at_path(dc,
-                                                change,
-                                                address_index,
-                                                &state->wallet_policy_map,
-                                                state->wallet_header_keys_info_merkle_root,
-                                                state->wallet_header_n_keys,
-                                                state->cur_input.prevout_scriptpubkey,
-                                                state->cur_input.prevout_scriptpubkey_len);
-        if (res < 0) {
-            PRINTF("Script didn't match\n");
-
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        } else if (res == 0) {
-            external = true;
-            break;
-        } else if (res == 1) {
-            // input is internal, nothing to do
-        } else {
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return;
-        }
-    } while (false);  // executed only once; in a block only to be able to break out of it
-
-    if (external) {
+    if (is_internal < 0) {
+        PRINTF("Error checking if input %d is internal\n", state->cur_input_index);
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    } else if (is_internal == 0) {
         PRINTF("INPUT %d is external\n", state->cur_input_index);
     } else {
         state->internal_inputs[state->cur_input_index] = 1;
-        state->internal_inputs_total_value += state->cur_input.prevout_amount;
+        state->internal_inputs_total_value += state->cur.input.prevout_amount;
 
-        int segwit_version = get_segwit_version(state->cur_input.prevout_scriptpubkey,
-                                                state->cur_input.prevout_scriptpubkey_len);
+        int segwit_version =
+            get_segwit_version(state->cur.in_out.scriptPubKey, state->cur.in_out.scriptPubKey_len);
 
         // For legacy or segwit-v0 inputs, the non-witness utxo must be present
-        if ((segwit_version == -1 || segwit_version == 0) && !state->cur_input.has_nonWitnessUtxo) {
+        if ((segwit_version == -1 || segwit_version == 0) && !state->cur.input.has_nonWitnessUtxo) {
             PRINTF("Non-witness utxo missing for legacy or segwitv0 input\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
         // For all segwit transactions, the witness utxo must be present
-        if (segwit_version >= 0 && !state->cur_input.has_witnessUtxo) {
+        if (segwit_version >= 0 && !state->cur.input.has_witnessUtxo) {
             PRINTF("Witness utxo missing for segwit input\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
@@ -834,28 +742,28 @@ static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         uint8_t key_type;
         buffer_read_u8(data, &key_type);
 
-        if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur_output.has_bip32_derivation) {
+        if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur.in_out.has_bip32_derivation) {
             // The first time that we encounter a PSBT_OUT_BIP32_DERIVATION or
             // PSBT_OUT_TAP_BIP32_DERIVATION key, we store the pubkey.
-            state->cur_output.has_bip32_derivation = true;
+            state->cur.in_out.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
-                                   state->cur_output.bip32_derivation_pubkey,
+                                   state->cur.in_out.bip32_derivation_pubkey,
                                    33)       // read compressed pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
-                state->cur_output.unexpected_pubkey_error = true;
+                state->cur.in_out.unexpected_pubkey_error = true;
             }
         } else if (key_type == PSBT_OUT_TAP_BIP32_DERIVATION &&
-                   !state->cur_output.has_bip32_derivation) {
-            state->cur_output.has_bip32_derivation = true;
+                   !state->cur.in_out.has_bip32_derivation) {
+            state->cur.in_out.has_bip32_derivation = true;
 
             if (!buffer_read_bytes(data,
-                                   state->cur_output.bip32_derivation_pubkey,
+                                   state->cur.in_out.bip32_derivation_pubkey,
                                    32)       // read x-only pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
-                state->cur_output.unexpected_pubkey_error = true;
+                state->cur.in_out.unexpected_pubkey_error = true;
             }
         }
     }
@@ -872,7 +780,8 @@ static void process_output_map(dispatcher_context_t *dc) {
         return;
     }
 
-    memset(&state->cur_output, 0, sizeof(state->cur_output));
+    // Reset cur struct
+    memset(&state->cur, 0, sizeof(state->cur));
 
     int res = call_get_merkleized_map_with_callback(
         dc,
@@ -880,13 +789,13 @@ static void process_output_map(dispatcher_context_t *dc) {
         state->n_outputs,
         state->cur_output_index,
         make_callback(state, (dispatcher_callback_t) output_keys_callback),
-        &state->cur_output.map);
+        &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    if (state->cur_output.unexpected_pubkey_error) {
+    if (state->cur.in_out.unexpected_pubkey_error) {
         PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -898,7 +807,7 @@ static void process_output_map(dispatcher_context_t *dc) {
 
     // Read the output's amount
     int result_len = call_get_merkleized_map_value(dc,
-                                                   &state->cur_output.map,
+                                                   &state->cur.in_out.map,
                                                    (uint8_t[]){PSBT_OUT_AMOUNT},
                                                    1,
                                                    raw_result,
@@ -909,138 +818,42 @@ static void process_output_map(dispatcher_context_t *dc) {
     }
     uint64_t value = read_u64_le(raw_result, 0);
 
-    state->cur_output.value = value;
+    state->cur.output.value = value;
     state->outputs_total_value += value;
 
     // Read the output's scriptPubKey
     result_len = call_get_merkleized_map_value(dc,
-                                               &state->cur_output.map,
+                                               &state->cur.in_out.map,
                                                (uint8_t[]){PSBT_OUT_SCRIPT},
                                                1,
-                                               state->cur_output.scriptpubkey,
-                                               sizeof(state->cur_output.scriptpubkey));
+                                               state->cur.in_out.scriptPubKey,
+                                               sizeof(state->cur.in_out.scriptPubKey));
     if (result_len == -1) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
-    } else if (result_len > (int) sizeof(state->cur_output.scriptpubkey)) {
+    } else if (result_len > (int) sizeof(state->cur.in_out.scriptPubKey)) {
         PRINTF("Output's scriptPubKey too long: %d\n", result_len);
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    state->cur_output.scriptpubkey_len = result_len;
+    state->cur.in_out.scriptPubKey_len = result_len;
 
     dc->next(check_output_owned);
 }
 
-// TODO: lots of code duplication with check_input_owned, consider refactoring
 static void check_output_owned(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    int script_type =
-        get_script_type(state->cur_output.scriptpubkey, state->cur_output.scriptpubkey_len);
+    int is_internal = is_in_out_internal(dc, state, &state->cur.in_out, false);
 
-    bool external = false;
-
-    do {
-        if (!state->cur_output.has_bip32_derivation) {
-            external = true;
-            break;
-        }
-
-        // get path, obtain change and address_index,
-
-        int bip32_path_len;
-        uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-        uint32_t fingerprint;
-
-        if (script_type == -1) {
-            external = true;  // unknown script, definitely external
-            break;
-        } else if (script_type == SCRIPT_TYPE_P2TR) {
-            // taproot output, use PSBT_OUT_TAP_BIP32_DERIVATION
-            uint8_t key[1 + 32];
-            key[0] = PSBT_OUT_TAP_BIP32_DERIVATION;
-            memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 32);
-
-            bip32_path_len = get_emptyhashes_fingerprint_and_path(dc,
-                                                                  &state->cur_output.map,
-                                                                  key,
-                                                                  sizeof(key),
-                                                                  &fingerprint,
-                                                                  bip32_path);
-        } else {
-            // legacy or segwitv0 output, use PSBT_OUT_BIP32_DERIVATION
-            uint8_t key[1 + 33];
-            key[0] = PSBT_OUT_BIP32_DERIVATION;
-            memcpy(key + 1, state->cur_output.bip32_derivation_pubkey, 33);
-
-            bip32_path_len = get_fingerprint_and_path(dc,
-                                                      &state->cur_output.map,
-                                                      key,
-                                                      sizeof(key),
-                                                      &fingerprint,
-                                                      bip32_path);
-        }
-
-        if (bip32_path_len < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // As per wallet policy assumptions, the path must have change and address index
-        if (bip32_path_len < 2) {
-            external = true;
-            break;
-        }
-        uint32_t change = bip32_path[bip32_path_len - 2];
-        uint32_t address_index = bip32_path[bip32_path_len - 1];
-
-        if (change != 1) {
-            // unlike for inputs, change must be 1 for this output to be considered internal
-            external = true;
-            break;
-        }
-
-        if (state->is_wallet_canonical) {
-            // for canonical wallets, the path must be exactly as expected for a change output
-            uint32_t coin_types[2] = {G_coin_config->bip44_coin_type,
-                                      G_coin_config->bip44_coin_type2};
-            if (!is_address_path_standard(bip32_path,
-                                          bip32_path_len,
-                                          state->bip44_purpose,
-                                          coin_types,
-                                          2,
-                                          1)) {
-                external = true;
-                break;
-            }
-        }
-
-        int res = compare_wallet_script_at_path(dc,
-                                                change,
-                                                address_index,
-                                                &state->wallet_policy_map,
-                                                state->wallet_header_keys_info_merkle_root,
-                                                state->wallet_header_n_keys,
-                                                state->cur_output.scriptpubkey,
-                                                state->cur_output.scriptpubkey_len);
-        if (res < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        } else if (res == 0) {
-            external = true;
-        } else if (res == 1) {
-            // output is internal, nothing to do
-        } else {
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return;
-        }
-    } while (false);  // execute only once; just to be able to break out
-
-    if (external) {
+    if (is_internal < 0) {
+        PRINTF("Error checking if output %d is internal\n", state->cur_output_index);
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    } else if (is_internal == 0) {
         // external output, user needs to validate
         ++state->external_outputs_count;
 
@@ -1049,7 +862,7 @@ static void check_output_owned(dispatcher_context_t *dc) {
     } else {
         // valid change address, nothing to show to the user
 
-        state->change_outputs_total_value += state->cur_output.value;
+        state->change_outputs_total_value += state->cur.output.value;
         ++state->change_count;
 
         dc->next(output_next);
@@ -1064,16 +877,16 @@ static void output_validate_external(dispatcher_context_t *dc) {
 
     // show this output's address
     char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    int address_len = get_script_address(state->cur_output.scriptpubkey,
-                                         state->cur_output.scriptpubkey_len,
+    int address_len = get_script_address(state->cur.in_out.scriptPubKey,
+                                         state->cur.in_out.scriptPubKey_len,
                                          G_coin_config,
                                          output_address,
                                          sizeof(output_address));
     if (address_len < 0) {
         // script does not have an address; check if OP_RETURN
-        if (is_opreturn(state->cur_output.scriptpubkey, state->cur_output.scriptpubkey_len)) {
-            int res = format_opscript_script(state->cur_output.scriptpubkey,
-                                             state->cur_output.scriptpubkey_len,
+        if (is_opreturn(state->cur.in_out.scriptPubKey, state->cur.in_out.scriptPubKey_len)) {
+            int res = format_opscript_script(state->cur.in_out.scriptPubKey,
+                                             state->cur.in_out.scriptPubKey_len,
                                              output_address);
             if (res == -1) {
                 PRINTF("Invalid or unsupported OP_RETURN for output %d\n", state->cur_output_index);
@@ -1109,7 +922,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
                            state->external_outputs_count,
                            output_address,
                            G_coin_config->name_short,
-                           state->cur_output.value,
+                           state->cur.output.value,
                            ui_action_validate_output);
         return;
     }
@@ -1298,8 +1111,8 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    // Reset cur_input struct
-    memset(&state->cur_input, 0, sizeof(state->cur_input));
+    // Reset cur struct
+    memset(&state->cur, 0, sizeof(state->cur));
 
     int res = call_get_merkleized_map_with_callback(
         dc,
@@ -1307,21 +1120,21 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         state->n_inputs,
         state->cur_input_index,
         make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur_input.map);
+        &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    if (!state->cur_input.has_sighash_type) {
-        state->cur_input.sighash_type = SIGHASH_ALL;
+    if (!state->cur.input.has_sighash_type) {
+        state->cur.input.sighash_type = SIGHASH_ALL;
     } else {
         // Get sighash type
         if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &state->cur_input.map,
+                                                      &state->cur.in_out.map,
                                                       (uint8_t[]){PSBT_IN_SIGHASH_TYPE},
                                                       1,
-                                                      &state->cur_input.sighash_type)) {
+                                                      &state->cur.input.sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", state->cur_input_index);
 
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1330,7 +1143,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     }
 
     // TODO: add support for other sighash flags
-    if (state->cur_input.sighash_type != SIGHASH_ALL) {
+    if (state->cur.input.sighash_type != SIGHASH_ALL) {
         PRINTF("Only SIGHASH_ALL is currently supported\n");
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
@@ -1346,10 +1159,10 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         // taproot input, use PSBT_IN_TAP_BIP32_DERIVATION
         uint8_t key[1 + 32];
         key[0] = PSBT_IN_TAP_BIP32_DERIVATION;
-        memcpy(key + 1, state->cur_input.bip32_derivation_pubkey, 32);
+        memcpy(key + 1, state->cur.in_out.bip32_derivation_pubkey, 32);
 
         bip32_path_len = get_emptyhashes_fingerprint_and_path(dc,
-                                                              &state->cur_input.map,
+                                                              &state->cur.in_out.map,
                                                               key,
                                                               sizeof(key),
                                                               &fingerprint,
@@ -1358,10 +1171,10 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         // legacy or segwitv0 input, use PSBT_IN_BIP32_DERIVATION
         uint8_t key[1 + 33];
         key[0] = PSBT_IN_BIP32_DERIVATION;
-        memcpy(key + 1, state->cur_input.bip32_derivation_pubkey, 33);
+        memcpy(key + 1, state->cur.in_out.bip32_derivation_pubkey, 33);
 
         bip32_path_len = get_fingerprint_and_path(dc,
-                                                  &state->cur_input.map,
+                                                  &state->cur.in_out.map,
                                                   key,
                                                   sizeof(key),
                                                   &fingerprint,
@@ -1373,11 +1186,11 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    state->cur_input.change = bip32_path[bip32_path_len - 2];
-    state->cur_input.address_index = bip32_path[bip32_path_len - 1];
+    state->cur.input.change = bip32_path[bip32_path_len - 2];
+    state->cur.input.address_index = bip32_path[bip32_path_len - 1];
 
     // Sign as segwit input iff it has a witness utxo
-    if (!state->cur_input.has_witnessUtxo) {
+    if (!state->cur.input.has_witnessUtxo) {
         dc->next(sign_legacy);
     } else {
         dc->next(sign_segwit);
@@ -1396,7 +1209,7 @@ static void sign_legacy(dispatcher_context_t *dc) {
     // Read the prevout index
     uint32_t prevout_n;
     if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                  &state->cur_input.map,
+                                                  &state->cur.in_out.map,
                                                   (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                   1,
                                                   &prevout_n)) {
@@ -1407,7 +1220,7 @@ static void sign_legacy(dispatcher_context_t *dc) {
     txid_parser_outputs_t parser_outputs;
     // request non-witness utxo, and get the prevout's value and scriptpubkey
     int res = call_psbt_parse_rawtx(dc,
-                                    &state->cur_input.map,
+                                    &state->cur.in_out.map,
                                     (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
                                     1,
                                     prevout_n,
@@ -1417,8 +1230,8 @@ static void sign_legacy(dispatcher_context_t *dc) {
         return;
     }
 
-    state->cur_input.prevout_scriptpubkey_len = parser_outputs.vout_scriptpubkey_len;
-    memcpy(state->cur_input.prevout_scriptpubkey,
+    state->cur.in_out.scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
+    memcpy(state->cur.in_out.scriptPubKey,
            parser_outputs.vout_scriptpubkey,
            parser_outputs.vout_scriptpubkey_len);
 
@@ -1452,7 +1265,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
         } else {
             // Avoid requesting the same map unnecessarily
             // (might be removed once a caching mechanism is implemented)
-            memcpy(&ith_map, &state->cur_input.map, sizeof(state->cur_input.map));
+            memcpy(&ith_map, &state->cur.in_out.map, sizeof(state->cur.in_out.map));
         }
 
         // get prevout hash and output index for the i-th input
@@ -1486,20 +1299,20 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
             // empty scriptcode
             crypto_hash_update_u8(&sighash_context.header, 0x00);
         } else {
-            if (!state->cur_input.has_redeemScript) {
+            if (!state->cur.input.has_redeemScript) {
                 // P2PKH, the script_code is the prevout's scriptPubKey
                 crypto_hash_update_varint(&sighash_context.header,
-                                          state->cur_input.prevout_scriptpubkey_len);
+                                          state->cur.in_out.scriptPubKey_len);
                 crypto_hash_update(&sighash_context.header,
-                                   state->cur_input.prevout_scriptpubkey,
-                                   state->cur_input.prevout_scriptpubkey_len);
+                                   state->cur.in_out.scriptPubKey,
+                                   state->cur.in_out.scriptPubKey_len);
             } else {
                 // P2SH, the script_code is the redeemScript
 
                 // update sighash_context with the length-prefixed redeem script
                 int redeemScript_len =
                     update_hashes_with_map_value(dc,
-                                                 &state->cur_input.map,
+                                                 &state->cur.in_out.map,
                                                  (uint8_t[]){PSBT_IN_REDEEM_SCRIPT},
                                                  1,
                                                  NULL,
@@ -1538,7 +1351,7 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // hash type
-    write_u32_le(tmp, 0, state->cur_input.sighash_type);
+    write_u32_le(tmp, 0, state->cur.input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // compute sighash
@@ -1559,7 +1372,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
         uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
         int wit_utxo_len = call_get_merkleized_map_value(dc,
-                                                         &state->cur_input.map,
+                                                         &state->cur.in_out.map,
                                                          (uint8_t[]){PSBT_IN_WITNESS_UTXO},
                                                          1,
                                                          raw_witnessUtxo,
@@ -1582,19 +1395,17 @@ static void sign_segwit(dispatcher_context_t *dc) {
         uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
 
         // Validation of the witness-utxo was already done during input processing
-        state->cur_input.prevout_amount = wit_utxo_prevout_amount;
-        state->cur_input.prevout_scriptpubkey_len = wit_utxo_scriptPubkey_len;
-        memcpy(state->cur_input.prevout_scriptpubkey,
-               wit_utxo_scriptPubkey,
-               wit_utxo_scriptPubkey_len);
+        state->cur.input.prevout_amount = wit_utxo_prevout_amount;
+        state->cur.in_out.scriptPubKey_len = wit_utxo_scriptPubkey_len;
+        memcpy(state->cur.in_out.scriptPubKey, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
 
-        if (state->cur_input.has_redeemScript) {
+        if (state->cur.input.has_redeemScript) {
             // Get redeemScript
             uint8_t redeemScript[64];
 
             int redeemScript_length =
                 call_get_merkleized_map_value(dc,
-                                              &state->cur_input.map,
+                                              &state->cur.in_out.map,
                                               (uint8_t[]){PSBT_IN_REDEEM_SCRIPT},
                                               1,
                                               redeemScript,
@@ -1618,12 +1429,12 @@ static void sign_segwit(dispatcher_context_t *dc) {
                 return;
             }
 
-            state->cur_input.script_len = redeemScript_length;
-            memcpy(state->cur_input.script, redeemScript, redeemScript_length);
+            state->cur.input.script_len = redeemScript_length;
+            memcpy(state->cur.input.script, redeemScript, redeemScript_length);
             segwit_version = get_segwit_version(redeemScript, redeemScript_length);
         } else {
-            state->cur_input.script_len = wit_utxo_scriptPubkey_len;
-            memcpy(state->cur_input.script, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
+            state->cur.input.script_len = wit_utxo_scriptPubkey_len;
+            memcpy(state->cur.input.script, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
 
             segwit_version = get_segwit_version(wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
         }
@@ -1806,7 +1617,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
         // get prevout hash and output index for the current input
         uint8_t prevout_hash[32];
         if (32 != call_get_merkleized_map_value(dc,
-                                                &state->cur_input.map,
+                                                &state->cur.in_out.map,
                                                 (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 prevout_hash,
@@ -1819,7 +1630,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
 
         uint8_t prevout_n_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
-                                               &state->cur_input.map,
+                                               &state->cur.in_out.map,
                                                (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                1,
                                                prevout_n_raw,
@@ -1832,12 +1643,12 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
     }
 
     // scriptCode
-    if (is_p2wpkh(state->cur_input.script, state->cur_input.script_len)) {
+    if (is_p2wpkh(state->cur.input.script, state->cur.input.script_len)) {
         // P2WPKH(script[2:22])
         crypto_hash_update_u32(&sighash_context.header, 0x1976a914);
-        crypto_hash_update(&sighash_context.header, state->cur_input.script + 2, 20);
+        crypto_hash_update(&sighash_context.header, state->cur.input.script + 2, 20);
         crypto_hash_update_u16(&sighash_context.header, 0x88ac);
-    } else if (is_p2wsh(state->cur_input.script, state->cur_input.script_len)) {
+    } else if (is_p2wsh(state->cur.input.script, state->cur.input.script_len)) {
         // P2WSH
 
         // update sighash_context.header with the length-prefixed witnessScript,
@@ -1846,7 +1657,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
         cx_sha256_init(&witnessScript_hash_context);
 
         int witnessScript_len = update_hashes_with_map_value(dc,
-                                                             &state->cur_input.map,
+                                                             &state->cur.in_out.map,
                                                              (uint8_t[]){PSBT_IN_WITNESS_SCRIPT},
                                                              1,
                                                              &witnessScript_hash_context.header,
@@ -1862,9 +1673,9 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
         crypto_hash_digest(&witnessScript_hash_context.header, witnessScript_hash, 32);
 
         // check that script == P2WSH(witnessScript)
-        if (state->cur_input.script_len != 2 + 32 || state->cur_input.script[0] != 0x00 ||
-            state->cur_input.script[1] != 0x20 ||
-            memcmp(state->cur_input.script + 2, witnessScript_hash, 32) != 0) {
+        if (state->cur.input.script_len != 2 + 32 || state->cur.input.script[0] != 0x00 ||
+            state->cur.input.script[1] != 0x20 ||
+            memcmp(state->cur.input.script + 2, witnessScript_hash, 32) != 0) {
             PRINTF("Mismatching witnessScript\n");
 
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1881,7 +1692,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
         uint8_t witness_utxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
         int witness_utxo_len = call_get_merkleized_map_value(dc,
-                                                             &state->cur_input.map,
+                                                             &state->cur.in_out.map,
                                                              (uint8_t[]){PSBT_IN_WITNESS_UTXO},
                                                              1,
                                                              witness_utxo,
@@ -1900,7 +1711,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
     {
         uint8_t nSequence_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
-                                               &state->cur_input.map,
+                                               &state->cur.in_out.map,
                                                (uint8_t[]){PSBT_IN_SEQUENCE},
                                                1,
                                                nSequence_raw,
@@ -1925,7 +1736,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // sighash type
-    write_u32_le(tmp, 0, state->cur_input.sighash_type);
+    write_u32_le(tmp, 0, state->cur.input.sighash_type);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // compute sighash
@@ -1948,7 +1759,7 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
     uint8_t tmp[32];
 
     // hash type
-    uint8_t sighash_byte = (uint8_t) (state->cur_input.sighash_type & 0xFF);
+    uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
     crypto_hash_update_u8(&sighash_context.header, sighash_byte);
 
     // nVersion
@@ -1976,7 +1787,7 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
     if ((sighash_byte & 0x80) == SIGHASH_ANYONECANPAY) {
         // outpoint (hash)
         if (32 != call_get_merkleized_map_value(dc,
-                                                &state->cur_input.map,
+                                                &state->cur.in_out.map,
                                                 (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 tmp,
@@ -1988,7 +1799,7 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
 
         // outpoint (output index)
         if (4 != call_get_merkleized_map_value(dc,
-                                               &state->cur_input.map,
+                                               &state->cur.in_out.map,
                                                (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                1,
                                                tmp,
@@ -1999,17 +1810,17 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
         crypto_hash_update(&sighash_context.header, tmp, 4);
 
         // amount
-        write_u64_le(tmp, 0, state->cur_input.prevout_amount);
+        write_u64_le(tmp, 0, state->cur.input.prevout_amount);
         crypto_hash_update(&sighash_context.header, tmp, 8);
 
         // scriptPubKey
         crypto_hash_update(&sighash_context.header,
-                           state->cur_input.prevout_scriptpubkey,
-                           state->cur_input.prevout_scriptpubkey_len);
+                           state->cur.in_out.scriptPubKey,
+                           state->cur.in_out.scriptPubKey_len);
 
         // nSequence
         if (4 != call_get_merkleized_map_value(dc,
-                                               &state->cur_input.map,
+                                               &state->cur.in_out.map,
                                                (uint8_t[]){PSBT_IN_SEQUENCE},
                                                1,
                                                tmp,
@@ -2043,8 +1854,8 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     for (int i = 0; i < state->our_key_derivation_length; i++) {
         sign_path[i] = state->our_key_derivation[i];
     }
-    sign_path[state->our_key_derivation_length] = state->cur_input.change;
-    sign_path[state->our_key_derivation_length + 1] = state->cur_input.address_index;
+    sign_path[state->our_key_derivation_length] = state->cur.input.change;
+    sign_path[state->our_key_derivation_length + 1] = state->cur.input.address_index;
 
     int sign_path_len = state->our_key_derivation_length + 2;
 
@@ -2064,7 +1875,7 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     uint8_t input_index = (uint8_t) state->cur_input_index;
     dc->add_to_response(&input_index, 1);
     dc->add_to_response(&sig, sig_len);
-    uint8_t sighash_byte = (uint8_t) (state->cur_input.sighash_type & 0xFF);
+    uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
     dc->add_to_response(&sighash_byte, 1);
     dc->finalize_response(SW_INTERRUPTED_EXECUTION);
 
@@ -2092,8 +1903,8 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     for (int i = 0; i < state->our_key_derivation_length; i++) {
         sign_path[i] = state->our_key_derivation[i];
     }
-    sign_path[state->our_key_derivation_length] = state->cur_input.change;
-    sign_path[state->our_key_derivation_length + 1] = state->cur_input.address_index;
+    sign_path[state->our_key_derivation_length] = state->cur.input.change;
+    sign_path[state->our_key_derivation_length + 1] = state->cur.input.address_index;
 
     int sign_path_len = state->our_key_derivation_length + 2;
 
@@ -2146,7 +1957,7 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     dc->add_to_response(&sig, sizeof(sig));
 
     // only append the sighash type byte if it is non-zero
-    uint8_t sighash_byte = (uint8_t) (state->cur_input.sighash_type & 0xFF);
+    uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
     if (sighash_byte != 0x00) {
         // only add the sighash byte if not 0
         dc->add_to_response(&sighash_byte, 1);

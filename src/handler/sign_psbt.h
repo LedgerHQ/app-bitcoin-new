@@ -1,28 +1,41 @@
 #pragma once
 
 #include "../boilerplate/dispatcher.h"
+#include "../constants.h"
 #include "../common/merkle.h"
+#include "../common/wallet.h"
 
 #define MAX_N_INPUTS_CAN_SIGN  64
 #define MAX_N_OUTPUTS_CAN_SIGN 256
 
+// common info that applies to either the current input or the current output
 typedef struct {
     merkleized_map_commitment_t map;
 
+    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
+                                   // PSBT_{IN,OUT}_BIP32_DERIVATION or
+                                   // PSBT_{IN,OUT}_TAP_BIP32_DERIVATION is not the correct length.
+
+    bool has_bip32_derivation;
+    uint8_t
+        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_{IN,OUT}_BIP32_DERIVATION or
+                                      // PSBT_{IN,OUT}_TAP_BIP32_DERIVATION key seen.
+                                      // Could be 33 (legacy or segwitv0) or 32 bytes long
+                                      // (taproot), based on the script type.
+
+    // For an output, its scriptPubKey
+    // for an input, the prevout's scriptPubKey (either from the non-witness-utxo, or from the
+    // witness-utxo)
+
+    uint8_t scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
+    int scriptPubKey_len;
+} in_out_info_t;
+
+typedef struct {
     bool has_witnessUtxo;
     bool has_nonWitnessUtxo;
     bool has_redeemScript;
     bool has_sighash_type;
-
-    bool has_bip32_derivation;
-    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_IN_BIP32_DERIVATION or
-                                          // PSBT_IN_TAP_BIP32_DERIVATION key seen.
-                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
-                                          // (taproot), based on the script type.
-
-    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
-                                   // PSBT_IN_BIP32_DERIVATION or PSBT_IN_TAP_BIP32_DERIVATION is
-                                   // not the correct length.
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
@@ -37,26 +50,11 @@ typedef struct {
 
     int change;
     int address_index;
-} cur_input_info_t;
+} input_info_t;
 
 typedef struct {
-    merkleized_map_commitment_t map;
-
-    bool has_bip32_derivation;
-    uint8_t bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_OUT_BIP32_DERIVATION or
-                                          // PSBT_OUT_TAP_BIP32_DERIVATION key seen.
-                                          // Could be 33 (legacy or segwitv0) or 32 bytes long
-                                          // (taproot), based on the script type.
-
-    bool unexpected_pubkey_error;  // Set to true if the pubkey in the keydata of
-                                   // PSBT_OUT_BIP32_DERIVATION or PSBT_OUT_TAP_BIP32_DERIVATION is
-                                   // not the correct length.
-
     uint64_t value;
-    uint8_t scriptpubkey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
-    int scriptpubkey_len;
-
-} cur_output_info_t;
+} output_info_t;
 
 typedef struct {
     machine_context_t ctx;
@@ -87,15 +85,17 @@ typedef struct {
     uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN];  // TODO: use a bitvector
 
     union {
-        struct {
-            unsigned int cur_input_index;
-            cur_input_info_t cur_input;
-        };
-        struct {
-            unsigned int cur_output_index;
-            cur_output_info_t cur_output;
-        };
+        unsigned int cur_input_index;
+        unsigned int cur_output_index;
     };
+
+    struct {
+        in_out_info_t in_out;
+        union {
+            input_info_t input;
+            output_info_t output;
+        };
+    } cur;
 
     uint8_t sighash[32];
 
