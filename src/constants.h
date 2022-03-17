@@ -29,8 +29,13 @@
  * Maximum length of a serialized address (in characters).
  * Segwit addresses can reach 74 characters; 76 on regtest because of the longer "bcrt" prefix.
  */
+#ifdef COIN_NATIVE_SEGWIT_PREFIX
 #define MAX_ADDRESS_LENGTH_STR (72 + sizeof(COIN_NATIVE_SEGWIT_PREFIX))
-
+#else
+// To be removed once altcoins are moved to a separate repo, as COIN_NATIVE_SEGWIT_PREFIX
+// will always be defined
+#define MAX_ADDRESS_LENGTH_STR 74
+#endif
 /**
  * Maximum transaction length (bytes).
  */
