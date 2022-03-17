@@ -47,18 +47,18 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
         if (!buffer_read_bytes(&dc->read_buffer, cur_hash, 32) ||
             !buffer_read_u8(&dc->read_buffer, &proof_size) ||
             !buffer_read_u8(&dc->read_buffer, &n_proof_elements)) {
-            return -2;
+            return -1;
         }
 
         if (n_proof_elements > proof_size) {
             PRINTF("Received more proof data than expected.\n");
 
             // Wrong length of the Merkle proof.
-            return -3;
+            return -1;
         }
 
         if (!buffer_can_read(&dc->read_buffer, 32 * (size_t) n_proof_elements)) {
-            return -4;
+            return -1;
         }
 
         // Copy leaf hash to output (although it is not verified yet)
@@ -81,7 +81,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
                 } else if (direction == 1) {
                     merkle_combine_hashes(sibling_hash, cur_hash, cur_hash);
                 } else {
-                    return -5;  // unexpected, proof too long?
+                    return -1;  // unexpected, proof too long?
                 }
 
                 buffer_seek_cur(&dc->read_buffer, 32);  // consume the bytes of the sibling hash
@@ -94,7 +94,7 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             uint8_t req_more[] = {CCMD_GET_MORE_ELEMENTS};
             SET_RESPONSE(dc, req_more, sizeof(req_more), SW_INTERRUPTED_EXECUTION);
             if (dc->process_interruption(dc) < 0) {
-                return -6;
+                return -1;
             }
 
             // Parse response to CCMD_GET_MORE_ELEMENTS
@@ -102,22 +102,22 @@ int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
             if (!buffer_read_u8(&dc->read_buffer, &n_proof_elements) ||
                 !buffer_read_u8(&dc->read_buffer, &elements_len) ||
                 !buffer_can_read(&dc->read_buffer, (size_t) n_proof_elements * elements_len)) {
-                return -7;
+                return -1;
             }
 
             if (elements_len != 32) {
-                return -8;
+                return -1;
             }
 
             if (cur_step + n_proof_elements > proof_size) {
                 // Receiving more data then expected
-                return -9;
+                return -1;
             }
         }
 
         if (memcmp(merkle_root, cur_hash, 32) != 0) {
             PRINTF("Merkle root mismatch");
-            return -10;
+            return -1;
         }
     }
 
