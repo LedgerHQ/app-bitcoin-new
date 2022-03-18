@@ -28,7 +28,7 @@ typedef struct {
     // witness-utxo)
 
     uint8_t scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
-    int scriptPubKey_len;
+    size_t scriptPubKey_len;
 } in_out_info_t;
 
 typedef struct {
@@ -40,11 +40,11 @@ typedef struct {
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
     uint8_t prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-    int prevout_scriptpubkey_len;
+    size_t prevout_scriptpubkey_len;
 
     // the script used when signing, either from the witness utxo or the redeem script
     uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-    int script_len;
+    size_t script_len;
 
     uint32_t sighash_type;
 

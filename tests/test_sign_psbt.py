@@ -548,3 +548,36 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
         hww_sigs = client.sign_psbt(psbt, wallet, None)
 
     assert len(hww_sigs) == 1
+
+
+@has_automation("automations/sign_with_wallet_external_inputs_accept.json")
+def test_sign_psbt_external_input(client: Client):
+    # PSBT for a transaction where the first input is internal (segwit), while the second input is external (legacy)
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAL8CAAAAAnoqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////USLCzeaCPlV1QXW5LJxXoKjhrIPDjheH/Tof8zSOlRMBAAAAAP3///8DoLsNAAAAAAAZdqkUNEoPSMoVDsK5A4F2YLm2ixOmcCaIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+R4QQ8AAAAAABl2qRQT19WBZpRsPsAik0Bm2MDREdG7QYisAAAAAAABAH0CAAAAAa+/rgZZD3Qf8a9ZtqxGESYzakxKgttVPfb++rc3rDPzAQAAAAD9////AnARAQAAAAAAIgAg/e5EHFblsG0N+CwSTHBwFKXKGWWL4LmFa8oW8e0yWfel9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLAAAAAAEBH6X0MAAAAAAAFgAUOvhCmtWVSqXuijPJg/2KHoZ5kksiBgPuLD2Y6x+TwKGqjlpACbcOt7ROrRXxZm8TawEq1Y0waBj1rML9VAAAgAEAAIAAAACAAQAAAAgAAAAAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAACICAinsR3JxMe0liKIMRu2pq7fapvSf1Quv5wucWqaWHE7MGPWswv1UAACAAQAAgAAAAIABAAAACgAAAAAA")
+
+    wallet0 = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    result0 = client.sign_psbt(psbt, wallet0, None)
+
+    # should only sign for the first input
+    assert list(result0.keys()) == [0]
+
+    wallet1 = PolicyMapWallet(
+        "",
+        "pkh(@0)",
+        [
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
+        ],
+    )
+
+    result1 = client.sign_psbt(psbt, wallet1, None)
+
+    # should only sign for the second input
+    assert list(result1.keys()) == [1]

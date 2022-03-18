@@ -176,6 +176,130 @@ static int get_segwit_version(const uint8_t scriptPubKey[], int scriptPubKey_len
     return -1;
 }
 
+/*
+ Convenience function to get the amount and scriptpubkey from the non-witness-utxo of a certain
+ input in a PSBTv2.
+ If expected_prevout_hash is not NULL, the function fails if the txid computed from the
+ non-witness-utxo does not match the one pointed by expected_prevout_hash. Returns -1 on failure, 0
+ on success.
+*/
+static int get_amount_scriptpubkey_from_psbt_nonwitness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len,
+    uint8_t *expected_prevout_hash) {
+    // If there is no witness-utxo, it must be the case that this is a legacy input.
+    // In this case, we can only retrieve the prevout amount and scriptPubKey by parsing
+    // the non-witness-utxo
+
+    // Read the prevout index
+    uint32_t prevout_n;
+    if (4 != call_get_merkleized_map_value_u32_le(dc,
+                                                  input_map,
+                                                  (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
+                                                  1,
+                                                  &prevout_n)) {
+        return -1;
+    }
+
+    txid_parser_outputs_t parser_outputs;
+    // request non-witness utxo, and get the prevout's value and scriptpubkey
+    int res = call_psbt_parse_rawtx(dc,
+                                    input_map,
+                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
+                                    1,
+                                    prevout_n,
+                                    &parser_outputs);
+    if (res < 0) {
+        PRINTF("Parsing rawtx failed\n");
+        return -1;
+    }
+
+    // if expected_prevout_hash is give, check that it matches the txid obtained from the parser
+    if (expected_prevout_hash != NULL &&
+        memcmp(parser_outputs.txid, expected_prevout_hash, 32) != 0) {
+        PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
+
+        return -1;
+    }
+
+    *amount = parser_outputs.vout_value;
+    *scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
+    memcpy(scriptPubKey, parser_outputs.vout_scriptpubkey, parser_outputs.vout_scriptpubkey_len);
+
+    return 0;
+}
+
+/*
+ Convenience function to get the amount and scriptpubkey from the witness-utxo of a certain input in
+ a PSBTv2.
+ Returns -1 on failure, 0 on success.
+*/
+static int get_amount_scriptpubkey_from_psbt_witness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len) {
+    uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+
+    int wit_utxo_len = call_get_merkleized_map_value(dc,
+                                                     input_map,
+                                                     (uint8_t[]){PSBT_IN_WITNESS_UTXO},
+                                                     1,
+                                                     raw_witnessUtxo,
+                                                     sizeof(raw_witnessUtxo));
+
+    if (wit_utxo_len < 0) {
+        return -1;
+    }
+    int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
+
+    if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
+        PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
+        return -1;
+    }
+
+    uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
+    uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+
+    *amount = wit_utxo_prevout_amount;
+    *scriptPubKey_len = wit_utxo_scriptPubkey_len;
+    memcpy(scriptPubKey, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
+    return 0;
+}
+
+/*
+ Convenience function to get the amount and scriptpubkey of a certain input in a PSBTv2.
+ It first tries to obtain it from the witness-utxo field; in case of failure, it then obtains it
+ from the non-witness-utxo.
+ Returns -1 on failure, 0 on success.
+*/
+static int get_amount_scriptpubkey_from_psbt(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len) {
+    int ret = get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                        input_map,
+                                                        amount,
+                                                        scriptPubKey,
+                                                        scriptPubKey_len);
+    if (ret >= 0) {
+        return ret;
+    }
+
+    return get_amount_scriptpubkey_from_psbt_nonwitness(dc,
+                                                        input_map,
+                                                        amount,
+                                                        scriptPubKey,
+                                                        scriptPubKey_len,
+                                                        NULL);
+}
+
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
@@ -481,17 +605,6 @@ static void process_input_map(dispatcher_context_t *dc) {
         return;
     }
 
-    // Read the prevout index
-    uint32_t prevout_n;
-    if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                  &state->cur.in_out.map,
-                                                  (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
-                                                  1,
-                                                  &prevout_n)) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
     // either witness utxo or non-witness utxo (or both) must be present.
     if (!state->cur.input.has_nonWitnessUtxo && !state->cur.input.has_witnessUtxo) {
         PRINTF("No witness utxo nor non-witness utxo present in input.\n");
@@ -502,84 +615,44 @@ static void process_input_map(dispatcher_context_t *dc) {
     // validate non-witness utxo (if present) and witness utxo (if present)
 
     if (state->cur.input.has_nonWitnessUtxo) {
-        txid_parser_outputs_t parser_outputs;
-        // request non-witness utxo, and get the prevout's value and scriptpubkey
-        res = call_psbt_parse_rawtx(dc,
-                                    &state->cur.in_out.map,
-                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
-                                    1,
-                                    prevout_n,
-                                    &parser_outputs);
-        if (res < 0) {
-            PRINTF("Parsing rawtx failed\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
         uint8_t prevout_hash[32];
 
         // check if the prevout_hash of the transaction matches the computed one from the
         // non-witness utxo
-        res = call_get_merkleized_map_value(dc,
-                                            &state->cur.in_out.map,
-                                            (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
-                                            1,
-                                            prevout_hash,
-                                            sizeof(prevout_hash));
+        if (0 > call_get_merkleized_map_value(dc,
+                                              &state->cur.in_out.map,
+                                              (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
+                                              1,
+                                              prevout_hash,
+                                              sizeof(prevout_hash))) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        };
 
-        if (res == -1 || memcmp(parser_outputs.txid, prevout_hash, 32) != 0) {
-            PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
-
+        // request non-witness utxo, and get the prevout's value and scriptpubkey
+        if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
+                                                             &state->cur.in_out.map,
+                                                             &state->cur.input.prevout_amount,
+                                                             state->cur.in_out.scriptPubKey,
+                                                             &state->cur.in_out.scriptPubKey_len,
+                                                             prevout_hash)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
-        uint64_t prevout_value = parser_outputs.vout_value;
-
-        state->inputs_total_value += prevout_value;
-
-        state->cur.input.prevout_amount = prevout_value;
-
-        state->cur.in_out.scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
-
-        if (state->cur.in_out.scriptPubKey_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
-            PRINTF("Prevout's scriptPubKey too long: %d bytes.\n",
-                   state->cur.in_out.scriptPubKey_len);
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        memcpy(state->cur.in_out.scriptPubKey,
-               parser_outputs.vout_scriptpubkey,
-               state->cur.in_out.scriptPubKey_len);
+        state->inputs_total_value += state->cur.input.prevout_amount;
     }
 
     if (state->cur.input.has_witnessUtxo) {
-        uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+        size_t wit_utxo_scriptPubkey_len;
+        uint8_t wit_utxo_scriptPubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+        uint64_t wit_utxo_prevout_amount;
 
-        int wit_utxo_len = call_get_merkleized_map_value(dc,
-                                                         &state->cur.in_out.map,
-                                                         (uint8_t[]){PSBT_IN_WITNESS_UTXO},
-                                                         1,
-                                                         raw_witnessUtxo,
-                                                         sizeof(raw_witnessUtxo));
-        if (wit_utxo_len < 0) {
-            PRINTF("Error fetching witness utxo\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
-
-        if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
-            PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
-
-        uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
+        get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                  &state->cur.in_out.map,
+                                                  &wit_utxo_prevout_amount,
+                                                  wit_utxo_scriptPubkey,
+                                                  &wit_utxo_scriptPubkey_len);
 
         if (state->cur.input.has_nonWitnessUtxo) {
             // we already know the scriptPubKey, but we double check that it matches
@@ -1183,34 +1256,17 @@ static void sign_legacy(dispatcher_context_t *dc) {
 
     // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
 
-    // Read the prevout index
-    uint32_t prevout_n;
-    if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                  &state->cur.in_out.map,
-                                                  (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
-                                                  1,
-                                                  &prevout_n)) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    txid_parser_outputs_t parser_outputs;
-    // request non-witness utxo, and get the prevout's value and scriptpubkey
-    int res = call_psbt_parse_rawtx(dc,
-                                    &state->cur.in_out.map,
-                                    (uint8_t[]){PSBT_IN_NON_WITNESS_UTXO},
-                                    1,
-                                    prevout_n,
-                                    &parser_outputs);
+    uint64_t tmp;  // unused
+    int res = get_amount_scriptpubkey_from_psbt_nonwitness(dc,
+                                                           &state->cur.in_out.map,
+                                                           &tmp,
+                                                           state->cur.in_out.scriptPubKey,
+                                                           &state->cur.in_out.scriptPubKey_len,
+                                                           NULL);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
-
-    state->cur.in_out.scriptPubKey_len = parser_outputs.vout_scriptpubkey_len;
-    memcpy(state->cur.in_out.scriptPubKey,
-           parser_outputs.vout_scriptpubkey,
-           parser_outputs.vout_scriptpubkey_len);
 
     dc->next(sign_legacy_compute_sighash);
 }
@@ -1346,35 +1402,17 @@ static void sign_segwit(dispatcher_context_t *dc) {
     uint8_t segwit_version;
 
     {
-        uint8_t raw_witnessUtxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-
-        int wit_utxo_len = call_get_merkleized_map_value(dc,
-                                                         &state->cur.in_out.map,
-                                                         (uint8_t[]){PSBT_IN_WITNESS_UTXO},
-                                                         1,
-                                                         raw_witnessUtxo,
-                                                         sizeof(raw_witnessUtxo));
-        if (wit_utxo_len < 0) {
-            PRINTF("Error fetching witness utxo\n");
+        uint64_t amount;
+        if (-1 == get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                            &state->cur.in_out.map,
+                                                            &amount,
+                                                            state->cur.in_out.scriptPubKey,
+                                                            &state->cur.in_out.scriptPubKey_len)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
-        int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
-
-        if (wit_utxo_len != 8 + 1 + wit_utxo_scriptPubkey_len) {
-            PRINTF("Length mismatch for witness utxo's scriptPubKey\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        uint8_t *wit_utxo_scriptPubkey = raw_witnessUtxo + 9;
-        uint64_t wit_utxo_prevout_amount = read_u64_le(&raw_witnessUtxo[0], 0);
-
-        // Validation of the witness-utxo was already done during input processing
-        state->cur.input.prevout_amount = wit_utxo_prevout_amount;
-        state->cur.in_out.scriptPubKey_len = wit_utxo_scriptPubkey_len;
-        memcpy(state->cur.in_out.scriptPubKey, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
+        state->inputs_total_value += amount;
 
         if (state->cur.input.has_redeemScript) {
             // Get redeemScript
@@ -1399,8 +1437,8 @@ static void sign_segwit(dispatcher_context_t *dc) {
             crypto_hash160(redeemScript, redeemScript_length, p2sh_redeemscript + 2);
             p2sh_redeemscript[22] = 0x87;
 
-            if (wit_utxo_scriptPubkey_len != 23 ||
-                memcmp(wit_utxo_scriptPubkey, p2sh_redeemscript, 23) != 0) {
+            if (state->cur.in_out.scriptPubKey_len != 23 ||
+                memcmp(state->cur.in_out.scriptPubKey, p2sh_redeemscript, 23) != 0) {
                 PRINTF("witnessUtxo's scriptPubKey does not match redeemScript\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return;
@@ -1410,17 +1448,20 @@ static void sign_segwit(dispatcher_context_t *dc) {
             memcpy(state->cur.input.script, redeemScript, redeemScript_length);
             segwit_version = get_segwit_version(redeemScript, redeemScript_length);
         } else {
-            state->cur.input.script_len = wit_utxo_scriptPubkey_len;
-            memcpy(state->cur.input.script, wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
+            state->cur.input.script_len = state->cur.in_out.scriptPubKey_len;
+            memcpy(state->cur.input.script,
+                   state->cur.in_out.scriptPubKey,
+                   state->cur.in_out.scriptPubKey_len);
 
-            segwit_version = get_segwit_version(wit_utxo_scriptPubkey, wit_utxo_scriptPubkey_len);
+            segwit_version = get_segwit_version(state->cur.in_out.scriptPubKey,
+                                                state->cur.in_out.scriptPubKey_len);
         }
-    }
 
-    if (segwit_version > 1) {
-        PRINTF("Segwit version not supported: %d\n", segwit_version);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
+        if (segwit_version > 1) {
+            PRINTF("Segwit version not supported: %d\n", segwit_version);
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return;
+        }
     }
 
     // compute all the tx-wide hashes
@@ -1519,30 +1560,27 @@ static void sign_segwit(dispatcher_context_t *dc) {
                 return;
             }
 
-            // get prevout hash and output index for the i-th input
-            uint8_t wit_utxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-            int ret = call_get_merkleized_map_value(dc,
-                                                    &ith_map,
-                                                    (uint8_t[]){PSBT_IN_WITNESS_UTXO},
-                                                    1,
-                                                    wit_utxo,
-                                                    sizeof(wit_utxo));
-            if (ret < 9) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return;
-            }
-            uint8_t scriptPubKey_len = wit_utxo[8];
-            if (ret != 8 + 1 + scriptPubKey_len) {
+            uint64_t in_amount;
+            uint8_t in_scriptPubKey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+            size_t in_scriptPubKey_len;
+
+            if (-1 == get_amount_scriptpubkey_from_psbt(dc,
+                                                        &ith_map,
+                                                        &in_amount,
+                                                        in_scriptPubKey,
+                                                        &in_scriptPubKey_len)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return;
             }
 
-            uint8_t *scriptPubKey = wit_utxo + 9;
+            uint8_t in_amount_le[8];
+            write_u64_le(in_amount_le, 0, in_amount);
+            crypto_hash_update(&sha_amounts_context.header, in_amount_le, 8);
 
-            crypto_hash_update(&sha_amounts_context.header, wit_utxo, 8);
-
-            crypto_hash_update_varint(&sha_scriptpubkeys_context.header, scriptPubKey_len);
-            crypto_hash_update(&sha_scriptpubkeys_context.header, scriptPubKey, scriptPubKey_len);
+            crypto_hash_update_varint(&sha_scriptpubkeys_context.header, in_scriptPubKey_len);
+            crypto_hash_update(&sha_scriptpubkeys_context.header,
+                               in_scriptPubKey,
+                               in_scriptPubKey_len);
         }
 
         crypto_hash_digest(&sha_amounts_context.header, state->hashes.sha_amounts, 32);
