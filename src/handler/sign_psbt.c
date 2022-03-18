@@ -433,7 +433,8 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
             state->cur.input.has_redeemScript = true;
         } else if (key_type == PSBT_IN_SIGHASH_TYPE) {
             state->cur.input.has_sighash_type = true;
-        } else if (key_type == PSBT_IN_BIP32_DERIVATION &&
+        } else if ((key_type == PSBT_IN_BIP32_DERIVATION ||
+                    key_type == PSBT_IN_TAP_BIP32_DERIVATION) &&
                    !state->cur.in_out.has_bip32_derivation) {
             // The first time that we encounter a PSBT_IN_BIP32_DERIVATION or
             // PSBT_IN_TAP_BIP32_DERIVATION (handled below) key, we store the pubkey. Since we only
@@ -441,21 +442,12 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
             // keys we use here (if there are multiple), as per the assumptions above.
             state->cur.in_out.has_bip32_derivation = true;
 
-            if (!buffer_read_bytes(data,
-                                   state->cur.in_out.bip32_derivation_pubkey,
-                                   33)       // read compressed pubkey
-                || buffer_can_read(data, 1)  // ...but should not be able to read more
-            ) {
-                state->cur.in_out.unexpected_pubkey_error = true;
-            }
-        } else if (key_type == PSBT_IN_TAP_BIP32_DERIVATION &&
-                   !state->cur.in_out.has_bip32_derivation) {
-            // See comment above
-            state->cur.in_out.has_bip32_derivation = true;
+            // x-only pubkeys for taproot, normal compressed pubkeys otherwise
+            size_t key_len = (key_type == PSBT_IN_TAP_BIP32_DERIVATION ? 32 : 33);
 
             if (!buffer_read_bytes(data,
                                    state->cur.in_out.bip32_derivation_pubkey,
-                                   32)       // read x-only pubkey
+                                   key_len)  // read compressed pubkey or x-only pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
                 state->cur.in_out.unexpected_pubkey_error = true;
@@ -742,25 +734,18 @@ static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
         uint8_t key_type;
         buffer_read_u8(data, &key_type);
 
-        if (key_type == PSBT_OUT_BIP32_DERIVATION && !state->cur.in_out.has_bip32_derivation) {
+        if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
+            !state->cur.in_out.has_bip32_derivation) {
             // The first time that we encounter a PSBT_OUT_BIP32_DERIVATION or
             // PSBT_OUT_TAP_BIP32_DERIVATION key, we store the pubkey.
             state->cur.in_out.has_bip32_derivation = true;
 
-            if (!buffer_read_bytes(data,
-                                   state->cur.in_out.bip32_derivation_pubkey,
-                                   33)       // read compressed pubkey
-                || buffer_can_read(data, 1)  // ...but should not be able to read more
-            ) {
-                state->cur.in_out.unexpected_pubkey_error = true;
-            }
-        } else if (key_type == PSBT_OUT_TAP_BIP32_DERIVATION &&
-                   !state->cur.in_out.has_bip32_derivation) {
-            state->cur.in_out.has_bip32_derivation = true;
+            // x-only pubkeys for taproot, normal compressed pubkeys otherwise
+            size_t key_len = (key_type == PSBT_OUT_TAP_BIP32_DERIVATION ? 32 : 33);
 
             if (!buffer_read_bytes(data,
                                    state->cur.in_out.bip32_derivation_pubkey,
-                                   32)       // read x-only pubkey
+                                   key_len)  // read compressed pubkey or x-only pubkey
                 || buffer_can_read(data, 1)  // ...but should not be able to read more
             ) {
                 state->cur.in_out.unexpected_pubkey_error = true;
