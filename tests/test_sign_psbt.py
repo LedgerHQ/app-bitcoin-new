@@ -117,7 +117,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
     return psbt
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     # PSBT for a legacy 1-input 1-output spend (no change address)
@@ -144,7 +144,7 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
@@ -171,7 +171,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
@@ -199,7 +199,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
@@ -304,7 +304,7 @@ def test_sign_psbt_multisig_wsh(client: Client):
 #         client.sign_psbt(psbt)
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
@@ -446,7 +446,7 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
     assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
@@ -544,7 +544,7 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    with automation(comm, "automations/sign_with_wallet_accept.json"):
+    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
         hww_sigs = client.sign_psbt(psbt, wallet, None)
 
     assert len(hww_sigs) == 1
