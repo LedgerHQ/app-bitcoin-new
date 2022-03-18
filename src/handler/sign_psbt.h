@@ -59,8 +59,6 @@ typedef struct {
 typedef struct {
     machine_context_t ctx;
 
-    merkleized_map_commitment_t global_map;  // 48 bytes
-
     uint32_t tx_version;
     uint32_t locktime;
 

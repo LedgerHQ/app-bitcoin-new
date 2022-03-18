@@ -58,9 +58,6 @@ static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accep
 static void ui_action_validate_output(dispatcher_context_t *dc, bool accept);
 static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept);
 
-// Read global map
-static void process_global_map(dispatcher_context_t *dc);
-
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
@@ -192,13 +189,14 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         return;
     }
 
-    if (!buffer_read_varint(&dc->read_buffer, &state->global_map.size)) {
+    merkleized_map_commitment_t global_map;
+    if (!buffer_read_varint(&dc->read_buffer, &global_map.size)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
 
-    if (!buffer_read_bytes(&dc->read_buffer, state->global_map.keys_root, 32) ||
-        !buffer_read_bytes(&dc->read_buffer, state->global_map.values_root, 32)) {
+    if (!buffer_read_bytes(&dc->read_buffer, global_map.keys_root, 32) ||
+        !buffer_read_bytes(&dc->read_buffer, global_map.values_root, 32)) {
         LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
@@ -332,17 +330,57 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
 
     state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
-    // Check integrity of the global map
-    if (call_check_merkle_tree_sorted(dc,
-                                      state->global_map.keys_root,
-                                      (size_t) state->global_map.size) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+    // process global map
+    {
+        // Check integrity of the global map
+        if (call_check_merkle_tree_sorted(dc, global_map.keys_root, (size_t) global_map.size) < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        uint8_t raw_result[9];  // max size for a varint
+        int result_len;
+
+        // Read tx version
+        result_len = call_get_merkleized_map_value(dc,
+                                                   &global_map,
+                                                   (uint8_t[]){PSBT_GLOBAL_TX_VERSION},
+                                                   1,
+                                                   raw_result,
+                                                   sizeof(raw_result));
+        if (result_len != 4) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+        state->tx_version = read_u32_le(raw_result, 0);
+
+        // Read fallback locktime.
+        // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
+        // preferred height/block locktime. If that's relevant, the client must set the fallback
+        // locktime to the appropriate value before calling sign_psbt.
+        result_len = call_get_merkleized_map_value(dc,
+                                                   &global_map,
+                                                   (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
+                                                   1,
+                                                   raw_result,
+                                                   sizeof(raw_result));
+        if (result_len == -1) {
+            state->locktime = 0;
+        } else if (result_len != 4) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        } else {
+            state->locktime = read_u32_le(raw_result, 0);
+        }
+
+        // we already know n_inputs and n_outputs, so we skip reading from the global map
     }
+
+    state->cur_input_index = 0;
 
     if (state->is_wallet_canonical) {
         // Canonical wallet, we start processing the psbt directly
-        dc->next(process_global_map);
+        dc->next(process_input_map);
     } else {
         // Show screen to authorize spend from a registered wallet
         dc->pause();
@@ -356,56 +394,10 @@ static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool 
     if (!accept) {
         SEND_SW(dc, SW_DENY);
     } else {
-        dc->next(process_global_map);
+        dc->next(process_input_map);
     }
 
     dc->run();
-}
-
-static void process_global_map(dispatcher_context_t *dc) {
-    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    uint8_t raw_result[9];  // max size for a varint
-    int result_len;
-
-    // Read tx version
-    result_len = call_get_merkleized_map_value(dc,
-                                               &state->global_map,
-                                               (uint8_t[]){PSBT_GLOBAL_TX_VERSION},
-                                               1,
-                                               raw_result,
-                                               sizeof(raw_result));
-    if (result_len != 4) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-    state->tx_version = read_u32_le(raw_result, 0);
-
-    // Read fallback locktime.
-    // Unlike BIP-0370 recommendation, we use the fallback locktime as-is, ignoring each input's
-    // preferred height/block locktime. If that's relevant, the client must set the fallback
-    // locktime to the appropriate value before calling sign_psbt.
-    result_len = call_get_merkleized_map_value(dc,
-                                               &state->global_map,
-                                               (uint8_t[]){PSBT_GLOBAL_FALLBACK_LOCKTIME},
-                                               1,
-                                               raw_result,
-                                               sizeof(raw_result));
-    if (result_len == -1) {
-        state->locktime = 0;
-    } else if (result_len != 4) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    } else {
-        state->locktime = read_u32_le(raw_result, 0);
-    }
-
-    // we already know n_inputs and n_outputs, so we skip reading from the global map
-
-    state->cur_input_index = 0;
-    dc->next(process_input_map);
 }
 
 /** Inputs verification flow
