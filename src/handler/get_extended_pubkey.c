@@ -28,8 +28,6 @@
 
 extern global_context_t *G_coin_config;
 
-static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice);
-
 static void send_response(dispatcher_context_t *dc);
 
 static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
@@ -172,27 +170,10 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc) {
     }
 
     if (display) {
-        dc->pause();
-        ui_display_pubkey(dc,
-                          path_str,
-                          !is_safe,
-                          state->serialized_pubkey_str,
-                          ui_action_validate_pubkey);
+        ui_display_pubkey(dc, path_str, !is_safe, state->serialized_pubkey_str, send_response);
     } else {
         dc->next(send_response);
     }
-}
-
-static void ui_action_validate_pubkey(dispatcher_context_t *dc, bool choice) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (choice) {
-        dc->next(send_response);
-    } else {
-        SEND_SW(dc, SW_DENY);
-    }
-
-    dc->run();
 }
 
 static void send_response(dispatcher_context_t *dc) {

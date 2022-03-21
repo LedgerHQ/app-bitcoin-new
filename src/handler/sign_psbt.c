@@ -52,12 +52,6 @@
 
 extern global_context_t *G_coin_config;
 
-// UI callbacks
-static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept);
-static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept);
-static void ui_action_validate_output(dispatcher_context_t *dc, bool accept);
-static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept);
-
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
@@ -504,21 +498,8 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         dc->next(process_input_map);
     } else {
         // Show screen to authorize spend from a registered wallet
-        dc->pause();
-        ui_authorize_wallet_spend(dc, wallet_header.name, ui_action_validate_wallet_authorized);
+        ui_authorize_wallet_spend(dc, wallet_header.name, process_input_map);
     }
-}
-
-static void ui_action_validate_wallet_authorized(dispatcher_context_t *dc, bool accept) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-    } else {
-        dc->next(process_input_map);
-    }
-
-    dc->run();
 }
 
 /** Inputs verification flow
@@ -746,21 +727,8 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
         }
 
         // some internal and some external inputs, warn the user first
-        dc->pause();
-        ui_warn_external_inputs(dc, ui_alert_external_inputs_result);
+        ui_warn_external_inputs(dc, verify_outputs_init);
     }
-}
-
-static void ui_alert_external_inputs_result(dispatcher_context_t *dc, bool accept) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-    } else {
-        dc->next(verify_outputs_init);
-    }
-
-    dc->run();
 }
 
 /** OUTPUTS VERIFICATION FLOW
@@ -964,27 +932,14 @@ static void output_validate_external(dispatcher_context_t *dc) {
         }
     } else {
         // Show address to the user
-        dc->pause();
         ui_validate_output(dc,
                            state->external_outputs_count,
                            output_address,
                            G_coin_config->name_short,
                            state->cur.output.value,
-                           ui_action_validate_output);
+                           output_next);
         return;
     }
-}
-
-static void ui_action_validate_output(dispatcher_context_t *dc, bool accept) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-    } else {
-        dc->next(output_next);
-    }
-
-    dc->run();
 }
 
 static void output_next(dispatcher_context_t *dc) {
@@ -1045,21 +1000,8 @@ static void confirm_transaction(dispatcher_context_t *dc) {
         dc->next(sign_init);
     } else {
         // Show final user validation UI
-        dc->pause();
-        ui_validate_transaction(dc, G_coin_config->name_short, fee, ui_action_validate_transaction);
+        ui_validate_transaction(dc, G_coin_config->name_short, fee, sign_init);
     }
-}
-
-static void ui_action_validate_transaction(dispatcher_context_t *dc, bool accept) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-    } else {
-        dc->next(sign_init);
-    }
-
-    dc->run();
 }
 
 /** SIGNING FLOW

@@ -40,9 +40,8 @@
 
 extern global_context_t *G_coin_config;
 
-static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
-
 static void compute_address(dispatcher_context_t *dc);
+static void send_response(dispatcher_context_t *dc);
 
 void handler_get_wallet_address(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -256,26 +255,19 @@ static void compute_address(dispatcher_context_t *dc) {
     }
 
     if (state->display_address == 0) {
-        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
+        dc->next(send_response);
     } else {
-        dc->pause();
         ui_display_wallet_address(dc,
                                   state->is_wallet_canonical ? NULL : state->wallet_header.name,
                                   state->address,
-                                  ui_action_validate_address);
+                                  send_response);
     }
 }
 
-static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
+static void send_response(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (accepted) {
-        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
-    } else {
-        SEND_SW(dc, SW_DENY);
-    }
-
-    dc->run();
+    SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
 }
