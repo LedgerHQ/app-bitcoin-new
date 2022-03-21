@@ -113,7 +113,7 @@ the right paths to identify internal inputs/outputs.
 // HELPER FUNCTIONS
 
 // Updates the hash_context with the network serialization of all the outputs
-// returns -1 on error (in that case, a response is already set). 0 on success.
+// returns -1 on error. 0 on success.
 static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
@@ -124,7 +124,6 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
 
         int res = call_get_merkleized_map(dc, state->outputs_root, state->n_outputs, i, &ith_map);
         if (res < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
             return -1;
         }
 
@@ -136,7 +135,6 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
                                                1,
                                                amount_raw,
                                                8)) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
             return -1;
         }
 
@@ -152,7 +150,6 @@ static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
                                                            out_script,
                                                            sizeof(out_script));
         if (out_script_len == -1) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
             return -1;
         }
 
@@ -1139,6 +1136,8 @@ static void sign_init(dispatcher_context_t *dc) {
         return;
     }
 
+    state->segwit_hashes_computed = false;
+
     state->cur_input_index = 0;
     dc->next(sign_process_input_map);
 }
@@ -1376,7 +1375,8 @@ static void sign_legacy_compute_sighash(dispatcher_context_t *dc) {
     // outputs
     crypto_hash_update_varint(&sighash_context.header, state->n_outputs);
     if (hash_outputs(dc, &sighash_context.header) == -1) {
-        return;  // response already set
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
     }
 
     // nLocktime
@@ -1466,126 +1466,134 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     // compute all the tx-wide hashes
 
-    {
-        // compute sha_prevouts and sha_sequences
-        cx_sha256_t sha_prevouts_context, sha_sequences_context;
+    if (!state->segwit_hashes_computed) {
+        {
+            // compute sha_prevouts and sha_sequences
+            cx_sha256_t sha_prevouts_context, sha_sequences_context;
 
-        // compute hashPrevouts and hashSequence
-        cx_sha256_init(&sha_prevouts_context);
-        cx_sha256_init(&sha_sequences_context);
+            // compute hashPrevouts and hashSequence
+            cx_sha256_init(&sha_prevouts_context);
+            cx_sha256_init(&sha_sequences_context);
 
-        for (unsigned int i = 0; i < state->n_inputs; i++) {
-            // get this input's map
-            merkleized_map_commitment_t ith_map;
+            for (unsigned int i = 0; i < state->n_inputs; i++) {
+                // get this input's map
+                merkleized_map_commitment_t ith_map;
 
-            int res = call_get_merkleized_map(dc, state->inputs_root, state->n_inputs, i, &ith_map);
-            if (res < 0) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return;
-            }
+                int res =
+                    call_get_merkleized_map(dc, state->inputs_root, state->n_inputs, i, &ith_map);
+                if (res < 0) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return;
+                }
 
-            // get prevout hash and output index for the i-th input
-            uint8_t ith_prevout_hash[32];
-            if (32 != call_get_merkleized_map_value(dc,
-                                                    &ith_map,
-                                                    (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
-                                                    1,
-                                                    ith_prevout_hash,
-                                                    32)) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return;
-            }
-
-            crypto_hash_update(&sha_prevouts_context.header, ith_prevout_hash, 32);
-
-            uint8_t ith_prevout_n_raw[4];
-            if (4 != call_get_merkleized_map_value(dc,
-                                                   &ith_map,
-                                                   (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
-                                                   1,
-                                                   ith_prevout_n_raw,
-                                                   4)) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return;
-            }
-
-            crypto_hash_update(&sha_prevouts_context.header, ith_prevout_n_raw, 4);
-
-            uint8_t ith_nSequence_raw[4];
-            if (4 != call_get_merkleized_map_value(dc,
-                                                   &ith_map,
-                                                   (uint8_t[]){PSBT_IN_SEQUENCE},
-                                                   1,
-                                                   ith_nSequence_raw,
-                                                   4)) {
-                // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
-                memset(ith_nSequence_raw, 0xFF, 4);
-            }
-
-            crypto_hash_update(&sha_sequences_context.header, ith_nSequence_raw, 4);
-        }
-
-        crypto_hash_digest(&sha_prevouts_context.header, state->hashes.sha_prevouts, 32);
-        crypto_hash_digest(&sha_sequences_context.header, state->hashes.sha_sequences, 32);
-    }
-
-    {
-        // compute sha_outputs
-        cx_sha256_t sha_outputs_context;
-        cx_sha256_init(&sha_outputs_context);
-
-        if (hash_outputs(dc, &sha_outputs_context.header) == -1) {
-            return;
-        }
-
-        crypto_hash_digest(&sha_outputs_context.header, state->hashes.sha_outputs, 32);
-    }
-
-    {
-        // compute sha_amounts and sha_scriptpubkeys
-        // TODO: could be skipped if there are no segwitv1 inputs to sign
-
-        cx_sha256_t sha_amounts_context, sha_scriptpubkeys_context;
-
-        cx_sha256_init(&sha_amounts_context);
-        cx_sha256_init(&sha_scriptpubkeys_context);
-
-        for (unsigned int i = 0; i < state->n_inputs; i++) {
-            // get this input's map
-            merkleized_map_commitment_t ith_map;
-
-            int res = call_get_merkleized_map(dc, state->inputs_root, state->n_inputs, i, &ith_map);
-            if (res < 0) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return;
-            }
-
-            uint64_t in_amount;
-            uint8_t in_scriptPubKey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-            size_t in_scriptPubKey_len;
-
-            if (-1 == get_amount_scriptpubkey_from_psbt(dc,
+                // get prevout hash and output index for the i-th input
+                uint8_t ith_prevout_hash[32];
+                if (32 != call_get_merkleized_map_value(dc,
                                                         &ith_map,
-                                                        &in_amount,
-                                                        in_scriptPubKey,
-                                                        &in_scriptPubKey_len)) {
+                                                        (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
+                                                        1,
+                                                        ith_prevout_hash,
+                                                        32)) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return;
+                }
+
+                crypto_hash_update(&sha_prevouts_context.header, ith_prevout_hash, 32);
+
+                uint8_t ith_prevout_n_raw[4];
+                if (4 != call_get_merkleized_map_value(dc,
+                                                       &ith_map,
+                                                       (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
+                                                       1,
+                                                       ith_prevout_n_raw,
+                                                       4)) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return;
+                }
+
+                crypto_hash_update(&sha_prevouts_context.header, ith_prevout_n_raw, 4);
+
+                uint8_t ith_nSequence_raw[4];
+                if (4 != call_get_merkleized_map_value(dc,
+                                                       &ith_map,
+                                                       (uint8_t[]){PSBT_IN_SEQUENCE},
+                                                       1,
+                                                       ith_nSequence_raw,
+                                                       4)) {
+                    // if no PSBT_IN_SEQUENCE is present, we must assume nSequence 0xFFFFFFFF
+                    memset(ith_nSequence_raw, 0xFF, 4);
+                }
+
+                crypto_hash_update(&sha_sequences_context.header, ith_nSequence_raw, 4);
+            }
+
+            crypto_hash_digest(&sha_prevouts_context.header, state->hashes.sha_prevouts, 32);
+            crypto_hash_digest(&sha_sequences_context.header, state->hashes.sha_sequences, 32);
+        }
+
+        {
+            // compute sha_outputs
+            cx_sha256_t sha_outputs_context;
+            cx_sha256_init(&sha_outputs_context);
+
+            if (hash_outputs(dc, &sha_outputs_context.header) == -1) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return;
             }
 
-            uint8_t in_amount_le[8];
-            write_u64_le(in_amount_le, 0, in_amount);
-            crypto_hash_update(&sha_amounts_context.header, in_amount_le, 8);
-
-            crypto_hash_update_varint(&sha_scriptpubkeys_context.header, in_scriptPubKey_len);
-            crypto_hash_update(&sha_scriptpubkeys_context.header,
-                               in_scriptPubKey,
-                               in_scriptPubKey_len);
+            crypto_hash_digest(&sha_outputs_context.header, state->hashes.sha_outputs, 32);
         }
 
-        crypto_hash_digest(&sha_amounts_context.header, state->hashes.sha_amounts, 32);
-        crypto_hash_digest(&sha_scriptpubkeys_context.header, state->hashes.sha_scriptpubkeys, 32);
+        {
+            // compute sha_amounts and sha_scriptpubkeys
+            // TODO: could be skipped if there are no segwitv1 inputs to sign
+
+            cx_sha256_t sha_amounts_context, sha_scriptpubkeys_context;
+
+            cx_sha256_init(&sha_amounts_context);
+            cx_sha256_init(&sha_scriptpubkeys_context);
+
+            for (unsigned int i = 0; i < state->n_inputs; i++) {
+                // get this input's map
+                merkleized_map_commitment_t ith_map;
+
+                int res =
+                    call_get_merkleized_map(dc, state->inputs_root, state->n_inputs, i, &ith_map);
+                if (res < 0) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return;
+                }
+
+                uint64_t in_amount;
+                uint8_t in_scriptPubKey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+                size_t in_scriptPubKey_len;
+
+                if (-1 == get_amount_scriptpubkey_from_psbt(dc,
+                                                            &ith_map,
+                                                            &in_amount,
+                                                            in_scriptPubKey,
+                                                            &in_scriptPubKey_len)) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return;
+                }
+
+                uint8_t in_amount_le[8];
+                write_u64_le(in_amount_le, 0, in_amount);
+                crypto_hash_update(&sha_amounts_context.header, in_amount_le, 8);
+
+                crypto_hash_update_varint(&sha_scriptpubkeys_context.header, in_scriptPubKey_len);
+                crypto_hash_update(&sha_scriptpubkeys_context.header,
+                                   in_scriptPubKey,
+                                   in_scriptPubKey_len);
+            }
+
+            crypto_hash_digest(&sha_amounts_context.header, state->hashes.sha_amounts, 32);
+            crypto_hash_digest(&sha_scriptpubkeys_context.header,
+                               state->hashes.sha_scriptpubkeys,
+                               32);
+        }
     }
+    state->segwit_hashes_computed = true;
 
     if (segwit_version == 0) {
         dc->next(sign_segwit_v0);

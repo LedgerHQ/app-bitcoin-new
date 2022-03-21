@@ -104,6 +104,7 @@ typedef struct {
         uint8_t sha_sequences[32];
         uint8_t sha_outputs[32];
     } hashes;
+    bool segwit_hashes_computed;
 
     uint64_t inputs_total_value;
     uint64_t outputs_total_value;
