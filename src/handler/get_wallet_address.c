@@ -134,20 +134,19 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         // we check if the key is indeed internal
         uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
 
-        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         state->wallet_header_keys_info_merkle_root,
                                                         state->wallet_header_n_keys,
                                                         0,  // only one key
-                                                        key_info_str,
-                                                        sizeof(key_info_str));
+                                                        state->key_info_str,
+                                                        sizeof(state->key_info_str));
         if (key_info_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
         // Make a sub-buffer for the pubkey info
-        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+        buffer_t key_info_buffer = buffer_create(state->key_info_str, key_info_len);
 
         policy_map_key_info_t key_info;
         if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
@@ -218,7 +217,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
     if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific error code
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 

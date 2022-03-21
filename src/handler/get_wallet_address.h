@@ -39,6 +39,8 @@ typedef struct {
 
     int address_len;
     char address[MAX_ADDRESS_LENGTH_STR + 1];  // null-terminated string
+
+    uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 } get_wallet_address_state_t;
 
 void handler_get_wallet_address(dispatcher_context_t *dispatcher_context);
