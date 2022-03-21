@@ -52,7 +52,7 @@
 #define MAX_PREVOUT_SCRIPTPUBKEY_LEN 34  // P2WSH's scriptPubKeys are the longest supported
 
 /**
- * Maximum scriptPubKey length for an input that we can sign.
+ * Maximum scriptPubKey length for an output that we can recognize.
  */
 #define MAX_OUTPUT_SCRIPTPUBKEY_LEN 83  // max 83 for OP_RETURN; other scripts are shorter
 

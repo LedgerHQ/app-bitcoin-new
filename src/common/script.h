@@ -152,7 +152,8 @@ typedef enum {
     SCRIPT_TYPE_P2SH = 0x01,
     SCRIPT_TYPE_P2WPKH = 0x02,
     SCRIPT_TYPE_P2WSH = 0x03,
-    SCRIPT_TYPE_P2TR = 0x04
+    SCRIPT_TYPE_P2TR = 0x04,
+    SCRIPT_TYPE_UNKNOWN_SEGWIT = 0xFF  // a valid but undefined segwit script
 } script_type_e;
 
 static inline bool is_p2wpkh(const uint8_t script[], size_t script_len) {
@@ -168,7 +169,7 @@ static inline bool is_opreturn(const uint8_t script[], size_t script_len) {
 }
 
 /**
- * Returns a constant of type `script_type_e` indicating the type of known script with an
+ * Returns a constant of type `script_type_e` indicating the type of known script type with an
  * address, or -1 for any invalid script, or valid script without an address.
  *
  * @param script the script

@@ -35,7 +35,16 @@ int get_script_type(const uint8_t script[], size_t script_len) {
         return SCRIPT_TYPE_P2TR;
     }
 
-    // unknown
+    // match if it is a potentially valid future segwit scriptPubKey as per BIP-0141
+    if (script_len >= 4 && script_len <= 42 &&
+        (script[0] == 0 || (script[0] >= OP_1 && script[0] <= OP_16))) {
+        uint8_t push_len = script[1];
+        if (script_len == 1 + 1 + push_len) {
+            return SCRIPT_TYPE_UNKNOWN_SEGWIT;
+        }
+    }
+
+    // unknown/invalid, or doesn't have an address
     return -1;
 }
 
@@ -51,29 +60,24 @@ int get_script_address(const uint8_t script[],
     int addr_len;
     switch (script_type) {
         case SCRIPT_TYPE_P2PKH:
-            addr_len =
-                base58_encode_address(script + 3, coin_config->p2pkh_version, out, out_len - 1);
+        case SCRIPT_TYPE_P2SH: {
+            int offset = (script_type == SCRIPT_TYPE_P2PKH) ? 3 : 2;
+            int ver = (script_type == SCRIPT_TYPE_P2PKH) ? coin_config->p2pkh_version
+                                                         : coin_config->p2sh_version;
+            addr_len = base58_encode_address(script + offset, ver, out, out_len - 1);
             if (addr_len < 0) {
                 return -1;
             }
             break;
-        case SCRIPT_TYPE_P2SH:
-            addr_len =
-                base58_encode_address(script + 2, coin_config->p2sh_version, out, out_len - 1);
-            if (addr_len < 0) {
-                return -1;
-            }
-            break;
+        }
         case SCRIPT_TYPE_P2WPKH:
         case SCRIPT_TYPE_P2WSH:
-        case SCRIPT_TYPE_P2TR: {
-            // bech32/bech32m encoding
-
-            // 20 for P2WPKH, 32 for P2WSH or P2TR
-            int hash_length = (script_type == SCRIPT_TYPE_P2WPKH ? 20 : 32);
+        case SCRIPT_TYPE_P2TR:
+        case SCRIPT_TYPE_UNKNOWN_SEGWIT: {
+            uint8_t prog_len = script[1];  // length of the witness program
 
             // witness program version
-            int version = (script_type == SCRIPT_TYPE_P2TR ? 1 : 0);
+            int version = (script[0] == 0 ? 0 : script[0] - 80);
 
             // make sure that the output buffer is long enough
             if (out_len < 73 + strlen(coin_config->native_segwit_prefix)) {
@@ -84,8 +88,7 @@ int get_script_address(const uint8_t script[],
                                          coin_config->native_segwit_prefix,
                                          version,
                                          script + 2,
-                                         hash_length  // 20 for WPKH, 32 for WSH
-            );
+                                         prog_len);
 
             if (ret != 1) {
                 return -1;  // should never happen

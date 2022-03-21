@@ -44,6 +44,14 @@ static void test_get_script_type_valid(void **state) {
                       0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
                       0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20};
     assert_int_equal(get_script_type(p2tr, sizeof(p2tr)), SCRIPT_TYPE_P2TR);
+
+    // unknown (but valid) segwit scriptPubKeys
+    uint8_t unknown1[] = {OP_0, 0x2, 0x01, 0x02};
+    assert_int_equal(get_script_type(unknown1, sizeof(unknown1)), SCRIPT_TYPE_UNKNOWN_SEGWIT);
+    uint8_t unknown2[] = {OP_16, 0x20, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+                          0x0b,  0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+                          0x17,  0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20};
+    assert_int_equal(get_script_type(unknown2, sizeof(unknown2)), SCRIPT_TYPE_UNKNOWN_SEGWIT);
 }
 
 static void test_get_script_type_invalid(void **state) {
@@ -108,6 +116,16 @@ static void test_get_script_type_invalid(void **state) {
                            0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,  0x16,
                            0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, OP_NOP};
     assert_int_equal(get_script_type(p2tr_long, sizeof(p2tr_long)), -1);
+
+    // segwit witness program must be at least 2 bytes
+    uint8_t segwit_too_short[] = {OP_1, 0x01, 0x01};
+    assert_int_equal(get_script_type(segwit_too_short, sizeof(segwit_too_short)), -1);
+
+    // segwit witness program must be at most 40 bytes
+    uint8_t segwit_too_long[] = {OP_16, 41, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12,
+                                 13,    14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+                                 28,    29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 41};
+    assert_int_equal(get_script_type(segwit_too_long, sizeof(segwit_too_long)), -1);
 }
 
 #define CHECK_VALID_TESTCASE(script, expected)                         \

@@ -27,7 +27,13 @@ int is_in_out_internal(dispatcher_context_t *dispatcher_context,
 
     int script_type = get_script_type(in_out_info->scriptPubKey, in_out_info->scriptPubKey_len);
     if (script_type == -1) {
+        // OP_RETURN outputs would return -1 despite being valid; but for those, there shouldn't be
+        // any BIP32 derivation in the PSBT, so no special case is needed here.
+
         PRINTF("Invalid script type\n");
+        return -1;
+    } else if (script_type == SCRIPT_TYPE_UNKNOWN_SEGWIT) {
+        // An unknown but valid segwit script type, definitely external.
         return 0;
     } else if (script_type == SCRIPT_TYPE_P2TR) {
         // taproot output, use PSBT_{IN,OUT}_TAP_BIP32_DERIVATION

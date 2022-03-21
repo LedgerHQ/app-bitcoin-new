@@ -550,13 +550,16 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
     assert len(hww_sigs) == 1
 
 
-@has_automation("automations/sign_with_wallet_external_inputs_accept.json")
-def test_sign_psbt_external_input(client: Client):
-    # PSBT for a transaction where the first input is internal (segwit), while the second input is external (legacy)
-    psbt = PSBT()
-    psbt.deserialize("cHNidP8BAL8CAAAAAnoqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////USLCzeaCPlV1QXW5LJxXoKjhrIPDjheH/Tof8zSOlRMBAAAAAP3///8DoLsNAAAAAAAZdqkUNEoPSMoVDsK5A4F2YLm2ixOmcCaIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+R4QQ8AAAAAABl2qRQT19WBZpRsPsAik0Bm2MDREdG7QYisAAAAAAABAH0CAAAAAa+/rgZZD3Qf8a9ZtqxGESYzakxKgttVPfb++rc3rDPzAQAAAAD9////AnARAQAAAAAAIgAg/e5EHFblsG0N+CwSTHBwFKXKGWWL4LmFa8oW8e0yWfel9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLAAAAAAEBH6X0MAAAAAAAFgAUOvhCmtWVSqXuijPJg/2KHoZ5kksiBgPuLD2Y6x+TwKGqjlpACbcOt7ROrRXxZm8TawEq1Y0waBj1rML9VAAAgAEAAIAAAACAAQAAAAgAAAAAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAACICAinsR3JxMe0liKIMRu2pq7fapvSf1Quv5wucWqaWHE7MGPWswv1UAACAAQAAgAAAAIABAAAACgAAAAAA")
+def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
+    # This psbt contains an output with future psbt version 16 (corresponding to address
+    # tb1sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4hu3px).
+    # The app should accept it nonetheless.
 
-    wallet0 = PolicyMapWallet(
+    psbt_b64 = "cHNidP8BAH0CAAAAAZvg4s1Yxz9DddwBeI+qqU7hcldqGSgWPXuZZReEFYvKAAAAAAD+////AqdTiQAAAAAAFgAUK5M/aeXrJEofBL7Uno7J5OyTvJ9AQg8AAAAAACJgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAHECAAAAAYWOSCXXmA0ztidPI5A6FskW99o7nWNVeFP7rXND5B9aAAAAAAD+////AoCWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JrzWm0pAQAAABYAFF7XSHCIZoptcIrXIWce1tKqp11EaQAAAAEBH4CWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JoiBgJ8t100sAXE659iu/LEV9djjoE+dX787I+mhnfZULY2Yhj1rML9VAAAgAEAAIAAAACAAAAAAAAAAAAAIgIDGZuJ2DVvV+HOOAoSBc8oYG2+qJhVsRw9/s+4oaUzVokY9azC/VQAAIABAACAAAAAgAEAAAABAAAAAAA="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = PolicyMapWallet(
         "",
         "wpkh(@0)",
         [
@@ -564,20 +567,7 @@ def test_sign_psbt_external_input(client: Client):
         ],
     )
 
-    result0 = client.sign_psbt(psbt, wallet0, None)
+    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
+        hww_sigs = client.sign_psbt(psbt, wallet, None)
 
-    # should only sign for the first input
-    assert list(result0.keys()) == [0]
-
-    wallet1 = PolicyMapWallet(
-        "",
-        "pkh(@0)",
-        [
-            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
-        ],
-    )
-
-    result1 = client.sign_psbt(psbt, wallet1, None)
-
-    # should only sign for the second input
-    assert list(result1.keys()) == [1]
+    assert len(hww_sigs) == 1
