@@ -1,10 +1,9 @@
-from sys import byteorder
 from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
-from .common import Chain
+from .common import Chain, read_varint
 from .client_command import ClientCommandInterpreter
 from .client_base import Client, TransportClient
 from .client_legacy import LegacyClient
@@ -208,7 +207,18 @@ class NewClient(Client):
         if any(len(x) <= 1 for x in results):
             raise RuntimeError("Invalid response")
 
-        return {int(res[0]): res[1:] for res in results}
+        results_map = {}
+        for res in results:
+            res_buffer = BytesIO(res)
+            input_index = read_varint(res_buffer)
+            signature = res_buffer.read()
+
+            if input_index in results_map:
+                raise RuntimeError(f"Multiple signatures produced for the same input: {input_index}")
+
+            results_map[input_index] = signature
+
+        return results_map
 
     def get_master_fingerprint(self) -> bytes:
         sw, response = self._make_request(self.builder.get_master_fingerprint())

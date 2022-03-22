@@ -339,13 +339,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
     }
     state->n_outputs = (unsigned int) n_outputs;
 
-    if (n_outputs > MAX_N_OUTPUTS_CAN_SIGN) {
-        // could remove this limitation; paranoia more than anything else
-        PRINTF("At most %d outputs are supported\n", MAX_N_OUTPUTS_CAN_SIGN);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
-    }
-
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
     if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
@@ -441,7 +434,7 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
 
     state->inputs_total_value = 0;
     state->internal_inputs_total_value = 0;
-    memset(state->internal_inputs, 0, sizeof state->internal_inputs);
+    memset(state->internal_inputs, 0, sizeof(state->internal_inputs));
 
     state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
@@ -672,7 +665,7 @@ static void check_input_owned(dispatcher_context_t *dc) {
     } else if (is_internal == 0) {
         PRINTF("INPUT %d is external\n", state->cur_input_index);
     } else {
-        state->internal_inputs[state->cur_input_index] = 1;
+        bitvector_set(state->internal_inputs, state->cur_input_index, 1);
         state->internal_inputs_total_value += state->cur.input.prevout_amount;
 
         int segwit_version =
@@ -705,7 +698,7 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
 
     size_t count_external_inputs = 0;
     for (unsigned int i = 0; i < state->n_inputs; i++) {
-        if (!state->internal_inputs[i]) {
+        if (!bitvector_get(state->internal_inputs, i)) {
             ++count_external_inputs;
         }
     }
@@ -1091,7 +1084,7 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
 
     // skip external inputs
     while (state->cur_input_index < state->n_inputs &&
-           !state->internal_inputs[state->cur_input_index]) {
+           !bitvector_get(state->internal_inputs, state->cur_input_index)) {
         PRINTF("Skipping signing external input %d\n", state->cur_input_index);
         ++state->cur_input_index;
     }
@@ -1837,11 +1830,15 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     // yield signature
     uint8_t cmd = CCMD_YIELD;
     dc->add_to_response(&cmd, 1);
-    uint8_t input_index = (uint8_t) state->cur_input_index;
-    dc->add_to_response(&input_index, 1);
+
+    uint8_t buf[9];
+    int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
+    dc->add_to_response(&buf, input_index_varint_len);
+
     dc->add_to_response(&sig, sig_len);
     uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
     dc->add_to_response(&sighash_byte, 1);
+
     dc->finalize_response(SW_INTERRUPTED_EXECUTION);
 
     if (dc->process_interruption(dc) < 0) {
@@ -1917,8 +1914,11 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     // yield signature
     uint8_t cmd = CCMD_YIELD;
     dc->add_to_response(&cmd, 1);
-    uint8_t input_index = (uint8_t) state->cur_input_index;
-    dc->add_to_response(&input_index, 1);
+
+    uint8_t buf[9];
+    int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
+    dc->add_to_response(&buf, input_index_varint_len);
+
     dc->add_to_response(&sig, sizeof(sig));
 
     // only append the sighash type byte if it is non-zero

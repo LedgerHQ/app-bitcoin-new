@@ -2,11 +2,11 @@
 
 #include "../boilerplate/dispatcher.h"
 #include "../constants.h"
+#include "../common/bitvector.h"
 #include "../common/merkle.h"
 #include "../common/wallet.h"
 
-#define MAX_N_INPUTS_CAN_SIGN  64
-#define MAX_N_OUTPUTS_CAN_SIGN 256
+#define MAX_N_INPUTS_CAN_SIGN 512
 
 // common info that applies to either the current input or the current output
 typedef struct {
@@ -80,7 +80,8 @@ typedef struct {
 
     uint32_t master_key_fingerprint;
 
-    uint8_t internal_inputs[MAX_N_INPUTS_CAN_SIGN];  // TODO: use a bitvector
+    // bitmap to track of which inputs are internal
+    uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
 
     union {
         unsigned int cur_input_index;

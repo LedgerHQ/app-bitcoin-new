@@ -447,31 +447,34 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: bool):
-    # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
+def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bool):
+    # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
     if not enable_slow_tests:
         pytest.skip()
 
+    n_inputs = 512
+    n_outputs = 256
+
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0)",
+        "tr(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
         ],
     )
 
     psbt = txmaker.createPsbt(
         wallet,
-        [10000 + 10000 * i for i in range(64)],
-        [999 + 99 * i for i in range(255)],
-        [i == 42 for i in range(255)]
+        [10000 + 10000 * i for i in range(n_inputs)],
+        [999 + 99 * i for i in range(n_outputs)],
+        [i == 42 for i in range(n_outputs)]
     )
 
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert len(result) == 64
+    assert len(result) == n_inputs
 
 
 def test_sign_psbt_fail_11_changes(client: Client):
