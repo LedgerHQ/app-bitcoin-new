@@ -123,6 +123,9 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
 // Debug utilities
 
+#if DEBUG == 0
+#define LOG_PROCESSOR(dc, file, line, func)
+#else
 // Print current filename, line number and function name.
 // Indents according to the nesting depth for subprocessors.
 static inline void print_dispatcher_info(dispatcher_context_t *dc,
@@ -141,3 +144,4 @@ static inline void print_dispatcher_info(dispatcher_context_t *dc,
 }
 
 #define LOG_PROCESSOR(dc, file, line, func) print_dispatcher_info(dc, file, line, func)
+#endif
