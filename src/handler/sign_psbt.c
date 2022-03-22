@@ -180,7 +180,7 @@ static int get_amount_scriptpubkey_from_psbt_nonwitness(
     uint64_t *amount,
     uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
     size_t *scriptPubKey_len,
-    uint8_t *expected_prevout_hash) {
+    const uint8_t *expected_prevout_hash) {
     // If there is no witness-utxo, it must be the case that this is a legacy input.
     // In this case, we can only retrieve the prevout amount and scriptPubKey by parsing
     // the non-witness-utxo
@@ -598,7 +598,7 @@ static void process_input_map(dispatcher_context_t *dc) {
                                               sizeof(prevout_hash))) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
-        };
+        }
 
         // request non-witness utxo, and get the prevout's value and scriptpubkey
         if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
@@ -836,11 +836,8 @@ static void process_output_map(dispatcher_context_t *dc) {
                                                1,
                                                state->cur.in_out.scriptPubKey,
                                                sizeof(state->cur.in_out.scriptPubKey));
-    if (result_len == -1) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    } else if (result_len > (int) sizeof(state->cur.in_out.scriptPubKey)) {
-        PRINTF("Output's scriptPubKey too long: %d\n", result_len);
+
+    if (result_len == -1 || result_len > (int) sizeof(state->cur.in_out.scriptPubKey)) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -1334,7 +1331,7 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    uint8_t segwit_version;
+    int segwit_version;
 
     {
         uint64_t amount;

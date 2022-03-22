@@ -33,7 +33,7 @@ static inline bool bitvector_get(const uint8_t *vec, unsigned int i) {
 static inline void bitvector_set(uint8_t *vec, unsigned int i, bool value) {
     unsigned int byte_pos = i / 8;
     unsigned int shift = 7 - i % 8;
-    uint8_t mask = 1 << shift;
+    uint8_t mask = (uint8_t) (1 << shift);
 
     if (value) {
         vec[byte_pos] |= mask;

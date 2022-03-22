@@ -486,9 +486,9 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_display_reject_step);
 
 void ui_display_pubkey(dispatcher_context_t *context,
-                       char *bip32_path_str,
+                       const char *bip32_path_str,
                        bool is_path_suspicious,
-                       char *pubkey,
+                       const char *pubkey,
                        command_processor_t on_success) {
     context->pause();
 
@@ -507,8 +507,8 @@ void ui_display_pubkey(dispatcher_context_t *context,
 }
 
 void ui_display_message_hash(dispatcher_context_t *context,
-                             char *bip32_path_str,
-                             char *message_hash,
+                             const char *bip32_path_str,
+                             const char *message_hash,
                              command_processor_t on_success) {
     context->pause();
 
@@ -523,9 +523,9 @@ void ui_display_message_hash(dispatcher_context_t *context,
 }
 
 void ui_display_address(dispatcher_context_t *context,
-                        char *address,
+                        const char *address,
                         bool is_path_suspicious,
-                        char *path_str,
+                        const char *path_str,
                         command_processor_t on_success) {
     context->pause();
 
@@ -544,7 +544,7 @@ void ui_display_address(dispatcher_context_t *context,
 }
 
 void ui_display_wallet_header(dispatcher_context_t *context,
-                              policy_map_wallet_header_t *wallet_header,
+                              const policy_map_wallet_header_t *wallet_header,
                               command_processor_t on_success) {
     context->pause();
 
@@ -559,7 +559,7 @@ void ui_display_wallet_header(dispatcher_context_t *context,
 }
 
 void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
-                                           char *pubkey,
+                                           const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
                                            bool is_internal,
@@ -591,8 +591,8 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
 }
 
 void ui_display_wallet_address(dispatcher_context_t *context,
-                               char *wallet_name,
-                               char *address,
+                               const char *wallet_name,
+                               const char *address,
                                command_processor_t on_success) {
     context->pause();
 
@@ -610,7 +610,7 @@ void ui_display_wallet_address(dispatcher_context_t *context,
 }
 
 void ui_display_unusual_path(dispatcher_context_t *context,
-                             char *bip32_path_str,
+                             const char *bip32_path_str,
                              command_processor_t on_success) {
     context->pause();
 
@@ -623,7 +623,7 @@ void ui_display_unusual_path(dispatcher_context_t *context,
 }
 
 void ui_authorize_wallet_spend(dispatcher_context_t *context,
-                               char *wallet_name,
+                               const char *wallet_name,
                                command_processor_t on_success) {
     context->pause();
 
@@ -646,8 +646,8 @@ void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t 
 
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
-                        char *address_or_description,
-                        char *coin_name,
+                        const char *address_or_description,
+                        const char *coin_name,
                         uint64_t amount,
                         command_processor_t on_success) {
     context->pause();
@@ -666,7 +666,7 @@ void ui_validate_output(dispatcher_context_t *context,
 }
 
 void ui_validate_transaction(dispatcher_context_t *context,
-                             char *coin_name,
+                             const char *coin_name,
                              uint64_t fee,
                              command_processor_t on_success) {
     context->pause();
