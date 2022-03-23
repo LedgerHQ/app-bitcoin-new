@@ -2,7 +2,7 @@
 
 ## Prerequisite
 
-Be sure to have your environment correctly set up (see [Getting Started](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html)) and [ledgerblue](https://pypi.org/project/ledgerblue/) and installed.
+Be sure to have your environment correctly set up (see [Getting Started](https://developers.ledger.com/docs/nano-app/introduction/)) and [ledgerblue](https://pypi.org/project/ledgerblue/) installed.
 
 If you want to benefit from [vscode](https://code.visualstudio.com/) integration, it's recommended to move the toolchain in `/opt` and set `BOLOS_ENV` environment variable as follows
 
@@ -25,13 +25,22 @@ make load     # load the app on the Nano using ledgerblue
 
 ## Documentation
 
-High level documentation such as [commands](doc/COMMANDS.md) are included in developer documentation which can be generated with [doxygen](https://www.doxygen.nl)
+High level documentation on the architecture and interface of the app:
+- [bitcoin.md](doc/bitcoin.md): specifications of application commands.
+- [wallet.md](doc/wallet.md): supported wallet signing policies.
+- [merkle.md](doc/merkle.md): rationale and specifications for the usage of Merkle trees.
+
+Additional documentation can be generated with [doxygen](https://www.doxygen.nl)
 
 ```
 doxygen .doxygen/Doxyfile
 ```
 
 the process outputs HTML and LaTeX documentations in `doc/html` and `doc/latex` folders.
+
+## Client libraries
+
+A [Python client library](bitcoin_client) and a [TypeScript client library](bitcoin_client_js) are available in this repository.
 
 ## Tests & Continuous Integration
 
