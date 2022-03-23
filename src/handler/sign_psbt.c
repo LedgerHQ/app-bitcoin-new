@@ -619,11 +619,14 @@ static void process_input_map(dispatcher_context_t *dc) {
         uint8_t wit_utxo_scriptPubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
         uint64_t wit_utxo_prevout_amount;
 
-        get_amount_scriptpubkey_from_psbt_witness(dc,
-                                                  &state->cur.in_out.map,
-                                                  &wit_utxo_prevout_amount,
-                                                  wit_utxo_scriptPubkey,
-                                                  &wit_utxo_scriptPubkey_len);
+        if (0 > get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                          &state->cur.in_out.map,
+                                                          &wit_utxo_prevout_amount,
+                                                          wit_utxo_scriptPubkey,
+                                                          &wit_utxo_scriptPubkey_len)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        };
 
         if (state->cur.input.has_nonWitnessUtxo) {
             // we already know the scriptPubKey, but we double check that it matches
@@ -1188,13 +1191,12 @@ static void sign_legacy(dispatcher_context_t *dc) {
     // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
 
     uint64_t tmp;  // unused
-    int res = get_amount_scriptpubkey_from_psbt_nonwitness(dc,
-                                                           &state->cur.in_out.map,
-                                                           &tmp,
-                                                           state->cur.in_out.scriptPubKey,
-                                                           &state->cur.in_out.scriptPubKey_len,
-                                                           NULL);
-    if (res < 0) {
+    if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
+                                                         &state->cur.in_out.map,
+                                                         &tmp,
+                                                         state->cur.in_out.scriptPubKey,
+                                                         &state->cur.in_out.scriptPubKey_len,
+                                                         NULL)) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -1335,11 +1337,11 @@ static void sign_segwit(dispatcher_context_t *dc) {
 
     {
         uint64_t amount;
-        if (-1 == get_amount_scriptpubkey_from_psbt_witness(dc,
-                                                            &state->cur.in_out.map,
-                                                            &amount,
-                                                            state->cur.in_out.scriptPubKey,
-                                                            &state->cur.in_out.scriptPubKey_len)) {
+        if (0 > get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                          &state->cur.in_out.map,
+                                                          &amount,
+                                                          state->cur.in_out.scriptPubKey,
+                                                          &state->cur.in_out.scriptPubKey_len)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -1500,11 +1502,11 @@ static void sign_segwit(dispatcher_context_t *dc) {
                 uint8_t in_scriptPubKey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
                 size_t in_scriptPubKey_len;
 
-                if (-1 == get_amount_scriptpubkey_from_psbt(dc,
-                                                            &ith_map,
-                                                            &in_amount,
-                                                            in_scriptPubKey,
-                                                            &in_scriptPubKey_len)) {
+                if (0 > get_amount_scriptpubkey_from_psbt(dc,
+                                                          &ith_map,
+                                                          &in_amount,
+                                                          in_scriptPubKey,
+                                                          &in_scriptPubKey_len)) {
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return;
                 }
