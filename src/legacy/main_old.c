@@ -828,7 +828,7 @@ uint8_t prepare_fees() {
         borrow = transaction_amount_sub_be(
                 fees, btchip_context_D.transactionContext.transactionAmount,
                 btchip_context_D.totalOutputAmount);
-        if (borrow && G_coin_config->kind == COIN_KIND_KOMODO) {
+        if (borrow && (G_coin_config->kind == COIN_KIND_KOMODO || G_coin_config->kind == COIN_KIND_PEERCOIN)) {
             os_memmove(vars.tmp.feesAmount, "REWARD", 6);
             vars.tmp.feesAmount[6] = '\0';
         }
