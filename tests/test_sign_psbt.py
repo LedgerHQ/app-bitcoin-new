@@ -138,11 +138,13 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+        bytes.fromhex(
             "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -165,11 +167,13 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
+        bytes.fromhex(
             "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -193,11 +197,13 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     #   "pubkey" : "03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068",
     #   "signature" : "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
+        bytes.fromhex(
             "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -224,14 +230,19 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
     #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+        bytes.fromhex(
             "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
-        ),
-        1: bytes.fromhex(
+        )
+    ), (
+        1,
+        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+        bytes.fromhex(
             "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
         ),
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_missing_nonwitnessutxo_accept.json")
@@ -323,11 +334,13 @@ def test_sign_psbt_multisig_wsh(client: Client):
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
+        bytes.fromhex(
             "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
         )
-    }
+    )]
 
 
 # def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
@@ -359,6 +372,7 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     )
 
     result = client.sign_psbt(psbt, wallet, None)
+    assert len(result) == 1
 
     # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
     # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
@@ -368,17 +382,17 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     sighash0 = bytes.fromhex("7A999E5AD6F53EA6448E7026061D3B4523F957999C430A5A492DFACE74AE31B6")
 
     # get the (tweaked) pubkey from the scriptPubKey
-    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+    pubkey0_psbt = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    assert len(result) == 1
+    idx0, pubkey0, sig0 = result[0]
+    assert idx0 == 0
+    assert pubkey0 == pubkey0_psbt
 
     # the sighash 0x01 is appended to the signature
-    assert len(result[0]) == 64+1
-    assert result[0][-1] == 0x01
+    assert len(sig0) == 64+1
+    assert sig0[-1] == 0x01
 
-    sig0 = result[0][:-1]
-
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2_sighash_default(client: Client):

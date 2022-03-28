@@ -1,4 +1,4 @@
-from typing import Tuple, Mapping, Optional, Union, Literal
+from typing import List, Tuple, Mapping, Optional, Union, Literal
 from io import BytesIO
 
 from ledgercomm import Transport
@@ -199,7 +199,7 @@ class Client:
 
         raise NotImplementedError
 
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> Mapping[int, bytes]:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
         Signature requires explicit approval from the user.
@@ -220,8 +220,11 @@ class Client:
 
         Returns
         -------
-        Mapping[int, bytes]
-            A mapping that has as keys the indexes of inputs that the Hardware Wallet signed, and the corresponding signatures as values.
+        List[Tuple[int, bytes, bytes]]
+            A list of tuples returned by the hardware wallets, where each element is a tuple of:
+            - an integer, the index of the input being signed;
+            - a `bytes` array of length 33 (compressed ecdsa pubkey) or 32 (x-only BIP-0340 pubkey), the corresponding pubkey for this signature;
+            - a `bytes` array with the signature.
         """
 
         raise NotImplementedError

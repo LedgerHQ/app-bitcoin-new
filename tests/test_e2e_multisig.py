@@ -165,15 +165,12 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    pubkeys = extract_our_pubkeys(psbt, speculos_globals.master_key_fingerprint)
-
     with automation(comm, "automations/sign_with_wallet_accept.json"):
         hww_sigs = client.sign_psbt(psbt, wallet, wallet_hmac)
 
-    assert len(hww_sigs) == len(pubkeys)  # should be true as long as all inputs are internal
+    assert len(hww_sigs) == len(psbt.inputs)  # should be true as long as all inputs are internal
 
-    for i, sig in hww_sigs.items():
-        pubkey = pubkeys[i]
+    for i, pubkey, sig in hww_sigs:
         psbt.inputs[i].partial_sigs[pubkey] = sig
 
     signed_psbt_hww_b64 = psbt.serialize()
