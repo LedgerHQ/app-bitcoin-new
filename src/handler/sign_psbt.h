@@ -67,6 +67,8 @@ typedef struct {
     unsigned int n_outputs;
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
+    uint8_t p2;
+
     bool is_wallet_canonical;
     int address_type;   // only relevant for canonical wallets
     int bip44_purpose;  // only relevant for canonical wallets
@@ -127,4 +129,4 @@ typedef struct {
     uint32_t our_key_derivation[MAX_BIP32_PATH_STEPS];
 } sign_psbt_state_t;
 
-void handler_sign_psbt(dispatcher_context_t *dispatcher_context);
+void handler_sign_psbt(dispatcher_context_t *dispatcher_context, uint8_t p2);

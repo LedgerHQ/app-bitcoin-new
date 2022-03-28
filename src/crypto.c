@@ -419,9 +419,11 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                            size_t bip32_path_len,
                                            const uint8_t hash[static 32],
+                                           uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
                                            uint32_t *info) {
     cx_ecfp_private_key_t private_key = {0};
+    cx_ecfp_public_key_t public_key;
     uint8_t chain_code[32] = {0};
     uint32_t info_internal = 0;
 
@@ -438,6 +440,16 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                     out,
                                     MAX_DER_SIG_LEN,
                                     &info_internal);
+
+            // generate corresponding public key
+            cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
+
+            if (pubkey != NULL) {
+                // compute compressed public key
+                if (crypto_get_compressed_pubkey(public_key.W, pubkey) < 0) {
+                    error = true;
+                }
+            }
         }
         CATCH_ALL {
             error = true;

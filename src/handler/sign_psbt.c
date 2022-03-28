@@ -311,7 +311,7 @@ static int get_amount_scriptpubkey_from_psbt(
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
  */
-void handler_sign_psbt(dispatcher_context_t *dc) {
+void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     // Device must be unlocked
@@ -319,6 +319,8 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
+
+    state->p2 = p2;
 
     merkleized_map_commitment_t global_map;
     if (!buffer_read_varint(&dc->read_buffer, &global_map.size)) {
@@ -340,7 +342,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         return;
     }
     if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
-        // TODO: remove this limitation
         PRINTF("At most %d inputs are supported\n", MAX_N_INPUTS_CAN_SIGN);
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
@@ -1964,8 +1965,14 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
 
     uint8_t sig[MAX_DER_SIG_LEN];
 
-    int sig_len =
-        crypto_ecdsa_sign_sha256_hash_with_key(sign_path, sign_path_len, state->sighash, sig, NULL);
+    uint8_t pubkey[33];
+
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(sign_path,
+                                                         sign_path_len,
+                                                         state->sighash,
+                                                         pubkey,
+                                                         sig,
+                                                         NULL);
     if (sig_len < 0) {
         // unexpected error when signing
         SEND_SW(dc, SW_BAD_STATE);
@@ -1979,6 +1986,13 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     uint8_t buf[9];
     int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
+
+    // pubkey is not present in version 0 of the protocol
+    if (state->p2 >= 1) {
+        uint8_t pubkey_len = 33;
+        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(pubkey, 33);
+    }
 
     dc->add_to_response(&sig, sig_len);
     uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
@@ -2018,11 +2032,20 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     uint8_t sig[64];
     size_t sig_len;
 
+    cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
+    uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
+
     bool error = false;
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
             crypto_tr_tweak_seckey(seckey);
+
+            // generate corresponding public key
+            cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
+            if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
+                error = true;
+            }
 
             unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
                                                           CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
@@ -2063,6 +2086,13 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     uint8_t buf[9];
     int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
+
+    // pubkey is not present in version 0 of the protocol
+    if (state->p2 >= 1) {
+        uint8_t pubkey_len = 32;
+        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(pubkey_tweaked_compr + 1, 32);  // skip the prefix for x-only pubkey
+    }
 
     dc->add_to_response(&sig, sizeof(sig));
 

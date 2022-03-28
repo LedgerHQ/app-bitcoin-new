@@ -25,4 +25,4 @@ typedef struct {
     uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN + 1];
 } register_wallet_state_t;
 
-void handler_register_wallet(dispatcher_context_t *dispatcher_context);
+void handler_register_wallet(dispatcher_context_t *dispatcher_context, uint8_t p2);

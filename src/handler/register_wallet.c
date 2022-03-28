@@ -53,7 +53,9 @@ static bool is_policy_name_acceptable(const char *name, size_t name_len);
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
  */
-void handler_register_wallet(dispatcher_context_t *dc) {
+void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     register_wallet_state_t *state = (register_wallet_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);

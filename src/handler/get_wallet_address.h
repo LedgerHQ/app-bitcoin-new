@@ -43,4 +43,4 @@ typedef struct {
     uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 } get_wallet_address_state_t;
 
-void handler_get_wallet_address(dispatcher_context_t *dispatcher_context);
+void handler_get_wallet_address(dispatcher_context_t *dispatcher_context, uint8_t p2);

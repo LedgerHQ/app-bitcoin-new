@@ -23,7 +23,7 @@ typedef struct dispatcher_context_s dispatcher_context_t;
 
 typedef void (*command_processor_t)(dispatcher_context_t *);
 
-typedef command_processor_t command_handler_t;
+typedef void (*command_handler_t)(dispatcher_context_t *, uint8_t p2);
 
 typedef struct machine_context_s {
     struct machine_context_s *parent_context;

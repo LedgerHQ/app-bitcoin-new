@@ -1,4 +1,4 @@
-Bitcoin application : Technical Specifications
+# Bitcoin application : Technical Specifications
 
 <!-- TODO: List all the technical limitation for each command (max limits, etc.) -->
 
@@ -7,7 +7,7 @@ Bitcoin application : Technical Specifications
 
 ### APDUs
 
-The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` and `P2` fields are reserved for future use and must be set to `0` in all messages.
+The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` field is reserved for future use and must be set to `0` in all messages. The `P2` field is used as a protocol version identifier; the current version is `1`, while version `0` is still supported. No other value must be used.
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
@@ -223,12 +223,13 @@ No output data; the signature are returned using the YIELD client command.
 
 #### Description
 
-Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, encoded as `<input_index> <signature>`, where the `input_index` is a Bitcoin style varint (currently, always 1 byte).
+Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, encoded as `<input_index> <pubkey_len> <pubkey> <signature>`, where the `input_index` is a Bitcoin style varint.
+
+If `P2` is `0` (version `0` of the protocol), `pubkey_len` and `pubkey` are omitted in the YIELD messages.
 
 For a registered wallet, the hmac must be correct.
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
-
 
 #### Client commands
 
@@ -338,7 +339,7 @@ The `YIELD` client command is sent to the client to communicate some result duri
 
 The client must respond with an empty message.
 
-### 40 GET_PREIMAGE
+### GET_PREIMAGE
 
 **Command code**: 0x40
 

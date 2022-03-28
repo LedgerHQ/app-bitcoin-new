@@ -43,7 +43,9 @@ extern global_context_t *G_coin_config;
 static void compute_address(dispatcher_context_t *dc);
 static void send_response(dispatcher_context_t *dc);
 
-void handler_get_wallet_address(dispatcher_context_t *dc) {
+void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
