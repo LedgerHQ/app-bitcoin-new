@@ -57,6 +57,11 @@
 #define MAX_PREVOUT_SCRIPTPUBKEY_LEN 34  // P2WSH's scriptPubKeys are the longest supported
 
 /**
+ * Maximum scriptPubKey length for an output that we can recognize.
+ */
+#define MAX_OUTPUT_SCRIPTPUBKEY_LEN 83  // max 83 for OP_RETURN; other scripts are shorter
+
+/**
  * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
  */
 #define MAX_WALLET_NAME_LENGTH 16

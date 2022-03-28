@@ -40,9 +40,8 @@
 
 #include "register_wallet.h"
 
-static void ui_action_validate_header(dispatcher_context_t *dc, bool accept);
-static void process_next_cosigner_info(dispatcher_context_t *dc);
-static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept);
+static void process_cosigner_info(dispatcher_context_t *dc);
+static void next_cosigner(dispatcher_context_t *dc);
 static void finalize_response(dispatcher_context_t *dc);
 
 extern global_context_t *G_coin_config;
@@ -112,29 +111,14 @@ void handler_register_wallet(dispatcher_context_t *dc) {
 
     state->next_pubkey_index = 0;
 
-    dc->pause();
-    ui_display_wallet_header(dc, &state->wallet_header, ui_action_validate_header);
-}
-
-/**
- * Abort if the user rejected the wallet header, otherwise start processing the pubkeys.
- */
-static void ui_action_validate_header(dispatcher_context_t *dc, bool accept) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-    } else {
-        dc->next(process_next_cosigner_info);
-    }
-    dc->run();
+    ui_display_wallet_header(dc, &state->wallet_header, process_cosigner_info);
 }
 
 /**
  * Receives and parses the next pubkey info.
  * Asks the user to validate the pubkey info.
  */
-static void process_next_cosigner_info(dispatcher_context_t *dc) {
+static void process_cosigner_info(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -205,38 +189,25 @@ static void process_next_cosigner_info(dispatcher_context_t *dc) {
     // checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
-    dc->pause();
     ui_display_policy_map_cosigner_pubkey(dc,
                                           (char *) state->next_pubkey_info,
                                           state->next_pubkey_index,  // 1-indexed for the UI
                                           state->wallet_header.n_keys,
                                           is_key_internal,
-                                          ui_action_validate_cosigner);
+                                          next_cosigner);
 }
 
-/**
- * Aborts if the user rejected the pubkey; if more xpubs are to be read, goes back to
- * request_next_cosigner_hash. Otherwise, finalizes the hash, and returns the sha256 digest and the
- * signature as the final response.
- */
-static void ui_action_validate_cosigner(dispatcher_context_t *dc, bool accept) {
+static void next_cosigner(dispatcher_context_t *dc) {
     register_wallet_state_t *state = (register_wallet_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (!accept) {
-        SEND_SW(dc, SW_DENY);
-        dc->run();
-        return;
-    }
-
     ++state->next_pubkey_index;
     if (state->next_pubkey_index < state->wallet_header.n_keys) {
-        dc->next(process_next_cosigner_info);
+        dc->next(process_cosigner_info);
     } else {
         dc->next(finalize_response);
     }
-    dc->run();
 }
 
 static void finalize_response(dispatcher_context_t *dc) {

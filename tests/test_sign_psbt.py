@@ -20,6 +20,8 @@ from test_utils import has_automation, bip0340, txmaker
 from embit.script import Script
 from embit.networks import NETWORKS
 
+from test_utils.speculos import automation
+
 tests_root: Path = Path(__file__).parent
 
 
@@ -115,7 +117,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
     return psbt
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     # PSBT for a legacy 1-input 1-output spend (no change address)
@@ -142,7 +144,7 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
@@ -169,7 +171,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
@@ -197,7 +199,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     }
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
@@ -302,7 +304,7 @@ def test_sign_psbt_multisig_wsh(client: Client):
 #         client.sign_psbt(psbt)
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
+@has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
@@ -444,32 +446,35 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
     assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_64to256(client: Client, enable_slow_tests: bool):
-    # PSBT for a transaction with 64 inputs and 256 outputs (maximum currently supported in the app)
+@has_automation("automations/sign_with_default_wallet_accept.json")
+def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bool):
+    # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
     if not enable_slow_tests:
         pytest.skip()
 
+    n_inputs = 512
+    n_outputs = 256
+
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0)",
+        "tr(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
         ],
     )
 
     psbt = txmaker.createPsbt(
         wallet,
-        [10000 + 10000 * i for i in range(64)],
-        [999 + 99 * i for i in range(255)],
-        [i == 42 for i in range(255)]
+        [10000 + 10000 * i for i in range(n_inputs)],
+        [999 + 99 * i for i in range(n_outputs)],
+        [i == 42 for i in range(n_outputs)]
     )
 
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert len(result) == 64
+    assert len(result) == n_inputs
 
 
 def test_sign_psbt_fail_11_changes(client: Client):
@@ -527,3 +532,45 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
     with pytest.raises(IncorrectDataError):
         client.sign_psbt(psbt, wallet, None)
     client._no_clone_psbt = False
+
+
+def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    psbt_b64 = "cHNidP8BAKMCAAAAAZ0gZDu3l28lrZWbtsuoIfI07zpsaXXMe6sMHHJn03LPAAAAAAD+////AgAAAAAAAAAASGpGVGhlIFRpbWVzIDAzL0phbi8yMDA5IENoYW5jZWxsb3Igb24gYnJpbmsgb2Ygc2Vjb25kIGJhaWxvdXQgZm9yIGJhbmtzLsGVmAAAAAAAFgAUK5M/aeXrJEofBL7Uno7J5OyTvJ8AAAAAAAEAcQIAAAABnpp88I3RXEU5b28rI3GGAXaWkk+w1sEqWDXFXdacKg8AAAAAAP7///8CgJaYAAAAAAAWABQTR+gqA3tduzjPjEdZ8kKx9cfgmvNabSkBAAAAFgAUCA6eZPSQK9gnq8ngOSaQ0ZdPeIVBAAAAAQEfgJaYAAAAAAAWABQTR+gqA3tduzjPjEdZ8kKx9cfgmiIGAny3XTSwBcTrn2K78sRX12OOgT51fvzsj6aGd9lQtjZiGPWswv1UAACAAQAAgAAAAIAAAAAAAAAAAAAAIgIDGZuJ2DVvV+HOOAoSBc8oYG2+qJhVsRw9/s+4oaUzVokY9azC/VQAAIABAACAAAAAgAEAAAABAAAAAA=="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
+        hww_sigs = client.sign_psbt(psbt, wallet, None)
+
+    assert len(hww_sigs) == 1
+
+
+def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
+    # This psbt contains an output with future psbt version 16 (corresponding to address
+    # tb1sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4hu3px).
+    # The app should accept it nonetheless.
+
+    psbt_b64 = "cHNidP8BAH0CAAAAAZvg4s1Yxz9DddwBeI+qqU7hcldqGSgWPXuZZReEFYvKAAAAAAD+////AqdTiQAAAAAAFgAUK5M/aeXrJEofBL7Uno7J5OyTvJ9AQg8AAAAAACJgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAHECAAAAAYWOSCXXmA0ztidPI5A6FskW99o7nWNVeFP7rXND5B9aAAAAAAD+////AoCWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JrzWm0pAQAAABYAFF7XSHCIZoptcIrXIWce1tKqp11EaQAAAAEBH4CWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JoiBgJ8t100sAXE659iu/LEV9djjoE+dX787I+mhnfZULY2Yhj1rML9VAAAgAEAAIAAAACAAAAAAAAAAAAAIgIDGZuJ2DVvV+HOOAoSBc8oYG2+qJhVsRw9/s+4oaUzVokY9azC/VQAAIABAACAAAAAgAEAAAABAAAAAAA="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
+        hww_sigs = client.sign_psbt(psbt, wallet, None)
+
+    assert len(hww_sigs) == 1

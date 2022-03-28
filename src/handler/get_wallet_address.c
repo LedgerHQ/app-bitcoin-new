@@ -23,6 +23,7 @@
 #include "../common/buffer.h"
 #include "../common/merkle.h"
 #include "../common/read.h"
+#include "../common/script.h"
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"
 #include "../commands.h"
@@ -39,9 +40,8 @@
 
 extern global_context_t *G_coin_config;
 
-static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted);
-
 static void compute_address(dispatcher_context_t *dc);
+static void send_response(dispatcher_context_t *dc);
 
 void handler_get_wallet_address(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -133,20 +133,19 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         // we check if the key is indeed internal
         uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
 
-        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         state->wallet_header_keys_info_merkle_root,
                                                         state->wallet_header_n_keys,
                                                         0,  // only one key
-                                                        key_info_str,
-                                                        sizeof(key_info_str));
+                                                        state->key_info_str,
+                                                        sizeof(state->key_info_str));
         if (key_info_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
         // Make a sub-buffer for the pubkey info
-        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+        buffer_t key_info_buffer = buffer_create(state->key_info_str, key_info_len);
 
         policy_map_key_info_t key_info;
         if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
@@ -217,7 +216,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
     if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);  // TODO: more specific error code
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
@@ -256,26 +255,19 @@ static void compute_address(dispatcher_context_t *dc) {
     }
 
     if (state->display_address == 0) {
-        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
+        dc->next(send_response);
     } else {
-        dc->pause();
         ui_display_wallet_address(dc,
                                   state->is_wallet_canonical ? NULL : state->wallet_header.name,
                                   state->address,
-                                  ui_action_validate_address);
+                                  send_response);
     }
 }
 
-static void ui_action_validate_address(dispatcher_context_t *dc, bool accepted) {
+static void send_response(dispatcher_context_t *dc) {
     get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (accepted) {
-        SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
-    } else {
-        SEND_SW(dc, SW_DENY);
-    }
-
-    dc->run();
+    SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
 }

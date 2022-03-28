@@ -1005,7 +1005,7 @@ unsigned int btchip_silent_confirm_single_output() {
             return 0;
         }
         get_address_from_output_script(btchip_context_D.currentOutput + 8, sizeof(btchip_context_D.currentOutput) - 8, tmp, sizeof(tmp));
-        if (strcmp(tmp, vars.swap_data.destination_address) != 0) {
+        if (strncmp(tmp, vars.swap_data.destination_address, sizeof(tmp)) != 0) {
             PRINTF("Address not matched\n");
             return 0;
         }

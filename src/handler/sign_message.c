@@ -28,8 +28,6 @@
 
 extern global_context_t *G_coin_config;
 
-static void ui_action_accept_signing(dispatcher_context_t *dc, bool choice);
-
 static void send_response(dispatcher_context_t *dc);
 
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
@@ -99,20 +97,7 @@ void handler_sign_message(dispatcher_context_t *dc) {
         snprintf(message_hash_str + 2 * i, 3, "%02X", state->message_hash[i]);
     }
 
-    dc->pause();
-    ui_display_message_hash(dc, path_str, message_hash_str, ui_action_accept_signing);
-}
-
-static void ui_action_accept_signing(dispatcher_context_t *dc, bool choice) {
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    if (choice) {
-        dc->next(send_response);
-    } else {
-        SEND_SW(dc, SW_DENY);
-    }
-
-    dc->run();
+    ui_display_message_hash(dc, path_str, message_hash_str, send_response);
 }
 
 static void send_response(dispatcher_context_t *dc) {
