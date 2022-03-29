@@ -1,6 +1,5 @@
 import pytest
 
-from typing import Dict
 import hmac
 from hashlib import sha256
 from decimal import Decimal
@@ -9,7 +8,6 @@ from bip32 import BIP32
 
 from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin._script import is_p2sh, is_p2wsh, parse_multisig
 
 from test_utils import SpeculosGlobals
 
@@ -17,64 +15,6 @@ from speculos.client import SpeculosClient
 from test_utils.speculos import automation
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
-
-
-def extract_our_pubkeys(psbt: PSBT, master_fp: bytes) -> Dict[int, bytes]:
-    # It only works for standard wallets and simple multisig; won't generalize to miniscript
-    # based on code in bitcoin-core/HWI
-
-    psbt2 = PSBT()
-    psbt2.deserialize(psbt.serialize())
-    if (psbt2.version is None or psbt.version == 0):
-        psbt2.convert_to_v2()
-
-    pubkeys: Dict[int, bytes] = {}
-    for input_num, psbt_in in enumerate(psbt2.inputs):
-        utxo = None
-        scriptcode = b""
-        if psbt_in.witness_utxo:
-            utxo = psbt_in.witness_utxo
-        if psbt_in.non_witness_utxo:
-            assert psbt_in.prev_out is not None
-            utxo = psbt_in.non_witness_utxo.vout[psbt_in.prev_out]
-        if utxo is None:
-            continue
-        scriptcode = utxo.scriptPubKey
-
-        if is_p2sh(scriptcode):
-            if len(psbt_in.redeem_script) == 0:
-                continue
-            scriptcode = psbt_in.redeem_script
-
-        # Check if P2WSH
-        if is_p2wsh(scriptcode):
-            if len(psbt_in.witness_script) == 0:
-                continue
-            scriptcode = psbt_in.witness_script
-
-        multisig = parse_multisig(scriptcode)
-        if multisig is not None:
-            _, ms_pubkeys = multisig
-
-            our_keys = 0
-            for pub in ms_pubkeys:
-                if pub in psbt_in.hd_keypaths:
-                    pk_origin = psbt_in.hd_keypaths[pub]
-                    if pk_origin.fingerprint == master_fp:
-                        our_keys += 1
-                        pubkeys[input_num] = pub
-
-            if our_keys > 1:
-                raise ValueError("Cannot have more than 1 internal key in a supported wallet")
-        else:
-            for key, origin in psbt_in.hd_keypaths.items():
-                if origin.fingerprint == master_fp:
-                    pubkeys[input_num] = key
-
-            for key, (_, origin) in psbt_in.tap_bip32_paths.items():
-                if key == psbt_in.tap_internal_key and origin.fingerprint == master_fp:
-                    pubkeys[input_num] = key
-    return pubkeys
 
 
 def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, is_speculos: bool, comm: SpeculosClient):
