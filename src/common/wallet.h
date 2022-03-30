@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <assert.h>
 
 #include "common/bip32.h"
 #include "common/buffer.h"
@@ -31,8 +32,7 @@
 // Therefore, the total length of the key info string is at most 162 bytes.
 #define MAX_POLICY_KEY_INFO_LEN (46 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
 
-// Enough to store "sh(wsh(sortedmulti(15,@0,@1,@2,@3,@4,@5,@6,@7,@8,@9,@10,@11,@12,@13,@14)))"
-#define MAX_POLICY_MAP_STR_LENGTH 74
+#define MAX_POLICY_MAP_STR_LENGTH 110  // TODO: increase limit, at least on non-NanoS
 
 #define MAX_POLICY_MAP_NAME_LENGTH 16
 
@@ -45,10 +45,10 @@
 // n_keys (1 byte)
 // keys_merkle_root (32 bytes)
 #define MAX_POLICY_MAP_SERIALIZED_LENGTH \
-    (1 + MAX_POLICY_MAP_NAME_LENGTH + 1 + MAX_POLICY_MAP_STR_LENGTH + 32)
+    (1 + 1 + MAX_POLICY_MAP_NAME_LENGTH + 1 + MAX_POLICY_MAP_STR_LENGTH + 1 + 32)
 
 // Maximum size of a parsed policy map in memory
-#define MAX_POLICY_MAP_BYTES 128
+#define MAX_POLICY_MAP_BYTES 256  // TODO: this is too large on Nano S
 
 // Currently only multisig is supported
 #define MAX_POLICY_MAP_LEN MAX_MULTISIG_POLICY_MAP_LENGTH
@@ -75,7 +75,7 @@ typedef struct {
 typedef enum {
     TOKEN_SH,
     TOKEN_WSH,
-    // TOKEN_PK,       // disabled, but it will be needed for taproot
+    TOKEN_PK,
     TOKEN_PKH,
     TOKEN_WPKH,
     // TOKEN_COMBO     // disabled, does not mix well with the script policy language
@@ -84,6 +84,39 @@ typedef enum {
     TOKEN_TR,
     // TOKEN_ADDR,     // unsupported
     // TOKEN_RAW,      // unsupported
+
+    /* miniscript tokens */
+
+    TOKEN_0,
+    TOKEN_1,
+    TOKEN_PK_K,
+    TOKEN_PK_H,
+    TOKEN_OLDER,
+    TOKEN_AFTER,
+    TOKEN_SHA256,
+    TOKEN_HASH256,
+    TOKEN_RIPEMD160,
+    TOKEN_HASH160,
+    TOKEN_ANDOR,
+    TOKEN_AND_V,
+    TOKEN_AND_B,
+    TOKEN_AND_N,
+    TOKEN_OR_B,
+    TOKEN_OR_C,
+    TOKEN_OR_D,
+    TOKEN_OR_I,
+    TOKEN_THRESH,
+    // wrappers
+    TOKEN_A,
+    TOKEN_S,
+    TOKEN_C,
+    TOKEN_T,
+    TOKEN_D,
+    TOKEN_V,
+    TOKEN_J,
+    TOKEN_N,
+    TOKEN_L,
+    TOKEN_U,
 } PolicyNodeType;
 
 // TODO: the following structures are using size_t for all integers to avoid alignment problems;
@@ -97,14 +130,44 @@ typedef struct {
 } policy_node_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_SH, == TOKEN_WSH
+    PolicyNodeType type;
+} policy_node_constant_t;
+
+typedef struct {
+    PolicyNodeType type;
     policy_node_t *script;
 } policy_node_with_script_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_PK, == TOKEN_PKH, == TOKEN_WPKH
-    size_t key_index;     // index of the key
+    PolicyNodeType type;
+    union {
+        policy_node_t *scripts[1];
+        policy_node_t *script;  // alias of scripts[0] for convenience
+    };
+} policy_node_with_script1_t;
+
+typedef struct {
+    PolicyNodeType type;
+    policy_node_t *scripts[2];
+} policy_node_with_script2_t;
+
+typedef struct {
+    PolicyNodeType type;
+    policy_node_t *scripts[3];
+} policy_node_with_script3_t;
+
+// generic type with pointer for up to 3 (but constant) number of child scripts
+typedef policy_node_with_script3_t policy_node_with_scripts_t;
+
+typedef struct {
+    PolicyNodeType type;
+    size_t key_index;  // index of the key
 } policy_node_with_key_t;
+
+typedef struct {
+    PolicyNodeType type;
+    uint32_t n;
+} policy_node_with_uint32_t;
 
 typedef struct {
     PolicyNodeType type;  // == TOKEN_MULTI, == TOKEN_SORTEDMULTI
@@ -112,6 +175,29 @@ typedef struct {
     size_t n;             // number of keys
     size_t *key_indexes;  // pointer to array of exactly n key indexes
 } policy_node_multisig_t;
+
+typedef struct policy_node_scriptlist_s {
+    policy_node_t *script;
+    struct policy_node_scriptlist_s *next;
+} policy_node_scriptlist_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_THRESH
+    size_t k;             // threshold
+    size_t n;             // number of child script (TODO: remove?)
+    policy_node_scriptlist_t
+        *scriptlist;  // pointer to array of exactly n pointers to child scripts
+} policy_node_thresh_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_SHA160, TOKEN_HASH160
+    uint8_t h[20];
+} policy_node_with_hash_160_t;
+
+typedef struct {
+    PolicyNodeType type;  // == TOKEN_SHA256, TOKEN_HASH256
+    uint8_t h[32];
+} policy_node_with_hash_256_t;
 
 /**
  * TODO: docs

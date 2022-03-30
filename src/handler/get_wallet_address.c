@@ -241,6 +241,7 @@ static void compute_address(dispatcher_context_t *dc) {
                                             state->address_index,
                                             &script_buf);
     if (script_len < 0) {
+        PRINTF("Couldn't produce wallet script\n");
         SEND_SW(dc, SW_BAD_STATE);  // unexpected
         return;
     }

@@ -144,8 +144,10 @@ def create_new_wallet() -> Tuple[str, str]:
     get_rpc().createwallet(wallet_name=wallet_name, descriptors=True)
     wallet_rpc = get_wallet_rpc(wallet_name)
 
+    all_descriptors = wallet_rpc.listdescriptors()["descriptors"]
     descriptor: str = next(filter(lambda d: d["desc"].startswith(
-        "pkh"), wallet_rpc.listdescriptors()["descriptors"]))["desc"]
+        "pkh") and "/0/*" in d["desc"], all_descriptors))["desc"]
+
     core_xpub_orig = descriptor[descriptor.index("(")+1: descriptor.index("/0/*")]
 
     return wallet_name, core_xpub_orig

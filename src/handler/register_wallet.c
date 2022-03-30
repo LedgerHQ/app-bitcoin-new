@@ -269,25 +269,9 @@ static void finalize_response(dispatcher_context_t *dc) {
 }
 
 static bool is_policy_acceptable(policy_node_t *policy) {
-    policy_node_t *internal_script;
+    // TODO: might want to add more restrictions
 
-    if (policy->type == TOKEN_SH) {
-        policy_node_t *child_node = ((policy_node_with_script_t *) policy)->script;
-        if (child_node->type == TOKEN_WSH) {
-            // sh(wsh({sorted}multi(@0)))
-            internal_script = ((policy_node_with_script_t *) child_node)->script;
-        } else {
-            // sh({sorted}multi(@0))
-            internal_script = child_node;
-        }
-    } else if (policy->type == TOKEN_WSH) {
-        // wsh({sorted}multi(@0))
-        internal_script = ((policy_node_with_script_t *) policy)->script;
-    } else {
-        return false;  // unexpected policy
-    }
-
-    return internal_script->type == TOKEN_MULTI || internal_script->type == TOKEN_SORTEDMULTI;
+    return policy->type == TOKEN_SH || policy->type == TOKEN_WSH || policy->type == TOKEN_TR;
 }
 
 static bool is_policy_name_acceptable(const char *name, size_t name_len) {

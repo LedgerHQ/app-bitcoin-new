@@ -132,9 +132,6 @@ static inline void print_dispatcher_info(dispatcher_context_t *dc,
                                          const char *file,
                                          int line,
                                          const char *func) {
-    // prevent warnings when DEBUG is 0
-    (void) file, (void) line, (void) func;
-
     machine_context_t *ctx = dc->machine_context_ptr;
     while (ctx->parent_context != NULL) {
         PRINTF("----");
