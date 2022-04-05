@@ -1,3 +1,5 @@
+import pytest
+
 from typing import List, Union
 
 import hmac
@@ -8,6 +10,7 @@ from bip32 import BIP32
 
 from bitcoin_client.ledger_bitcoin import Client
 from bitcoin_client.ledger_bitcoin.client_base import TransportClient
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
 
@@ -25,7 +28,7 @@ def get_internal_xpub(speculos_globals: SpeculosGlobals, path: str) -> str:
     return bip32.get_xpub_from_path(f"m/{path}")
 
 
-def run_test(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def run_test_e2e(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     with automation(comm, "automations/register_wallet_accept.json"):
         wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
 
@@ -107,6 +110,16 @@ def run_test(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test_wal
     assert len(hww_sigs) == len(psbt.inputs)  # should be true as long as all inputs are internal
 
 
+def run_test_invalid(client: Client, policy_map: str, keys_info: List[str]):
+    wallet_policy = PolicyMapWallet(
+        name="Invalid wallet",
+        policy_map=policy_map,
+        keys_info=keys_info)
+
+    with pytest.raises(IncorrectDataError):
+        client.register_wallet(wallet_policy)
+
+
 def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     # One of two keys (equally likely)
     # or(pk(key_1),pk(key_2))
@@ -122,7 +135,7 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -140,7 +153,7 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -158,7 +171,7 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -178,7 +191,7 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
             f"{core_xpub_orig2}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -199,7 +212,7 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -220,4 +233,65 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
             f"{core_xpub_orig2}/**",
         ])
 
-    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    path = "48'/1'/0'/2'"
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig3 = create_new_wallet()
+    _, core_xpub_orig4 = create_new_wallet()
+    _, core_xpub_orig5 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals, path)
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**"
+
+    wallet_policy = PolicyMapWallet(
+        name="Me or them",
+        policy_map=f"wsh(or_d(pk(@0),multi(3,@1,@2,@3,@4,@5)))",
+        keys_info=[
+            internal_xpub_orig,
+            f"{core_xpub_orig1}/**",
+            f"{core_xpub_orig2}/**",
+            f"{core_xpub_orig3}/**",
+            f"{core_xpub_orig4}/**",
+            f"{core_xpub_orig5}/**",
+        ])
+
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGlobals):
+    path = "48'/1'/0'/2'"
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig3 = create_new_wallet()
+    _, core_xpub_orig4 = create_new_wallet()
+    _, core_xpub_orig5 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals, path)
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**"
+
+    H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
+
+    # sh(sh(...)), wsh(sh(...)), wsh(wsh(...)) are invalid
+    run_test_invalid(client, "sh(sh(pkh(@0)))", [internal_xpub_orig])
+    run_test_invalid(client, "wsh(sh(pkh(@0)))", [internal_xpub_orig])
+    run_test_invalid(client, "wsh(wsh(pkh(@0)))", [internal_xpub_orig])
+
+    # tr must be top-level
+    run_test_invalid(client, "wsh(tr(pk(@0)))", [internal_xpub_orig])
+    run_test_invalid(client, "sh(tr(pk(@0)))", [internal_xpub_orig])
+
+    # sortedmulti is not valid miniscript, can only be used as a descriptor inside sh or wsh
+    # TODO: this test is failing because wallet registration doesn't quite try to validate the script
+    #       (address derivation would fail when processing sortedmulti)
+    #       This could be solved by generating the first address during wallet registration.
+    # run_test_invalid(client, "wsh(or_d(pk(@0),sortedmulti(3,@1,@2,@3,@4,@5)))",
+    #                  [
+    #                      internal_xpub_orig,
+    #                      f"{core_xpub_orig1}/**",
+    #                      f"{core_xpub_orig2}/**",
+    #                      f"{core_xpub_orig3}/**",
+    #                      f"{core_xpub_orig4}/**",
+    #                      f"{core_xpub_orig5}/**",
+    #                  ])

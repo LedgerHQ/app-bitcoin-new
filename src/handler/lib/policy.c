@@ -879,10 +879,6 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                 ret = execute_processor(&state, process_thresh_node, NULL);
                 break;
 
-            // case TOKEN_SH:
-            // case TOKEN_WSH:
-            //     ret = execute_processor(&state, process_sh_wsh_node, NULL);
-            //     break;
             case TOKEN_MULTI:
             case TOKEN_SORTEDMULTI:
                 ret = execute_processor(&state, process_multi_sortedmulti_node, NULL);
