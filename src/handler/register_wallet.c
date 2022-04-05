@@ -46,7 +46,7 @@ static void finalize_response(dispatcher_context_t *dc);
 
 extern global_context_t *G_coin_config;
 
-static bool is_policy_acceptable(policy_node_t *policy);
+static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
 
 /**
@@ -268,7 +268,7 @@ static void finalize_response(dispatcher_context_t *dc) {
     SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
 }
 
-static bool is_policy_acceptable(policy_node_t *policy) {
+static bool is_policy_acceptable(const policy_node_t *policy) {
     // TODO: might want to add more restrictions
 
     return policy->type == TOKEN_SH || policy->type == TOKEN_WSH || policy->type == TOKEN_TR;

@@ -251,7 +251,7 @@ const generic_processor_command_t commands_u[] = {{CMD_CODE_OP, OP_IF},
                                                   {CMD_CODE_OP_V, OP_ENDIF},
                                                   {CMD_CODE_END, 0}};
 
-static void print_parser_info(policy_parser_state_t *state, const char *func_name) {
+static void print_parser_info(const policy_parser_state_t *state, const char *func_name) {
     (void) func_name;  // avoid warnings when DEBUG=0
 
     for (int i = 0; i < state->node_stack_eos; i++) {
@@ -269,7 +269,7 @@ static void print_parser_info(policy_parser_state_t *state, const char *func_nam
  * Pushes a node onto the stack. Returns 0 on success, -1 if the stack is exhausted.
  */
 static int state_stack_push(policy_parser_state_t *state,
-                            policy_node_t *policy_node,
+                            const policy_node_t *policy_node,
                             uint8_t mode,
                             uint8_t flags) {
     ++state->node_stack_eos;
@@ -416,7 +416,7 @@ static void update_output(policy_parser_state_t *state, const uint8_t *data, siz
     if (node->mode == MODE_OUT_BYTES) {
         if (!buffer_write_bytes(node->out_buf, data, data_len)) {
             node->flags |= PROCESSOR_FLAG_OUTPUT_OVERFLOW;
-        };
+        }
     } else {
         crypto_hash_update(&node->hash_context->header, data, data_len);
     }
@@ -431,11 +431,11 @@ static void update_output_push_u32(policy_parser_state_t *state, uint32_t n) {
     if (n == 0) {
         update_output_u8(state, OP_0);
     } else if (n <= 16) {
-        update_output_u8(state, 0x50 + n);
+        update_output_u8(state, 0x50 + (uint8_t) n);
     } else {
         uint8_t n_le[4];
         write_u32_le(n_le, 0, n);
-        int byte_size;
+        uint8_t byte_size;
         if (n <= 0x7f)
             byte_size = 1;
         else if (n <= 0x7fff)
@@ -461,7 +461,7 @@ static void update_output_push_u32(policy_parser_state_t *state, uint32_t n) {
 
 static void update_output_op_v(policy_parser_state_t *state, uint8_t op) {
     PRINT_PARSER_INFO(state);
-    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+    const policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     if (node->flags & PROCESSOR_FLAG_V) {
         if (op == OP_CHECKSIG || op == OP_CHECKMULTISIG || op == OP_NUMEQUAL || op == OP_EQUAL) {
             // the _VERIFY versions of the opcodes are all 1 larger
@@ -482,7 +482,7 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
-    generic_processor_command_t *commands = (generic_processor_command_t *) arg;
+    const generic_processor_command_t *commands = (const generic_processor_command_t *) arg;
 
     size_t n_commands = 0;
     while (commands[n_commands].code != CMD_CODE_END) ++n_commands;
@@ -510,7 +510,8 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                 break;
             }
             case CMD_CODE_PUSH_PK: {
-                policy_node_with_key_t *policy = (policy_node_with_key_t *) node->policy_node;
+                const policy_node_with_key_t *policy =
+                    (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
                 if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
                     return -1;
@@ -521,7 +522,8 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                 break;
             }
             case CMD_CODE_PUSH_PKH: {
-                policy_node_with_key_t *policy = (policy_node_with_key_t *) node->policy_node;
+                const policy_node_with_key_t *policy =
+                    (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
                 if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
                     return -1;
@@ -533,39 +535,40 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                 break;
             }
             case CMD_CODE_PUSH_UINT32: {
-                policy_node_with_uint32_t *policy = (policy_node_with_uint32_t *) node->policy_node;
+                const policy_node_with_uint32_t *policy =
+                    (const policy_node_with_uint32_t *) node->policy_node;
                 update_output_push_u32(state, policy->n);
                 break;
             }
             case CMD_CODE_PUSH_HASH20: {
-                policy_node_with_hash_160_t *policy =
-                    (policy_node_with_hash_160_t *) node->policy_node;
+                const policy_node_with_hash_160_t *policy =
+                    (const policy_node_with_hash_160_t *) node->policy_node;
                 update_output_u8(state, 20);
                 update_output(state, policy->h, 20);
                 break;
             }
             case CMD_CODE_PUSH_HASH32: {
-                policy_node_with_hash_256_t *policy =
-                    (policy_node_with_hash_256_t *) node->policy_node;
+                const policy_node_with_hash_256_t *policy =
+                    (const policy_node_with_hash_256_t *) node->policy_node;
                 update_output_u8(state, 32);
                 update_output(state, policy->h, 32);
                 break;
             }
             case CMD_CODE_PROCESS_CHILD: {
-                policy_node_with_scripts_t *policy =
-                    (policy_node_with_scripts_t *) node->policy_node;
+                const policy_node_with_scripts_t *policy =
+                    (const policy_node_with_scripts_t *) node->policy_node;
                 state_stack_push(state, policy->scripts[cmd_data], node->mode, 0);
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_V: {
-                policy_node_with_scripts_t *policy =
-                    (policy_node_with_scripts_t *) node->policy_node;
+                const policy_node_with_scripts_t *policy =
+                    (const policy_node_with_scripts_t *) node->policy_node;
                 state_stack_push(state, policy->scripts[cmd_data], node->mode, node->flags);
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_VV: {
-                policy_node_with_scripts_t *policy =
-                    (policy_node_with_scripts_t *) node->policy_node;
+                const policy_node_with_scripts_t *policy =
+                    (const policy_node_with_scripts_t *) node->policy_node;
                 state_stack_push(state,
                                  policy->scripts[cmd_data],
                                  node->mode,
@@ -630,7 +633,7 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
-    policy_node_thresh_t *policy = (policy_node_thresh_t *) node->policy_node;
+    const policy_node_thresh_t *policy = (const policy_node_thresh_t *) node->policy_node;
 
     // [X1] [X2] ADD ... [Xn] ADD ... <k> EQUAL
 
@@ -673,7 +676,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
-    policy_node_multisig_t *policy = (policy_node_multisig_t *) node->policy_node;
+    const policy_node_multisig_t *policy = (const policy_node_multisig_t *) node->policy_node;
 
     // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
 
@@ -772,10 +775,10 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
     int script_type = -1;
     if (policy->type == TOKEN_SH) {
-        policy_node_t *child = ((policy_node_with_script_t *) policy)->script;
+        const policy_node_t *child = ((const policy_node_with_script_t *) policy)->script;
         if (child->type == TOKEN_WSH) {
             script_type = WRAPPED_SCRIPT_TYPE_SH_WSH;
-            core_policy = ((policy_node_with_script_t *) child)->script;
+            core_policy = ((const policy_node_with_script_t *) child)->script;
         } else {
             script_type = WRAPPED_SCRIPT_TYPE_SH;
             core_policy = child;
@@ -784,7 +787,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
     } else if (policy->type == TOKEN_WSH) {
         script_type = WRAPPED_SCRIPT_TYPE_WSH;
         core_mode = MODE_OUT_HASH;
-        core_policy = ((policy_node_with_script_t *) policy)->script;
+        core_policy = ((const policy_node_with_script_t *) policy)->script;
     } else {
         core_policy = policy;
     }
@@ -804,7 +807,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
     int ret;
     do {
-        policy_parser_node_state_t *node = &state.nodes[state.node_stack_eos];
+        const policy_parser_node_state_t *node = &state.nodes[state.node_stack_eos];
 
         switch (node->policy_node->type) {
             case TOKEN_0:

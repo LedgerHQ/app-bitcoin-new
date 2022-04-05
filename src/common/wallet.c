@@ -192,6 +192,16 @@ static uint8_t lowercase_hex_to_int(char c) {
     return (uint8_t) (is_digit(c) ? c - '0' : c - 'a' + 10);
 }
 
+static bool consume_character(buffer_t *in_buf, char expected) {
+    // the next character must be a comma
+    char c;
+    if (!buffer_peek(in_buf, (uint8_t *) &c) || c != expected) {
+        return false;
+    }
+    buffer_seek_cur(in_buf, 1);
+    return true;
+}
+
 /**
  * Read up to out_len characters from buffer, until either:
  * - the buffer is exhausted
@@ -211,9 +221,9 @@ static size_t read_token(buffer_t *buffer, char *out, size_t out_len) {
 
 /**
  * Read the next word from buffer (or up to MAX_TOKEN_LENGTH characters), and
- * returns the index of this word in KNOWN_TOKENS if found; -1 otherwise.
+ * returns the index of this word in KNOWN_TOKENS if found; TOKEN_INVALID otherwise.
  */
-static int parse_token(buffer_t *buffer) {
+static PolicyNodeType parse_token(buffer_t *buffer) {
     char word[MAX_TOKEN_LENGTH + 1];
 
     size_t word_len = read_token(buffer, word, MAX_TOKEN_LENGTH);
@@ -221,10 +231,10 @@ static int parse_token(buffer_t *buffer) {
 
     for (unsigned int i = 0; i < sizeof(KNOWN_TOKENS) / sizeof(KNOWN_TOKENS[0]); i++) {
         if (strncmp((const char *) PIC(KNOWN_TOKENS[i].name), word, MAX_TOKEN_LENGTH) == 0) {
-            return (int) PIC(KNOWN_TOKENS[i].type);
+            return ((const token_descriptor_t *) PIC(&KNOWN_TOKENS[i]))->type;
         }
     }
-    return -1;
+    return TOKEN_INVALID;
 }
 
 /**
@@ -235,10 +245,6 @@ static int parse_token(buffer_t *buffer) {
  */
 static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
     uint8_t c;
-    if (!buffer_peek(buffer, &c) || !is_digit(c)) {
-        return -1;
-    }
-
     size_t result = 0;
     int digits_read = 0;
     while (buffer_peek(buffer, &c) && is_digit(c)) {
@@ -246,7 +252,7 @@ static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
         uint8_t next_digit = c - '0';
 
         if (digits_read == 2 && result == 0) {
-            // if the first digit was a 0, than it should be the only digit
+            // if the first digit was a 0, then it should be the only digit
             return -1;
         }
 
@@ -303,10 +309,8 @@ static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
     *out = der_step;
 
     // Check if hardened
-    uint8_t c;
-    if (buffer_peek(buffer, &c) && c == '\'') {
+    if (consume_character(buffer, '\'')) {
         *out |= BIP32_FIRST_HARDENED_CHILD;
-        buffer_seek_cur(buffer, 1);  // skip the ' character
     }
     return 0;
 }
@@ -318,15 +322,9 @@ static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
 int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
     memset(out, 0, sizeof(policy_map_key_info_t));
 
-    uint8_t c;
-    if (!buffer_peek(buffer, &c)) {
-        return -1;
-    }
-
-    if (c == '[') {
+    if (consume_character(buffer, '[')) {
         out->has_key_origin = 1;
 
-        buffer_seek_cur(buffer, 1);         // skip 1 byte
         if (!buffer_can_read(buffer, 9)) {  // at least 8 bytes + (closing parenthesis or '\')
             return -1;
         }
@@ -342,10 +340,9 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
 
         // read all the given derivation steps
         out->master_key_derivation_len = 0;
-        while (buffer_peek(buffer, &c) && c == '/') {
-            buffer_seek_cur(buffer, 1);  // skip the '/' character
+        while (consume_character(buffer, '/')) {
             if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
-                return -1;
+                return WITH_ERROR(-1, "Too many derivation steps");
             }
 
             if (buffer_read_derivation_step(
@@ -358,13 +355,14 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         }
 
         // the next character must be ']'
-        if (!buffer_read_u8(buffer, &c) || c != ']') {
-            return -1;
+        if (!consume_character(buffer, ']')) {
+            return WITH_ERROR(-1, "Expected ']'");
         }
     }
 
     // consume the rest of the buffer into the pubkey, except possibly the final "/**"
     unsigned int ext_pubkey_len = 0;
+    uint8_t c;
     while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_peek(buffer, &c) &&
            is_alphanumeric(c)) {
         out->ext_pubkey[ext_pubkey_len] = c;
@@ -372,6 +370,11 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
         buffer_seek_cur(buffer, 1);
     }
     out->ext_pubkey[ext_pubkey_len] = '\0';
+
+    if (ext_pubkey_len < 111 || ext_pubkey_len > 112) {
+        // loose sanity check; pubkeys in bitcoin can be 111 or 112 characters long
+        return WITH_ERROR(-1, "Invalid extended pubkey length\n");
+    }
 
     // either the string terminates now, or it has a final "/**" suffix for the wildcard.
     if (!buffer_can_read(buffer, 1)) {
@@ -409,16 +412,6 @@ static size_t parse_key_index(buffer_t *in_buf) {
 
 #define CONTEXT_WITHIN_SH  1  // parsing a direct child of SH
 #define CONTEXT_WITHIN_WSH 2  // parsing a direct child of WSH
-
-static bool consume_character(buffer_t *in_buf, char expected) {
-    // the next character must be a comma
-    char c;
-    if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != expected) {
-        PRINTF("Unexpected char: %c. Was expecting: %c\n", c, expected);
-        return false;
-    }
-    return true;
-}
 
 // forward declaration
 static int parse_script(buffer_t *in_buf,
@@ -531,7 +524,7 @@ static int parse_script(buffer_t *in_buf,
     }
 
     // We read the token, we'll do different parsing based on what token we find
-    int token = parse_token(in_buf);
+    PolicyNodeType token = parse_token(in_buf);
 
     // Opening '('
     if (!consume_character(in_buf, '(')) {
@@ -714,9 +707,7 @@ static int parse_script(buffer_t *in_buf,
                     return -1;
                 }
                 // peek, if next character is ',', consume it and exit
-                uint8_t c;
-                if (buffer_peek(in_buf, &c) && c == ',') {
-                    buffer_seek_cur(in_buf, 1);  // skip the comma
+                if (consume_character(in_buf, ',')) {
                     cur->next =
                         (policy_node_scriptlist_t *) buffer_alloc(out_buf,
                                                                   sizeof(policy_node_scriptlist_t),

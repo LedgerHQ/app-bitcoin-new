@@ -25,7 +25,7 @@ def get_internal_xpub(speculos_globals: SpeculosGlobals, path: str) -> str:
     return bip32.get_xpub_from_path(f"m/{path}")
 
 
-def run_test(wallet_policy: PolicyMapWallet, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def run_test(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     with automation(comm, "automations/register_wallet_accept.json"):
         wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
 
@@ -112,7 +112,7 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
     # or(pk(key_1),pk(key_2))
 
     path = "499'/1'/0'"
-    core_wallet_name, core_xpub_orig = create_new_wallet()
+    _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Joint account",
@@ -122,7 +122,7 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -130,7 +130,7 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
     # or(99@pk(key_likely),pk(key_unlikely))
 
     path = "499'/1'/0'"
-    core_wallet_name, core_xpub_orig = create_new_wallet()
+    _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Joint account",
@@ -140,7 +140,7 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -148,7 +148,7 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
     # and(pk(key_user),or(99@pk(key_service),older(12960)))
 
     path = "48'/1'/0'/2'"
-    core_wallet_name, core_xpub_orig = create_new_wallet()
+    _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="2FA wallet",
@@ -158,7 +158,7 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
             f"{core_xpub_orig}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -166,8 +166,8 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
     # thresh(3,pk(key_1),pk(key_2),pk(key_3),older(12960))
 
     path = "48'/1'/0'/2'"
-    core_wallet_name1, core_xpub_orig1 = create_new_wallet()
-    core_wallet_name2, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Decaying 3of3",
@@ -178,8 +178,7 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
             f"{core_xpub_orig2}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name1, core_wallet_name2],
-             rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -187,8 +186,8 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
     # or(pk(key_revocation),and(pk(key_remote),or(pk(key_local),hash160(H))))
 
     path = "48'/1'/0'/2'"
-    core_wallet_name1, core_xpub_orig1 = create_new_wallet()
-    core_wallet_name2, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
     wallet_policy = PolicyMapWallet(
@@ -200,8 +199,7 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name1, core_wallet_name2],
-             rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -209,8 +207,8 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
     # andor(pk(key_remote),or_i(and_v(v:pkh(key_local),hash160(H)),older(1008)),pk(key_revocation))
 
     path = "48'/1'/0'/2'"
-    core_wallet_name1, core_xpub_orig1 = create_new_wallet()
-    core_wallet_name2, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
     wallet_policy = PolicyMapWallet(
@@ -222,5 +220,4 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
             f"{core_xpub_orig2}/**",
         ])
 
-    run_test(wallet_policy, [core_wallet_name1, core_wallet_name2],
-             rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)

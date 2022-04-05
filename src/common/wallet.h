@@ -117,6 +117,8 @@ typedef enum {
     TOKEN_N,
     TOKEN_L,
     TOKEN_U,
+
+    TOKEN_INVALID = -1  // used to mark invalid tokens
 } PolicyNodeType;
 
 // TODO: the following structures are using size_t for all integers to avoid alignment problems;
