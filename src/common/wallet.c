@@ -405,7 +405,8 @@ static size_t parse_key_index(buffer_t *in_buf) {
     return k;
 }
 
-#define CONTEXT_WITHIN_SH 1
+#define CONTEXT_WITHIN_SH  1  // parsing a direct child of SH
+#define CONTEXT_WITHIN_WSH 2  // parsing a direct child of WSH
 
 static bool consume_character(buffer_t *in_buf, char expected) {
     // the next character must be a comma
@@ -424,7 +425,7 @@ static bool consume_character(buffer_t *in_buf, char expected) {
 static int parse_script(buffer_t *in_buf,
                         buffer_t *out_buf,
                         size_t depth,
-                        unsigned long context_flags) {
+                        unsigned int context_flags) {
     // look ahead to finds out if the buffer starts with alphanumeric digits that could be wrappers,
     // followed by a colon
     int n_wrappers = 0;
@@ -528,8 +529,8 @@ static int parse_script(buffer_t *in_buf,
                 }
 
             } else if (token == TOKEN_WSH) {
-                if (depth != 0 && (context_flags & CONTEXT_WITHIN_SH) == 0) {
-                    return WITH_ERROR(-1, "sh can only be top-level or inside sh");
+                if (depth != 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
+                    return WITH_ERROR(-1, "wsh can only be top-level or inside sh");
                 }
             }
 
@@ -544,11 +545,8 @@ static int parse_script(buffer_t *in_buf,
 
             node->type = token;
 
-            unsigned int inner_context_flags = context_flags;
-
-            if (token == TOKEN_SH) {
-                inner_context_flags |= CONTEXT_WITHIN_SH;
-            }
+            unsigned int inner_context_flags =
+                (token == TOKEN_SH) ? CONTEXT_WITHIN_SH : CONTEXT_WITHIN_WSH;
 
             // the internal script is recursively parsed (if successful) in the current location
             // of the output buffer
@@ -762,6 +760,17 @@ static int parse_script(buffer_t *in_buf,
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
+
+            if (token == TOKEN_TR && depth > 1) {
+                return WITH_ERROR(-1, "tr can only be top-level");
+            }
+
+            if (token == TOKEN_WPKH) {
+                if (depth > 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
+                    return WITH_ERROR(-1, "wpkh can only be top-level or inside sh");
+                }
+            }
+
             parsed_node = (policy_node_t *) node;
 
             node->type = token;
@@ -804,6 +813,14 @@ static int parse_script(buffer_t *in_buf,
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
+
+            if (token == TOKEN_SORTEDMULTI) {
+                if (((context_flags & CONTEXT_WITHIN_SH) != 0) &&
+                    ((context_flags & CONTEXT_WITHIN_WSH) != 0)) {
+                    return WITH_ERROR(-1, "sortedmulti can only be directly under sh or wsh");
+                }
+            }
+
             parsed_node = (policy_node_t *) node;
             node->type = token;
 
