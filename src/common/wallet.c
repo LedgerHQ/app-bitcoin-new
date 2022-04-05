@@ -9,6 +9,8 @@
 
 #include "../boilerplate/sw.h"
 
+#include "../debug-helpers/debug.h"
+
 #ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
 #else

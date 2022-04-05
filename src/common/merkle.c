@@ -25,6 +25,7 @@
 #include "merkle.h"
 
 #include "cx_ram.h"
+#include "debug-helpers/debug.h"
 
 void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static 32]) {
     cx_sha256_t hash;

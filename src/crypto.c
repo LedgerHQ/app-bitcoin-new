@@ -24,6 +24,9 @@
 #include "cx_stubs.h"
 #include "cx_ecfp.h"
 #include "ox_ec.h"
+#include "cx_ram.h"
+#include "lcx_ripemd160.h"
+#include "cx_ripemd160.h"
 
 #include "common/base58.h"
 #include "common/bip32.h"
@@ -31,12 +34,10 @@
 #include "common/read.h"
 #include "common/write.h"
 
-#include "crypto.h"
+#include "cxram_stash.h"
+#include "debug-helpers/debug.h"
 
-#include "cx_ram.h"
-#include "lcx_ripemd160.h"
-#include "cx_ripemd160.h"
-#include "../../cxram_stash.h"
+#include "crypto.h"
 
 /**
  * Generator for secp256k1, value 'g' defined in "Standards for Efficient Cryptography"
