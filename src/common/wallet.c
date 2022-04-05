@@ -418,6 +418,37 @@ static bool consume_character(buffer_t *in_buf, char expected) {
     return true;
 }
 
+// forward declaration
+static int parse_script(buffer_t *in_buf,
+                        buffer_t *out_buf,
+                        size_t depth,
+                        unsigned int context_flags);
+
+static int parse_child_scripts(buffer_t *in_buf,
+                               buffer_t *out_buf,
+                               size_t depth,
+                               policy_node_t *child_scripts[],
+                               int n_children) {
+    // the internal scripts are recursively parsed (if successful) in the current location
+    // of the output buffer
+
+    for (int child_index = 0; child_index < n_children; child_index++) {
+        buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
+        child_scripts[child_index] = (policy_node_t *) buffer_get_cur(out_buf);
+
+        if (0 > parse_script(in_buf, out_buf, depth + 1, 0)) {
+            // failed while parsing internal script
+            return -1;
+        }
+
+        // the next character must be a comma (except after the last child)
+        if (child_index <= n_children - 2 && !consume_character(in_buf, ',')) {
+            return WITH_ERROR(-1, "Expected ','");
+        }
+    }
+    return 0;
+}
+
 /**
  * Parses a SCRIPT expression from the in_buf buffer, allocating the nodes and variables in out_buf.
  * The initial pointer in out_buf will contain the root node of the SCRIPT.
@@ -501,7 +532,7 @@ static int parse_script(buffer_t *in_buf,
     int token = parse_token(in_buf);
 
     // Opening '('
-    if (!buffer_read_u8(in_buf, (uint8_t *) &c) && c != '(') {
+    if (!consume_character(in_buf, '(')) {
         return WITH_ERROR(-1, "Expected '('");
     }
     policy_node_t *parsed_node;
@@ -509,10 +540,10 @@ static int parse_script(buffer_t *in_buf,
     switch (token) {
         case TOKEN_0:
         case TOKEN_1: {
-            policy_node_with_script_t *node =
-                (policy_node_with_script_t *) buffer_alloc(out_buf,
-                                                           sizeof(policy_node_with_script_t),
-                                                           true);
+            policy_node_constant_t *node =
+                (policy_node_constant_t *) buffer_alloc(out_buf,
+                                                        sizeof(policy_node_constant_t),
+                                                        true);
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
@@ -527,7 +558,6 @@ static int parse_script(buffer_t *in_buf,
                 if (depth != 0) {
                     return WITH_ERROR(-1, "sh can only be a top-level function");
                 }
-
             } else if (token == TOKEN_WSH) {
                 if (depth != 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
                     return WITH_ERROR(-1, "wsh can only be top-level or inside sh");
@@ -608,25 +638,8 @@ static int parse_script(buffer_t *in_buf,
 
             node->type = token;
 
-            // TODO: what's the right context flags?
-            unsigned int inner_context_flags = context_flags;
-
-            // the internal scripts are recursively parsed (if successful) in the current location
-            // of the output buffer
-
-            for (int child_index = 0; child_index < 3; child_index++) {
-                buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-                node->scripts[child_index] = (policy_node_t *) buffer_get_cur(out_buf);
-
-                if (0 > parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) {
-                    // failed while parsing internal script
-                    return -1;
-                }
-
-                // the next character must be a comma (except after the last child)
-                if (child_index <= 1 && !consume_character(in_buf, ',')) {
-                    return WITH_ERROR(-1, "Expected ','");
-                }
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 3)) {
+                return -1;
             }
             break;
         }
@@ -648,30 +661,7 @@ static int parse_script(buffer_t *in_buf,
 
             node->type = token;
 
-            // TODO: what's the right context flags?
-            unsigned int inner_context_flags = context_flags;
-
-            // the internal scripts are recursively parsed (if successful) in the current location
-            // of the output buffer
-
-            buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->scripts[0] = (policy_node_t *) buffer_get_cur(out_buf);
-
-            if (0 > parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) {
-                // failed while parsing internal script
-                return -1;
-            }
-
-            // the next character must be a comma
-            if (!consume_character(in_buf, ',')) {
-                return WITH_ERROR(-1, "Expected ','");
-            }
-
-            buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->scripts[1] = (policy_node_t *) buffer_get_cur(out_buf);
-
-            if (0 > parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) {
-                // failed while parsing internal script
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
                 return -1;
             }
 
@@ -685,9 +675,6 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
             node->type = token;
-
-            // TODO: what's the right context flags?
-            unsigned int inner_context_flags = context_flags;
 
             // the internal scripts are recursively parsed (if successful) in the current location
             // of the output buffer
@@ -720,7 +707,7 @@ static int parse_script(buffer_t *in_buf,
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
                 cur->script = (policy_node_t *) buffer_get_cur(out_buf);
-                if (0 > parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) {
+                if (0 > parse_script(in_buf, out_buf, depth + 1, 0)) {
                     // failed while parsing internal script
                     return -1;
                 }
