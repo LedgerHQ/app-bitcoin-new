@@ -9,15 +9,7 @@
 union cx_u G_cx;
 #endif
 
-#ifndef USE_CXRAM_SECTION
-
-uint8_t G_cxram_replacement_buffer[1024];
-
-uint8_t *get_cxram_buffer() {
-    return G_cxram_replacement_buffer;
-}
-
-#else
+#ifdef USE_CXRAM_SECTION
 
 uint8_t *get_cxram_buffer() {
     return (uint8_t *) &G_cx;

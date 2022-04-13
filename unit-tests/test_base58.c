@@ -7,12 +7,6 @@
 
 #include <cmocka.h>
 
-uint8_t G_cxram_replacement_buffer[1024];
-
-uint8_t *get_cxram_buffer() {
-    return G_cxram_replacement_buffer;
-}
-
 #include "common/base58.h"
 
 static void test_base58(void **state) {
