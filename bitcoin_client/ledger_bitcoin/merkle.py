@@ -1,14 +1,15 @@
 from typing import List, Iterable, Mapping
 
-from .common import write_varint, sha256
+import common
 
-NIL = bytes([0] * 32)
+
+NIL = bytes([0] * 32)     #you can also use NIL = bytes(32)
 
 
 def floor_lg(n: int) -> int:
     """Return floor(log_2(n)) for a positive integer `n`"""
 
-    assert n > 0
+    assert n > 0, 'inpute integer should be greater than 0'
 
     r = 0
     t = 1
@@ -21,7 +22,7 @@ def floor_lg(n: int) -> int:
 def ceil_lg(n: int) -> int:
     """Return ceiling(log_2(n)) for a positive integer `n`."""
 
-    assert n > 0
+    assert n > 0, 'input integer should be greater than 0'
 
     r = 0
     t = 1
@@ -53,32 +54,36 @@ def largest_power_of_2_less_than(n: int) -> int:
 def element_hash(element_preimage: bytes) -> bytes:
     """Computes the hash of an element to be stored in the Merkle tree."""
 
-    return sha256(b'\x00' + element_preimage)
+    return common.sha256(b'\x00' + element_preimage)
 
 
 def combine_hashes(left: bytes, right: bytes) -> bytes:
     if len(left) != 32 or len(right) != 32:
         raise ValueError("The elements must be 32-bytes sha256 outputs.")
 
-    return sha256(b'\x01' + left + right)
+    return common.sha256(b'\x01' + left + right)
 
 
 # root is the only node with parent == None
 # leaves have left == right == None
+
 class Node:
-    def __init__(self, left, right, parent, value: bytes):
+    def __init__(self, left, right, parent, value: bytes):                     
+        """as soon as the object is create it will be assigned its attributes"""
         self.left = left
         self.right = right
         self.parent = parent
         self.value = value
 
-    def recompute_value(self):
+    def recompute_value(self):                        
+        """assigning hashes to the internal nodes"""                         
         assert self.left is not None
         assert self.right is not None
         self.value = combine_hashes(self.left.value, self.right.value)
 
-    def sibling(self):
-        if self.parent is None:
+    def sibling(self):    
+        """return the sibling node of a node"""                                                     
+        if self.parent is None:                                                            
             raise IndexError("The root does not have a sibling.")
 
         if self.parent.left == self:
@@ -92,7 +97,7 @@ class Node:
 def make_tree(leaves: List[Node], begin: int, size: int) -> Node:
     """Given a list of nodes, builds the left-complete Merkle tree on top of it.
     The nodes in `leaves` are modified by setting their `parent` field appropriately.
-    It returns the root of the newly built tree.
+    It returns the root_node of the newly built tree.
     """
 
     if size == 0:
@@ -122,12 +127,14 @@ class MerkleTree:
     - the value of the right child.
 
     The binary tree has the following properties (assuming the vector contains n leaves):
-    - There are always n - 1 internal nodes; all the internal nodes have exactly two children.
+    - There are always n - 1 internal nodes; given that all the internal nodes have exactly two children.
     - If a subtree has n > 1 leaves, then the left subchild is a complete subtree with p leaves, where p is the largest
       power of 2 smaller than n.
     """
 
     def __init__(self, elements: Iterable[bytes] = []):
+        """as soon as the object of Merkle Tree Class is created then at the same time, 
+           the corresponding Merkle Tree is also created with the help of given leaves[] array."""
         self.leaves = [Node(None, None, None, el) for el in elements]
         n_elements = len(self.leaves)
         if n_elements > 0:
@@ -168,7 +175,7 @@ class MerkleTree:
             ltree_size = 0
         else:
             # number of leaves of the left subtree of cur_root
-            ltree_size = 1 << (self.depth - 1)
+            ltree_size = 1 << (self.depth - 1)                   #silmilar to ltree_size = 2^(depth-1)
 
         cur_root = self.root_node
         cur_root_size = len(self.leaves) - 1
@@ -215,6 +222,10 @@ class MerkleTree:
             self.fix_up(self.leaves[index].parent)
 
     def fix_up(self, node: Node):
+        """
+        If there is any change in hash value due to addition of new leaf or due to change in value of existing leaf.
+        then it(fix_up()) recalculate the corresponding hashes which needs to be change.
+        """
         while node is not None:
             node.recompute_value()
             node = node.parent
@@ -257,4 +268,5 @@ def get_merkleized_map_commitment(mapping: Mapping[bytes, bytes]) -> bytes:
     items_sorted = list(sorted(mapping.items()))
     keys_hashes = [element_hash(i[0]) for i in items_sorted]
     values_hashes = [element_hash(i[1]) for i in items_sorted]
-    return write_varint(len(mapping)) + MerkleTree(keys_hashes).root + MerkleTree(values_hashes).root
+    return common.write_varint(len(mapping)) + MerkleTree(keys_hashes).root + MerkleTree(values_hashes).root
+
