@@ -466,6 +466,8 @@ static int parse_script(buffer_t *in_buf,
         }
     }
 
+    policy_node_t *outermost_node = (policy_node_t *) buffer_get_cur(out_buf);
+
     policy_node_with_script_t *inner_wrapper = NULL;  // pointer to the inner wrapper, if any
 
     if (can_read && c == ':') {
@@ -481,34 +483,34 @@ static int parse_script(buffer_t *in_buf,
             buffer_read_u8(in_buf, (uint8_t *) &c);
             switch (c) {
                 case 'a':
-                    node->type = TOKEN_A;
+                    node->base.type = TOKEN_A;
                     break;
                 case 's':
-                    node->type = TOKEN_S;
+                    node->base.type = TOKEN_S;
                     break;
                 case 'c':
-                    node->type = TOKEN_C;
+                    node->base.type = TOKEN_C;
                     break;
                 case 't':
-                    node->type = TOKEN_T;
+                    node->base.type = TOKEN_T;
                     break;
                 case 'd':
-                    node->type = TOKEN_D;
+                    node->base.type = TOKEN_D;
                     break;
                 case 'v':
-                    node->type = TOKEN_V;
+                    node->base.type = TOKEN_V;
                     break;
                 case 'j':
-                    node->type = TOKEN_J;
+                    node->base.type = TOKEN_J;
                     break;
                 case 'n':
-                    node->type = TOKEN_N;
+                    node->base.type = TOKEN_N;
                     break;
                 case 'l':
-                    node->type = TOKEN_L;
+                    node->base.type = TOKEN_L;
                     break;
                 case 'u':
-                    node->type = TOKEN_U;
+                    node->base.type = TOKEN_U;
                     break;
                 default:
                     PRINTF("Unexpected wrapper: %c\n", c);
@@ -521,14 +523,21 @@ static int parse_script(buffer_t *in_buf,
             inner_wrapper = node;
         }
         buffer_seek_cur(in_buf, 1);  // skip ":"
+    } else {
+        n_wrappers = 0;  // it was not a wrapper
     }
 
     // We read the token, we'll do different parsing based on what token we find
     PolicyNodeType token = parse_token(in_buf);
 
-    // Opening '('
-    if (!consume_character(in_buf, '(')) {
-        return WITH_ERROR(-1, "Expected '('");
+    // all tokens but '0' and '1' have opening and closing parentheses
+    bool has_parentheses = token != TOKEN_0 && token != TOKEN_1;
+
+    if (has_parentheses) {
+        // Opening '('
+        if (!consume_character(in_buf, '(')) {
+            return WITH_ERROR(-1, "Expected '('");
+        }
     }
     policy_node_t *parsed_node;
 
@@ -542,9 +551,28 @@ static int parse_script(buffer_t *in_buf,
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
+
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
+            node->base.type = token;
+            if (token == TOKEN_0) {
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 1;
+                node->base.flags.miniscript_mod_o = 0;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = 1;
+            } else {
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 1;
+                node->base.flags.miniscript_mod_o = 0;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = 0;
+                node->base.flags.miniscript_mod_u = 1;
+            }
+
             break;
         }
         case TOKEN_SH:
@@ -568,7 +596,9 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
+            node->base.type = token;
+
+            node->base.flags.is_miniscript = 0;
 
             unsigned int inner_context_flags =
                 (token == TOKEN_SH) ? CONTEXT_WITHIN_SH : CONTEXT_WITHIN_WSH;
@@ -596,10 +626,18 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
             if (0 > buffer_read_hex_hash(in_buf, node->h, 32)) {
                 return WITH_ERROR(-1, "Failed to parse 32-byte hash image");
             }
+
+            node->base.type = token;
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = 0;
+            node->base.flags.miniscript_mod_o = 1;
+            node->base.flags.miniscript_mod_n = 1;
+            node->base.flags.miniscript_mod_d = 1;
+            node->base.flags.miniscript_mod_u = 1;
             break;
         }
 
@@ -614,10 +652,18 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
             if (0 > buffer_read_hex_hash(in_buf, node->h, 20)) {
                 return WITH_ERROR(-1, "Failed to parse 20-byte hash image");
             }
+
+            node->base.type = token;
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = 0;
+            node->base.flags.miniscript_mod_o = 1;
+            node->base.flags.miniscript_mod_n = 1;
+            node->base.flags.miniscript_mod_d = 1;
+            node->base.flags.miniscript_mod_u = 1;
             break;
         }
 
@@ -631,19 +677,346 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
+            node->base.type = token;
 
             if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 3)) {
                 return -1;
             }
+
+            for (int i = 0; i < 3; i++) {
+                if (!node->scripts[i]->flags.is_miniscript) {
+                    return WITH_ERROR(-1, "children of andor must be miniscript");
+                }
+            }
+
+            // andor(X, Y, Z)
+            // X is Bdu; Y and Z are both B, K, or V
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Y = node->scripts[1];
+            policy_node_t *Z = node->scripts[2];
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
+                !X->flags.miniscript_mod_u) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Y->flags.miniscript_type != Z->flags.miniscript_type) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Y->flags.miniscript_type == MINISCRIPT_TYPE_W) {  // must be one of the other three
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = Y->flags.miniscript_type;
+            node->base.flags.miniscript_mod_z =
+                X->flags.miniscript_mod_z & Y->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o =
+                (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_o & Z->flags.miniscript_mod_o)
+                |
+                (X->flags.miniscript_mod_o & Y->flags.miniscript_mod_z & Z->flags.miniscript_mod_z);
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = Z->flags.miniscript_mod_d;
+            node->base.flags.miniscript_mod_u = Y->flags.miniscript_mod_u & Z->flags.miniscript_mod_u;
+            // clang-format on
+
             break;
         }
-        case TOKEN_AND_V:
-        case TOKEN_AND_B:
-        case TOKEN_AND_N:
-        case TOKEN_OR_B:
-        case TOKEN_OR_C:
-        case TOKEN_OR_D:
+        case TOKEN_AND_V: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of and_v must be miniscript");
+            }
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Y = node->scripts[1];
+
+            // and_v(X,Y)
+            // X is V; Y is B, K, or V
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_V) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Y->flags.miniscript_type == MINISCRIPT_TYPE_W) {  // must be one of the other three
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = Y->flags.miniscript_type;
+            node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Y->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o =
+                (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_o)
+                |
+                (X->flags.miniscript_mod_o & Y->flags.miniscript_mod_z);
+            node->base.flags.miniscript_mod_n =
+                X->flags.miniscript_mod_n
+                |
+                (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_n);
+            node->base.flags.miniscript_mod_d = 0;
+            node->base.flags.miniscript_mod_u = Y->flags.miniscript_mod_u;
+            // clang-format on
+
+            break;
+        }
+        case TOKEN_AND_B: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of and_b must be miniscript");
+            }
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Y = node->scripts[1];
+
+            // and_b(X,Y)
+            // X is B; Y is W
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B ||
+                Y->flags.miniscript_type != MINISCRIPT_TYPE_W) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Y->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o =
+                (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_o)
+                |
+                (X->flags.miniscript_mod_o & Y->flags.miniscript_mod_z);
+            node->base.flags.miniscript_mod_n =
+                X->flags.miniscript_mod_n
+                |
+                (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_n);
+            node->base.flags.miniscript_mod_d = X->flags.miniscript_mod_d & Y->flags.miniscript_mod_d;
+            node->base.flags.miniscript_mod_u = Y->flags.miniscript_mod_u;
+            // clang-format on
+
+            break;
+        }
+        case TOKEN_AND_N: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of and_n must be miniscript");
+            }
+
+            // and_n(X, Y) is equivalent to andor(X, Y, 1)
+            // X is Bdu; Y is B
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Y = node->scripts[1];
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
+                !X->flags.miniscript_mod_u) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Y->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z =
+                X->flags.miniscript_mod_z & Y->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_o & Y->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = 1;
+            node->base.flags.miniscript_mod_u = Y->flags.miniscript_mod_u;
+            // clang-format on
+
+            break;
+        }
+        case TOKEN_OR_B: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of or_b must be miniscript");
+            }
+
+            // or_b(X, Z)
+            // X is Bd; Z is Wd
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Z = node->scripts[1];
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Z->flags.miniscript_type != MINISCRIPT_TYPE_W || !Z->flags.miniscript_mod_d) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o =
+                (X->flags.miniscript_mod_z & Z->flags.miniscript_mod_o)
+                |
+                (X->flags.miniscript_mod_o & Z->flags.miniscript_mod_z);
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = 1;
+            node->base.flags.miniscript_mod_u = 1;
+            // clang-format on
+
+            break;
+        }
+        case TOKEN_OR_C: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of or_c must be miniscript");
+            }
+
+            // or_c(X, Z)
+            // X is Bdu; Z is V
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Z = node->scripts[1];
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
+                !X->flags.miniscript_mod_u) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Z->flags.miniscript_type != MINISCRIPT_TYPE_V) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_V;
+            node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_o & Z->flags.miniscript_mod_o;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = 0;
+            node->base.flags.miniscript_mod_u = 0;
+            // clang-format on
+
+            break;
+        }
+        case TOKEN_OR_D: {
+            policy_node_with_script2_t *node =
+                (policy_node_with_script2_t *) buffer_alloc(out_buf,
+                                                            sizeof(policy_node_with_script2_t),
+                                                            true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
+                return -1;
+            }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of or_d must be miniscript");
+            }
+
+            // or_d(X, Z)
+            // X is Bdu; Z is B
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Z = node->scripts[1];
+
+            if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
+                !X->flags.miniscript_mod_u) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            if (Z->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+                return WITH_ERROR(-1, "invalid type");
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_o & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = Z->flags.miniscript_mod_d;
+            node->base.flags.miniscript_mod_u = Z->flags.miniscript_mod_u;
+            // clang-format on
+
+            break;
+        }
         case TOKEN_OR_I: {
             policy_node_with_script2_t *node =
                 (policy_node_with_script2_t *) buffer_alloc(out_buf,
@@ -654,11 +1027,39 @@ static int parse_script(buffer_t *in_buf,
             }
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
+            node->base.type = token;
 
             if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2)) {
                 return -1;
             }
+
+            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+                return WITH_ERROR(-1, "children of or_i must be miniscript");
+            }
+
+            // or_i(X, Z)
+            // both are B, K, or V
+
+            policy_node_t *X = node->scripts[0];
+            policy_node_t *Z = node->scripts[1];
+
+            if (X->flags.miniscript_type == MINISCRIPT_TYPE_W) {
+                return WITH_ERROR(-1, "invalid type");  // must be B, K or V
+            }
+
+            if (X->flags.miniscript_type != Z->flags.miniscript_type) {
+                return WITH_ERROR(-1, "invalid type");  // children must be the same type
+            }
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = X->flags.miniscript_type;
+            node->base.flags.miniscript_mod_z = 0;
+            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = X->flags.miniscript_mod_d | Z->flags.miniscript_mod_d;
+            node->base.flags.miniscript_mod_u = X->flags.miniscript_mod_u & Z->flags.miniscript_mod_u;
+            // clang-format on
 
             break;
         }
@@ -669,7 +1070,7 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
             parsed_node = (policy_node_t *) node;
-            node->type = token;
+            node->base.type = token;
 
             // the internal scripts are recursively parsed (if successful) in the current location
             // of the output buffer
@@ -697,6 +1098,9 @@ static int parse_script(buffer_t *in_buf,
             }
             policy_node_scriptlist_t *cur = node->scriptlist;
             cur->next = NULL;
+
+            unsigned int count_z = 0;
+            unsigned int count_o = 0;
             while (true) {
                 ++node->n;
                 // parse a script into cur->script
@@ -706,6 +1110,37 @@ static int parse_script(buffer_t *in_buf,
                     // failed while parsing internal script
                     return -1;
                 }
+
+                if (!cur->script->flags.is_miniscript) {
+                    return WITH_ERROR(-1, "children of thresh must be miniscript");
+                }
+
+                if (node->n == 1) {
+                    // the first child's type must be B
+                    if (cur->script->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+                        return WITH_ERROR(-1, "the first children of thresh must be of type B");
+                    }
+                } else {
+                    // every other child's type must be W
+                    if (cur->script->flags.miniscript_type != MINISCRIPT_TYPE_W) {
+                        return WITH_ERROR(
+                            -1,
+                            "each child of thresh (except the first) must be of type W");
+                    }
+                }
+
+                // all children must have properties du
+                if (!cur->script->flags.miniscript_mod_d || !cur->script->flags.miniscript_mod_u) {
+                    return WITH_ERROR(-1, "each child of thresh must have properties d and u");
+                }
+
+                if (cur->script->flags.miniscript_mod_z) {
+                    ++count_z;
+                }
+                if (cur->script->flags.miniscript_mod_o) {
+                    ++count_o;
+                }
+
                 // peek, if next character is ',', consume it and exit
                 if (consume_character(in_buf, ',')) {
                     cur->next =
@@ -724,25 +1159,32 @@ static int parse_script(buffer_t *in_buf,
                 }
             }
 
+            // thresh(k, X1, ..., Xn)
+            // X1 is Bdu; others are Wdu
+
+            // clang-format off
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = (count_z == node->n) ? 1 : 0;
+            node->base.flags.miniscript_mod_o = (count_z == node->n - 1 && count_o == 1) ? 1 : 0;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = 0;
+            node->base.flags.miniscript_mod_u = 0;
+            // clang-format on
+
             break;
         }
         case TOKEN_PK:
         case TOKEN_PKH:
         case TOKEN_PK_K:
         case TOKEN_PK_H:
-        case TOKEN_WPKH:
-        case TOKEN_TR:  // currently supporting x-only keys
-        {
+        case TOKEN_WPKH: {
             policy_node_with_key_t *node =
                 (policy_node_with_key_t *) buffer_alloc(out_buf,
                                                         sizeof(policy_node_with_key_t),
                                                         true);
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
-            }
-
-            if (token == TOKEN_TR && depth > 1) {
-                return WITH_ERROR(-1, "tr can only be top-level");
             }
 
             if (token == TOKEN_WPKH) {
@@ -753,13 +1195,86 @@ static int parse_script(buffer_t *in_buf,
 
             parsed_node = (policy_node_t *) node;
 
-            node->type = token;
+            node->base.type = token;
 
             int key_index = parse_key_index(in_buf);
             if (key_index == -1) {
                 return WITH_ERROR(-1, "Couldn't parse key index");
             }
             node->key_index = (size_t) key_index;
+
+            if (token == TOKEN_WPKH) {
+                // not valid in miniscript
+                node->base.flags.is_miniscript = 0;
+            } else {
+                switch (token) {
+                    case TOKEN_PK:  // pk(key) == c:pk_k(key)
+                        node->base.flags.is_miniscript = 1;
+                        node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                        node->base.flags.miniscript_mod_z = 0;
+                        node->base.flags.miniscript_mod_o = 1;
+                        node->base.flags.miniscript_mod_n = 1;
+                        node->base.flags.miniscript_mod_d = 1;
+                        node->base.flags.miniscript_mod_u = 1;
+                        break;
+                    case TOKEN_PKH:  // pkh(key) == c:pk_h(key)
+                        node->base.flags.is_miniscript = 1;
+                        node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                        node->base.flags.miniscript_mod_z = 0;
+                        node->base.flags.miniscript_mod_o = 0;
+                        node->base.flags.miniscript_mod_n = 1;
+                        node->base.flags.miniscript_mod_d = 1;
+                        node->base.flags.miniscript_mod_u = 1;
+                        break;
+                    case TOKEN_PK_K:
+                        node->base.flags.is_miniscript = 1;
+                        node->base.flags.miniscript_type = MINISCRIPT_TYPE_K;
+                        node->base.flags.miniscript_mod_z = 0;
+                        node->base.flags.miniscript_mod_o = 1;
+                        node->base.flags.miniscript_mod_n = 1;
+                        node->base.flags.miniscript_mod_d = 1;
+                        node->base.flags.miniscript_mod_u = 1;
+                        break;
+                    case TOKEN_PK_H:
+                        node->base.flags.is_miniscript = 1;
+                        node->base.flags.miniscript_type = MINISCRIPT_TYPE_K;
+                        node->base.flags.miniscript_mod_z = 0;
+                        node->base.flags.miniscript_mod_o = 0;
+                        node->base.flags.miniscript_mod_n = 1;
+                        node->base.flags.miniscript_mod_d = 1;
+                        node->base.flags.miniscript_mod_u = 1;
+                        break;
+                    default:
+                        return WITH_ERROR(-1, "unreachable code reached");
+                }
+            }
+
+            break;
+        }
+        case TOKEN_TR: {  // currently supporting x-only keys
+            policy_node_with_key_t *node =
+                (policy_node_with_key_t *) buffer_alloc(out_buf,
+                                                        sizeof(policy_node_with_key_t),
+                                                        true);
+            if (node == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+
+            if (depth > 1) {
+                return WITH_ERROR(-1, "tr can only be top-level");
+            }
+
+            parsed_node = (policy_node_t *) node;
+
+            node->base.type = token;
+
+            int key_index = parse_key_index(in_buf);
+            if (key_index == -1) {
+                return WITH_ERROR(-1, "Couldn't parse key index");
+            }
+            node->key_index = (size_t) key_index;
+
+            node->base.flags.is_miniscript = 0;
 
             break;
         }
@@ -773,13 +1288,23 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
             parsed_node = (policy_node_t *) node;
-            node->type = token;
+            node->base.type = token;
 
             if (parse_unsigned_decimal(in_buf, &node->n) == -1) {
                 return WITH_ERROR(-1, "Error parsing number");
             }
 
-            // TODO: any checks on n?
+            if (node->n < 1 || node->n >= (1u << 31)) {
+                return WITH_ERROR(-1, "n must satisfy 1 <= n < 2^31 in older/after");
+            }
+
+            node->base.flags.is_miniscript = 1;
+            node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+            node->base.flags.miniscript_mod_z = 1;
+            node->base.flags.miniscript_mod_o = 0;
+            node->base.flags.miniscript_mod_n = 0;
+            node->base.flags.miniscript_mod_d = 0;
+            node->base.flags.miniscript_mod_u = 0;
 
             break;
         }
@@ -802,7 +1327,7 @@ static int parse_script(buffer_t *in_buf,
             }
 
             parsed_node = (policy_node_t *) node;
-            node->type = token;
+            node->base.type = token;
 
             if (parse_unsigned_decimal(in_buf, &node->k) == -1) {
                 return WITH_ERROR(-1, "Error parsing threshold");
@@ -844,6 +1369,18 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Invalid k and/or n");
             }
 
+            if (token == TOKEN_SORTEDMULTI) {
+                node->base.flags.is_miniscript = 0;
+            } else {
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = 0;
+                node->base.flags.miniscript_mod_n = 1;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = 1;
+            }
+
             break;
         }
         default:
@@ -851,8 +1388,10 @@ static int parse_script(buffer_t *in_buf,
             return -1;
     }
 
-    if (!consume_character(in_buf, ')')) {
-        return WITH_ERROR(-1, "Expected ')'");
+    if (has_parentheses) {
+        if (!consume_character(in_buf, ')')) {
+            return WITH_ERROR(-1, "Expected ')'");
+        }
     }
 
     if (depth == 0 && buffer_can_read(in_buf, 1)) {
@@ -863,6 +1402,174 @@ static int parse_script(buffer_t *in_buf,
     // to the parsed node
     if (inner_wrapper != NULL) {
         inner_wrapper->script = parsed_node;
+    }
+
+    // Validate and compute the flags (miniscript type and modifiers) for all the wrapper, if any
+    // We start from the most internal wrapper.
+    // Remark: This loop has quadratic complexity as we process a linked list in reverse order, but
+    // it does not matter as it is always a short list.
+
+    for (int i = n_wrappers - 1; i >= 0; i--) {
+        // find the actual node by traversing the list
+        policy_node_with_script_t *node = (policy_node_with_script_t *) outermost_node;
+        for (int j = 0; j < i; j++) {
+            node = (policy_node_with_script_t *) node->script;
+        }
+
+        if (!node->script->flags.is_miniscript) {
+            return WITH_ERROR(-1, "wrappers can only be applied to miniscript");
+        }
+
+        policy_node_t *X = node->script;
+
+        uint8_t X_type = X->flags.miniscript_type;
+
+        uint8_t X_z = X->flags.miniscript_mod_z;
+        uint8_t X_o = X->flags.miniscript_mod_o;
+        uint8_t X_n = X->flags.miniscript_mod_n;
+        uint8_t X_d = X->flags.miniscript_mod_d;
+        uint8_t X_u = X->flags.miniscript_mod_u;
+
+        switch (node->base.type) {
+            case TOKEN_A:
+                if (X_type != MINISCRIPT_TYPE_B) {
+                    return WITH_ERROR(-1, "'a' wrapper requires a B type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_W;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = 0;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = X_d;
+                node->base.flags.miniscript_mod_u = X_u;
+                break;
+            case TOKEN_S:
+                if (X_type != MINISCRIPT_TYPE_B || !X_o) {
+                    return WITH_ERROR(-1, "'s' wrapper requires a Bu type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_W;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = 0;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = X_d;
+                node->base.flags.miniscript_mod_u = X_u;
+                break;
+            case TOKEN_C:
+                if (X_type != MINISCRIPT_TYPE_K) {
+                    return WITH_ERROR(-1, "'c' wrapper requires a K type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = X_o;
+                node->base.flags.miniscript_mod_n = X_n;
+                node->base.flags.miniscript_mod_d = X_d;
+                node->base.flags.miniscript_mod_u = 1;
+                break;
+            case TOKEN_T:
+                // t:X == and_v(X,1)
+
+                if (X_type != MINISCRIPT_TYPE_V) {
+                    return WITH_ERROR(-1, "'t' wrapper requires a V type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = X_z;
+                node->base.flags.miniscript_mod_o = X_o;
+                node->base.flags.miniscript_mod_n = X_n;
+                node->base.flags.miniscript_mod_d = 0;
+                node->base.flags.miniscript_mod_u = 1;
+                break;
+            case TOKEN_D:
+                if (X_type != MINISCRIPT_TYPE_V || !X_z) {
+                    return WITH_ERROR(-1, "'d' wrapper requires a Vz type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = 1;
+                node->base.flags.miniscript_mod_n = 1;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = 0;
+                break;
+            case TOKEN_V:
+                if (X_type != MINISCRIPT_TYPE_B) {
+                    return WITH_ERROR(-1, "'v' wrapper requires a B type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_V;
+                node->base.flags.miniscript_mod_z = X_z;
+                node->base.flags.miniscript_mod_o = X_o;
+                node->base.flags.miniscript_mod_n = X_n;
+                node->base.flags.miniscript_mod_d = 0;
+                node->base.flags.miniscript_mod_u = 0;
+                break;
+            case TOKEN_J:
+                if (X_type != MINISCRIPT_TYPE_B || !X_n) {
+                    return WITH_ERROR(-1, "'j' wrapper requires a Bn type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = X_o;
+                node->base.flags.miniscript_mod_n = 1;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = X_u;
+                break;
+            case TOKEN_N:
+                if (X_type != MINISCRIPT_TYPE_B) {
+                    return WITH_ERROR(-1, "'n' wrapper requires a B type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = X_z;
+                node->base.flags.miniscript_mod_o = X_o;
+                node->base.flags.miniscript_mod_n = X_n;
+                node->base.flags.miniscript_mod_d = X_d;
+                node->base.flags.miniscript_mod_u = 1;
+                break;
+            case TOKEN_L:
+                // l:X == or_i(0,X)
+
+                if (X_type != MINISCRIPT_TYPE_B) {
+                    return WITH_ERROR(-1, "'l' wrapper requires a B type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = X_z;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = X_u;
+                break;
+            case TOKEN_U:
+                // u:X == or_i(X,0)
+
+                if (X_type != MINISCRIPT_TYPE_B) {
+                    return WITH_ERROR(-1, "'u' wrapper requires a B type child");
+                }
+
+                node->base.flags.is_miniscript = 1;
+                node->base.flags.miniscript_type = MINISCRIPT_TYPE_B;
+                node->base.flags.miniscript_mod_z = 0;
+                node->base.flags.miniscript_mod_o = X_z;
+                node->base.flags.miniscript_mod_n = 0;
+                node->base.flags.miniscript_mod_d = 1;
+                node->base.flags.miniscript_mod_u = X_u;
+                break;
+            default:
+                return WITH_ERROR(-1, "unreachable code reached");
+        }
     }
 
     return 0;

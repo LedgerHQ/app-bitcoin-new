@@ -121,27 +121,40 @@ typedef enum {
     TOKEN_INVALID = -1  // used to mark invalid tokens
 } PolicyNodeType;
 
+// miniscript basic types
+#define MINISCRIPT_TYPE_B 0
+#define MINISCRIPT_TYPE_V 1
+#define MINISCRIPT_TYPE_K 2
+#define MINISCRIPT_TYPE_W 3
+
 // TODO: the following structures are using size_t for all integers to avoid alignment problems;
 //       if memory is an issue, we could use a packed version instead, but care needs to be taken
 //       when accessing pointers, since they would be unaligned.
-
 // abstract type for all nodes
-typedef struct {
+typedef struct policy_node_s {
     PolicyNodeType type;
-    void *node_data;  // subtypes will redefine this
+    struct {
+        unsigned int is_miniscript : 1;
+        unsigned int miniscript_type : 2;  // B, C, K or W
+        unsigned int miniscript_mod_z : 1;
+        unsigned int miniscript_mod_o : 1;
+        unsigned int miniscript_mod_n : 1;
+        unsigned int miniscript_mod_d : 1;
+        unsigned int miniscript_mod_u : 1;
+    } flags;  // 1 byte
 } policy_node_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
 } policy_node_constant_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     policy_node_t *script;
 } policy_node_with_script_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     union {
         policy_node_t *scripts[1];
         policy_node_t *script;  // alias of scripts[0] for convenience
@@ -149,12 +162,12 @@ typedef struct {
 } policy_node_with_script1_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     policy_node_t *scripts[2];
 } policy_node_with_script2_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     policy_node_t *scripts[3];
 } policy_node_with_script3_t;
 
@@ -162,20 +175,20 @@ typedef struct {
 typedef policy_node_with_script3_t policy_node_with_scripts_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     size_t key_index;  // index of the key
 } policy_node_with_key_t;
 
 typedef struct {
-    PolicyNodeType type;
+    struct policy_node_s base;
     uint32_t n;
 } policy_node_with_uint32_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_MULTI, == TOKEN_SORTEDMULTI
-    size_t k;             // threshold
-    size_t n;             // number of keys
-    size_t *key_indexes;  // pointer to array of exactly n key indexes
+    struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
+    size_t k;                   // threshold
+    size_t n;                   // number of keys
+    size_t *key_indexes;        // pointer to array of exactly n key indexes
 } policy_node_multisig_t;
 
 typedef struct policy_node_scriptlist_s {
@@ -184,20 +197,20 @@ typedef struct policy_node_scriptlist_s {
 } policy_node_scriptlist_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_THRESH
-    size_t k;             // threshold
-    size_t n;             // number of child script (TODO: remove?)
+    struct policy_node_s base;  // type is TOKEN_THRESH
+    size_t k;                   // threshold
+    size_t n;                   // number of child script (TODO: remove?)
     policy_node_scriptlist_t
         *scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_SHA160, TOKEN_HASH160
+    struct policy_node_s base;  // type is TOKEN_SHA160 or TOKEN_HASH160
     uint8_t h[20];
 } policy_node_with_hash_160_t;
 
 typedef struct {
-    PolicyNodeType type;  // == TOKEN_SHA256, TOKEN_HASH256
+    struct policy_node_s base;  // type is TOKEN_SHA256 or TOKEN_HASH256
     uint8_t h[32];
 } policy_node_with_hash_256_t;
 

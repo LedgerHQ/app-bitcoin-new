@@ -603,7 +603,7 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) 
 
     if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
         return -1;
-    } else if (policy->type == TOKEN_PKH) {
+    } else if (policy->base.type == TOKEN_PKH) {
         update_output_u8(state, OP_DUP);
         update_output_u8(state, OP_HASH160);
 
@@ -614,7 +614,7 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) 
 
         update_output_u8(state, OP_EQUALVERIFY);
         update_output_op_v(state, OP_CHECKSIG);
-    } else {  // policy->type == TOKEN_WPKH
+    } else {  // policy->base.type == TOKEN_WPKH
         update_output_u8(state, OP_0);
 
         update_output_u8(state, 20);  // PUSH 20 bytes
@@ -690,7 +690,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
         }
     }
 
-    if (policy->type == TOKEN_SORTEDMULTI) {
+    if (policy->base.type == TOKEN_SORTEDMULTI) {
         // sort the pubkeys (we avoid using qsort, as it takes ~700 bytes in binary size)
 
         // bubble sort
