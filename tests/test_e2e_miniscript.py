@@ -184,7 +184,7 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Decaying 3of3",
-        policy_map="wsh(thresh(3,pk(@0),s:pk(@1),s:pk(@2),sdv:older(12960)))",
+        policy_map="wsh(thresh(3,pk(@0),s:pk(@1),s:pk(@2),sln:older(12960)))",
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
             f"{core_xpub_orig1}/**",
