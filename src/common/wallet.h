@@ -195,7 +195,7 @@ typedef struct policy_node_scriptlist_s {
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
     int16_t k;                  // threshold
-    int16_t n;                  // number of child script (TODO: remove?)
+    int16_t n;                  // number of child scripts
     policy_node_scriptlist_t
         *scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;

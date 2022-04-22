@@ -584,7 +584,6 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
     }
 }
 
-// TODO: wpkh can't be inside miniscript, but pkh can
 static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
@@ -929,7 +928,6 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
     if (core_mode == MODE_OUT_HASH) {
         crypto_hash_digest(&state.hash_context.header, state.hash, 32);
 
-        // TODO: process sh/wsh to produce final script
         switch (script_type) {
             case WRAPPED_SCRIPT_TYPE_SH:
             case WRAPPED_SCRIPT_TYPE_SH_WSH: {

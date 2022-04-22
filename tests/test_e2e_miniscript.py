@@ -271,8 +271,6 @@ def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGloba
     internal_xpub = get_internal_xpub(speculos_globals, path)
     internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**"
 
-    H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
-
     # sh(sh(...)), wsh(sh(...)), wsh(wsh(...)) are invalid
     run_test_invalid(client, "sh(sh(pkh(@0)))", [internal_xpub_orig])
     run_test_invalid(client, "wsh(sh(pkh(@0)))", [internal_xpub_orig])
@@ -283,15 +281,12 @@ def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGloba
     run_test_invalid(client, "sh(tr(pk(@0)))", [internal_xpub_orig])
 
     # sortedmulti is not valid miniscript, can only be used as a descriptor inside sh or wsh
-    # TODO: this test is failing because wallet registration doesn't quite try to validate the script
-    #       (address derivation would fail when processing sortedmulti)
-    #       This could be solved by generating the first address during wallet registration.
-    # run_test_invalid(client, "wsh(or_d(pk(@0),sortedmulti(3,@1,@2,@3,@4,@5)))",
-    #                  [
-    #                      internal_xpub_orig,
-    #                      f"{core_xpub_orig1}/**",
-    #                      f"{core_xpub_orig2}/**",
-    #                      f"{core_xpub_orig3}/**",
-    #                      f"{core_xpub_orig4}/**",
-    #                      f"{core_xpub_orig5}/**",
-    #                  ])
+    run_test_invalid(client, "wsh(or_d(pk(@0),sortedmulti(3,@1,@2,@3,@4,@5)))",
+                     [
+                         internal_xpub_orig,
+                         f"{core_xpub_orig1}/**",
+                         f"{core_xpub_orig2}/**",
+                         f"{core_xpub_orig3}/**",
+                         f"{core_xpub_orig4}/**",
+                         f"{core_xpub_orig5}/**",
+                     ])

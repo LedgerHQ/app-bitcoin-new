@@ -48,8 +48,6 @@ Currently supported wallet policies for multisig:
 
 #pragma GCC diagnostic pop
 
-// TODO: add unit tests to this module
-
 typedef struct {
     PolicyNodeType type;
     const char *name;
@@ -407,7 +405,7 @@ static int16_t parse_key_index(buffer_t *in_buf) {
     if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
         return -1;
     }
-    return k;
+    return (int16_t) k;  // this cast is safe, since k is at most INT16_MAX
 }
 
 #define CONTEXT_WITHIN_SH  1  // parsing a direct child of SH
@@ -1427,7 +1425,7 @@ static int parse_script(buffer_t *in_buf,
             return WITH_ERROR(-1, "wrappers can only be applied to miniscript");
         }
 
-        policy_node_t *X = node->script;
+        const policy_node_t *X = node->script;
 
         uint8_t X_type = X->flags.miniscript_type;
 
