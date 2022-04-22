@@ -127,10 +127,6 @@ typedef enum {
 #define MINISCRIPT_TYPE_K 2
 #define MINISCRIPT_TYPE_W 3
 
-// TODO: the following structures are using size_t for all integers to avoid alignment problems;
-//       if memory is an issue, we could use a packed version instead, but care needs to be taken
-//       when accessing pointers, since they would be unaligned.
-// abstract type for all nodes
 typedef struct policy_node_s {
     PolicyNodeType type;
     struct {
@@ -176,7 +172,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 
 typedef struct {
     struct policy_node_s base;
-    size_t key_index;  // index of the key
+    int16_t key_index;  // index of the key
 } policy_node_with_key_t;
 
 typedef struct {
@@ -186,9 +182,9 @@ typedef struct {
 
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
-    size_t k;                   // threshold
-    size_t n;                   // number of keys
-    size_t *key_indexes;        // pointer to array of exactly n key indexes
+    int16_t k;                  // threshold
+    int16_t n;                  // number of keys
+    int16_t *key_indexes;       // pointer to array of exactly n key indexes
 } policy_node_multisig_t;
 
 typedef struct policy_node_scriptlist_s {
@@ -198,8 +194,8 @@ typedef struct policy_node_scriptlist_s {
 
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
-    size_t k;                   // threshold
-    size_t n;                   // number of child script (TODO: remove?)
+    int16_t k;                  // threshold
+    int16_t n;                  // number of child script (TODO: remove?)
     policy_node_scriptlist_t
         *scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;

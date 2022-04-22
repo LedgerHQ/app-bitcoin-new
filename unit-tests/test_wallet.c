@@ -318,6 +318,9 @@ static void test_miniscript_types(void **state) {
          TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG);  // alias to c:pk_k
     Test("pkh(@0)", "?",
          TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG);  // alias to c:pk_h
+
+    // TODO: we might want to add more tests for the `pk`, `pkh`, `and_n`, `t:`, `l:`, `u:`, since
+    //       we process them explicitly instead of using the type reductions as per miniscript specs
 }
 
 int main() {

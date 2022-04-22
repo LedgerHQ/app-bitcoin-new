@@ -243,7 +243,7 @@ static PolicyNodeType parse_token(buffer_t *buffer) {
  * Returns a valid 0 on success, -1 on failure.
  * The read number is saved into *out on success.
  */
-static int parse_unsigned_decimal(buffer_t *buffer, size_t *out) {
+static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
     uint8_t c;
     size_t result = 0;
     int digits_read = 0;
@@ -397,14 +397,14 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
     return 0;
 }
 
-static size_t parse_key_index(buffer_t *in_buf) {
+static int16_t parse_key_index(buffer_t *in_buf) {
     char c;
     if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
         return -1;
     }
 
-    size_t k;
-    if (parse_unsigned_decimal(in_buf, &k) == -1) {
+    uint32_t k;
+    if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
         return -1;
     }
     return k;
@@ -692,9 +692,9 @@ static int parse_script(buffer_t *in_buf,
             // andor(X, Y, Z)
             // X is Bdu; Y and Z are both B, K, or V
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Y = node->scripts[1];
-            policy_node_t *Z = node->scripts[2];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Y = node->scripts[1];
+            const policy_node_t *Z = node->scripts[2];
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -745,8 +745,8 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "children of and_v must be miniscript");
             }
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Y = node->scripts[1];
 
             // and_v(X,Y)
             // X is V; Y is B, K, or V
@@ -797,8 +797,8 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "children of and_b must be miniscript");
             }
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Y = node->scripts[1];
 
             // and_b(X,Y)
             // X is B; Y is W
@@ -849,8 +849,8 @@ static int parse_script(buffer_t *in_buf,
             // and_n(X, Y) is equivalent to andor(X, Y, 1)
             // X is Bdu; Y is B
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Y = node->scripts[1];
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -897,8 +897,8 @@ static int parse_script(buffer_t *in_buf,
             // or_b(X, Z)
             // X is Bd; Z is Wd
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Z = node->scripts[1];
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d) {
                 return WITH_ERROR(-1, "invalid type");
@@ -946,8 +946,8 @@ static int parse_script(buffer_t *in_buf,
             // or_c(X, Z)
             // X is Bdu; Z is V
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Z = node->scripts[1];
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -993,8 +993,8 @@ static int parse_script(buffer_t *in_buf,
             // or_d(X, Z)
             // X is Bdu; Z is B
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Z = node->scripts[1];
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -1040,8 +1040,8 @@ static int parse_script(buffer_t *in_buf,
             // or_i(X, Z)
             // both are B, K, or V
 
-            policy_node_t *X = node->scripts[0];
-            policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node->scripts[0];
+            const policy_node_t *Z = node->scripts[1];
 
             if (X->flags.miniscript_type == MINISCRIPT_TYPE_W) {
                 return WITH_ERROR(-1, "invalid type");  // must be B, K or V
@@ -1075,9 +1075,11 @@ static int parse_script(buffer_t *in_buf,
             // the internal scripts are recursively parsed (if successful) in the current location
             // of the output buffer
 
-            if (parse_unsigned_decimal(in_buf, &node->k) == -1) {
+            uint32_t k;
+            if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
                 return WITH_ERROR(-1, "Error parsing threshold");
             }
+            node->k = (int16_t) k;
 
             // the next character must be a comma
             if (!consume_character(in_buf, ',')) {
@@ -1099,8 +1101,8 @@ static int parse_script(buffer_t *in_buf,
             policy_node_scriptlist_t *cur = node->scriptlist;
             cur->next = NULL;
 
-            unsigned int count_z = 0;
-            unsigned int count_o = 0;
+            int count_z = 0;
+            int count_o = 0;
             while (true) {
                 ++node->n;
                 // parse a script into cur->script
@@ -1197,11 +1199,10 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            int key_index = parse_key_index(in_buf);
-            if (key_index == -1) {
+            node->key_index = parse_key_index(in_buf);
+            if (node->key_index == -1) {
                 return WITH_ERROR(-1, "Couldn't parse key index");
             }
-            node->key_index = (size_t) key_index;
 
             if (token == TOKEN_WPKH) {
                 // not valid in miniscript
@@ -1268,11 +1269,10 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            int key_index = parse_key_index(in_buf);
-            if (key_index == -1) {
+            node->key_index = parse_key_index(in_buf);
+            if (node->key_index == -1) {
                 return WITH_ERROR(-1, "Couldn't parse key index");
             }
-            node->key_index = (size_t) key_index;
 
             node->base.flags.is_miniscript = 0;
 
@@ -1329,14 +1329,16 @@ static int parse_script(buffer_t *in_buf,
             parsed_node = (policy_node_t *) node;
             node->base.type = token;
 
-            if (parse_unsigned_decimal(in_buf, &node->k) == -1) {
+            uint32_t k;
+            if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
                 return WITH_ERROR(-1, "Error parsing threshold");
             }
+            node->k = (int16_t) k;
 
             // We allocate the array of key indices at the current position in the output buffer
             // (on success)
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->key_indexes = (size_t *) buffer_get_cur(out_buf);
+            node->key_indexes = (int16_t *) buffer_get_cur(out_buf);
 
             node->n = 0;
             while (true) {
@@ -1350,16 +1352,21 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Expected ','");
                 }
 
-                int key_index = parse_key_index(in_buf);
+                int16_t key_index = parse_key_index(in_buf);
                 if (key_index == -1) {
                     return WITH_ERROR(-1, "Error parsing key index");
                 }
 
-                size_t *key_index_out = (size_t *) buffer_alloc(out_buf, sizeof(size_t), true);
+                int16_t *key_index_out =
+                    (int16_t *) buffer_alloc(out_buf,
+                                             sizeof(int16_t),
+                                             false);  // we don't align this pointer, as we are
+                                                      // allocating consecutive uint16_t elements
+                                                      // and we already aligned the first element
                 if (key_index_out == NULL) {
                     return WITH_ERROR(-1, "Out of memory");
                 }
-                *key_index_out = (size_t) key_index;
+                *key_index_out = key_index;
 
                 ++node->n;
             }

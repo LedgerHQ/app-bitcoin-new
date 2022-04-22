@@ -684,7 +684,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
 
     // derive each key
     uint8_t compressed_pubkeys[MAX_POLICY_MAP_KEYS][33];
-    for (unsigned int i = 0; i < policy->n; i++) {
+    for (int i = 0; i < policy->n; i++) {
         if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkeys[i])) {
             return -1;
         }
@@ -697,7 +697,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
         bool swapped;
         do {
             swapped = false;
-            for (unsigned int i = 1; i < policy->n; i++) {
+            for (int i = 1; i < policy->n; i++) {
                 if (cmp_compressed_pubkeys(compressed_pubkeys[i - 1], compressed_pubkeys[i]) > 0) {
                     swapped = true;
 
@@ -711,7 +711,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
         } while (swapped);
     }
 
-    for (unsigned int i = 0; i < policy->n; i++) {
+    for (int i = 0; i < policy->n; i++) {
         // push <i-th pubkey> (33 = 0x21 bytes)
         update_output_u8(state, 0x21);
         update_output(state, compressed_pubkeys[i], 33);
