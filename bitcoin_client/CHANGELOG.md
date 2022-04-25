@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.0.3] - 25-04-2022
+
+### Changed
+
+Imported upstream changes to auxiliary classes from bitcoin-core/HWI.
+
+### Fixed
+
+Solved incorrect handling of signature responses for transactions with more than 252 inputs.
+
 ## [0.0.2] - 09-02-2022
 
 ### Added
