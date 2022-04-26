@@ -151,14 +151,6 @@ typedef struct {
 
 typedef struct {
     struct policy_node_s base;
-    union {
-        policy_node_t *scripts[1];
-        policy_node_t *script;  // alias of scripts[0] for convenience
-    };
-} policy_node_with_script1_t;
-
-typedef struct {
-    struct policy_node_s base;
     policy_node_t *scripts[2];
 } policy_node_with_script2_t;
 
@@ -211,13 +203,17 @@ typedef struct {
 } policy_node_with_hash_256_t;
 
 /**
- * TODO: docs
+ * Parses the string in the `buffer` as a serialized policy map into `header`
+ *
+ * @param buffer the pointer to the buffer_t to parse
+ * @param header the pointer to a `policy_map_wallet_header_t` structure
+ * @return a negative number on failure, 0 on success.
  */
 int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header);
 
 /**
  *
- * Parses a string representing the key information for a policy map wallet (multisig).
+ * Parses a string representing the key information for a policy map wallet.
  * The string is compatible with the output descriptor format, except that the pubkey must _not_
  * have derivation steps (the key origin info, if present, does have derivation steps from the
  * master key fingerprint). The serialized base58check-encoded pubkey is _not_ validated.
@@ -228,14 +224,25 @@ int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header)
 int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
 
 /**
- * TODO: docs
+ * Parses `in_buf` as a policy map, constructing the abstract syntax tree in the buffer `out` of
+ * size `out_len`.
+ *
+ * @param in_buf the buffer containing the policy map to parse
+ * @param out the pointer to the output buffer, which must be 4-byte aligned
+ * @param out_len the length of the output buffer
+ * @return 0 on success; -1 in case of parsing error, if the output buffer is unaligned, or if the
+ * output buffer is too small.
  */
 int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
 
 #ifndef SKIP_FOR_CMOCKA
 
 /**
- * TODO: docs
+ * Computes the id of the policy map wallet (commitment to header + policy map + keys_info), as per
+ * specifications.
+ *
+ * @param wallet_header
+ * @param out a pointer to a 32-byte array for the output
  */
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]);
 

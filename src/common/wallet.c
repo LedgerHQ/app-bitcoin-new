@@ -313,10 +313,6 @@ static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
     return 0;
 }
 
-// TODO: we are currently enforcing that the master key fingerprint (if present) is in lowercase
-// hexadecimal digits,
-//       and that the symbol for "hardened derivation" is "'".
-//       This implies descriptors should be normalized on the client side.
 int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
     memset(out, 0, sizeof(policy_map_key_info_t));
 
