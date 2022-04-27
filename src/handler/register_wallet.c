@@ -102,8 +102,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
-    // check if policy is acceptable; only multisig is accepted at this time,
-    // and it must be one of the accepted patterns.
+    // check if policy is acceptable
     if (!is_policy_acceptable(&state->policy_map)) {
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
@@ -224,11 +223,6 @@ static void finalize_response(dispatcher_context_t *dc) {
         return;
     }
 
-    // TODO: force PIN validation to prevent evil maid attacks registering a wallet.
-    //       As only the wallet name is shown when signing from a registered wallet, registering a
-    //       wallet is a sensitive operation, and a fraudulent wallet with the same name would
-    //       result in loss of funds.
-
     struct {
         uint8_t wallet_id[32];
         uint8_t hmac[32];
@@ -269,8 +263,6 @@ static void finalize_response(dispatcher_context_t *dc) {
 }
 
 static bool is_policy_acceptable(const policy_node_t *policy) {
-    // TODO: might want to add more restrictions
-
     return policy->type == TOKEN_SH || policy->type == TOKEN_WSH || policy->type == TOKEN_TR;
 }
 

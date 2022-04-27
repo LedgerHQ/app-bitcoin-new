@@ -10,7 +10,7 @@ from bip32 import BIP32
 
 from bitcoin_client.ledger_bitcoin import Client
 from bitcoin_client.ledger_bitcoin.client_base import TransportClient
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
+from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
 
@@ -116,7 +116,7 @@ def run_test_invalid(client: Client, policy_map: str, keys_info: List[str]):
         policy_map=policy_map,
         keys_info=keys_info)
 
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises((IncorrectDataError, NotSupportedError)):
         client.register_wallet(wallet_policy)
 
 
@@ -279,6 +279,10 @@ def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGloba
     # tr must be top-level
     run_test_invalid(client, "wsh(tr(pk(@0)))", [internal_xpub_orig])
     run_test_invalid(client, "sh(tr(pk(@0)))", [internal_xpub_orig])
+
+    # valid miniscript must be inside wsh() or sh(wsh())
+    run_test_invalid(client, "or_d(pk(@0),pkh(@1))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "sh(or_d(pk(@0),pkh(@1)))", [internal_xpub_orig, core_xpub_orig1])
 
     # sortedmulti is not valid miniscript, can only be used as a descriptor inside sh or wsh
     run_test_invalid(client, "wsh(or_d(pk(@0),sortedmulti(3,@1,@2,@3,@4,@5)))",
