@@ -1,9 +1,15 @@
 #pragma once
 
 /**
- * Instruction class of the Bitcoin application.
+ * Instruction class of the Legacy Bitcoin application.
  */
 #define CLA_APP_LEGACY 0xE0
+
+/**
+ * Other instruction class used in the legacy Bitcoin application for certain extensions.
+ * This is added for compatibility and can be removed once the legacy support is dropped.
+ */
+#define CLA_APP_LEGACY_JC_EXT 0xF0
 
 /**
  * Instruction class of the Bitcoin application.
