@@ -72,7 +72,7 @@ static bool check_output_displayable() {
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
     if (btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) ||
-        isP2sh || !(nullAmount && isOpReturn)) {
+        isP2sh || (nullAmount && isOpReturn)) {
         isRecognizedOutputScript = true;
     } else if (G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) {
         if (isOpCreate || isOpCall)
