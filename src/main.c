@@ -199,7 +199,7 @@ void app_main() {
         }
 
 #ifndef DISABLE_LEGACY_SUPPORT
-        if (G_io_apdu_buffer[0] == CLA_APP_LEGACY) {
+        if (G_io_apdu_buffer[0] == CLA_APP_LEGACY || G_io_apdu_buffer[0] == CLA_APP_LEGACY_JC_EXT) {
             if (G_app_mode != APP_MODE_LEGACY) {
                 explicit_bzero(&btchip_context_D, sizeof(btchip_context_D));
 
