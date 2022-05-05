@@ -862,6 +862,10 @@ void get_address_from_output_script(unsigned char* script, int script_size, char
         strcpy(out, "OP_RETURN");
         return;
     }
+    if (G_coin_config->kind == COIN_KIND_PEERCOIN && btchip_output_script_is_empty(script)) {
+        strcpy(out, "COINSTAKE");
+        return;
+    }
     if ((G_coin_config->kind == COIN_KIND_QTUM || G_coin_config->kind == COIN_KIND_HYDRA) &&
         btchip_output_script_is_op_create(script, script_size)) {
         strcpy(out, "OP_CREATE");
