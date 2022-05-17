@@ -96,160 +96,161 @@ typedef struct {
     uint8_t data;
 } generic_processor_command_t;
 
-const generic_processor_command_t commands_0[] = {{CMD_CODE_OP_V, OP_0}, {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_1[] = {{CMD_CODE_OP_V, OP_1}, {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_pk_k[] = {{CMD_CODE_PUSH_PK, 0}, {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_pk_h[] = {{CMD_CODE_OP, OP_DUP},
-                                                     {CMD_CODE_OP, OP_HASH160},
-                                                     {CMD_CODE_PUSH_PKH, 0},
-                                                     {CMD_CODE_OP, OP_EQUALVERIFY},
-                                                     {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_pk[] = {{CMD_CODE_PUSH_PK, 0},
-                                                   {CMD_CODE_OP_V, OP_CHECKSIG},
-                                                   {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_older[] = {{CMD_CODE_PUSH_UINT32, 0},
-                                                      {CMD_CODE_OP_V, OP_CHECKSEQUENCEVERIFY},
-                                                      {CMD_CODE_END, 0}};
-const generic_processor_command_t commands_after[] = {{CMD_CODE_PUSH_UINT32, 0},
-                                                      {CMD_CODE_OP_V, OP_CHECKLOCKTIMEVERIFY},
-                                                      {CMD_CODE_END, 0}};
-
-const generic_processor_command_t commands_sha256[] = {{CMD_CODE_OP, OP_SIZE},
-                                                       {CMD_CODE_OP, 1},   // 1-byte push
-                                                       {CMD_CODE_OP, 32},  // pushed value
-                                                       {CMD_CODE_OP, OP_EQUALVERIFY},
-                                                       {CMD_CODE_OP, OP_SHA256},
-                                                       {CMD_CODE_PUSH_HASH32, 0},
-                                                       {CMD_CODE_OP_V, OP_EQUAL},
-                                                       {CMD_CODE_END, 0}};
-
-const generic_processor_command_t commands_hash256[] = {{CMD_CODE_OP, OP_SIZE},
-                                                        {CMD_CODE_OP, 1},   // 1-byte push
-                                                        {CMD_CODE_OP, 32},  // pushed value
-                                                        {CMD_CODE_OP, OP_EQUALVERIFY},
-                                                        {CMD_CODE_OP, OP_HASH256},
-                                                        {CMD_CODE_PUSH_HASH32, 0},
-                                                        {CMD_CODE_OP_V, OP_EQUAL},
-                                                        {CMD_CODE_END, 0}};
-
-const generic_processor_command_t commands_ripemd160[] = {{CMD_CODE_OP, OP_SIZE},
-                                                          {CMD_CODE_OP, 1},   // 1-byte push
-                                                          {CMD_CODE_OP, 32},  // pushed value
-                                                          {CMD_CODE_OP, OP_EQUALVERIFY},
-                                                          {CMD_CODE_OP, OP_RIPEMD160},
-                                                          {CMD_CODE_PUSH_HASH20, 0},
-                                                          {CMD_CODE_OP_V, OP_EQUAL},
+static const generic_processor_command_t commands_0[] = {{CMD_CODE_OP_V, OP_0}, {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_1[] = {{CMD_CODE_OP_V, OP_1}, {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_pk_k[] = {{CMD_CODE_PUSH_PK, 0},
+                                                            {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_pk_h[] = {{CMD_CODE_OP, OP_DUP},
+                                                            {CMD_CODE_OP, OP_HASH160},
+                                                            {CMD_CODE_PUSH_PKH, 0},
+                                                            {CMD_CODE_OP, OP_EQUALVERIFY},
+                                                            {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_pk[] = {{CMD_CODE_PUSH_PK, 0},
+                                                          {CMD_CODE_OP_V, OP_CHECKSIG},
                                                           {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_older[] = {{CMD_CODE_PUSH_UINT32, 0},
+                                                             {CMD_CODE_OP_V, OP_CSV},
+                                                             {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_after[] = {{CMD_CODE_PUSH_UINT32, 0},
+                                                             {CMD_CODE_OP_V, OP_CLTV},
+                                                             {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_hash160[] = {{CMD_CODE_OP, OP_SIZE},
-                                                        {CMD_CODE_OP, 1},   // 1-byte push
-                                                        {CMD_CODE_OP, 32},  // pushed value
-                                                        {CMD_CODE_OP, OP_EQUALVERIFY},
-                                                        {CMD_CODE_OP, OP_HASH160},
-                                                        {CMD_CODE_PUSH_HASH20, 0},
-                                                        {CMD_CODE_OP_V, OP_EQUAL},
-                                                        {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_sha256[] = {{CMD_CODE_OP, OP_SIZE},
+                                                              {CMD_CODE_OP, 1},   // 1-byte push
+                                                              {CMD_CODE_OP, 32},  // pushed value
+                                                              {CMD_CODE_OP, OP_EQUALVERIFY},
+                                                              {CMD_CODE_OP, OP_SHA256},
+                                                              {CMD_CODE_PUSH_HASH32, 0},
+                                                              {CMD_CODE_OP_V, OP_EQUAL},
+                                                              {CMD_CODE_END, 0}};
+
+static const generic_processor_command_t commands_hash256[] = {{CMD_CODE_OP, OP_SIZE},
+                                                               {CMD_CODE_OP, 1},   // 1-byte push
+                                                               {CMD_CODE_OP, 32},  // pushed value
+                                                               {CMD_CODE_OP, OP_EQUALVERIFY},
+                                                               {CMD_CODE_OP, OP_HASH256},
+                                                               {CMD_CODE_PUSH_HASH32, 0},
+                                                               {CMD_CODE_OP_V, OP_EQUAL},
+                                                               {CMD_CODE_END, 0}};
+
+static const generic_processor_command_t commands_ripemd160[] = {{CMD_CODE_OP, OP_SIZE},
+                                                                 {CMD_CODE_OP, 1},   // 1-byte push
+                                                                 {CMD_CODE_OP, 32},  // pushed value
+                                                                 {CMD_CODE_OP, OP_EQUALVERIFY},
+                                                                 {CMD_CODE_OP, OP_RIPEMD160},
+                                                                 {CMD_CODE_PUSH_HASH20, 0},
+                                                                 {CMD_CODE_OP_V, OP_EQUAL},
+                                                                 {CMD_CODE_END, 0}};
+
+static const generic_processor_command_t commands_hash160[] = {{CMD_CODE_OP, OP_SIZE},
+                                                               {CMD_CODE_OP, 1},   // 1-byte push
+                                                               {CMD_CODE_OP, 32},  // pushed value
+                                                               {CMD_CODE_OP, OP_EQUALVERIFY},
+                                                               {CMD_CODE_OP, OP_HASH160},
+                                                               {CMD_CODE_PUSH_HASH20, 0},
+                                                               {CMD_CODE_OP_V, OP_EQUAL},
+                                                               {CMD_CODE_END, 0}};
 
 // andor(X,Y,X) ==> [X] NOTIF [Z] ELSE [Y] ENDIF
-const generic_processor_command_t commands_andor[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                      {CMD_CODE_OP, OP_NOTIF},
-                                                      {CMD_CODE_PROCESS_CHILD, 2},
-                                                      {CMD_CODE_OP, OP_ELSE},
-                                                      {CMD_CODE_PROCESS_CHILD, 1},
-                                                      {CMD_CODE_OP_V, OP_ENDIF},
-                                                      {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_andor[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                             {CMD_CODE_OP, OP_NOTIF},
+                                                             {CMD_CODE_PROCESS_CHILD, 2},
+                                                             {CMD_CODE_OP, OP_ELSE},
+                                                             {CMD_CODE_PROCESS_CHILD, 1},
+                                                             {CMD_CODE_OP_V, OP_ENDIF},
+                                                             {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_and_v[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                      {CMD_CODE_PROCESS_CHILD_V, 1},
-                                                      {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_and_v[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                             {CMD_CODE_PROCESS_CHILD_V, 1},
+                                                             {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_and_b[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                      {CMD_CODE_PROCESS_CHILD, 1},
-                                                      {CMD_CODE_OP_V, OP_BOOLAND},
-                                                      {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_and_b[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                             {CMD_CODE_PROCESS_CHILD, 1},
+                                                             {CMD_CODE_OP_V, OP_BOOLAND},
+                                                             {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_and_n[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                      {CMD_CODE_OP, OP_NOTIF},
-                                                      {CMD_CODE_OP, OP_0},
-                                                      {CMD_CODE_OP, OP_ELSE},
-                                                      {CMD_CODE_PROCESS_CHILD, 1},
-                                                      {CMD_CODE_OP_V, OP_ENDIF},
-                                                      {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_and_n[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                             {CMD_CODE_OP, OP_NOTIF},
+                                                             {CMD_CODE_OP, OP_0},
+                                                             {CMD_CODE_OP, OP_ELSE},
+                                                             {CMD_CODE_PROCESS_CHILD, 1},
+                                                             {CMD_CODE_OP_V, OP_ENDIF},
+                                                             {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_or_b[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                     {CMD_CODE_PROCESS_CHILD, 1},
-                                                     {CMD_CODE_OP_V, OP_BOOLOR},
-                                                     {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_or_b[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                            {CMD_CODE_PROCESS_CHILD, 1},
+                                                            {CMD_CODE_OP_V, OP_BOOLOR},
+                                                            {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_or_c[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                     {CMD_CODE_OP, OP_NOTIF},
-                                                     {CMD_CODE_PROCESS_CHILD, 1},
-                                                     {CMD_CODE_OP_V, OP_ENDIF},
-                                                     {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_or_c[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                            {CMD_CODE_OP, OP_NOTIF},
+                                                            {CMD_CODE_PROCESS_CHILD, 1},
+                                                            {CMD_CODE_OP_V, OP_ENDIF},
+                                                            {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_or_d[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                     {CMD_CODE_OP, OP_IFDUP},
-                                                     {CMD_CODE_OP, OP_NOTIF},
-                                                     {CMD_CODE_PROCESS_CHILD, 1},
-                                                     {CMD_CODE_OP_V, OP_ENDIF},
-                                                     {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_or_d[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                            {CMD_CODE_OP, OP_IFDUP},
+                                                            {CMD_CODE_OP, OP_NOTIF},
+                                                            {CMD_CODE_PROCESS_CHILD, 1},
+                                                            {CMD_CODE_OP_V, OP_ENDIF},
+                                                            {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_or_i[] = {{CMD_CODE_OP, OP_IF},
-                                                     {CMD_CODE_PROCESS_CHILD, 0},
-                                                     {CMD_CODE_OP, OP_ELSE},
-                                                     {CMD_CODE_PROCESS_CHILD, 1},
-                                                     {CMD_CODE_OP_V, OP_ENDIF},
-                                                     {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_or_i[] = {{CMD_CODE_OP, OP_IF},
+                                                            {CMD_CODE_PROCESS_CHILD, 0},
+                                                            {CMD_CODE_OP, OP_ELSE},
+                                                            {CMD_CODE_PROCESS_CHILD, 1},
+                                                            {CMD_CODE_OP_V, OP_ENDIF},
+                                                            {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_a[] = {{CMD_CODE_OP, OP_TOALTSTACK},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_a[] = {{CMD_CODE_OP, OP_TOALTSTACK},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_s[] = {{CMD_CODE_OP, OP_SWAP},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_s[] = {{CMD_CODE_OP, OP_SWAP},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_c[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_CHECKSIG},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_c[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_CHECKSIG},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_t[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_1},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_t[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_1},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_d[] = {{CMD_CODE_OP, OP_DUP},
-                                                  {CMD_CODE_OP, OP_IF},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_ENDIF},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_d[] = {{CMD_CODE_OP, OP_DUP},
+                                                         {CMD_CODE_OP, OP_IF},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_ENDIF},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_v[] = {{CMD_CODE_PROCESS_CHILD_VV, 0},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_v[] = {{CMD_CODE_PROCESS_CHILD_VV, 0},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_j[] = {{CMD_CODE_OP, OP_SIZE},
-                                                  {CMD_CODE_OP, OP_0NOTEQUAL},
-                                                  {CMD_CODE_OP, OP_IF},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_ENDIF},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_j[] = {{CMD_CODE_OP, OP_SIZE},
+                                                         {CMD_CODE_OP, OP_0NOTEQUAL},
+                                                         {CMD_CODE_OP, OP_IF},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_ENDIF},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_n[] = {{CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_0NOTEQUAL},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_n[] = {{CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_0NOTEQUAL},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_l[] = {{CMD_CODE_OP, OP_IF},
-                                                  {CMD_CODE_OP, OP_0},
-                                                  {CMD_CODE_OP, OP_ELSE},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP_V, OP_ENDIF},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_l[] = {{CMD_CODE_OP, OP_IF},
+                                                         {CMD_CODE_OP, OP_0},
+                                                         {CMD_CODE_OP, OP_ELSE},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP_V, OP_ENDIF},
+                                                         {CMD_CODE_END, 0}};
 
-const generic_processor_command_t commands_u[] = {{CMD_CODE_OP, OP_IF},
-                                                  {CMD_CODE_PROCESS_CHILD, 0},
-                                                  {CMD_CODE_OP, OP_ELSE},
-                                                  {CMD_CODE_OP, OP_0},
-                                                  {CMD_CODE_OP_V, OP_ENDIF},
-                                                  {CMD_CODE_END, 0}};
+static const generic_processor_command_t commands_u[] = {{CMD_CODE_OP, OP_IF},
+                                                         {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP, OP_ELSE},
+                                                         {CMD_CODE_OP, OP_0},
+                                                         {CMD_CODE_OP_V, OP_ENDIF},
+                                                         {CMD_CODE_END, 0}};
 
 static void print_parser_info(const policy_parser_state_t *state, const char *func_name) {
     (void) func_name;  // avoid warnings when DEBUG=0
