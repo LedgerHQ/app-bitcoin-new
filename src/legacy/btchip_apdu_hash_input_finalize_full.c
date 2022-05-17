@@ -46,7 +46,7 @@ static bool check_output_displayable() {
     bool displayable = true;
     unsigned char amount[8], isOpReturn, isP2sh, isNativeSegwit, j,
         nullAmount = 1;
-    unsigned char isOpCreate, isOpCall, isEmpty;
+    unsigned char isOpCreate, isOpCall;
     bool isRecognizedOutputScript = false;
 
     for (j = 0; j < 8; j++) {
@@ -71,7 +71,6 @@ static bool check_output_displayable() {
     isOpCall =
         btchip_output_script_is_op_call(btchip_context_D.currentOutput + 8,
           sizeof(btchip_context_D.currentOutput) - 8);
-    isEmpty = btchip_output_script_is_empty(btchip_context_D.currentOutput + 8);
     if (btchip_output_script_is_regular(btchip_context_D.currentOutput + 8) ||
         isP2sh || (nullAmount && isOpReturn)) {
         isRecognizedOutputScript = true;
@@ -79,7 +78,7 @@ static bool check_output_displayable() {
         if (isOpCreate || isOpCall)
             isRecognizedOutputScript = true;
     } else if (G_coin_config->kind == COIN_KIND_PEERCOIN) {
-        if (nullAmount && isEmpty)
+        if (nullAmount)
             isRecognizedOutputScript = true;
     }
     if (!isRecognizedOutputScript) {
