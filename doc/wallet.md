@@ -1,57 +1,124 @@
 # Wallet policy
 
-A _wallet descriptor template_ follows the same language as output descriptor, except that each `KEY` expression is replaced with the `@` character followed by non-negative  decimal number (starting with `0`). Each of them is a placeholder for the key information that is kept in a separate vector.
-A *wallet policy* is the pair of the _wallet descriptor template_ and the vector of key information; some additional metadata is associated, as described below.
+A _wallet policy_ is a structured representation of an account secured by a policy expressed with output script descriptors. It is composed by two parts:
+a wallet descriptor template and the vector of key placeholder expressions.
+
+A _wallet descriptor template_ follows language very similar to output descriptor, except that each `KEY` expression with a key placeholder `KP` expression, that refers to to one of the keys in the keys information vector, plus the additional derivation steps to use for that key.
+
 
 Each key information is an expression similar to the `KEY` expressions of output descriptors, except that
-- only serialized extended public keys ("xpubs") are supported;
-- key origin information is compulsory
-- it is followed by a `/**` prefix implying the last two steps of derivation (change and address index). A formalized description follows below.
+- only serialized extended public keys ("xpubs") are supported at this time;
+- key origin information is compulsory for internal keys.
 
-## Reference
+This section formally defines wallet policies, and how they relate to
+output script descriptors.
 
-A wallet descriptor template is a `SCRIPT` expression, described as follows:
+## Formal definition
+
+A wallet policy is composed by a wallet descriptor template, together with
+a vector of key information items.
+
+### Wallet descriptor template ====
+
+A wallet descriptor template is a `SCRIPT` expression.
 
 `SCRIPT` expressions:
--   `sh(SCRIPT)` (top level only): P2SH embed the argument.
--   `wsh(SCRIPT)` (top level or inside `sh` only): P2WSH embed the argument.
--   `pkh(KP)` (not inside `tr`): P2PKH output for the given public key (use `addr` if you only know the pubkey hash).
--   `wpkh(KP)` (top level or inside `sh` only): P2WPKH output for the given compressed pubkey.
--   `multi(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script.
--   `sortedmulti(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script with keys sorted lexicographically in the resulting script.
+- `sh(SCRIPT)` (top level only): P2SH embed the argument.
+- `wsh(SCRIPT)` (top level or inside `sh` only): P2WSH embed the argument.
+- `pkh(KP)` (not inside `tr`): P2PKH output for the given public key (use
+`addr` if you only know the pubkey hash).
+- `wpkh(KP)` (top level or inside `sh` only): P2WPKH output for the given
+compressed pubkey.
+- `multi(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script.
+- `sortedmulti(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script with keys
+sorted lexicographically in the resulting script.
+- `tr(KP)`: P2TR output with the specified key as internal key.
 
-Key placeholder `KP` expressions consist of
+`KP` expressions (key placeholders) consist of
 - a single character `@`
-- followed by a non-negative decimal number, with no leading zeros (except for `@0`).
+- followed by a non-negative decimal number, with no leading zeros (except
+for `@0`).
+- possibly followed by either:
+  - the string  `/**`, or
+  - a string of the form `/<NUM;NUM>/*`, for two distinct decimal numbers
+`NUM` representing unhardened derivations
 
-The placeholder `@i` for some number *i* represents the *i*-th key in the vector of key orgin informations (which must be of size at least *i* + 1, or the wallet is invalid. 
+The `/**` in the placeholder template represents commonly used paths for
+receive/change addresses, and is equivalent to `<0;1>`.
 
-Each element of the *key origin informations* list is a `KEY` expression.
-`KEY` expressions:
+The placeholder `@i` for some number *i* represents the *i*-th key in the
+vector of key origin information (which must be of size at least *i* + 1,
+or the wallet policy is invalid).
 
--   Key origin information, consisting of:
-    -   An open bracket `[`
-    -   Exactly 8 hex characters for the fingerprint of the master key from which this key is derived from (see [BIP32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for details)
-    -   Followed by zero or more `/NUM'` path elements to indicate hardened derivation steps between the fingerprint and the xpub that follows
-    -   A closing bracket `]`
--   Followed by the actual key, which is a serialized extended public key (`xpub`) (as defined in [BIP 32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)).
--   Followed by the string `/**`
+NOTE: the `tr(KP)` descriptor will be generalized to a `tr(KP,TREE)` expression to support taproot scripts in a future version.
 
-Note that this format is much more restricted (by design) than the format used in output descriptors. In particular, the key origin information is compulsory.
+### Keys information vector
 
-The `/**` in the descriptor template represents all the possible paths used in the wallet.
+Each element of the keys origin information vector is a `KEY` expression.
+
+`KEY` expressions consist of
+- Optionally, key origin information, consisting of:
+  - An open bracket `[`
+  - Exactly 8 hex characters for the fingerprint of the master key from
+which this key is derived from (see [BIP32](
+https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for details)
+  - Followed by zero or more `/NUM'` path elements to indicate hardened
+derivation steps between the fingerprint and the xpub that follows
+  - A closing bracket `]`
+- Followed by the actual key, which is either
+  - a hex-encoded pubkey, which is either
+    - inside `wpkh` and `wsh`, only compressed public keys are permitted
+(exactly 66 hex characters starting with `02` or `03`.
+    - inside `tr`, x-only pubkeys are also permitted (exactly 64 hex
+characters).
+  - a serialized extended public key (`xpub`) (as defined in [BIP 32](
+https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki))
+
+The placeholder `@i` for some number *i* represents the *i*-th key in the
+vector of key origin information (which must be of size at least *i* + 1,
+or the wallet policy is invalid).
+
+A key with no origin information will be treated as external by the hardware wallet.
+
+### Additional rules
+
+The wallet policy is invalid if any placeholder expression with additional
+derivation steps is used when the corresponding key information is not an
+xpub.
+
+The key information vector *should* be ordered so that placeholder `@i`
+never appear for the first time before an occurrence of `@j`  for some `j <
+i`; for example, the first placeholder is always `@0`, the next one is
+`@1`, etc.
+
+### Implementation-specific restrictions
+
+- Placeholder _must_ be followed by `/**` or `/<0;1>`.
+- Key expressions only support xpubs at this time (no hex-encoded pubkeys).
 
 ## Descriptor derivation
 
-From a descriptor template (and the associated vector of keys), one can therefore obtain the descriptor for receive and change addresses by:
+From a wallet descriptor template (and the associated vector of keys
+information), one can therefore obtain the 1-dimensional descriptor for
+receive and change addresses by:
 
-- replacing each key placeholder with the corresponding key / key origin, and then
--  replacing `/**` with either `/0/*` (receive addresses descriptor) or `/1/*` (change addresses descriptor).
+- replacing each key placeholder with the corresponding key origin
+information;
+- replacing every `/**`  with `/0/*` for the receive descriptor, and `/1/*`
+for the change descriptor;
+- replacing every `/<M;N>` with  `/M` for the receive descriptor, and `/N`
+for the change descriptor.
 
-For example, the wallet descriptor `pkh(@0)` with key information `["[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/**"]` produces the following two descriptors:
+For example, the wallet descriptor `pkh(@0/**)` with key information
+`["[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL"]`
+produces the following two descriptors:
 
-- Receive descriptor: `pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*)`
-- Change descriptor: `pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)`
+- Receive descriptor:
+`pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/0/*)`
+
+- Change descriptor:
+`pkh([d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/1/*)`
+
 
 # Policy registration and usage
 The app supports a number of features related to wallet policies. In order to securely sign transactions with a policy wallet (for example in a multisignature), it is necessary to be able to:
@@ -73,13 +140,13 @@ A registered wallet policy comprises the following:
 
 The wallet policy is serialized as the concatenation of:
 
-- `1 byte`: a byte equal to `0x01`, reserved for future use
+- `1 byte`: a byte equal to `0x02`, the version of the wallet policy language
 - `1 byte`: the length of the wallet name (0 for standard wallet)
 - `<variable length>`:  the wallet name (empty for standard wallets)
 - `<variable length>`: the length of the wallet descriptor template, encoded as a Bitcoin-style variable-length integer
-- `<variable length>`: the wallet descriptor template, as an ascii string (no terminating 0)
+- `32 bytes`: the sha256 hash of the wallet descriptor template
 - `<variable length>`: the number of keys in the list of keys, encoded as a Bitcoin-style variable-length integer
-- `<32 bytes>`: the root of the canonical Merkle tree of the list of keys.
+- `<32 bytes>`: the root of the canonical Merkle tree of the list of keys
 
 See [merkle](merkle.md) for information on Merkle trees.
 
