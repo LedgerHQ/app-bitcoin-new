@@ -52,6 +52,8 @@ def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
     parser.addoption("--enableslowtests", action="store_true")
+    parser.addoption("--model", action="store", default="nanos")
+    parser.addoption("--sdk", action="store", default="2.1")
 
 
 @pytest.fixture(scope="module")
@@ -93,13 +95,23 @@ def enable_slow_tests(pytestconfig):
     return pytestconfig.getoption("enableslowtests")
 
 
+@pytest.fixture
+def model(pytestconfig):
+    return pytestconfig.getoption("model")
+
+
+@pytest.fixture
+def sdk(pytestconfig):
+    return pytestconfig.getoption("sdk")
+
+
 @pytest.fixture(scope='session', autouse=True)
 def root_directory(request):
     return Path(str(request.config.rootdir))
 
 
 @pytest.fixture
-def comm(settings, root_directory, hid, headless, app_version: str) -> Union[TransportClient, SpeculosClient]:
+def comm(settings, root_directory, hid, headless, model, sdk, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
@@ -123,7 +135,7 @@ def comm(settings, root_directory, hid, headless, app_version: str) -> Union[Tra
 
         client = SpeculosClient(
             app_binary,
-            ['--sdk', '2.1', '--seed', f'{settings["mnemonic"]}']
+            ['--model', model, '--sdk', sdk, '--seed', f'{settings["mnemonic"]}']
             + ["--display", "qt" if not headless else "headless"]
             + lib_params
         )
