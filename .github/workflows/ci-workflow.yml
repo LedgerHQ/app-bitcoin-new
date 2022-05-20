@@ -108,6 +108,16 @@ jobs:
 
   job_test:
     name: Tests
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "2.1"
+          - model: nanox
+            SDK: "2.0.2"
+          - model: nanosp
+            SDK: "1.0"
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -129,17 +139,27 @@ jobs:
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app-nanos
+          name: bitcoin-testnet-app-${{matrix.model}}
           path: bin
 
       - name: Run tests
         run: |
           cd tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
 
   job_test_mainnet:
     name: Tests on mainnet
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "2.1"
+          - model: nanox
+            SDK: "2.0.2"
+          - model: nanosp
+            SDK: "1.0"
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -161,14 +181,14 @@ jobs:
       - name: Download Bitcoin app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-app-nanos
+          name: bitcoin-app-${{matrix.model}}
           path: bin
 
       - name: Run tests
         run: |
           cd tests_mainnet
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
 
   job_test_js_lib:
     name: Tests with the JS library
