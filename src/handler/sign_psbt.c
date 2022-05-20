@@ -365,7 +365,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
     }
 
     // Fetch the serialized wallet policy from the client
-    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
+    uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
     int serialized_wallet_policy_len = call_get_preimage(dc,
                                                          wallet_id,
                                                          serialized_wallet_policy,
@@ -378,22 +378,42 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
     policy_map_wallet_header_t wallet_header;
     buffer_t serialized_wallet_policy_buf =
         buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
+    if ((read_wallet_policy_header(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
+    state->wallet_header_version = wallet_header.version;
     memcpy(state->wallet_header_keys_info_merkle_root,
            wallet_header.keys_info_merkle_root,
            sizeof(wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = wallet_header.n_keys;
 
-    buffer_t policy_map_buffer =
-        buffer_create(&wallet_header.policy_map, wallet_header.policy_map_len);
+    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
+
+    buffer_t policy_map_buffer;
+
+    if (wallet_header.version == WALLET_POLICY_VERSION_V1) {
+        policy_map_buffer = buffer_create(wallet_header.policy_map, wallet_header.policy_map_len);
+    } else {
+        // if V2, stream and parse policy from client first
+        int policy_descriptor_len = call_get_preimage(dc,
+                                                      wallet_header.policy_map_sha256,
+                                                      policy_map_bytes,
+                                                      sizeof(policy_map_bytes));
+        if (policy_descriptor_len < 0) {
+            PRINTF("Failed getting wallet policy descriptor\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
+    }
 
     if (parse_policy_map(&policy_map_buffer,
                          state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes)) < 0) {
+                         sizeof(state->wallet_policy_map_bytes),
+                         wallet_header.version) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -1137,7 +1157,9 @@ static void sign_init(dispatcher_context_t *dc) {
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
         policy_map_key_info_t our_key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &our_key_info) == -1) {
+        if (parse_policy_map_key_info(&key_info_buffer,
+                                      &our_key_info,
+                                      state->wallet_header_version) == -1) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return;
         }

@@ -36,6 +36,7 @@ void ui_display_address(dispatcher_context_t *dispatcher_context,
 
 void ui_display_wallet_header(dispatcher_context_t *context,
                               const policy_map_wallet_header_t *wallet_header,
+                              const char *policy_descriptor,
                               command_processor_t on_success);
 
 void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,

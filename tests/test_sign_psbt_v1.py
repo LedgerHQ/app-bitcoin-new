@@ -1,3 +1,6 @@
+# Tests using the V1 version of the wallet policy language, used before version 2.1.0 of the app
+# Make sure we remain compatible for some time.
+
 import pytest
 
 import threading
@@ -8,7 +11,7 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType, WalletType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
@@ -119,17 +122,18 @@ def open_psbt_from_file(filename: str) -> PSBT:
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_pkh_1to1(client: Client):
+def test_sign_psbt_singlesig_pkh_1to1_v1(client: Client):
 
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
 
     wallet = PolicyMapWallet(
         "",
-        "pkh(@0/**)",
+        "pkh(@0)",
         [
-            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     # expected sigs:
@@ -148,17 +152,18 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
+def test_sign_psbt_singlesig_sh_wpkh_1to2_v1(client: Client):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "",
-        "sh(wpkh(@0/**))",
+        "sh(wpkh(@0))",
         [
-            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"
+            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     # expected sigs:
@@ -177,17 +182,18 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
+def test_sign_psbt_singlesig_wpkh_1to2_v1(client: Client):
 
     # PSBT for a legacy 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     result = client.sign_psbt(psbt, wallet, None)
@@ -207,17 +213,18 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
+def test_sign_psbt_singlesig_wpkh_2to2_v1(client: Client):
     # PSBT for a legacy 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     result = client.sign_psbt(psbt, wallet, None)
@@ -243,96 +250,23 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
             "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
         ),
     )]
-
-
-@has_automation("automations/sign_with_default_wallet_missing_nonwitnessutxo_accept.json")
-def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
-    # Same as the previous test, but the non-witness-utxo is missing.
-    # The app should sign after a warning.
-
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
-
-    # remove the non-witness-utxo field
-    for input in psbt.inputs:
-        input.non_witness_utxo = None
-
-    wallet = PolicyMapWallet(
-        "",
-        "wpkh(@0/**)",
-        [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
-        ],
-    )
-
-    result = client.sign_psbt(psbt, wallet, None)
-
-    # expected sigs
-    # #0:
-    #   "pubkey" : "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3",
-    #   "signature" : "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
-    # #1:
-    #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
-    #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-
-    assert result == [(
-        0,
-        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
-        bytes.fromhex(
-            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
-        )
-    ), (
-        1,
-        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
-        bytes.fromhex(
-            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-        ),
-    )]
-
-
-# def test_sign_psbt_legacy(client: Client):
-#     # legacy address
-#     # PSBT for a legacy 1-input 1-output spend
-#     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUhIh4AAAA="
-
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
-
-#     result = client.sign_psbt(psbt)
-
-#     print(result)
-
-
-# def test_sign_psbt_legacy_p2pkh(client: Client):
-#     # test from app-bitcoin
-
-#     # legacy address
-#     # PSBT for a legacy 1-input, 1-output + 1-change address spend
-#     unsigned_raw_psbt_base64 = 'cHNidP8BAHcBAAAAAVf4kTUeYOlEcY8d8StPd7ZCzGMUYYS+3Gx7xkoMCzneAAAAAAAAAAAAAqCGAQAAAAAAGXapFHrmeHmDxejS4X7xcPdZBWw2A6fYiKygfAEAAAAAABl2qRQYm4Or/V0O+Y+/NZTJXMU7RJdK6oisAAAAAAABAOICAAAAAV33ueIMUtHaJwGiRKSXVCFSZvAW9r139kClIAzR+340AQAAAGtIMEUCIQDIBpV0KZNcXWH1SCI8NTbcc5/jUYFLzp7cFpTlpcJavwIgE+MHsLSIWstkzP+vX0eU8gUEAyXrw2wlh4fEiLA4wrsBIQOLpGLX3WWRfs5FQUKQO7NioLQS0YQdUgh62IFka2zcz/3///8CFAwDAAAAAAAZdqkUs+F8Te+KORSO1vrX3G/r4w3TJMuIrDBXBQAAAAAAGXapFOCok4BjXxi37glUbZYyMry5kkEriKz+BB0AAQMEAQAAAAAAAA=='
-
-#     # expected sig: 3044022012f6a643d1d1a558912e0935dbd6a9694fe87c841e0f699c7cbb7c818503c115022064585f9b69c3452183a74ee7f00ae0452139e2c73b156dfd6ac835bea4fdf975
-
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
-
-#     result = client.sign_psbt(psbt)
-
-#     print(result)
 
 
 @has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_multisig_wsh(client: Client):
+def test_sign_psbt_multisig_wsh_v1(client: Client):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     wallet_hmac = bytes.fromhex(
-        "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+        "d6434852fb3caa7edbd1165084968f1691444b3cfc10cf1e431acbbc7f48451f"
     )
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
@@ -348,32 +282,19 @@ def test_sign_psbt_multisig_wsh(client: Client):
     )]
 
 
-# def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
-#     # legacy address
-#     # PSBT for a legacy 1-input 1-output spend
-#     # The spend is valid, but the non-witness utxo is wrong; therefore, it should fail the hash test
-#     # TODO: this fails PSBT decoding; need to make a version we can control for this test.
-
-#     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUySC0BAAA="
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
-
-#     with pytest.raises(IncorrectDataError):
-#         client.sign_psbt(psbt)
-
-
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
+def test_sign_psbt_taproot_1to2_v1(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
 
     wallet = PolicyMapWallet(
         "",
-        "tr(@0/**)",
+        "tr(@0)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     result = client.sign_psbt(psbt, wallet, None)
@@ -399,40 +320,8 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
 
     assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
-    # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
-
-    wallet = PolicyMapWallet(
-        "",
-        "tr(@0)",
-        [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
-        ],
-    )
-
-    result = client.sign_psbt(psbt, wallet, None)
-
-    # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
-    # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
-    # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
-
-    # sighash verified with bitcoin-core
-    sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
-
-    # get the (tweaked) pubkey from the scriptPubKey
-    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
-
-    assert len(result) == 1
-    assert len(result[0]) == 64
-
-    sig0 = result[0]
-
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
-
-def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -441,10 +330,11 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     n_ins = 4
@@ -496,7 +386,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             shown_out_idx += 1
 
 
-def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClient, is_speculos: bool):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -504,10 +394,11 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     in_amounts = [21_000_000*100_000_000]
@@ -542,7 +433,7 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bool):
+def test_sign_psbt_singlesig_wpkh_512to256_v1(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
@@ -554,10 +445,11 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
 
     wallet = PolicyMapWallet(
         "",
-        "tr(@0/**)",
+        "tr(@0)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     psbt = txmaker.createPsbt(
@@ -572,16 +464,17 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     assert len(result) == n_inputs
 
 
-def test_sign_psbt_fail_11_changes(client: Client):
+def test_sign_psbt_fail_11_changes_v1(client: Client):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     psbt = txmaker.createPsbt(
@@ -595,7 +488,7 @@ def test_sign_psbt_fail_11_changes(client: Client):
         client.sign_psbt(psbt, wallet, None)
 
 
-def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool):
+def test_sign_psbt_fail_wrong_non_witness_utxo_v1(client: Client, is_speculos: bool):
     # PSBT for transaction with the wrong non-witness utxo for an input.
     # It must fail with IncorrectDataError before any user interaction.
 
@@ -604,10 +497,11 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     psbt = txmaker.createPsbt(
@@ -629,13 +523,14 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
     client._no_clone_psbt = False
 
 
-def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_opreturn_v1(client: Client, comm: SpeculosClient):
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     psbt_b64 = "cHNidP8BAKMCAAAAAZ0gZDu3l28lrZWbtsuoIfI07zpsaXXMe6sMHHJn03LPAAAAAAD+////AgAAAAAAAAAASGpGVGhlIFRpbWVzIDAzL0phbi8yMDA5IENoYW5jZWxsb3Igb24gYnJpbmsgb2Ygc2Vjb25kIGJhaWxvdXQgZm9yIGJhbmtzLsGVmAAAAAAAFgAUK5M/aeXrJEofBL7Uno7J5OyTvJ8AAAAAAAEAcQIAAAABnpp88I3RXEU5b28rI3GGAXaWkk+w1sEqWDXFXdacKg8AAAAAAP7///8CgJaYAAAAAAAWABQTR+gqA3tduzjPjEdZ8kKx9cfgmvNabSkBAAAAFgAUCA6eZPSQK9gnq8ngOSaQ0ZdPeIVBAAAAAQEfgJaYAAAAAAAWABQTR+gqA3tduzjPjEdZ8kKx9cfgmiIGAny3XTSwBcTrn2K78sRX12OOgT51fvzsj6aGd9lQtjZiGPWswv1UAACAAQAAgAAAAIAAAAAAAAAAAAAAIgIDGZuJ2DVvV+HOOAoSBc8oYG2+qJhVsRw9/s+4oaUzVokY9azC/VQAAIABAACAAAAAgAEAAAABAAAAAA=="
@@ -648,7 +543,7 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
     assert len(hww_sigs) == 1
 
 
-def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_segwit_v16_v1(client: Client, comm: SpeculosClient):
     # This psbt contains an output with future psbt version 16 (corresponding to address
     # tb1sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4hu3px).
     # The app should accept it nonetheless.
@@ -659,51 +554,14 @@ def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
 
     wallet = PolicyMapWallet(
         "",
-        "wpkh(@0/**)",
+        "wpkh(@0)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     with automation(comm, "automations/sign_with_default_wallet_accept.json"):
         hww_sigs = client.sign_psbt(psbt, wallet, None)
 
     assert len(hww_sigs) == 1
-
-
-def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
-    # PSBT obtained by joining pkh-1to1.psbt, tr-1to2.psbt, wpkh-1to2.psbt.
-    # We sign it with each of the respective wallets; therefore it must show the "external inputs" warning each time.
-    psbt_b64 = "cHNidP8BAP0yAQIAAAADobgj0jNtaUtJNO+bblt94XoFUT2oop2wKi7Lx6mm/m0BAAAAAP3///9RIsLN5oI+VXVBdbksnFegqOGsg8OOF4f9Oh/zNI6VEwEAAAAA/f///3oqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////BaCGAQAAAAAAFgAUE5m4oJhHoDmwNS9Y0hLBgLqxf3dV/6cAAAAAACJRIAuOdIa8MGoK77enwArwQFVC2xrNc+7MqCdxzPX+XrYPeEEPAAAAAAAZdqkUE9fVgWaUbD7AIpNAZtjA0RHRu0GIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+Sguw0AAAAAABl2qRQ0Sg9IyhUOwrkDgXZgubaLE6ZwJoisAAAAAAABASunhqkAAAAAACJRINj08dGJltthuxyvVCPeJdih7unJUNN+b/oCMBLV5i4NIRYhLqKFalzxEOZqK+nXNTFHk/28s4iyuPE/K2remC569RkA9azC/VYAAIABAACAAAAAgAEAAAAAAAAAARcgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLIgYD7iw9mOsfk8Chqo5aQAm3Dre0Tq0V8WZvE2sBKtWNMGgY9azC/VQAAIABAACAAAAAgAEAAAAIAAAAAAABBSACkIHs5WFqocuZMZ/Eh07+5H8IzrpfYARjbIxDQJpfCiEHApCB7OVhaqHLmTGfxIdO/uR/CM66X2AEY2yMQ0CaXwoZAPWswv1WAACAAQAAgAAAAIABAAAAAgAAAAAAIgICKexHcnEx7SWIogxG7amrt9qm9J/VC6/nC5xappYcTswY9azC/VQAAIABAACAAAAAgAEAAAAKAAAAAAA="
-    psbt = PSBT()
-    psbt.deserialize(psbt_b64)
-
-    wallets = [
-        PolicyMapWallet(
-            "",
-            "pkh(@0/**)",
-            [
-                "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
-            ],
-        ),
-        PolicyMapWallet(
-            "",
-            "tr(@0/**)",
-            [
-                "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
-            ],
-        ),
-        PolicyMapWallet(
-            "",
-            "wpkh(@0/**)",
-            [
-                "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
-            ],
-        )
-    ]
-
-    for wallet in wallets:
-        with automation(comm, "automations/sign_with_wallet_external_inputs_accept.json"):
-            hww_sigs = client.sign_psbt(psbt, wallet, None)
-
-        assert len(hww_sigs) == 1

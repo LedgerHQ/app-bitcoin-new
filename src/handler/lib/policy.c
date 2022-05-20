@@ -45,6 +45,7 @@ typedef struct {
 
 typedef struct {
     dispatcher_context_t *dispatcher_context;
+    int wallet_version;  // version of the wallet policy
     const uint8_t *keys_merkle_root;
     uint32_t n_keys;
     bool change;
@@ -359,7 +360,7 @@ static int __attribute__((noinline)) get_extended_pubkey(policy_parser_state_t *
         // Make a sub-buffer for the pubkey info
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_version) == -1) {
             return -1;
         }
     }
@@ -391,12 +392,13 @@ static int get_derived_pubkey(policy_parser_state_t *state, int key_index, uint8
         return -1;
     }
 
-    if (ret == 1) {
-        // we derive the /0/i child of this pubkey
-        // we reuse the same memory of ext_pubkey
-        bip32_CKDpub(&ext_pubkey, state->change, &ext_pubkey);
-        bip32_CKDpub(&ext_pubkey, state->address_index, &ext_pubkey);
-    }
+    // TODO: here we assume that we always generate /0/i or /1/i; this will no longer be guaranteed
+    // once the full wallet policy specs are implemented
+
+    // we derive the /0/i child of this pubkey
+    // we reuse the same memory of ext_pubkey
+    bip32_CKDpub(&ext_pubkey, state->change, &ext_pubkey);
+    bip32_CKDpub(&ext_pubkey, state->address_index, &ext_pubkey);
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
 
@@ -683,7 +685,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     update_output_u8(state, 0x50 + policy->k);  // OP_k
 
     // derive each key
-    uint8_t compressed_pubkeys[MAX_POLICY_MAP_KEYS][33];
+    uint8_t compressed_pubkeys[MAX_WALLET_POLICY_KEYS][33];
     for (int i = 0; i < policy->n; i++) {
         if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkeys[i])) {
             return -1;
@@ -757,12 +759,14 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
 
 int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            const policy_node_t *policy,
+                           int wallet_version,
                            const uint8_t keys_merkle_root[static 32],
                            uint32_t n_keys,
                            bool change,
                            size_t address_index,
                            buffer_t *out_buf) {
     policy_parser_state_t state = {.dispatcher_context = dispatcher_context,
+                                   .wallet_version = wallet_version,
                                    .keys_merkle_root = keys_merkle_root,
                                    .n_keys = n_keys,
                                    .change = change,

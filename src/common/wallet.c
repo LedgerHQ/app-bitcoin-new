@@ -19,35 +19,6 @@
 #define PIC(x) (x)
 #endif
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcomment"
-// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
-
-/*
-Currently supported policies for singlesig:
-
-- pkh(key/**) where `key` follows `BIP44`       (legacy)
-- wpkh(key/**) where `key` follows `BIP 84`     (native segwit)
-- sh(wpkh(key/**)) where `key` follows `BIP 49` (nested segwit)
-- tr(key/**) where `key` follows `BIP 86`       (single-key p2tr)
-
-Currently supported wallet policies for multisig:
-
-   LEGACY
-  sh(multi(...)))
-  sh(sortedmulti(...)))
-
-   NATIVE SEGWIT
-  wsh(multi(...))
-  wsh(sortedmulti(...))
-
-   WRAPPED SEGWIT
-  sh(wsh(multi(...)))
-  sh(wsh(sortedmulti(...)))
-*/
-
-#pragma GCC diagnostic pop
-
 typedef struct {
     PolicyNodeType type;
     const char *name;
@@ -121,50 +92,60 @@ const bool is_valid_miniscript_wrapper[] = {
  */
 #define MAX_TOKEN_LENGTH (sizeof("sortedmulti") - 1)
 
-int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header) {
-    if (!buffer_read_u8(buffer, &header->type)) {
-        return -1;
+int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *header) {
+    if (!buffer_read_u8(buffer, &header->version)) {
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
 
-    if (header->type != WALLET_TYPE_POLICY_MAP) {
-        return -2;
+    if (header->version != WALLET_POLICY_VERSION_V1 &&
+        header->version != WALLET_POLICY_VERSION_V2) {
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
 
     if (!buffer_read_u8(buffer, &header->name_len)) {
-        return -3;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
 
     if (header->name_len > MAX_WALLET_NAME_LENGTH) {
-        return -4;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
 
     if (!buffer_read_bytes(buffer, (uint8_t *) header->name, header->name_len)) {
-        return -5;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
     header->name[header->name_len] = '\0';
 
     uint64_t policy_map_len;
     if (!buffer_read_varint(buffer, &policy_map_len)) {
-        return -6;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
     header->policy_map_len = (uint16_t) policy_map_len;
 
-    if (header->policy_map_len > MAX_POLICY_MAP_STR_LENGTH) {
-        return -7;
-    }
+    if (header->version == WALLET_POLICY_VERSION_V1) {
+        if (policy_map_len > MAX_WALLET_POLICY_STR_LENGTH_V1) {
+            return WITH_ERROR(-1, "Invalid wallet policy header: descriptor template too long");
+        }
+        if (!buffer_read_bytes(buffer, (uint8_t *) header->policy_map, header->policy_map_len)) {
+            return WITH_ERROR(-1, "Invalid wallet policy header");
+        }
+    } else {  // WALLET_POLICY_VERSION_V2
+        if (policy_map_len > MAX_WALLET_POLICY_STR_LENGTH_V2) {
+            return WITH_ERROR(-1, "Invalid wallet policy header: descriptor template too long");
+        }
 
-    if (!buffer_read_bytes(buffer, (uint8_t *) header->policy_map, header->policy_map_len)) {
-        return -8;
+        if (!buffer_read_bytes(buffer, (uint8_t *) header->policy_map_sha256, 32)) {
+            return WITH_ERROR(-1, "Invalid wallet policy header");
+        }
     }
 
     uint64_t n_keys;
     if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
-        return -9;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
     header->n_keys = (uint16_t) n_keys;
 
     if (!buffer_read_bytes(buffer, (uint8_t *) header->keys_info_merkle_root, 32)) {
-        return -10;
+        return WITH_ERROR(-1, "Invalid wallet policy header");
     }
 
     return 0;
@@ -191,12 +172,22 @@ static uint8_t lowercase_hex_to_int(char c) {
 }
 
 static bool consume_character(buffer_t *in_buf, char expected) {
-    // the next character must be a comma
     char c;
     if (!buffer_peek(in_buf, (uint8_t *) &c) || c != expected) {
         return false;
     }
     buffer_seek_cur(in_buf, 1);
+    return true;
+}
+
+static bool consume_characters(buffer_t *in_buf, const char *expected, size_t len) {
+    char c;
+    for (size_t i = 0; i < len; i++) {
+        if (!buffer_peek_n(in_buf, i, (uint8_t *) &c) || c != expected[i]) {
+            return false;
+        }
+    }
+    buffer_seek_cur(in_buf, len);
     return true;
 }
 
@@ -313,7 +304,11 @@ static int buffer_read_derivation_step(buffer_t *buffer, uint32_t *out) {
     return 0;
 }
 
-int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
+int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int version) {
+    if (version != WALLET_POLICY_VERSION_V1 && version != WALLET_POLICY_VERSION_V2) {
+        return WITH_ERROR(-1, "Invalid version");
+    }
+
     memset(out, 0, sizeof(policy_map_key_info_t));
 
     if (consume_character(buffer, '[')) {
@@ -367,13 +362,24 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
 
     if (ext_pubkey_len < 111 || ext_pubkey_len > 112) {
         // loose sanity check; pubkeys in bitcoin can be 111 or 112 characters long
-        return WITH_ERROR(-1, "Invalid extended pubkey length\n");
+        return WITH_ERROR(-1, "Invalid extended pubkey length");
     }
 
     // either the string terminates now, or it has a final "/**" suffix for the wildcard.
     if (!buffer_can_read(buffer, 1)) {
-        // no wildcard
+        // no wildcard; this is an error in V1
+        if (version == WALLET_POLICY_VERSION_V1) {
+            return WITH_ERROR(
+                -1,
+                "Invalid key expression; keys in V1 wallet policies must end with /**.");
+        }
+
         return 0;
+    }
+
+    // in V2, key expressions terminate with the key (no wildcards)
+    if (version == WALLET_POLICY_VERSION_V2) {
+        return WITH_ERROR(-1, "Invalid key expression; must terminate after the key/xpub");
     }
 
     out->has_wildcard = 1;
@@ -391,7 +397,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out) {
     return 0;
 }
 
-static int16_t parse_key_index(buffer_t *in_buf) {
+static int16_t parse_placeholder(buffer_t *in_buf, int version) {
     char c;
     if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
         return -1;
@@ -401,6 +407,14 @@ static int16_t parse_key_index(buffer_t *in_buf) {
     if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
         return -1;
     }
+
+    if (version == WALLET_POLICY_VERSION_V2) {
+        // the key expression must be followed by / and **, or /<0;1>/*
+        if (!consume_characters(in_buf, "/**", 3) && !consume_characters(in_buf, "/<0;1>/*", 8)) {
+            return WITH_ERROR((int16_t) -1, "Expected /** or /<0;1>/* in placeholder");
+        }
+    }
+
     return (int16_t) k;  // this cast is safe, since k is at most INT16_MAX
 }
 
@@ -410,6 +424,7 @@ static int16_t parse_key_index(buffer_t *in_buf) {
 // forward declaration
 static int parse_script(buffer_t *in_buf,
                         buffer_t *out_buf,
+                        int version,
                         size_t depth,
                         unsigned int context_flags);
 
@@ -418,6 +433,7 @@ static int parse_child_scripts(buffer_t *in_buf,
                                size_t depth,
                                policy_node_t *child_scripts[],
                                int n_children,
+                               int version,
                                unsigned int context_flags) {
     // the internal scripts are recursively parsed (if successful) in the current location
     // of the output buffer
@@ -426,7 +442,7 @@ static int parse_child_scripts(buffer_t *in_buf,
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
         child_scripts[child_index] = (policy_node_t *) buffer_get_cur(out_buf);
 
-        if (0 > parse_script(in_buf, out_buf, depth + 1, context_flags)) {
+        if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
             // failed while parsing internal script
             return -1;
         }
@@ -445,6 +461,7 @@ static int parse_child_scripts(buffer_t *in_buf,
  */
 static int parse_script(buffer_t *in_buf,
                         buffer_t *out_buf,
+                        int version,
                         size_t depth,
                         unsigned int context_flags) {
     int n_wrappers = 0;
@@ -621,7 +638,7 @@ static int parse_script(buffer_t *in_buf,
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
             node->script = (policy_node_t *) buffer_get_cur(out_buf);
 
-            if (0 > parse_script(in_buf, out_buf, depth + 1, inner_context_flags)) {
+            if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                 // failed while parsing internal script
                 return -1;
             }
@@ -692,7 +709,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 3, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        3,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -750,7 +773,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -802,7 +831,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -851,7 +886,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -899,7 +940,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -948,7 +995,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -995,7 +1048,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -1042,7 +1101,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_child_scripts(in_buf, out_buf, depth, node->scripts, 2, context_flags)) {
+            if (0 > parse_child_scripts(in_buf,
+                                        out_buf,
+                                        depth,
+                                        node->scripts,
+                                        2,
+                                        version,
+                                        context_flags)) {
                 return -1;
             }
 
@@ -1121,7 +1186,7 @@ static int parse_script(buffer_t *in_buf,
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
                 cur->script = (policy_node_t *) buffer_get_cur(out_buf);
-                if (0 > parse_script(in_buf, out_buf, depth + 1, context_flags)) {
+                if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
                     // failed while parsing internal script
                     return -1;
                 }
@@ -1212,7 +1277,7 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            node->key_index = parse_key_index(in_buf);
+            node->key_index = parse_placeholder(in_buf, version);
             if (node->key_index == -1) {
                 return WITH_ERROR(-1, "Couldn't parse key index");
             }
@@ -1282,7 +1347,7 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            node->key_index = parse_key_index(in_buf);
+            node->key_index = parse_placeholder(in_buf, version);
             if (node->key_index == -1) {
                 return WITH_ERROR(-1, "Couldn't parse key index");
             }
@@ -1357,7 +1422,7 @@ static int parse_script(buffer_t *in_buf,
             while (true) {
                 uint8_t c;
                 // If the next character is a ')', we exit and leave it in the buffer
-                if (buffer_peek(in_buf, (uint8_t *) &c) && c == ')') {
+                if (buffer_peek(in_buf, &c) && c == ')') {
                     break;
                 }
 
@@ -1366,7 +1431,7 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Expected ','");
                 }
 
-                int16_t key_index = parse_key_index(in_buf);
+                int16_t key_index = parse_placeholder(in_buf, version);
                 if (key_index == -1) {
                     return WITH_ERROR(-1, "Error parsing key index");
                 }
@@ -1386,7 +1451,7 @@ static int parse_script(buffer_t *in_buf,
             }
 
             // check integrity of k and n
-            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_POLICY_MAP_COSIGNERS)) {
+            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_WALLET_POLICY_COSIGNERS)) {
                 return WITH_ERROR(-1, "Invalid k and/or n");
             }
 
@@ -1419,7 +1484,7 @@ static int parse_script(buffer_t *in_buf,
         return WITH_ERROR(-1, "Input buffer too long");
     }
 
-    // if there was one or more wrappers wrapper, the script of the most internal node must point
+    // if there was one or more wrappers, the script of the most internal node must point
     // to the parsed node
     if (inner_wrapper != NULL) {
         inner_wrapper->script = parsed_node;
@@ -1596,14 +1661,18 @@ static int parse_script(buffer_t *in_buf,
     return 0;
 }
 
-int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len) {
+int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len, int version) {
     if ((unsigned long) out % 4 != 0) {
         return WITH_ERROR(-1, "Unaligned pointer");
     }
 
+    if (version != WALLET_POLICY_VERSION_V1 && version != WALLET_POLICY_VERSION_V2) {
+        return WITH_ERROR(-1, "Unsupported wallet policy version");
+    }
+
     buffer_t out_buf = buffer_create(out, out_len);
 
-    return parse_script(in_buf, &out_buf, 0, 0);
+    return parse_script(in_buf, &out_buf, version, 0, 0);
 }
 
 #ifndef SKIP_FOR_CMOCKA
@@ -1612,14 +1681,19 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
     cx_sha256_t wallet_hash_context;
     cx_sha256_init(&wallet_hash_context);
 
-    crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->type);
+    crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->version);
     crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->name_len);
     crypto_hash_update(&wallet_hash_context.header, wallet_header->name, wallet_header->name_len);
 
     crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->policy_map_len);
-    crypto_hash_update(&wallet_hash_context.header,
-                       wallet_header->policy_map,
-                       wallet_header->policy_map_len);
+
+    if (wallet_header->version == WALLET_POLICY_VERSION_V1) {
+        crypto_hash_update(&wallet_hash_context.header,
+                           wallet_header->policy_map,
+                           wallet_header->policy_map_len);
+    } else {  // WALLET_POLICY_VERSION_V2
+        crypto_hash_update(&wallet_hash_context.header, wallet_header->policy_map_sha256, 32);
+    }
 
     crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->n_keys);
 

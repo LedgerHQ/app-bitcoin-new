@@ -125,7 +125,7 @@ def read_uint(buf: BytesIO,
 
 
 def serialize_str(value: str) -> bytes:
-    return len(value).to_bytes(1, byteorder="big") + value.encode("latin-1")
+    return len(value.encode()).to_bytes(1, byteorder="big") + value.encode()
 
 
 def ripemd160(x: bytes) -> bytes:

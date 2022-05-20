@@ -67,12 +67,15 @@ class NewClient(Client):
         return response.decode()
 
     def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
-        if wallet.type != WalletType.POLICYMAP:
-            raise ValueError("wallet type must be POLICYMAP")
+        if wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
+            raise ValueError("invalid wallet policy version")
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
+
+        # necessary for V2
+        client_intepreter.add_known_preimage(wallet.policy_map.encode())
 
         sw, response = self._make_request(
             self.builder.register_wallet(wallet), client_intepreter
@@ -98,9 +101,7 @@ class NewClient(Client):
         display: bool,
     ) -> str:
 
-        if wallet.type != WalletType.POLICYMAP or not isinstance(
-            wallet, PolicyMapWallet
-        ):
+        if not isinstance(wallet, PolicyMapWallet) or wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
             raise ValueError("wallet type must be POLICYMAP")
 
         if change != 0 and change != 1:
@@ -109,6 +110,9 @@ class NewClient(Client):
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
+
+        # necessary for V2
+        client_intepreter.add_known_preimage(wallet.policy_map.encode())
 
         sw, response = self._make_request(
             self.builder.get_wallet_address(
@@ -172,6 +176,9 @@ class NewClient(Client):
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
+
+        # necessary for V2
+        client_intepreter.add_known_preimage(wallet.policy_map.encode())
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
         client_intepreter.add_known_mapping(global_map)

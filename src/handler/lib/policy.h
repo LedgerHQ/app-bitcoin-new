@@ -17,6 +17,8 @@
  *   Pointer to the dispatcher context
  * @param[in] policy
  *   Pointer to the root node of the policy
+ * @param[in] wallet_version
+ *   The wallet policy version, either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
  * @param[in] keys_merkle_root
  *   The Merkle root of the tree of key informations in the policy
  * @param[in] n_keys
@@ -34,6 +36,7 @@
  */
 int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            const policy_node_t *policy,
+                           int wallet_version,
                            const uint8_t keys_merkle_root[static 32],
                            uint32_t n_keys,
                            bool change,

@@ -73,10 +73,11 @@ typedef struct {
     int address_type;   // only relevant for canonical wallets
     int bip44_purpose;  // only relevant for canonical wallets
 
+    int wallet_header_version;
     uint8_t wallet_header_keys_info_merkle_root[32];
     size_t wallet_header_n_keys;
     union {
-        uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t wallet_policy_map;
     };
 

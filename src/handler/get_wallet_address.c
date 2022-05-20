@@ -91,22 +91,45 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
 
     buffer_t serialized_wallet_policy_buf =
         buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
+    if ((read_wallet_policy_header(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
+    state->wallet_header_version = state->wallet_header.version;
+    // TODO: looks redundant, might need to refactor
     memcpy(state->wallet_header_keys_info_merkle_root,
            state->wallet_header.keys_info_merkle_root,
            sizeof(state->wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = state->wallet_header.n_keys;
 
-    buffer_t policy_map_buffer =
-        buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
+
+    buffer_t policy_map_buffer;
+
+    if (state->wallet_header.version == WALLET_POLICY_VERSION_V1) {
+        policy_map_buffer =
+            buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    } else {
+        // if V2, stream and parse policy from client first
+        int policy_descriptor_len = call_get_preimage(dc,
+                                                      state->wallet_header.policy_map_sha256,
+                                                      policy_map_bytes,
+                                                      sizeof(policy_map_bytes));
+        if (policy_descriptor_len < 0) {
+            PRINTF("Failed getting wallet policy descriptor\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
+    }
 
     if (parse_policy_map(&policy_map_buffer,
                          state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes)) < 0) {
+                         sizeof(state->wallet_policy_map_bytes),
+                         state->wallet_header.version) < 0) {
+        PRINTF("Failed parsing wallet policy descriptor\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -150,7 +173,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
         buffer_t key_info_buffer = buffer_create(state->key_info_str, key_info_len);
 
         policy_map_key_info_t key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header.version) ==
+            -1) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -218,6 +242,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
     get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
     if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
+        PRINTF("Mismatching wallet policy id\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -235,6 +260,7 @@ static void compute_address(dispatcher_context_t *dc) {
 
     int script_len = call_get_wallet_script(dc,
                                             &state->wallet_policy_map,
+                                            state->wallet_header_version,
                                             state->wallet_header_keys_info_merkle_root,
                                             state->wallet_header_n_keys,
                                             state->is_change,

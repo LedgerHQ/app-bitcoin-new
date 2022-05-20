@@ -129,10 +129,10 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Joint account",
-        policy_map="wsh(or_b(pk(@0),s:pk(@1)))",
+        policy_map="wsh(or_b(pk(@0/**),s:pk(@1/**)))",
         keys_info=[
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
-            f"{core_xpub_orig}/**",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -147,10 +147,10 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Joint account",
-        policy_map="wsh(or_d(pk(@0),pkh(@1)))",
+        policy_map="wsh(or_d(pk(@0/**),pkh(@1/**)))",
         keys_info=[
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
-            f"{core_xpub_orig}/**",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -165,10 +165,10 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="2FA wallet",
-        policy_map="wsh(and_v(v:pk(@0),or_d(pk(@1),older(12960))))",
+        policy_map="wsh(and_v(v:pk(@0/**),or_d(pk(@1/**),older(12960))))",
         keys_info=[
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
-            f"{core_xpub_orig}/**",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -184,11 +184,11 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
     internal_xpub = get_internal_xpub(speculos_globals, path)
     wallet_policy = PolicyMapWallet(
         name="Decaying 3of3",
-        policy_map="wsh(thresh(3,pk(@0),s:pk(@1),s:pk(@2),sln:older(12960)))",
+        policy_map="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@2/**),sln:older(12960)))",
         keys_info=[
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
-            f"{core_xpub_orig1}/**",
-            f"{core_xpub_orig2}/**",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig1}",
+            f"{core_xpub_orig2}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -205,11 +205,11 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
     wallet_policy = PolicyMapWallet(
         name="BOLT #3 offered",
-        policy_map=f"wsh(t:or_c(pk(@0),and_v(v:pk(@1),or_c(pk(@2),v:hash160({H})))))",
+        policy_map=f"wsh(t:or_c(pk(@0/**),and_v(v:pk(@1/**),or_c(pk(@2/**),v:hash160({H})))))",
         keys_info=[
-            f"{core_xpub_orig1}/**",
-            f"{core_xpub_orig2}/**",
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
+            f"{core_xpub_orig1}",
+            f"{core_xpub_orig2}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -226,11 +226,11 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
     wallet_policy = PolicyMapWallet(
         name="BOLT #3 received",
-        policy_map=f"wsh(andor(pk(@0),or_i(and_v(v:pkh(@1),hash160({H})),older(1008)),pk(@2)))",
+        policy_map=f"wsh(andor(pk(@0/**),or_i(and_v(v:pkh(@1/**),hash160({H})),older(1008)),pk(@2/**)))",
         keys_info=[
-            f"{core_xpub_orig1}/**",
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
-            f"{core_xpub_orig2}/**",
+            f"{core_xpub_orig1}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig2}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -244,18 +244,18 @@ def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculo
     _, core_xpub_orig4 = create_new_wallet()
     _, core_xpub_orig5 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
-    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**"
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
 
     wallet_policy = PolicyMapWallet(
         name="Me or them",
-        policy_map=f"wsh(or_d(pk(@0),multi(3,@1,@2,@3,@4,@5)))",
+        policy_map=f"wsh(or_d(pk(@0/**),multi(3,@1/**,@2/**,@3/**,@4/**,@5/**)))",
         keys_info=[
             internal_xpub_orig,
-            f"{core_xpub_orig1}/**",
-            f"{core_xpub_orig2}/**",
-            f"{core_xpub_orig3}/**",
-            f"{core_xpub_orig4}/**",
-            f"{core_xpub_orig5}/**",
+            f"{core_xpub_orig1}",
+            f"{core_xpub_orig2}",
+            f"{core_xpub_orig3}",
+            f"{core_xpub_orig4}",
+            f"{core_xpub_orig5}",
         ])
 
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
@@ -269,28 +269,28 @@ def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGloba
     _, core_xpub_orig4 = create_new_wallet()
     _, core_xpub_orig5 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals, path)
-    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**"
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
 
     # sh(sh(...)), wsh(sh(...)), wsh(wsh(...)) are invalid
-    run_test_invalid(client, "sh(sh(pkh(@0)))", [internal_xpub_orig])
-    run_test_invalid(client, "wsh(sh(pkh(@0)))", [internal_xpub_orig])
-    run_test_invalid(client, "wsh(wsh(pkh(@0)))", [internal_xpub_orig])
+    run_test_invalid(client, "sh(sh(pkh(@0/**)))", [internal_xpub_orig])
+    run_test_invalid(client, "wsh(sh(pkh(@0/**)))", [internal_xpub_orig])
+    run_test_invalid(client, "wsh(wsh(pkh(@0/**)))", [internal_xpub_orig])
 
     # tr must be top-level
-    run_test_invalid(client, "wsh(tr(pk(@0)))", [internal_xpub_orig])
-    run_test_invalid(client, "sh(tr(pk(@0)))", [internal_xpub_orig])
+    run_test_invalid(client, "wsh(tr(pk(@0/**)))", [internal_xpub_orig])
+    run_test_invalid(client, "sh(tr(pk(@0/**)))", [internal_xpub_orig])
 
     # valid miniscript must be inside wsh() or sh(wsh())
-    run_test_invalid(client, "or_d(pk(@0),pkh(@1))", [internal_xpub_orig, core_xpub_orig1])
-    run_test_invalid(client, "sh(or_d(pk(@0),pkh(@1)))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "or_d(pk(@0/**),pkh(@1/**))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "sh(or_d(pk(@0/**),pkh(@1/**)))", [internal_xpub_orig, core_xpub_orig1])
 
     # sortedmulti is not valid miniscript, can only be used as a descriptor inside sh or wsh
-    run_test_invalid(client, "wsh(or_d(pk(@0),sortedmulti(3,@1,@2,@3,@4,@5)))",
+    run_test_invalid(client, "wsh(or_d(pk(@0/**),sortedmulti(3,@1/**,@2/**,@3/**,@4/**,@5/**)))",
                      [
                          internal_xpub_orig,
-                         f"{core_xpub_orig1}/**",
-                         f"{core_xpub_orig2}/**",
-                         f"{core_xpub_orig3}/**",
-                         f"{core_xpub_orig4}/**",
-                         f"{core_xpub_orig5}/**",
+                         f"{core_xpub_orig1}",
+                         f"{core_xpub_orig2}",
+                         f"{core_xpub_orig3}",
+                         f"{core_xpub_orig4}",
+                         f"{core_xpub_orig5}",
                      ])

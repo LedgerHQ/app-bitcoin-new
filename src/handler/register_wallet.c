@@ -34,6 +34,7 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+#include "lib/get_preimage.h"
 #include "lib/policy.h"
 
 #include "client_commands.h"
@@ -71,23 +72,44 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (serialized_policy_map_len > MAX_POLICY_MAP_SERIALIZED_LENGTH) {
+    if (serialized_policy_map_len > MAX_WALLET_POLICY_SERIALIZED_LENGTH) {
         PRINTF("Policy map too long\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    if ((read_policy_map_wallet(&dc->read_buffer, &state->wallet_header)) < 0) {
-        PRINTF("Failed reading policy map\n");
+    if ((read_wallet_policy_header(&dc->read_buffer, &state->wallet_header)) < 0) {
+        PRINTF("Failed reading wallet policy header\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 
-    buffer_t policy_map_buffer =
-        buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
+
+    buffer_t policy_map_buffer;
+
+    if (state->wallet_header.version == WALLET_POLICY_VERSION_V1) {
+        policy_map_buffer =
+            buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
+    } else {
+        // if V2, stream and parse policy from client first
+        int policy_descriptor_len = call_get_preimage(dc,
+                                                      state->wallet_header.policy_map_sha256,
+                                                      policy_map_bytes,
+                                                      sizeof(policy_map_bytes));
+        if (policy_descriptor_len < 0) {
+            PRINTF("Failed getting wallet policy descriptor\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
+    }
+
     if (parse_policy_map(&policy_map_buffer,
                          state->policy_map_bytes,
-                         sizeof(state->policy_map_bytes)) < 0) {
+                         sizeof(state->policy_map_bytes),
+                         state->wallet_header.version) < 0) {
         PRINTF("Failed parsing policy map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -112,7 +134,14 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 
     state->next_pubkey_index = 0;
 
-    ui_display_wallet_header(dc, &state->wallet_header, process_cosigner_info);
+    ui_display_wallet_header(dc,
+                             &state->wallet_header,
+                             state->wallet_header.version == WALLET_POLICY_VERSION_V1
+                                 // in V1, the policy_map is part of the header;
+                                 // in V2, we fetched it separately
+                                 ? state->wallet_header.policy_map
+                                 : (char *) policy_map_bytes,
+                             process_cosigner_info);
 }
 
 /**
@@ -142,7 +171,8 @@ static void process_cosigner_info(dispatcher_context_t *dc) {
     buffer_t key_info_buffer = buffer_create(state->next_pubkey_info, pubkey_info_len);
 
     policy_map_key_info_t key_info;
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+    if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header.version) ==
+        -1) {
         PRINTF("Incorrect policy map.\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -153,14 +183,9 @@ static void process_cosigner_info(dispatcher_context_t *dc) {
     // one is our key. Using addresses without a wildcard could potentially be supported, but
     // disabled for now (question to address: can only _some_ of the keys have a wildcard?).
 
+    // TODO: allow missing key origin
     if (!key_info.has_key_origin) {
         PRINTF("Key info without origin unsupported.\n");
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
-    }
-
-    if (!key_info.has_wildcard) {
-        PRINTF("Key info without wildcard unsupported.\n");
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
@@ -267,8 +292,8 @@ static bool is_policy_acceptable(const policy_node_t *policy) {
 }
 
 static bool is_policy_name_acceptable(const char *name, size_t name_len) {
-    // between 1 and MAX_POLICY_MAP_NAME_LENGTH characters
-    if (name_len == 0 || name_len > MAX_POLICY_MAP_NAME_LENGTH) return false;
+    // between 1 and MAX_WALLET_POLICY_NAME_LENGTH characters
+    if (name_len == 0 || name_len > MAX_WALLET_POLICY_NAME_LENGTH) return false;
 
     // first and last characters must not be whitespace
     if (name[0] == ' ' || name[name_len - 1] == ' ') return false;

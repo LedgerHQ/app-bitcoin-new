@@ -52,7 +52,7 @@ typedef struct {
 
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
-    char policy_map[MAX_POLICY_MAP_STR_LENGTH];
+    char policy_map[MAX_WALLET_POLICY_STR_LENGTH + 1];
     char address[MAX_ADDRESS_LENGTH_STR + 1];
 } ui_wallet_state_t;
 
@@ -577,13 +577,16 @@ void ui_display_address(dispatcher_context_t *context,
 
 void ui_display_wallet_header(dispatcher_context_t *context,
                               const policy_map_wallet_header_t *wallet_header,
+                              const char *policy_descriptor,
                               command_processor_t on_success) {
     context->pause();
 
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_header->name, sizeof(wallet_header->name));
-    strncpy(state->policy_map, wallet_header->policy_map, sizeof(wallet_header->policy_map));
+    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
+    state->wallet_name[wallet_header->name_len] = 0;
+    strncpy(state->policy_map, policy_descriptor, sizeof(state->policy_map));
+    state->policy_map[wallet_header->policy_map_len] = 0;
 
     g_next_processor = on_success;
 

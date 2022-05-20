@@ -13,61 +13,88 @@
 #include "cx.h"
 #endif
 
-#define WALLET_TYPE_POLICY_MAP 1
+#define WALLET_POLICY_VERSION_V1 1  // the legacy version of the first release
+#define WALLET_POLICY_VERSION_V2 2  // the current full version
 
 /**
- * Maximum supported number of keys for a policy map.
+ * Maximum supported number of keys for a wallet policy.
  */
-#define MAX_POLICY_MAP_COSIGNERS 5
+#define MAX_WALLET_POLICY_COSIGNERS 5
 
 /**
- * Maximum supported number of keys for a policy map.
+ * Maximum supported number of keys for a wallet policy.
  */
-#define MAX_POLICY_MAP_KEYS 5
+#define MAX_WALLET_POLICY_KEYS 5
 
 // The string describing a pubkey can contain:
 // - (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 3*12 = 46 bytes)
 // - the xpub itself (up to 113 characters)
 // - optional, the "/**" suffix.
 // Therefore, the total length of the key info string is at most 162 bytes.
-#define MAX_POLICY_KEY_INFO_LEN (46 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
+#define MAX_POLICY_KEY_INFO_LEN_V1 (46 + MAX_SERIALIZED_PUBKEY_LENGTH + 3)
 
-#define MAX_POLICY_MAP_STR_LENGTH 110  // TODO: increase limit, at least on non-NanoS
+// In V1, there is no "/**" suffix, as that is no longer part of the key
+#define MAX_POLICY_KEY_INFO_LEN_V2 (46 + MAX_SERIALIZED_PUBKEY_LENGTH)
 
-#define MAX_POLICY_MAP_NAME_LENGTH 16
+#define MAX_POLICY_KEY_INFO_LEN MAX(MAX_POLICY_KEY_INFO_LEN_V1, MAX_POLICY_KEY_INFO_LEN_V2)
 
-// at most 126 bytes
+// longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
+#define MAX_WALLET_POLICY_STR_LENGTH_V1 40
+
+#define MAX_WALLET_POLICY_STR_LENGTH_V2 128  // TODO: increase limit, at least on non-NanoS
+
+#define MAX_WALLET_POLICY_STR_LENGTH \
+    MAX(MAX_WALLET_POLICY_STR_LENGTH_V1, MAX_WALLET_POLICY_STR_LENGTH_V2)
+
+#define MAX_WALLET_POLICY_NAME_LENGTH 16
+
+// at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
-// name (max MAX_POLICY_MAP_NAME_LENGTH bytes)
+// name (max MAX_WALLET_POLICY_NAME_LENGTH bytes)
 // policy length (1 byte)
-// policy (max MAX_POLICY_MAP_STR_LENGTH bytes)
+// policy (max MAX_WALLET_POLICY_STR_LENGTH bytes)
 // n_keys (1 byte)
 // keys_merkle_root (32 bytes)
-#define MAX_POLICY_MAP_SERIALIZED_LENGTH \
-    (1 + 1 + MAX_POLICY_MAP_NAME_LENGTH + 1 + MAX_POLICY_MAP_STR_LENGTH + 1 + 32)
+#define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1 \
+    (1 + 1 + MAX_WALLET_POLICY_NAME_LENGTH + 1 + MAX_WALLET_POLICY_STR_LENGTH_V1 + 1 + 32)
 
-// Maximum size of a parsed policy map in memory
-#define MAX_POLICY_MAP_BYTES 256  // TODO: this is too large on Nano S
+// at most 100 bytes
+// wallet type (1 byte)
+// name length (1 byte)
+// name (max MAX_WALLET_POLICY_NAME_LENGTH bytes)
+// policy length (varint, up to 9 bytes)
+// policy hash 32
+// n_keys (varint, up to 9 bytes)
+// keys_merkle_root (32 bytes)
+#define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2 \
+    (1 + 1 + MAX_WALLET_POLICY_NAME_LENGTH + 9 + 32 + 9 + 32)
 
-// Currently only multisig is supported
-#define MAX_POLICY_MAP_LEN MAX_MULTISIG_POLICY_MAP_LENGTH
+#define MAX_WALLET_POLICY_SERIALIZED_LENGTH \
+    MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
+
+// Maximum size of a parsed wallet descriptor template in memory
+#define MAX_WALLET_POLICY_BYTES 256  // TODO: this is too large on Nano S
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
     uint8_t master_key_fingerprint[4];
     uint8_t master_key_derivation_len;
     uint8_t has_key_origin;
-    uint8_t has_wildcard;  // true iff the keys ends with the /** wildcard
+    uint8_t has_wildcard;  // true iff the keys ends with the wildcard (/ followed by **)
     char ext_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
 } policy_map_key_info_t;
 
 typedef struct {
-    uint8_t type;  // Currently the only supported value is WALLET_TYPE_POLICY_MAP
+    uint8_t version;  // supported values: WALLET_POLICY_VERSION_V1 and WALLET_POLICY_VERSION_V2
     uint8_t name_len;
-    char name[MAX_WALLET_NAME_LENGTH + 1];
     uint16_t policy_map_len;
-    char policy_map[MAX_POLICY_MAP_STR_LENGTH];
+    char name[MAX_WALLET_NAME_LENGTH + 1];
+    union {
+        // TODO: rename to "descriptor_template"?
+        char policy_map[MAX_WALLET_POLICY_STR_LENGTH_V1];  // used in V1
+        uint8_t policy_map_sha256[32];                     // used in V2
+    };
     size_t n_keys;
     uint8_t keys_info_merkle_root[32];  // root of the Merkle tree of the keys information
 } policy_map_wallet_header_t;
@@ -209,19 +236,29 @@ typedef struct {
  * @param header the pointer to a `policy_map_wallet_header_t` structure
  * @return a negative number on failure, 0 on success.
  */
-int read_policy_map_wallet(buffer_t *buffer, policy_map_wallet_header_t *header);
+int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *header);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcomment"
+// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
 
 /**
- *
  * Parses a string representing the key information for a policy map wallet.
  * The string is compatible with the output descriptor format, except that the pubkey must _not_
  * have derivation steps (the key origin info, if present, does have derivation steps from the
  * master key fingerprint). The serialized base58check-encoded pubkey is _not_ validated.
  *
- * For example:
+ * For WALLET_POLICY_VERSION_V1, the final suffix /** must be present and is part of the key
+ * information. For WALLET_POLICY_VERSION_V2, parsing stops at the xpub.
+ *
+ * Example (V1):
+ * "[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/**"
+ * Example (V2):
  * "[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL"
  */
-int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
+int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int version);
+
+#pragma GCC diagnostic pop
 
 /**
  * Parses `in_buf` as a policy map, constructing the abstract syntax tree in the buffer `out` of
@@ -230,10 +267,11 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out);
  * @param in_buf the buffer containing the policy map to parse
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
+ * @param version either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
  * @return 0 on success; -1 in case of parsing error, if the output buffer is unaligned, or if the
  * output buffer is too small.
  */
-int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len);
+int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len, int version);
 
 #ifndef SKIP_FOR_CMOCKA
 

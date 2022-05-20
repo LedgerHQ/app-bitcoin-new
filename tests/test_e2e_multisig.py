@@ -137,8 +137,8 @@ def test_e2e_multisig(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, sp
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"{core_xpub_orig}/**",
-            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}/**",
+            f"{core_xpub_orig}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
         ],
     )
 
