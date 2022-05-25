@@ -1,3 +1,5 @@
+import pytest
+
 from typing import List, Union
 
 import hmac
@@ -127,7 +129,7 @@ def run_test(wallet_policy: PolicyMapWallet, core_wallet_names: List[str], rpc: 
     rpc.sendrawtransaction(rawtx)
 
 
-def test_e2e_multisig(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     path = "48'/1'/0'/2'"
     core_wallet_name, core_xpub_orig = create_new_wallet()
 
@@ -143,3 +145,32 @@ def test_e2e_multisig(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, sp
     )
 
     run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], enable_slow_tests: bool):
+    # Largest supported multisig with sortedmulti.
+    # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
+
+    # slow test, disabled by default
+    if not enable_slow_tests:
+        pytest.skip()
+
+    core_wallet_names: List[str] = []
+    core_xpub_origs: List[str] = []
+    for _ in range(15):
+        name, xpub_orig = create_new_wallet()
+        core_wallet_names.append(name)
+        core_xpub_origs.append(xpub_orig)
+
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals, path)
+
+    wallet_policy = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        sorted=True,
+        keys_info=core_xpub_origs + [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
+    )
+
+    run_test(wallet_policy, core_wallet_names, rpc, rpc_test_wallet, client, speculos_globals, comm)

@@ -171,13 +171,6 @@ The following policy types are currently supported:
 - `sh(wsh(multi(...)))` and `sh(wsh(sortedmulti(...)))` (wrapped-segwit multisignature wallets);
 - `wsh(multi(...))` and `wsh(sortedmulti(...))` (native segwit multisignature wallets).
 
-## Other technical limitations
-
-At this time, there are some technical limitations on the accepted wallet policies:
-- `multi` and `sortedmulti` support at most 5 keys;
-
-These limitations will likely be removed in the future.
-
 # Default wallets
 A few policies that correspond to standardized single-key wallets can be used without requiring any registration; in the serialization, the wallet name must be a zero-length string. Those are the following policies:
 

@@ -5,6 +5,7 @@
 #include "../lib/get_merkle_leaf_element.h"
 #include "../../crypto.h"
 #include "../../common/base58.h"
+#include "../../common/bitvector.h"
 #include "../../common/script.h"
 #include "../../common/segwit_addr.h"
 
@@ -410,12 +411,6 @@ static void update_output(policy_parser_state_t *state, const uint8_t *data, siz
 
     node->length += data_len;
 
-    PRINTF("ADD TO HASH: ");
-    for (unsigned int i = 0; i < data_len; i++) {
-        PRINTF("%02X", data[i]);
-    }
-    PRINTF("\n");
-
     if (node->mode == MODE_OUT_BYTES) {
         if (!buffer_write_bytes(node->out_buf, data, data_len)) {
             node->flags |= PROCESSOR_FLAG_OUTPUT_OVERFLOW;
@@ -684,39 +679,52 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
 
     update_output_u8(state, 0x50 + policy->k);  // OP_k
 
-    // derive each key
-    uint8_t compressed_pubkeys[MAX_WALLET_POLICY_KEYS][33];
+    // bitvector of used keys (only relevant for sorting keys in SORTEDMULTI)
+    uint8_t used[BITVECTOR_REAL_SIZE(MAX_PUBKEYS_PER_MULTISIG)];
+    memset(used, 0, sizeof(memset));
+
     for (int i = 0; i < policy->n; i++) {
-        if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkeys[i])) {
-            return -1;
-        }
-    }
+        uint8_t compressed_pubkey[33];
 
-    if (policy->base.type == TOKEN_SORTEDMULTI) {
-        // sort the pubkeys (we avoid using qsort, as it takes ~700 bytes in binary size)
+        if (policy->base.type == TOKEN_MULTI) {
+            if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkey)) {
+                return -1;
+            }
+        } else {
+            // sortedmulti is problematic, especially for very large wallets: we don't have enough
+            // memory on Nano S to keep all the keys in memory. Therefore, we use a slow method: at
+            // each iteration, find the lexicographically smallest key that was not already used
+            // (basically, like in insertion sort). This means quadratic communication with the
+            // client, and a quadratic number of pubkey derivations as well, which are quite slow.
+            // Performance might become an issue for very large multisig wallets, but this allows us
+            // to remove any limitation on the supported number of pubkeys, and to keep the code
+            // simple.
+            // Should speed be reported as an issue in practice, sorting could be done in-memory for
+            // non-Nano S devices, instead (requiring 33*MAX_PUBKEYS_PER_MULTISIG > 500 bytes more
+            // memory).
 
-        // bubble sort
-        bool swapped;
-        do {
-            swapped = false;
-            for (int i = 1; i < policy->n; i++) {
-                if (cmp_compressed_pubkeys(compressed_pubkeys[i - 1], compressed_pubkeys[i]) > 0) {
-                    swapped = true;
+            int smallest_pubkey_index = -1;
+            memset(compressed_pubkey, 0xFF, sizeof(compressed_pubkey));  // init to largest value
 
-                    for (int j = 0; j < 33; j++) {
-                        uint8_t t = compressed_pubkeys[i - 1][j];
-                        compressed_pubkeys[i - 1][j] = compressed_pubkeys[i][j];
-                        compressed_pubkeys[i][j] = t;
+            for (int j = 0; j < policy->n; j++) {
+                if (!bitvector_get(used, j)) {
+                    uint8_t cur_pubkey[33];
+                    if (-1 == get_derived_pubkey(state, policy->key_indexes[j], cur_pubkey)) {
+                        return -1;
+                    }
+
+                    if (cmp_compressed_pubkeys(compressed_pubkey, cur_pubkey) > 0) {
+                        memcpy(compressed_pubkey, cur_pubkey, 33);
+                        smallest_pubkey_index = j;
                     }
                 }
             }
-        } while (swapped);
-    }
+            bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
+        }
 
-    for (int i = 0; i < policy->n; i++) {
         // push <i-th pubkey> (33 = 0x21 bytes)
         update_output_u8(state, 0x21);
-        update_output(state, compressed_pubkeys[i], 33);
+        update_output(state, compressed_pubkey, 33);
     }
 
     update_output_u8(state, 0x50 + policy->n);    // OP_n

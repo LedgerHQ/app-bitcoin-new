@@ -81,7 +81,7 @@ class MultisigWallet(PolicyMapWallet):
     def __init__(self, name: str, address_type: AddressType, threshold: int, keys_info: List[str], sorted: bool = True, version: WalletType = WalletType.WALLET_POLICY_V2) -> None:
         n_keys = len(keys_info)
 
-        if not (1 <= threshold <= n_keys <= 15):
+        if not (1 <= threshold <= n_keys <= 16):
             raise ValueError("Invalid threshold or number of keys")
 
         multisig_op = "sortedmulti" if sorted else "multi"

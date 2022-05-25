@@ -1451,7 +1451,7 @@ static int parse_script(buffer_t *in_buf,
             }
 
             // check integrity of k and n
-            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_WALLET_POLICY_COSIGNERS)) {
+            if (!(1 <= node->k && node->k <= node->n && node->n <= MAX_PUBKEYS_PER_MULTISIG)) {
                 return WITH_ERROR(-1, "Invalid k and/or n");
             }
 

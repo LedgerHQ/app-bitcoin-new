@@ -13,18 +13,12 @@
 #include "cx.h"
 #endif
 
+// The maximum number of keys supported for CHECKMULSITIG{VERIFY}
+// bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
+#define MAX_PUBKEYS_PER_MULTISIG 16
+
 #define WALLET_POLICY_VERSION_V1 1  // the legacy version of the first release
 #define WALLET_POLICY_VERSION_V2 2  // the current full version
-
-/**
- * Maximum supported number of keys for a wallet policy.
- */
-#define MAX_WALLET_POLICY_COSIGNERS 5
-
-/**
- * Maximum supported number of keys for a wallet policy.
- */
-#define MAX_WALLET_POLICY_KEYS 5
 
 // The string describing a pubkey can contain:
 // - (optional) the key origin info, which we limit to 46 bytes (2 + 8 + 3*12 = 46 bytes)
