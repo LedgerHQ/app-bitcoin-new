@@ -637,7 +637,7 @@ void ui_authorize_wallet_spend(dispatcher_context_t *context,
 }
 
 void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t on_success) {
-    (void) (context);
+    context->pause();
 
     g_next_processor = on_success;
 
