@@ -39,9 +39,6 @@ typedef struct {
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
-    uint8_t prevout_scriptpubkey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-    size_t prevout_scriptpubkey_len;
-
     // the script used when signing, either from the witness utxo or the redeem script
     uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
     size_t script_len;
