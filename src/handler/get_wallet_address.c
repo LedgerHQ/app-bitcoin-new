@@ -91,45 +91,14 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
 
     buffer_t serialized_wallet_policy_buf =
         buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_wallet_policy_header(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
 
-    state->wallet_header_version = state->wallet_header.version;
-    // TODO: looks redundant, might need to refactor
-    memcpy(state->wallet_header_keys_info_merkle_root,
-           state->wallet_header.keys_info_merkle_root,
-           sizeof(state->wallet_header.keys_info_merkle_root));
-    state->wallet_header_n_keys = state->wallet_header.n_keys;
-
-    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
-
-    buffer_t policy_map_buffer;
-
-    if (state->wallet_header.version == WALLET_POLICY_VERSION_V1) {
-        policy_map_buffer =
-            buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
-    } else {
-        // if V2, stream and parse policy from client first
-        int policy_descriptor_len = call_get_preimage(dc,
-                                                      state->wallet_header.policy_map_sha256,
-                                                      policy_map_bytes,
-                                                      sizeof(policy_map_bytes));
-        if (policy_descriptor_len < 0) {
-            PRINTF("Failed getting wallet policy descriptor\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
-    }
-
-    if (parse_policy_map(&policy_map_buffer,
-                         state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes),
-                         state->wallet_header.version) < 0) {
-        PRINTF("Failed parsing wallet policy descriptor\n");
+    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+    if (0 > read_and_parse_wallet_policy(dc,
+                                         &serialized_wallet_policy_buf,
+                                         &state->wallet_header,
+                                         policy_map_descriptor,
+                                         state->wallet_policy_map_bytes,
+                                         sizeof(state->wallet_policy_map_bytes))) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -159,8 +128,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
         uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
 
         int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        state->wallet_header_keys_info_merkle_root,
-                                                        state->wallet_header_n_keys,
+                                                        state->wallet_header.keys_info_merkle_root,
+                                                        state->wallet_header.n_keys,
                                                         0,  // only one key
                                                         state->key_info_str,
                                                         sizeof(state->key_info_str));
@@ -260,9 +229,9 @@ static void compute_address(dispatcher_context_t *dc) {
 
     int script_len = call_get_wallet_script(dc,
                                             &state->wallet_policy_map,
-                                            state->wallet_header_version,
-                                            state->wallet_header_keys_info_merkle_root,
-                                            state->wallet_header_n_keys,
+                                            state->wallet_header.version,
+                                            state->wallet_header.keys_info_merkle_root,
+                                            state->wallet_header.n_keys,
                                             state->is_change,
                                             state->address_index,
                                             &script_buf);

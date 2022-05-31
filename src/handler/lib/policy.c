@@ -3,6 +3,7 @@
 #include "policy.h"
 
 #include "../lib/get_merkle_leaf_element.h"
+#include "../lib/get_preimage.h"
 #include "../../crypto.h"
 #include "../../common/base58.h"
 #include "../../common/bitvector.h"
@@ -253,6 +254,40 @@ static const generic_processor_command_t commands_u[] = {{CMD_CODE_OP, OP_IF},
                                                          {CMD_CODE_OP, OP_0},
                                                          {CMD_CODE_OP_V, OP_ENDIF},
                                                          {CMD_CODE_END, 0}};
+
+int read_and_parse_wallet_policy(dispatcher_context_t *dispatcher_context,
+                                 buffer_t *buf,
+                                 policy_map_wallet_header_t *wallet_header,
+                                 uint8_t policy_map_descriptor[static MAX_WALLET_POLICY_STR_LENGTH],
+                                 uint8_t *policy_map_bytes,
+                                 size_t policy_map_bytes_len) {
+    if ((read_wallet_policy_header(buf, wallet_header)) < 0) {
+        return WITH_ERROR(-1, "Failed reading wallet policy header");
+    }
+
+    if (wallet_header->version == WALLET_POLICY_VERSION_V1) {
+        memcpy(policy_map_descriptor, wallet_header->policy_map, wallet_header->policy_map_len);
+    } else {
+        // if V2, stream and parse policy from client first
+        int policy_descriptor_len = call_get_preimage(dispatcher_context,
+                                                      wallet_header->policy_map_sha256,
+                                                      policy_map_descriptor,
+                                                      MAX_WALLET_POLICY_STR_LENGTH);
+        if (policy_descriptor_len < 0) {
+            return WITH_ERROR(-1, "Failed getting wallet policy descriptor");
+        }
+    }
+
+    buffer_t policy_map_buffer =
+        buffer_create(policy_map_descriptor, wallet_header->policy_map_len);
+    if (parse_policy_map(&policy_map_buffer,
+                         policy_map_bytes,
+                         policy_map_bytes_len,
+                         wallet_header->version) < 0) {
+        return WITH_ERROR(-1, "Failed parsing policy map");
+    }
+    return 0;
+}
 
 static void print_parser_info(const policy_parser_state_t *state, const char *func_name) {
     (void) func_name;  // avoid warnings when DEBUG=0

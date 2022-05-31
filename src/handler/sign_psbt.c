@@ -375,10 +375,17 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
-    policy_map_wallet_header_t wallet_header;
     buffer_t serialized_wallet_policy_buf =
         buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_wallet_policy_header(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
+
+    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+    policy_map_wallet_header_t wallet_header;
+    if (0 > read_and_parse_wallet_policy(dc,
+                                         &serialized_wallet_policy_buf,
+                                         &wallet_header,
+                                         policy_map_descriptor,
+                                         state->wallet_policy_map_bytes,
+                                         sizeof(state->wallet_policy_map_bytes))) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -388,35 +395,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
            wallet_header.keys_info_merkle_root,
            sizeof(wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = wallet_header.n_keys;
-
-    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
-
-    buffer_t policy_map_buffer;
-
-    if (wallet_header.version == WALLET_POLICY_VERSION_V1) {
-        policy_map_buffer = buffer_create(wallet_header.policy_map, wallet_header.policy_map_len);
-    } else {
-        // if V2, stream and parse policy from client first
-        int policy_descriptor_len = call_get_preimage(dc,
-                                                      wallet_header.policy_map_sha256,
-                                                      policy_map_bytes,
-                                                      sizeof(policy_map_bytes));
-        if (policy_descriptor_len < 0) {
-            PRINTF("Failed getting wallet policy descriptor\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
-    }
-
-    if (parse_policy_map(&policy_map_buffer,
-                         state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes),
-                         wallet_header.version) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
 
     uint8_t hmac_or =
         0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)

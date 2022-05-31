@@ -72,45 +72,14 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
-    if (serialized_policy_map_len > MAX_WALLET_POLICY_SERIALIZED_LENGTH) {
-        PRINTF("Policy map too long\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
 
-    if ((read_wallet_policy_header(&dc->read_buffer, &state->wallet_header)) < 0) {
-        PRINTF("Failed reading wallet policy header\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    uint8_t policy_map_bytes[MAX_WALLET_POLICY_STR_LENGTH];  // used for V2
-
-    buffer_t policy_map_buffer;
-
-    if (state->wallet_header.version == WALLET_POLICY_VERSION_V1) {
-        policy_map_buffer =
-            buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
-    } else {
-        // if V2, stream and parse policy from client first
-        int policy_descriptor_len = call_get_preimage(dc,
-                                                      state->wallet_header.policy_map_sha256,
-                                                      policy_map_bytes,
-                                                      sizeof(policy_map_bytes));
-        if (policy_descriptor_len < 0) {
-            PRINTF("Failed getting wallet policy descriptor\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        policy_map_buffer = buffer_create(policy_map_bytes, policy_descriptor_len);
-    }
-
-    if (parse_policy_map(&policy_map_buffer,
-                         state->policy_map_bytes,
-                         sizeof(state->policy_map_bytes),
-                         state->wallet_header.version) < 0) {
-        PRINTF("Failed parsing policy map\n");
+    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+    if (0 > read_and_parse_wallet_policy(dc,
+                                         &dc->read_buffer,
+                                         &state->wallet_header,
+                                         policy_map_descriptor,
+                                         state->policy_map_bytes,
+                                         sizeof(state->policy_map_bytes))) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -136,11 +105,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 
     ui_display_register_wallet(dc,
                                &state->wallet_header,
-                               state->wallet_header.version == WALLET_POLICY_VERSION_V1
-                                   // in V1, the policy_map is part of the header;
-                                   // in V2, we fetched it separately
-                                   ? state->wallet_header.policy_map
-                                   : (char *) policy_map_bytes,
+                               (char *) policy_map_descriptor,
                                process_cosigner_info);
 }
 

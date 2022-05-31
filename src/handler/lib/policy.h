@@ -11,6 +11,32 @@
     (sizeof(WALLET_SLIP0021_LABEL) - 1)  // sizeof counts the terminating 0
 
 /**
+ * Parses a serialized wallet policy, saving the wallet header, the policy map descriptor and the
+ * policy descriptor. Then, it parses the descriptor into the Abstract Syntax Tree into the
+ * policy_map_bytes array.
+ *
+ * It returns -1 if any error occurs.
+ *
+ * @param dispatcher_context Pointer to the dispatcher content
+ * @param buf Pointer to the buffer from which the serialized policy is read from
+ * @param wallet_header Pointer to policy_map_wallet_header_t that will receive the policy map
+ * header
+ * @param policy_map_descriptor Pointer to a buffer of MAX_WALLET_POLICY_STR_LENGTH bytes that will
+ * contain the descriptor template as a string
+ * @param policy_map_bytes Pointer to an array of bytes that will be used for the parsed abstract
+ * syntax tree
+ * @param policy_map_bytes_len Length of policy_map_bytes in bytes.
+ * @return 0 on success, a negative number in case of error.
+ */
+// TODO: we should distinguish actual errors from just "policy too big to fit in memory"
+int read_and_parse_wallet_policy(dispatcher_context_t *dispatcher_context,
+                                 buffer_t *buf,
+                                 policy_map_wallet_header_t *wallet_header,
+                                 uint8_t policy_map_descriptor[static MAX_WALLET_POLICY_STR_LENGTH],
+                                 uint8_t *policy_map_bytes,
+                                 size_t policy_map_bytes_len);
+
+/**
  * Computes the script corresponding to a wallet policy, for a certain change and address index.
  *
  * @param[in] dispatcher_context
