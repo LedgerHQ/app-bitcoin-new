@@ -134,14 +134,14 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 
     state->next_pubkey_index = 0;
 
-    ui_display_wallet_header(dc,
-                             &state->wallet_header,
-                             state->wallet_header.version == WALLET_POLICY_VERSION_V1
-                                 // in V1, the policy_map is part of the header;
-                                 // in V2, we fetched it separately
-                                 ? state->wallet_header.policy_map
-                                 : (char *) policy_map_bytes,
-                             process_cosigner_info);
+    ui_display_register_wallet(dc,
+                               &state->wallet_header,
+                               state->wallet_header.version == WALLET_POLICY_VERSION_V1
+                                   // in V1, the policy_map is part of the header;
+                                   // in V2, we fetched it separately
+                                   ? state->wallet_header.policy_map
+                                   : (char *) policy_map_bytes,
+                               process_cosigner_info);
 }
 
 /**
@@ -292,8 +292,8 @@ static bool is_policy_acceptable(const policy_node_t *policy) {
 }
 
 static bool is_policy_name_acceptable(const char *name, size_t name_len) {
-    // between 1 and MAX_WALLET_POLICY_NAME_LENGTH characters
-    if (name_len == 0 || name_len > MAX_WALLET_POLICY_NAME_LENGTH) return false;
+    // between 1 and MAX_WALLET_NAME_LENGTH characters
+    if (name_len == 0 || name_len > MAX_WALLET_NAME_LENGTH) return false;
 
     // first and last characters must not be whitespace
     if (name[0] == ' ' || name[name_len - 1] == ' ') return false;

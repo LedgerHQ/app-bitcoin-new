@@ -193,20 +193,11 @@ UX_STEP_NOCB(ux_display_address_step,
                  .text = g_ui_state.path_and_address.address,
              });
 
-// Step with icon and text with name of a wallet being registered
-UX_STEP_NOCB(ux_display_wallet_header_name_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Register wallet",
-                 g_ui_state.wallet.wallet_name,
-             });
-
 // Step with description of a policy wallet
-UX_STEP_NOCB(ux_display_wallet_policy_map_type_step,
+UX_STEP_NOCB(ux_display_wallet_policy_map_step,
              bnnn_paging,
              {
-                 .title = "Policy map:",  // TODO: simplify for known multisig policies
+                 .title = "Policy map:",
                  .text = g_ui_state.wallet.policy_map,
              });
 
@@ -218,30 +209,12 @@ UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
                  .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
              });
 
-// Step with icon and text with name of a wallet being registered
-UX_STEP_NOCB(ux_display_receive_in_wallet_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Receive in:",
-                 g_ui_state.wallet.wallet_name,
-             });
-
 // Step with title/text for address, used when showing a wallet receive address
 UX_STEP_NOCB(ux_display_wallet_address_step,
              bnnn_paging,
              {
                  .title = "Address",
                  .text = g_ui_state.wallet.address,
-             });
-
-// Step with icon and text with name of a wallet to spend from
-UX_STEP_NOCB(ux_display_spend_from_wallet_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Spend from:",
-                 g_ui_state.wallet.wallet_name,
              });
 
 // Step with warning icon and text explaining that there are external inputs
@@ -297,6 +270,40 @@ UX_STEP_CB(ux_accept_and_send_step,
            pbb,
            continue_after_approval(true),
            {&C_icon_validate_14, "Accept", "and send"});
+
+// Step with wallet icon and "Register wallet"
+UX_STEP_NOCB(ux_display_register_wallet_step,
+             pb,
+             {
+                 &C_icon_wallet,
+                 "Register wallet",
+             });
+
+// Step with wallet icon and "Receive in known wallet"
+UX_STEP_NOCB(ux_display_receive_in_registered_wallet_step,
+             pnn,
+             {
+                 &C_icon_wallet,
+                 "Receive in",
+                 "known wallet",
+             });
+
+// Step with wallet icon and "Spend from known wallet"
+UX_STEP_NOCB(ux_display_spend_from_registered_wallet_step,
+             pnn,
+             {
+                 &C_icon_wallet,
+                 "Spend from",
+                 "known wallet",
+             });
+
+// Step with "Wallet name:", followed by the wallet name
+UX_STEP_NOCB(ux_display_wallet_name_step,
+             bnnn_paging,
+             {
+                 .title = "Wallet name:",
+                 .text = g_ui_state.wallet.wallet_name,
+             });
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_sign_message_step,
@@ -412,13 +419,15 @@ UX_FLOW(ux_display_unusual_derivation_path_flow,
         &ux_display_reject_step);
 
 // FLOW to display the header of a policy map wallet:
-// #1 screen: eye icon + "Register wallet" and the wallet name
-// #2 screen: display policy map (paginated)
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_policy_map_header_flow,
-        &ux_display_wallet_header_name_step,
-        &ux_display_wallet_policy_map_type_step,
+// #1 screen: Wallet icon + "Register wallet"
+// #2 screen: "Wallet name:" and wallet name
+// #3 screen: display policy map (paginated)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_register_wallet_flow,
+        &ux_display_register_wallet_step,
+        &ux_display_wallet_name_step,
+        &ux_display_wallet_policy_map_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -432,12 +441,14 @@ UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
         &ux_display_reject_step);
 
 // FLOW to display the name and an address of a registered wallet:
-// #1 screen: wallet name
-// #2 screen: wallet address (paginated)
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_wallet_name_address_flow,
-        &ux_display_receive_in_wallet_step,
+// #1 screen: Wallet icon + "Receive in known wallet"
+// #2 screen: wallet name
+// #3 screen: wallet address (paginated)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_receive_in_wallet_flow,
+        &ux_display_receive_in_registered_wallet_step,
+        &ux_display_wallet_name_step,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
@@ -452,11 +463,13 @@ UX_FLOW(ux_display_canonical_wallet_address_flow,
         &ux_display_reject_step);
 
 // FLOW to display a registered wallet and authorize spending:
-// #1 screen: wallet name
-// #2 screen: approve button
-// #3 screen: reject button
-UX_FLOW(ux_display_wallet_for_spending_flow,
-        &ux_display_spend_from_wallet_step,
+// #1 screen: "Spend from known wallet"
+// #2 screen: wallet name
+// #3 screen: approve button
+// #4 screen: reject button
+UX_FLOW(ux_display_spend_from_wallet_flow,
+        &ux_display_spend_from_registered_wallet_step,
+        &ux_display_wallet_name_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -575,10 +588,10 @@ void ui_display_address(dispatcher_context_t *context,
     }
 }
 
-void ui_display_wallet_header(dispatcher_context_t *context,
-                              const policy_map_wallet_header_t *wallet_header,
-                              const char *policy_descriptor,
-                              command_processor_t on_success) {
+void ui_display_register_wallet(dispatcher_context_t *context,
+                                const policy_map_wallet_header_t *wallet_header,
+                                const char *policy_descriptor,
+                                command_processor_t on_success) {
     context->pause();
 
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
@@ -590,7 +603,7 @@ void ui_display_wallet_header(dispatcher_context_t *context,
 
     g_next_processor = on_success;
 
-    ux_flow_init(0, ux_display_policy_map_header_flow, NULL);
+    ux_flow_init(0, ux_display_register_wallet_flow, NULL);
 }
 
 void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
@@ -612,12 +625,12 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
         snprintf(state->signer_index,
                  sizeof(state->signer_index),
                  "Key @%u <ours>",
-                 cosigner_index + 1);
+                 cosigner_index);
     } else {
         snprintf(state->signer_index,
                  sizeof(state->signer_index),
                  "Key @%u <theirs>",
-                 cosigner_index + 1);
+                 cosigner_index);
     }
 
     g_next_processor = on_success;
@@ -640,7 +653,7 @@ void ui_display_wallet_address(dispatcher_context_t *context,
         ux_flow_init(0, ux_display_canonical_wallet_address_flow, NULL);
     } else {
         strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
-        ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
+        ux_flow_init(0, ux_display_receive_in_wallet_flow, NULL);
     }
 }
 
@@ -668,7 +681,7 @@ void ui_authorize_wallet_spend(dispatcher_context_t *context,
 
     g_next_processor = on_success;
 
-    ux_flow_init(0, ux_display_wallet_for_spending_flow, NULL);
+    ux_flow_init(0, ux_display_spend_from_wallet_flow, NULL);
 }
 
 void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t on_success) {

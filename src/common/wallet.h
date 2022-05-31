@@ -40,29 +40,26 @@
 #define MAX_WALLET_POLICY_STR_LENGTH \
     MAX(MAX_WALLET_POLICY_STR_LENGTH_V1, MAX_WALLET_POLICY_STR_LENGTH_V2)
 
-#define MAX_WALLET_POLICY_NAME_LENGTH 16
-
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
-// name (max MAX_WALLET_POLICY_NAME_LENGTH bytes)
+// name (max MAX_WALLET_NAME_LENGTH bytes)
 // policy length (1 byte)
 // policy (max MAX_WALLET_POLICY_STR_LENGTH bytes)
 // n_keys (1 byte)
 // keys_merkle_root (32 bytes)
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1 \
-    (1 + 1 + MAX_WALLET_POLICY_NAME_LENGTH + 1 + MAX_WALLET_POLICY_STR_LENGTH_V1 + 1 + 32)
+    (1 + 1 + MAX_WALLET_NAME_LENGTH + 1 + MAX_WALLET_POLICY_STR_LENGTH_V1 + 1 + 32)
 
 // at most 100 bytes
 // wallet type (1 byte)
 // name length (1 byte)
-// name (max MAX_WALLET_POLICY_NAME_LENGTH bytes)
+// name (max MAX_WALLET_NAME_LENGTH bytes)
 // policy length (varint, up to 9 bytes)
 // policy hash 32
 // n_keys (varint, up to 9 bytes)
 // keys_merkle_root (32 bytes)
-#define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2 \
-    (1 + 1 + MAX_WALLET_POLICY_NAME_LENGTH + 9 + 32 + 9 + 32)
+#define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2 (1 + 1 + MAX_WALLET_NAME_LENGTH + 9 + 32 + 9 + 32)
 
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH \
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)

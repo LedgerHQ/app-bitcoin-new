@@ -76,6 +76,28 @@ def test_register_wallet_accept_wit(client: Client, speculos_globals):
     )
 
 
+@has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_with_long_name(client: Client, speculos_globals):
+    wallet = MultisigWallet(
+        name="Cold storage with a pretty long name that requires 64 characters",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+
+    wallet_id, wallet_hmac = client.register_wallet(wallet)
+
+    assert wallet_id == wallet.id
+
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        wallet_hmac,
+    )
+
+
 @has_automation("automations/register_wallet_reject.json")
 def test_register_wallet_reject_header(client: Client):
     wallet = MultisigWallet(
