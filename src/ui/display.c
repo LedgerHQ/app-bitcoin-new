@@ -255,7 +255,7 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
 
 // Step with warning icon for unverified inputs (segwit inputs with no non-witness-utxo)
 UX_STEP_NOCB(ux_unverified_segwit_input_flow_1_step, pb, {&C_icon_warning, "Unverified inputs"});
-UX_STEP_NOCB(ux_unverified_segwit_input_flow_2_step, nn, {"Update", " Ledger Live"});
+UX_STEP_NOCB(ux_unverified_segwit_input_flow_2_step, nn, {"Update", "Ledger Live"});
 UX_STEP_NOCB(ux_unverified_segwit_input_flow_3_step, nn, {"or third party", "wallet software"});
 
 // Step with eye icon and "Review" and the output index

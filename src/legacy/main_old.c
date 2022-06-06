@@ -652,7 +652,7 @@ UX_STEP_NOCB(
     nn,
     {
       .line1 = "Update",
-      .line2 = " Ledger Live"
+      .line2 = "Ledger Live"
     });
 UX_STEP_NOCB(
     ux_request_segwit_input_approval_flow_3_step,
