@@ -392,8 +392,12 @@ static void swap_library_main_helper(struct libargs_s *args) {
                 handle_check_address(args->check_address, args->coin_config);
             break;
         case SIGN_TRANSACTION:
+            // copy_transaction_parameters must be called before anything that accesses global
+            // variables, or the parameters might be overwritten
+            bool no_error = copy_transaction_parameters(args->create_transaction);
+
             initialize_app_globals();
-            if (copy_transaction_parameters(args->create_transaction)) {
+            if (no_error) {
                 // never returns
 
                 G_coin_config = args->coin_config;
