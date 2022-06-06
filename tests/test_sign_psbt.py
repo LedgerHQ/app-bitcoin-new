@@ -72,16 +72,13 @@ def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict])
 def parse_signing_events(events: List[dict]) -> dict:
     ret = dict()
 
-    # each of these is True if the _previous_ event was matching (so the next text needs to be recorded)
-    was_amount = False
-    was_address = False
-    was_fees = False
-
     cur_output_index = -1
-
+    
     ret["addresses"] = []
     ret["amounts"] = []
     ret["fees"] = ""
+    next_step = ""
+    keywords = ("Amount", "Address", "Fees", "Accept", "Approve")
 
     for ev in events:
         if ev["text"].startswith("output #"):
@@ -93,18 +90,20 @@ def parse_signing_events(events: List[dict]) -> dict:
 
             ret["addresses"].append("")
             ret["amounts"].append("")
+            next_step = ""
 
-        if was_address:
+        elif ev["text"].startswith(keywords):
+            next_step = ev["text"]
+            continue
+
+        if next_step.startswith("Address"):
             ret["addresses"][-1] += ev["text"]
-        if was_amount:
-            ret["amounts"][-1] += ev["text"]
 
-        if was_fees:
+        elif next_step.startswith("Fees"):
             ret["fees"] += ev["text"]
 
-        was_amount = ev["text"].startswith("Amount")
-        was_address = ev["text"].startswith("Address")
-        was_fees = ev["text"].startswith("Fees")
+        elif next_step.startswith("Amount"):
+            ret["amounts"][-1] += ev["text"]
 
     return ret
 
