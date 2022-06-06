@@ -391,9 +391,12 @@ static void swap_library_main_helper(struct libargs_s *args) {
             args->check_address->result =
                 handle_check_address(args->check_address, args->coin_config);
             break;
-        case SIGN_TRANSACTION:
+        case SIGN_TRANSACTION: {
+            // copying arguments (pointing to globals) to context *before*
+            // calling `initialize_app_globals` as it could override them
+            const bool args_are_copied = copy_transaction_parameters(args->create_transaction);
             initialize_app_globals();
-            if (copy_transaction_parameters(args->create_transaction)) {
+            if (args_are_copied) {
                 // never returns
 
                 G_coin_config = args->coin_config;
@@ -427,6 +430,7 @@ static void swap_library_main_helper(struct libargs_s *args) {
                 app_main();
             }
             break;
+        }
         case GET_PRINTABLE_AMOUNT:
             // ensure result is zero if an exception is thrown (compatibility breaking, disabled
             // until LL is ready)
