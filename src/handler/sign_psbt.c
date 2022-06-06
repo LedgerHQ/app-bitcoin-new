@@ -57,6 +57,7 @@ static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
 
 static void alert_external_inputs(dispatcher_context_t *dc);
+static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc);
 
 // Output validation
 static void verify_outputs_init(dispatcher_context_t *dc);
@@ -208,7 +209,7 @@ static int get_amount_scriptpubkey_from_psbt_nonwitness(
         return -1;
     }
 
-    // if expected_prevout_hash is give, check that it matches the txid obtained from the parser
+    // if expected_prevout_hash is given, check that it matches the txid obtained from the parser
     if (expected_prevout_hash != NULL &&
         memcmp(parser_outputs.txid, expected_prevout_hash, 32) != 0) {
         PRINTF("Prevout hash did not match non-witness-utxo transaction hash\n");
@@ -674,11 +675,18 @@ static void check_input_owned(dispatcher_context_t *dc) {
         int segwit_version =
             get_segwit_version(state->cur.in_out.scriptPubKey, state->cur.in_out.scriptPubKey_len);
 
-        // For legacy or segwit-v0 inputs, the non-witness utxo must be present
-        if ((segwit_version == -1 || segwit_version == 0) && !state->cur.input.has_nonWitnessUtxo) {
-            PRINTF("Non-witness utxo missing for legacy or segwitv0 input\n");
+        // For legacy inputs, the non-witness utxo must be present
+        if (segwit_version == -1 && !state->cur.input.has_nonWitnessUtxo) {
+            PRINTF("Non-witness utxo missing for legacy input\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
+        }
+
+        // For segwitv0 inputs, the non-witness utxo _should_ be present; we show a warning
+        // to the user otherwise, but we continue nonetheless on approval
+        if (segwit_version == 0 && !state->cur.input.has_nonWitnessUtxo) {
+            PRINTF("Non-witness utxo missing for segwitv0 input. Will show a warning.\n");
+            state->show_missing_nonwitnessutxo_warning = true;
         }
 
         // For all segwit transactions, the witness utxo must be present
@@ -708,7 +716,7 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
 
     if (count_external_inputs == 0) {
         // no external inputs
-        dc->next(verify_outputs_init);
+        dc->next(alert_missing_nonwitnessutxo);
     } else if (count_external_inputs == state->n_inputs) {
         // no internal inputs, nothing to sign
         PRINTF("No internal inputs. Aborting\n");
@@ -723,7 +731,20 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
         }
 
         // some internal and some external inputs, warn the user first
-        ui_warn_external_inputs(dc, verify_outputs_init);
+        ui_warn_external_inputs(dc, alert_missing_nonwitnessutxo);
+    }
+}
+
+// If any segwitv0 input is missing the non-witness-utxo, we warn the user
+static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    if (state->show_missing_nonwitnessutxo_warning) {
+        ui_warn_unverified_segwit_inputs(dc, verify_outputs_init);
+    } else {
+        dc->next(verify_outputs_init);
     }
 }
 

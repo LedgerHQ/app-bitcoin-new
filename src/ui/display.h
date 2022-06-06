@@ -60,6 +60,9 @@ void ui_authorize_wallet_spend(dispatcher_context_t *context,
 
 void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t on_success);
 
+void ui_warn_unverified_segwit_inputs(dispatcher_context_t *context,
+                                      command_processor_t on_success);
+
 void ui_validate_output(dispatcher_context_t *context,
                         int index,
                         const char *address_or_description,
