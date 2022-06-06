@@ -233,6 +233,45 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     }
 
 
+@has_automation("automations/sign_with_default_wallet_missing_nonwitnessutxo_accept.json")
+def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
+    # Same as the previous test, but the non-witness-utxo is missing.
+    # The app should sign after a warning.
+
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
+
+    # remove the non-witness-utxo field
+    for input in psbt.inputs:
+        input.non_witness_utxo = None
+
+    wallet = PolicyMapWallet(
+        "",
+        "wpkh(@0)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        ],
+    )
+
+    result = client.sign_psbt(psbt, wallet, None)
+
+    # expected sigs
+    # #0:
+    #   "pubkey" : "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3",
+    #   "signature" : "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+    # #1:
+    #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
+    #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+
+    assert result == {
+        0: bytes.fromhex(
+            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+        ),
+        1: bytes.fromhex(
+            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+        ),
+    }
+
+
 # def test_sign_psbt_legacy(client: Client):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
