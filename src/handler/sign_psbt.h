@@ -96,6 +96,9 @@ typedef struct {
         };
     } cur;
 
+    // if any segwitv0 input is missing the non-witness-utxo, we show a warning
+    bool show_missing_nonwitnessutxo_warning;
+
     uint8_t sighash[32];
 
     struct {

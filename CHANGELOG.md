@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.0.6] - 06-06-2022
+
+### Added
+
+- Support signing of segwit V0 transactions with unverified inputs for compatibility with software unable to provide the previous transaction.
+
+### Fixed
+
+- Fixed bug preventing signing transactions with external inputs (or with mixed script types).
 
 ## [2.0.5] - 03-05-2022
 

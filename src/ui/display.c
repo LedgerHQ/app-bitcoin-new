@@ -253,6 +253,11 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
                  "external inputs",
              });
 
+// Step with warning icon for unverified inputs (segwit inputs with no non-witness-utxo)
+UX_STEP_NOCB(ux_unverified_segwit_input_flow_1_step, pb, {&C_icon_warning, "Unverified inputs"});
+UX_STEP_NOCB(ux_unverified_segwit_input_flow_2_step, nn, {"Update", " Ledger Live"});
+UX_STEP_NOCB(ux_unverified_segwit_input_flow_3_step, nn, {"or third party", "wallet software"});
+
 // Step with eye icon and "Review" and the output index
 UX_STEP_NOCB(ux_review_step,
              pnn,
@@ -461,6 +466,19 @@ UX_FLOW(ux_display_warning_external_inputs_flow,
         &ux_display_reject_if_not_sure_step,
         &ux_display_continue_step);
 
+// FLOW to warn about segwitv0 inputs with no non-witness-utxo
+// #1 screen: warning icon + "Unverified inputs"
+// #2 screen: "Update Ledger Live"
+// #3 screen: "or external wallet software"
+// #4 screen: "continue" button
+// #5 screen: "reject" button
+UX_FLOW(ux_display_unverified_segwit_inputs_flow,
+        &ux_unverified_segwit_input_flow_1_step,
+        &ux_unverified_segwit_input_flow_2_step,
+        &ux_unverified_segwit_input_flow_3_step,
+        &ux_display_continue_step,
+        &ux_display_reject_step);
+
 // FLOW to validate a single output
 // #1 screen: eye icon + "Review" + index of output to validate
 // #2 screen: output amount
@@ -642,6 +660,15 @@ void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t 
     g_next_processor = on_success;
 
     ux_flow_init(0, ux_display_warning_external_inputs_flow, NULL);
+}
+
+void ui_warn_unverified_segwit_inputs(dispatcher_context_t *context,
+                                      command_processor_t on_success) {
+    context->pause();
+
+    g_next_processor = on_success;
+
+    ux_flow_init(0, ux_display_unverified_segwit_inputs_flow, NULL);
 }
 
 void ui_validate_output(dispatcher_context_t *context,
