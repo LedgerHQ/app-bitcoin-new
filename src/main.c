@@ -297,7 +297,13 @@ void app_exit() {
 
 static void initialize_app_globals() {
     io_reset_timeouts();
-    memset(&G_swap_state, 0, sizeof(G_swap_state));
+
+    // We only zero the called_from_swap and should_exit fields and not the entire G_swap_state, as
+    // we need the globals initialization to happen _after_ calling copy_transaction_parameters when
+    // processing a SIGN_TRANSACTION request from the swap app (which initializes the other fields
+    // of G_swap_state).
+    G_swap_state.called_from_swap = false;
+    G_swap_state.should_exit = false;
 }
 
 /**
