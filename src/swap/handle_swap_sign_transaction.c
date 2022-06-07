@@ -62,6 +62,8 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     memcpy(vars.swap_data.fees, fees, 8);
 #endif
 
+    initialize_swap_globals();
+
     G_swap_state.amount = read_u64_be(amount, 0);
     G_swap_state.fees = read_u64_be(fees, 0);
     memcpy(G_swap_state.destination_address,

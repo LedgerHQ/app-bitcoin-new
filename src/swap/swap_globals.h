@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 
 typedef struct swap_globals_s {
     uint64_t amount;
@@ -12,3 +13,10 @@ typedef struct swap_globals_s {
 } swap_globals_t;
 
 extern swap_globals_t G_swap_state;
+
+/**
+ * Zeroes the global state related to the swap feature.
+ */
+static inline void initialize_swap_globals() {
+    memset(&G_swap_state, 0, sizeof(G_swap_state));
+}

@@ -295,9 +295,12 @@ void app_exit() {
     END_TRY_L(exit);
 }
 
+/**
+ * Initializes to zero the app globals.
+ * Does _not_ initialize the swap-related state.
+ */
 static void initialize_app_globals() {
     io_reset_timeouts();
-    memset(&G_swap_state, 0, sizeof(G_swap_state));
 }
 
 /**
@@ -307,6 +310,7 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     PRINT_STACK_POINTER();
 
     initialize_app_globals();
+    initialize_swap_globals();
 
     // assumptions on the length of data structures
 
