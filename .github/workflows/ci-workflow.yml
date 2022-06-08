@@ -13,7 +13,18 @@ on:
 
 jobs:
   job_build:
-    name: Compilation
+    name: Compilation for NanoS, X and S+
+
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "$NANOS_SDK"
+          - model: nanox
+            SDK: "$NANOX_SDK"
+          - model: nanosp
+            SDK: "$NANOSP_SDK"
+
     runs-on: ubuntu-latest
 
     container:
@@ -25,27 +36,27 @@ jobs:
 
       - name: Build
         run: |
-          make DEBUG=0 COIN=bitcoin && mv bin/ bitcoin-bin/
+          make DEBUG=0 COIN=bitcoin BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-bin/
           make clean
-          make DEBUG=0 COIN=bitcoin_testnet && mv bin/ bitcoin-testnet-bin/
+          make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
           make clean
-          make DEBUG=0 COIN=bitcoin_testnet_lib && mv bin/ bitcoin-testnet-lib-bin/
+          make DEBUG=0 COIN=bitcoin_testnet_lib BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-lib-bin/
       - name: Upload Bitcoin app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-app
+          name: bitcoin-app-${{ matrix.model }}
           path: bitcoin-bin
 
       - name: Upload Bitcoin Testnet app binary
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-${{ matrix.model }}
           path: bitcoin-testnet-bin
 
       - name: Upload Bitcoin Testnet app binary (lib version)
         uses: actions/upload-artifact@v2
         with:
-          name: bitcoin-testnet-lib-app
+          name: bitcoin-testnet-lib-app-${{ matrix.model }}
           path: bitcoin-testnet-lib-bin
 
   job_unit_test:
@@ -97,6 +108,16 @@ jobs:
 
   job_test:
     name: Tests
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "2.1"
+          - model: nanox
+            SDK: "2.0.2"
+          - model: nanosp
+            SDK: "1.0"
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -118,17 +139,27 @@ jobs:
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-${{matrix.model}}
           path: bin
 
       - name: Run tests
         run: |
           cd tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
 
   job_test_mainnet:
     name: Tests on mainnet
+    strategy:
+      matrix:
+        include:
+          - model: nanos
+            SDK: "2.1"
+          - model: nanox
+            SDK: "2.0.2"
+          - model: nanosp
+            SDK: "1.0"
+
     needs: job_build
     runs-on: ubuntu-latest
 
@@ -150,14 +181,14 @@ jobs:
       - name: Download Bitcoin app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-app
+          name: bitcoin-app-${{matrix.model}}
           path: bin
 
       - name: Run tests
         run: |
           cd tests_mainnet
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
 
   job_test_js_lib:
     name: Tests with the JS library
@@ -191,7 +222,7 @@ jobs:
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-nanos
           path: bin
 
       - name: Run tests
@@ -223,7 +254,7 @@ jobs:
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app
+          name: bitcoin-testnet-app-nanos
           path: tests-legacy/bitcoin-testnet-bin
 
       - name: Run tests
@@ -256,13 +287,13 @@ jobs:
       - name: Download Bitcoin app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-app
+          name: bitcoin-app-nanos
           path: tests-legacy/bitcoin-bin
 
       - name: Download Bitcoin Testnet app binary (library version)
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-lib-app
+          name: bitcoin-testnet-lib-app-nanos
           path: tests-legacy/bitcoin-testnet-bin
 
 
