@@ -148,17 +148,12 @@ static void process_cosigner_info(dispatcher_context_t *dc) {
     // one is our key. Using addresses without a wildcard could potentially be supported, but
     // disabled for now (question to address: can only _some_ of the keys have a wildcard?).
 
-    // TODO: allow missing key origin
-    if (!key_info.has_key_origin) {
-        PRINTF("Key info without origin unsupported.\n");
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
-    }
-
     bool is_key_internal = false;
-    if (read_u32_be(key_info.master_key_fingerprint, 0) == state->master_key_fingerprint) {
-        // it could be a collision on the fingerprint; we verify that we can actually generate the
-        // same pubkey
+    // if there is key origin information and the fingerprint matches, we make sure it's not a false
+    // positive (it could be wrong info, or a collision).
+    if (key_info.has_key_origin &&
+        read_u32_be(key_info.master_key_fingerprint, 0) == state->master_key_fingerprint) {
+        // we verify that we can actually generate the same pubkey
         char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
         int serialized_pubkey_len =
             get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,

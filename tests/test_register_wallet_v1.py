@@ -148,16 +148,3 @@ def test_register_wallet_unsupported_policy_v1(client: Client):
             ],
             version=WalletType.WALLET_POLICY_V1
         ))
-
-    with pytest.raises(NotSupportedError):
-        # Not supporting keys without origin information (even if external)
-        client.register_wallet(MultisigWallet(
-            name="Cold storage",
-            address_type=AddressType.WIT,
-            threshold=2,
-            keys_info=[
-                f"tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
-                f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
-            ],
-            version=WalletType.WALLET_POLICY_V1
-        ))
