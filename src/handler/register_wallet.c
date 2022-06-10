@@ -201,10 +201,15 @@ static void finalize_response(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->n_internal_keys != 1) {
-        // Unclear if there is any use case for multiple internal keys in the same wallet.
+    if (state->n_internal_keys < 1) {
+        // Unclear if there is any use case for registering policies with no internal keys.
         // We disallow that, might reconsider in future versions if needed.
-        SEND_SW(dc, SW_NOT_SUPPORTED);
+        PRINTF("Wallet policy with no internal keys\n");
+        return;
+    } else if (state->n_internal_keys != 1 &&
+               state->wallet_header.version == WALLET_POLICY_VERSION_V1) {
+        // for legacy policies, we keep the restriction to exactly 1 internal key
+        PRINTF("V1 policies must have exactly 1 internal key\n");
         return;
     }
 

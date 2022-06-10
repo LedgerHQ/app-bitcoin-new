@@ -6,25 +6,18 @@ import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from bip32 import BIP32
-
 from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
 from bitcoin_client.ledger_bitcoin.client_base import TransportClient
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
 
-from test_utils import SpeculosGlobals
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
 from speculos.client import SpeculosClient
 from test_utils.speculos import automation
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
-
-
-def get_internal_xpub(speculos_globals: SpeculosGlobals, path: str) -> str:
-    bip32 = BIP32.from_seed(speculos_globals.seed, network="test")
-    return bip32.get_xpub_from_path(f"m/{path}")
 
 
 def run_test(wallet_policy: PolicyMapWallet, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
@@ -106,7 +99,8 @@ def run_test(wallet_policy: PolicyMapWallet, core_wallet_names: List[str], rpc: 
     with automation(comm, "automations/sign_with_wallet_accept.json"):
         hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac)
 
-    assert len(hww_sigs) == len(psbt.inputs)  # should be true as long as all inputs are internal
+    n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
+    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
 
     for i, pubkey, sig in hww_sigs:
         psbt.inputs[i].partial_sigs[pubkey] = sig
@@ -133,7 +127,7 @@ def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Cli
     path = "48'/1'/0'/2'"
     core_wallet_name, core_xpub_orig = create_new_wallet()
 
-    internal_xpub = get_internal_xpub(speculos_globals, path)
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     wallet_policy = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -145,6 +139,36 @@ def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Cli
     )
 
     run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # test an edge case of a multisig where the wallet controls more than one key
+    # 3-of-5 multisig where 2 keys are internal
+
+    path_1 = "48'/1'/0'/2'"
+    internal_xpub_1 = get_internal_xpub(speculos_globals.seed, path_1)
+    path_2 = "48'/1'/1'/2'"
+    internal_xpub_2 = get_internal_xpub(speculos_globals.seed, path_2)
+
+    core_wallet_name_1, core_xpub_orig_1 = create_new_wallet()
+    core_wallet_name_2, core_xpub_orig_2 = create_new_wallet()
+    core_wallet_name_3, core_xpub_orig_3 = create_new_wallet()
+
+    wallet_policy = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=3,
+        keys_info=[
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path_1}]{internal_xpub_1}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path_2}]{internal_xpub_2}",
+            f"{core_xpub_orig_1}",
+            f"{core_xpub_orig_2}",
+            f"{core_xpub_orig_3}",
+        ],
+    )
+
+    run_test(wallet_policy, [core_wallet_name_1, core_wallet_name_2, core_wallet_name_3],
+             rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
 def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], enable_slow_tests: bool):
@@ -163,7 +187,7 @@ def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: C
         core_xpub_origs.append(xpub_orig)
 
     path = "48'/1'/0'/2'"
-    internal_xpub = get_internal_xpub(speculos_globals, path)
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
 
     wallet_policy = MultisigWallet(
         name="Cold storage",

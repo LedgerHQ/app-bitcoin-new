@@ -124,12 +124,12 @@ def test_register_wallet_invalid_names_v1(client: Client):
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_unsupported_policy_v1(client: Client):
-    # valid policise, but not supported (might change in the future)
+    # valid policies, but not supported (might change in the future)
 
     with pytest.raises(NotSupportedError):
         client.register_wallet(PolicyMapWallet(
             name="Unsupported",
-            policy_map="sh(pkh(@0))",  # unusual script, not in the whitelist
+            policy_map="pk(@0)",  # bare pubkey, not supported
             keys_info=[
                 f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
             ],

@@ -1,7 +1,10 @@
 import hashlib
+from typing import Literal, Union
 
 from mnemonic import Mnemonic
 from bip32 import BIP32
+
+from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
 
 from .slip21 import Slip21Node
 
@@ -73,3 +76,34 @@ class SpeculosGlobals:
         slip21_root = Slip21Node.from_seed(self.seed)
         self.wallet_registration_key = slip21_root.derive_child(
             WALLET_POLICY_SLIP21_LABEL).key
+
+
+def get_internal_xpub(seed: str, path: str) -> str:
+    bip32 = BIP32.from_seed(seed, network="test")
+    return bip32.get_xpub_from_path(f"m/{path}")
+
+
+def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: PolicyMapWallet) -> int:
+    """Count how many of the keys in wallet_policy are indeed internal"""
+
+    bip32 = BIP32.from_seed(seed, network)
+    master_key_fingerprint = hash160(bip32.pubkey)[0:4]
+
+    count = 0
+    for key_info in wallet_policy.keys_info:
+        if "]" in key_info:
+            key_orig_end_pos = key_info.index("]")
+            fpr = key_info[1:9]
+            path = key_info[10:key_orig_end_pos]
+            xpub = key_info[key_orig_end_pos + 1:]
+
+            # support for V1 policies, where the key info contains additional derivation steps
+            if "/" in xpub:
+                xpub = xpub[:xpub.index("/")]  # truncate any additional steps
+
+            if fpr == master_key_fingerprint.hex():
+                computed_xpub = get_internal_xpub(seed, path)
+                if computed_xpub == xpub:
+                    count += 1
+
+    return count

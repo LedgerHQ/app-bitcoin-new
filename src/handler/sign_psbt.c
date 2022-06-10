@@ -73,6 +73,7 @@ static void confirm_transaction(dispatcher_context_t *dc);
 
 // Signing process (all)
 static void sign_init(dispatcher_context_t *dc);
+static void sign_find_next_internal_key(dispatcher_context_t *dc);
 static void sign_process_input_map(dispatcher_context_t *dc);
 
 // Legacy sighash computation (P2PKH and P2SH)
@@ -1105,7 +1106,11 @@ static void confirm_transaction(dispatcher_context_t *dc) {
 
 /** SIGNING FLOW
  *
- * Iterate over all inputs. For each input that should be signed, compute and sign sighash.
+ * For each internal key, iterate over all inputs.
+ * For each input that should be signed, compute and sign the sighash.
+ *
+ * There is certainly repeated work that could be optimized in the case of multiple internal keys.
+ * Not worth optimizing at this time, yet it is useful to support it as an advanced use case.
  */
 
 // entry point for the signing flow
@@ -1114,15 +1119,26 @@ static void sign_init(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    state->segwit_hashes_computed = false;
+
+    state->cur_key_index = 0;
+    dc->next(sign_find_next_internal_key);
+}
+
+// iterate over all the keys, start the input processing for each internal key found
+static void sign_find_next_internal_key(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
     // find and parse our registered key info in the wallet
-    bool our_key_found = false;
-    for (unsigned int i = 0; i < state->wallet_header_n_keys; i++) {
+    while (state->cur_key_index < state->wallet_header_n_keys) {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         state->wallet_header_keys_info_merkle_root,
                                                         state->wallet_header_n_keys,
-                                                        i,
+                                                        state->cur_key_index,
                                                         key_info_str,
                                                         sizeof(key_info_str));
 
@@ -1159,32 +1175,27 @@ static void sign_init(dispatcher_context_t *dc) {
 
             if (strncmp(our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) ==
                 0) {
-                our_key_found = true;
-
                 state->our_key_derivation_length = our_key_info.master_key_derivation_len;
                 for (int i = 0; i < our_key_info.master_key_derivation_len; i++) {
                     state->our_key_derivation[i] = our_key_info.master_key_derivation[i];
                 }
 
-                break;
+                // internal key, start processing the inputs
+                state->cur_input_index = 0;
+                dc->next(sign_process_input_map);
+                return;
             }
         }
+
+        // Not an internal key, move on
+        ++state->cur_key_index;
     }
 
-    if (!our_key_found) {
-        PRINTF("Couldn't find internal key\n");
-        SEND_SW(
-            dc,
-            SW_BAD_STATE);  // should never happen if we only register wallets with an internal key
-        return;
-    }
-
-    state->segwit_hashes_computed = false;
-
-    state->cur_input_index = 0;
-    dc->next(sign_process_input_map);
+    // no more keys to process; we're done
+    dc->next(finalize);
 }
 
+// process an input (or move on to the the next key if we're already done with all the inputs)
 static void sign_process_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
@@ -1198,8 +1209,9 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     }
 
     if (state->cur_input_index >= state->n_inputs) {
-        // all inputs already processed
-        dc->next(finalize);
+        // all inputs already processed, move on to the next internal key (if any)
+        ++state->cur_key_index;
+        dc->next(sign_find_next_internal_key);
         return;
     }
 

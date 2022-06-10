@@ -83,6 +83,7 @@ typedef struct {
     // bitmap to track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
 
+    unsigned int cur_key_index;  // index of the currently processed key during input signing
     union {
         unsigned int cur_input_index;
         unsigned int cur_output_index;
