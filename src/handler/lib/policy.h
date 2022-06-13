@@ -84,11 +84,26 @@ int get_policy_address_type(const policy_node_t *policy);
  * Verifies if the wallet_hmac is correct for the given wallet_id, using the symmetric key derived
  * with the WALLET_SLIP0021_LABEL label according to SLIP-0021.
  *
- * @param[in] policy
- *   Pointer to the root node of the policy
- * @param[in] policy
- *   Pointer to the root node of the policy
-
+ * @param[in] wallet_id
+ *   Pointer to the a 32-bytes array containing the 32-byte wallet policy id.
+ * @param[in] wallet_hmac
+ *   Pointer to the a 32-bytes array containing the wallet policy registration hmac.
  * @return true if the given hmac is valid, false otherwise.
  */
 bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_hmac[static 32]);
+
+/**
+ * Copies the i-th placeholder (indexing from 0) of the given policy into `out_placeholder` (if not
+ * null).
+ *
+ * @param[in] policy
+ *   Pointer to the root node of the policy
+ * @param[in] i
+ *   Index of the wanted placeholder. Ignored if out_placeholder is NULL.
+ * @param[out] out_placeholder
+ *   If not NULL, it is a pointer that will receive the i-th placeholder of the policy.
+ * @return the number of placeholders in the policy on success; -1 in case of error.
+ */
+int get_key_placeholder_by_index(const policy_node_t *policy,
+                                 unsigned int i,
+                                 policy_node_key_placeholder_t *out_placeholder);

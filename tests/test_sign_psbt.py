@@ -707,3 +707,33 @@ def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
             hww_sigs = client.sign_psbt(psbt, wallet, None)
 
         assert len(hww_sigs) == 1
+
+
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
+    # An earlier (unreleased) version of the app had issues in recognizing the internal key in
+    # wallets with multiple internal keys. This caused the app not to recognize some inputs as
+    # internal and refuse signing.
+    # This test avoid regressions.
+
+    psbt_b64 = "cHNidP8BAH0CAAAAAc73gS9SovmC2TiOljy8430GM1piHwQ2qexyVay941KiAAAAAAD9////AoRMiQAAAAAAIgAgCNTAdTDWmzUxjznipRc1U4uQGLRoZrO78XwYXYUabZpAQg8AAAAAABYAFERtNGMisyaTdIH6qfcs0sgquVa9AAAAAAABAIkCAAAAARZzljeqA1KqIrHu0Dlk1eHOMjicZvTJNJyJr/EKGRpbAAAAAAD+////AoCWmAAAAAAAIgAg7J/0qnaRhypwlt/UpEpsEFWGdEW1xaoG8zEdfnMy+LjbWm0pAQAAACJRIDnrpLTPwAtLr+lUmuKj0BponWuHmsIjhT94mb7F0QNeaQAAAAEBK4CWmAAAAAAAIgAg7J/0qnaRhypwlt/UpEpsEFWGdEW1xaoG8zEdfnMy+LgBBY4hA1h5yhc6nBs/MA7Fh/tMxtVNYY4wWE5CXBtTuYgocI8drGQhArcwd+z8NOR+OK4rn4KGkQCCFM8COcy6P8m/T41alSKMrSED2O7HEKG8D9F+VNLOnTTQL43jAvbEPioS3GbGDIQceJVnIQMcumfE5xIqwJgWWRP5G5iLnJRWKeGzi7yANv+se/rxEmisIgYCtzB37Pw05H44riufgoaRAIIUzwI5zLo/yb9PjVqVIowY9azC/SwAAIABAACAAAAAgAIAAAADAAAAIgYDHLpnxOcSKsCYFlkT+RuYi5yUVinhs4u8gDb/rHv68RIMoPWInwAAAAADAAAAIgYDWHnKFzqcGz8wDsWH+0zG1U1hjjBYTkJcG1O5iChwjx0Y9azC/SwAAIABAACAAAAAgAAAAAADAAAAIgYD2O7HEKG8D9F+VNLOnTTQL43jAvbEPioS3GbGDIQceJUMt6EhtAAAAAADAAAAAAEBjiECUzcaIHTkAJE5L9bKuknM0NEVGMEJZh9J+AglLIn3FWSsZCECmjJ4GqB1Hs3Dr/H+FWE3rSzge5+iVTuf+FA3DBpG3SWtIQL+762PyBkOL51EV+NoTOccB+ABFJtDgCJ3I79tiEq7cGchAuWvSvOsaVtJcvo5AFkgH7RZXYD4+VU+4x4MqG2IiTPcaKwiAgJTNxogdOQAkTkv1sq6SczQ0RUYwQlmH0n4CCUsifcVZBj1rML9LAAAgAEAAIAAAACAAQAAAAEAAAAiAgKaMngaoHUezcOv8f4VYTetLOB7n6JVO5/4UDcMGkbdJRj1rML9LAAAgAEAAIAAAACAAwAAAAEAAAAiAgLlr0rzrGlbSXL6OQBZIB+0WV2A+PlVPuMeDKhtiIkz3Ayg9YifAQAAAAEAAAAiAgL+762PyBkOL51EV+NoTOccB+ABFJtDgCJ3I79tiEq7cAy3oSG0AQAAAAEAAAAAAA=="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = PolicyMapWallet(
+        "Me and Bob or me and Carl",
+        "wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
+        [
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDDcwGjxKph1xkiAnzvpgdnTeaEhVnH9d766yqvd16JN7EmPW9qSwnbco7kZwPd7UbyEwRojYGUaHT1UULbdqAjGQzeCy3qdZEwZLRmpzwZV",
+            "tpubDCDraP1C24GGX6BHCewLBWbKQRNGACfz8JjyKXYoZjEJWeGV5Ng43FL31MryaiqeBjdC5dPUZD2zqnmMe6gqrYEstnu8pmJZYp3AQmhzQ6G",
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "e139a96195e18bc61e8cda72d11b3f75d3084a5c893990ca74a152206064792d"
+    )
+
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    print(result)

@@ -255,7 +255,7 @@ def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculo
     run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
-def test_e2e_miniscript_me_and_bob_or_me_and_carl(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     # policy: or(and(pk(A1), pk(B)),and(pk(A2), pk(C)))
     # where A1 and A2 are both internal keys; therefore, two signatures per input must be returned
 
@@ -276,6 +276,29 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl(rpc, rpc_test_wallet, client: 
             internal_xpub_orig_1,
             f"{core_xpub_orig1}",
             internal_xpub_orig_2,
+            f"{core_xpub_orig2}",
+        ])
+
+    run_test_e2e(wallet_policy, rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_miniscript_me_and_bob_or_me_and_carl_2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # same as the previous example, but uses the same xpubs with two different paths for the internal keys,
+    # by using the /<M,N>/* notation instead of different internal xpubs
+
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
+
+    path = "44'/1'/0'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
+
+    wallet_policy = PolicyMapWallet(
+        name="Me and Bob or me and Carl",
+        policy_map=f"wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
+        keys_info=[
+            internal_xpub_orig,
+            f"{core_xpub_orig1}",
             f"{core_xpub_orig2}",
         ])
 

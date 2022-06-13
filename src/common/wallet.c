@@ -397,25 +397,72 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
     return 0;
 }
 
-static int16_t parse_placeholder(buffer_t *in_buf, int version) {
+static int parse_placeholder(buffer_t *in_buf, int version, policy_node_key_placeholder_t *out) {
     char c;
     if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
-        return -1;
+        return WITH_ERROR(-1, "Expected key placeholder starting with '@'");
     }
 
     uint32_t k;
     if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
-        return -1;
+        return WITH_ERROR(-1, "The key index in a placeholder must be at most 32767");
     }
 
-    if (version == WALLET_POLICY_VERSION_V2) {
+    out->key_index = (int16_t) k;
+
+    if (version == WALLET_POLICY_VERSION_V1) {
+        // default values for compatibility with the new code
+        out->num_first = 0;
+        out->num_second = 1;
+    } else if (version == WALLET_POLICY_VERSION_V2) {
         // the key expression must be followed by / and **, or /<0;1>/*
-        if (!consume_characters(in_buf, "/**", 3) && !consume_characters(in_buf, "/<0;1>/*", 8)) {
-            return WITH_ERROR((int16_t) -1, "Expected /** or /<0;1>/* in placeholder");
+        uint8_t next_character;
+        if (!consume_character(in_buf, '/')           // the next character is "/"
+            || !buffer_peek(in_buf, &next_character)  // we must be able to read the next character
+            || !(next_character == '*' || next_character == '<')  // and it must be '*' or '<'
+        ) {
+            return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
         }
+
+        if (next_character == '*') {
+            if (!consume_characters(in_buf, "**", 2)) {
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+            }
+            out->num_first = 0;
+            out->num_second = 1;
+        } else if (next_character == '<') {
+            buffer_seek_cur(in_buf, 1);  // skip "<"
+            if (parse_unsigned_decimal(in_buf, &out->num_first) == -1 ||
+                out->num_first > 0x80000000u) {
+                return WITH_ERROR(
+                    -1,
+                    "Expected /** or /<M;N>/* in key placeholder, with unhardened M and N");
+            }
+
+            if (!consume_character(in_buf, ';')) {
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+            }
+
+            if (parse_unsigned_decimal(in_buf, &out->num_second) == -1 ||
+                out->num_second > 0x80000000u) {
+                return WITH_ERROR(
+                    -1,
+                    "Expected /** or /<M;N>/* in key placeholder, with unhardened M and N");
+            }
+
+            if (out->num_first == out->num_second) {
+                return WITH_ERROR(-1, "M and N must be different in <M;N>/*");
+            }
+
+            if (!consume_characters(in_buf, ">/*", 3)) {
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+            }
+        }
+    } else {
+        return WITH_ERROR(-1, "Invalid version number");
     }
 
-    return (int16_t) k;  // this cast is safe, since k is at most INT16_MAX
+    return 0;
 }
 
 #define CONTEXT_WITHIN_SH  1  // parsing a direct child of SH
@@ -1267,6 +1314,13 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
+            node->key_placeholder = (policy_node_key_placeholder_t *)
+                buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
+
+            if (node->key_placeholder == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+
             if (token == TOKEN_WPKH) {
                 if (depth > 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
                     return WITH_ERROR(-1, "wpkh can only be top-level or inside sh");
@@ -1277,9 +1331,8 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            node->key_index = parse_placeholder(in_buf, version);
-            if (node->key_index == -1) {
-                return WITH_ERROR(-1, "Couldn't parse key index");
+            if (0 > parse_placeholder(in_buf, version, node->key_placeholder)) {
+                return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
             if (token == TOKEN_WPKH) {
@@ -1331,6 +1384,10 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_TR: {  // currently supporting x-only keys
+            if (depth > 1) {
+                return WITH_ERROR(-1, "tr can only be top-level");
+            }
+
             policy_node_with_key_t *node =
                 (policy_node_with_key_t *) buffer_alloc(out_buf,
                                                         sizeof(policy_node_with_key_t),
@@ -1339,18 +1396,20 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            if (depth > 1) {
-                return WITH_ERROR(-1, "tr can only be top-level");
+            node->key_placeholder = (policy_node_key_placeholder_t *)
+                buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
+
+            if (node->key_placeholder == NULL) {
+                return WITH_ERROR(-1, "Out of memory");
+            }
+
+            if (0 > parse_placeholder(in_buf, version, node->key_placeholder)) {
+                return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
             parsed_node = (policy_node_t *) node;
 
             node->base.type = token;
-
-            node->key_index = parse_placeholder(in_buf, version);
-            if (node->key_index == -1) {
-                return WITH_ERROR(-1, "Couldn't parse key index");
-            }
 
             node->base.flags.is_miniscript = 0;
 
@@ -1416,7 +1475,7 @@ static int parse_script(buffer_t *in_buf,
             // We allocate the array of key indices at the current position in the output buffer
             // (on success)
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->key_indexes = (int16_t *) buffer_get_cur(out_buf);
+            node->key_placeholders = (policy_node_key_placeholder_t *) buffer_get_cur(out_buf);
 
             node->n = 0;
             while (true) {
@@ -1431,21 +1490,19 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Expected ','");
                 }
 
-                int16_t key_index = parse_placeholder(in_buf, version);
-                if (key_index == -1) {
-                    return WITH_ERROR(-1, "Error parsing key index");
-                }
-
-                int16_t *key_index_out =
-                    (int16_t *) buffer_alloc(out_buf,
-                                             sizeof(int16_t),
-                                             false);  // we don't align this pointer, as we are
-                                                      // allocating consecutive uint16_t elements
-                                                      // and we already aligned the first element
-                if (key_index_out == NULL) {
+                policy_node_key_placeholder_t *key_placeholder =
+                    (policy_node_key_placeholder_t *) buffer_alloc(
+                        out_buf,
+                        sizeof(policy_node_key_placeholder_t),
+                        true);  // we align this pointer, as there's padding in an array of
+                                // structures
+                if (key_placeholder == NULL) {
                     return WITH_ERROR(-1, "Out of memory");
                 }
-                *key_index_out = key_index;
+
+                if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
+                    return WITH_ERROR(-1, "Error parsing key placeholder");
+                }
 
                 ++node->n;
             }

@@ -158,6 +158,27 @@ typedef struct policy_node_s {
     } flags;  // 1 byte
 } policy_node_t;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcomment"
+// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
+
+/** Structure representing a key placeholder.
+ * In V1, it's the index of a key expression in the key informations array, which includes the final
+ * / ** step.
+ * In V2, it's the index of a key expression in the key informations array, plus the two
+ * numbers a, b in the /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations
+ * array don't have extra derivation steps.
+ */
+typedef struct {
+    // the following fields are only used in V2
+    uint32_t num_first;   // NUM_a of /<NUM_a,NUM_b>/*
+    uint32_t num_second;  // NUM_b of /<NUM_a,NUM_b>/*
+
+    // common between V1 and V2
+    int16_t key_index;  // index of the key
+} policy_node_key_placeholder_t;
+#pragma GCC diagnostic pop
+
 typedef struct {
     struct policy_node_s base;
 } policy_node_constant_t;
@@ -182,7 +203,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 
 typedef struct {
     struct policy_node_s base;
-    int16_t key_index;  // index of the key
+    policy_node_key_placeholder_t *key_placeholder;
 } policy_node_with_key_t;
 
 typedef struct {
@@ -194,7 +215,8 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
     int16_t k;                  // threshold
     int16_t n;                  // number of keys
-    int16_t *key_indexes;       // pointer to array of exactly n key indexes
+    policy_node_key_placeholder_t
+        *key_placeholders;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
 typedef struct policy_node_scriptlist_s {

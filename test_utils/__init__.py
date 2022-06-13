@@ -90,7 +90,7 @@ def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test
     master_key_fingerprint = hash160(bip32.pubkey)[0:4]
 
     count = 0
-    for key_info in wallet_policy.keys_info:
+    for key_index, key_info in enumerate(wallet_policy.keys_info):
         if "]" in key_info:
             key_orig_end_pos = key_info.index("]")
             fpr = key_info[1:9]
@@ -104,6 +104,7 @@ def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test
             if fpr == master_key_fingerprint.hex():
                 computed_xpub = get_internal_xpub(seed, path)
                 if computed_xpub == xpub:
-                    count += 1
+                    # there could be multiple placeholders using the same key; we must count all of them
+                    count += wallet_policy.policy_map.count(f"@{key_index}/")
 
     return count

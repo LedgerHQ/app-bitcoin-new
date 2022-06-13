@@ -16,12 +16,10 @@ typedef struct {
                                    // PSBT_{IN,OUT}_BIP32_DERIVATION or
                                    // PSBT_{IN,OUT}_TAP_BIP32_DERIVATION is not the correct length.
 
-    bool has_bip32_derivation;
-    uint8_t
-        bip32_derivation_pubkey[33];  // the pubkey of the first PSBT_{IN,OUT}_BIP32_DERIVATION or
-                                      // PSBT_{IN,OUT}_TAP_BIP32_DERIVATION key seen.
-                                      // Could be 33 (legacy or segwitv0) or 32 bytes long
-                                      // (taproot), based on the script type.
+    bool placeholder_found;  // Set to true if a matching placeholder is found in the input info
+
+    bool is_change;
+    int address_index;
 
     // For an output, its scriptPubKey
     // for an input, the prevout's scriptPubKey (either from the non-witness-utxo, or from the
@@ -44,9 +42,6 @@ typedef struct {
     size_t script_len;
 
     uint32_t sighash_type;
-
-    int change;
-    int address_index;
 } input_info_t;
 
 typedef struct {
@@ -67,8 +62,6 @@ typedef struct {
     uint8_t p2;
 
     bool is_wallet_canonical;
-    int address_type;   // only relevant for canonical wallets
-    int bip44_purpose;  // only relevant for canonical wallets
 
     int wallet_header_version;
     uint8_t wallet_header_keys_info_merkle_root[32];
@@ -83,7 +76,12 @@ typedef struct {
     // bitmap to track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
 
-    unsigned int cur_key_index;  // index of the currently processed key during input signing
+    int cur_placeholder_index;  // index of the current key placeholder during input signing
+    uint32_t cur_placeholder_fingerprint;
+    int cur_placeholder_key_derivation_length;
+    uint32_t cur_placeholder_key_derivation[MAX_BIP32_PATH_STEPS];
+    policy_node_key_placeholder_t cur_placeholder;
+
     union {
         unsigned int cur_input_index;
         unsigned int cur_output_index;
@@ -96,12 +94,6 @@ typedef struct {
             output_info_t output;
         };
     } cur;
-
-    // if any segwitv0 input is missing the non-witness-utxo, we show a warning
-    bool show_missing_nonwitnessutxo_warning;
-
-    // if any input has non-default sighash, we show a warning
-    bool show_nondefault_sighash_warning;
 
     uint8_t sighash[32];
 
@@ -121,11 +113,14 @@ typedef struct {
 
     uint64_t change_outputs_total_value;
 
+    // if any segwitv0 input is missing the non-witness-utxo, we show a warning
+    bool show_missing_nonwitnessutxo_warning;
+
+    // if any input has non-default sighash, we show a warning
+    bool show_nondefault_sighash_warning;
+
     int external_outputs_count;  // count of external outputs that are shown to the user
     int change_count;            // count of outputs compatible with change outputs
-
-    int our_key_derivation_length;
-    uint32_t our_key_derivation[MAX_BIP32_PATH_STEPS];
 } sign_psbt_state_t;
 
 void handler_sign_psbt(dispatcher_context_t *dispatcher_context, uint8_t p2);

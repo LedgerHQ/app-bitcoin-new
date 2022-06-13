@@ -1,3 +1,5 @@
+import re
+
 from enum import IntEnum
 from typing import List
 
@@ -75,7 +77,14 @@ class PolicyMapWallet(Wallet):
             desc = desc.replace(f"@{i}", key)
 
         # in V1, /** is part of the key; in V1, it's part of the policy map. This handles either
-        return desc.replace("/**", f"/{1 if change else 0}/*")
+        desc = desc.replace("/**", f"/{1 if change else 0}/*")
+
+        if self.version == WalletType.WALLET_POLICY_V2:
+            # V2, the /<M;N> syntax is supported. Replace with M if not change, or with N if change
+            regex = r"/<(\d+);(\d+)>"
+            desc = re.sub(regex, "/\\2" if change else "/\\1", desc)
+
+        return desc
 
 class MultisigWallet(PolicyMapWallet):
     def __init__(self, name: str, address_type: AddressType, threshold: int, keys_info: List[str], sorted: bool = True, version: WalletType = WalletType.WALLET_POLICY_V2) -> None:

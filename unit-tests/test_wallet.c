@@ -37,7 +37,9 @@ static void test_parse_policy_map_singlesig_1(void **state) {
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
     assert_int_equal(node_1->base.type, TOKEN_PKH);
-    assert_int_equal(node_1->key_index, 0);
+    assert_int_equal(node_1->key_placeholder->key_index, 0);
+    assert_int_equal(node_1->key_placeholder->num_first, 0);
+    assert_int_equal(node_1->key_placeholder->num_second, 1);
 }
 
 static void test_parse_policy_map_singlesig_2(void **state) {
@@ -59,7 +61,9 @@ static void test_parse_policy_map_singlesig_2(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) root->script;
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
-    assert_int_equal(inner->key_index, 0);
+    assert_int_equal(inner->key_placeholder->key_index, 0);
+    assert_int_equal(inner->key_placeholder->num_first, 0);
+    assert_int_equal(inner->key_placeholder->num_second, 1);
 }
 
 static void test_parse_policy_map_singlesig_3(void **state) {
@@ -85,7 +89,9 @@ static void test_parse_policy_map_singlesig_3(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) mid->script;
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
-    assert_int_equal(inner->key_index, 0);
+    assert_int_equal(inner->key_placeholder->key_index, 0);
+    assert_int_equal(inner->key_placeholder->num_first, 0);
+    assert_int_equal(inner->key_placeholder->num_second, 1);
 }
 
 static void test_parse_policy_map_multisig_1(void **state) {
@@ -105,9 +111,15 @@ static void test_parse_policy_map_multisig_1(void **state) {
     assert_int_equal(node_1->base.type, TOKEN_SORTEDMULTI);
     assert_int_equal(node_1->k, 2);
     assert_int_equal(node_1->n, 3);
-    assert_int_equal(node_1->key_indexes[0], 0);
-    assert_int_equal(node_1->key_indexes[1], 1);
-    assert_int_equal(node_1->key_indexes[2], 2);
+    assert_int_equal(node_1->key_placeholders[0].key_index, 0);
+    assert_int_equal(node_1->key_placeholders[0].num_first, 0);
+    assert_int_equal(node_1->key_placeholders[0].num_second, 1);
+    assert_int_equal(node_1->key_placeholders[1].key_index, 1);
+    assert_int_equal(node_1->key_placeholders[1].num_first, 0);
+    assert_int_equal(node_1->key_placeholders[1].num_second, 1);
+    assert_int_equal(node_1->key_placeholders[2].key_index, 2);
+    assert_int_equal(node_1->key_placeholders[2].num_first, 0);
+    assert_int_equal(node_1->key_placeholders[2].num_second, 1);
 }
 
 static void test_parse_policy_map_multisig_2(void **state) {
@@ -131,7 +143,11 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
-    for (int i = 0; i < 5; i++) assert_int_equal(inner->key_indexes[i], i);
+    for (int i = 0; i < 5; i++) {
+        assert_int_equal(inner->key_placeholders[i].key_index, i);
+        assert_int_equal(inner->key_placeholders[i].num_first, 0);
+        assert_int_equal(inner->key_placeholders[i].num_second, 1);
+    }
 }
 
 static void test_parse_policy_map_multisig_3(void **state) {
@@ -158,7 +174,11 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
-    for (int i = 0; i < 5; i++) assert_int_equal(inner->key_indexes[i], i);
+    for (int i = 0; i < 5; i++) {
+        assert_int_equal(inner->key_placeholders[i].key_index, i);
+        assert_int_equal(inner->key_placeholders[i].num_first, 0);
+        assert_int_equal(inner->key_placeholders[i].num_second, 1);
+    }
 }
 
 // convenience function to parse as one liners

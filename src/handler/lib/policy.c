@@ -289,20 +289,6 @@ int read_and_parse_wallet_policy(dispatcher_context_t *dispatcher_context,
     return 0;
 }
 
-static void print_parser_info(const policy_parser_state_t *state, const char *func_name) {
-    (void) func_name;  // avoid warnings when DEBUG=0
-
-    for (int i = 0; i < state->node_stack_eos; i++) {
-        PRINTF("##");
-    }
-    PRINTF("%s(%d); FLAGS: %d\n",
-           func_name,
-           state->nodes[state->node_stack_eos].step,
-           state->nodes[state->node_stack_eos].flags);
-}
-
-#define PRINT_PARSER_INFO(state) print_parser_info(state, __func__)
-
 /**
  * Pushes a node onto the stack. Returns 0 on success, -1 if the stack is exhausted.
  */
@@ -418,22 +404,23 @@ static int __attribute__((noinline)) get_extended_pubkey(policy_parser_state_t *
     return key_info.has_wildcard ? 1 : 0;
 }
 
-static int get_derived_pubkey(policy_parser_state_t *state, int key_index, uint8_t out[static 33]) {
+static int get_derived_pubkey(policy_parser_state_t *state,
+                              const policy_node_key_placeholder_t *key_placeholder,
+                              uint8_t out[static 33]) {
     PRINT_STACK_POINTER();
 
     serialized_extended_pubkey_t ext_pubkey;
 
-    int ret = get_extended_pubkey(state, key_index, &ext_pubkey);
+    int ret = get_extended_pubkey(state, key_placeholder->key_index, &ext_pubkey);
     if (ret < 0) {
         return -1;
     }
 
-    // TODO: here we assume that we always generate /0/i or /1/i; this will no longer be guaranteed
-    // once the full wallet policy specs are implemented
-
-    // we derive the /0/i child of this pubkey
+    // we derive the /<change>/<address_index> child of this pubkey
     // we reuse the same memory of ext_pubkey
-    bip32_CKDpub(&ext_pubkey, state->change, &ext_pubkey);
+    bip32_CKDpub(&ext_pubkey,
+                 state->change ? key_placeholder->num_second : key_placeholder->num_first,
+                 &ext_pubkey);
     bip32_CKDpub(&ext_pubkey, state->address_index, &ext_pubkey);
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
@@ -493,7 +480,6 @@ static void update_output_push_u32(policy_parser_state_t *state, uint32_t n) {
 }
 
 static void update_output_op_v(policy_parser_state_t *state, uint8_t op) {
-    PRINT_PARSER_INFO(state);
     const policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     if (node->flags & PROCESSOR_FLAG_V) {
         if (op == OP_CHECKSIG || op == OP_CHECKMULTISIG || op == OP_NUMEQUAL || op == OP_EQUAL) {
@@ -509,10 +495,6 @@ static void update_output_op_v(policy_parser_state_t *state, uint8_t op) {
 }
 
 static int process_generic_node(policy_parser_state_t *state, const void *arg) {
-    for (int i = 0; i < state->node_stack_eos; i++) {
-        PRINTF("##");
-    }
-
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     const generic_processor_command_t *commands = (const generic_processor_command_t *) arg;
@@ -528,11 +510,6 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
         uint8_t cmd_code = commands[node->step].code;
         uint8_t cmd_data = commands[node->step].data;
 
-        PRINTF("process_command-%d(%d); FLAGS: %d\n",
-               node->policy_node->type,
-               node->step,
-               node->flags);
-
         switch (cmd_code) {
             case CMD_CODE_OP: {
                 update_output_u8(state, cmd_data);
@@ -546,7 +523,7 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+                if (-1 == get_derived_pubkey(state, policy->key_placeholder, compressed_pubkey)) {
                     return -1;
                 }
 
@@ -558,7 +535,7 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+                if (-1 == get_derived_pubkey(state, policy->key_placeholder, compressed_pubkey)) {
                     return -1;
                 }
                 crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
@@ -620,7 +597,6 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
 static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
-    PRINT_PARSER_INFO(state);
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
@@ -633,7 +609,7 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) 
 
     uint8_t compressed_pubkey[33];
 
-    if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+    if (-1 == get_derived_pubkey(state, policy->key_placeholder, compressed_pubkey)) {
         return -1;
     } else if (policy->base.type == TOKEN_PKH) {
         update_output_u8(state, OP_DUP);
@@ -661,7 +637,6 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) 
 static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
-    PRINT_PARSER_INFO(state);
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
@@ -704,7 +679,6 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
 static int process_multi_sortedmulti_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
-    PRINT_PARSER_INFO(state);
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
@@ -722,7 +696,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
         uint8_t compressed_pubkey[33];
 
         if (policy->base.type == TOKEN_MULTI) {
-            if (-1 == get_derived_pubkey(state, policy->key_indexes[i], compressed_pubkey)) {
+            if (-1 == get_derived_pubkey(state, &policy->key_placeholders[i], compressed_pubkey)) {
                 return -1;
             }
         } else {
@@ -744,7 +718,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
             for (int j = 0; j < policy->n; j++) {
                 if (!bitvector_get(used, j)) {
                     uint8_t cur_pubkey[33];
-                    if (-1 == get_derived_pubkey(state, policy->key_indexes[j], cur_pubkey)) {
+                    if (-1 == get_derived_pubkey(state, &policy->key_placeholders[j], cur_pubkey)) {
                         return -1;
                     }
 
@@ -772,7 +746,6 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
 static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
-    PRINT_PARSER_INFO(state);
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
@@ -781,7 +754,7 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     uint8_t compressed_pubkey[33];
     uint8_t tweaked_key[32];
 
-    if (-1 == get_derived_pubkey(state, policy->key_index, compressed_pubkey)) {
+    if (-1 == get_derived_pubkey(state, policy->key_placeholder, compressed_pubkey)) {
         return -1;
     }
 
@@ -799,6 +772,10 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
 #define WRAPPED_SCRIPT_TYPE_SH     0
 #define WRAPPED_SCRIPT_TYPE_WSH    1
 #define WRAPPED_SCRIPT_TYPE_SH_WSH 2
+
+#pragma GCC diagnostic push
+// make sure that the compiler gives an error if any PolicyNodeType is missed
+#pragma GCC diagnostic error "-Wswitch-enum"
 
 int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            const policy_node_t *policy,
@@ -963,6 +940,12 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
             case TOKEN_TR:
                 ret = execute_processor(&state, process_tr_node, NULL);
                 break;
+            case TOKEN_SH:
+            case TOKEN_WSH:
+                PRINTF("Unexpected token type: %d\n", node->policy_node->type);
+                return -1;
+
+            case TOKEN_INVALID:
             default:
                 PRINTF("Unknown token type: %d\n", node->policy_node->type);
                 return -1;
@@ -1016,6 +999,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
     return ret;
 }
+#pragma GCC diagnostic pop
 
 int get_policy_address_type(const policy_node_t *policy) {
     // legacy, native segwit, wrapped segwit, or taproot
@@ -1061,3 +1045,150 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
 
     return result;
 }
+
+#pragma GCC diagnostic push
+// make sure that the compiler gives an error if any PolicyNodeType is missed
+#pragma GCC diagnostic error "-Wswitch-enum"
+
+int get_key_placeholder_by_index(const policy_node_t *policy,
+                                 unsigned int i,
+                                 policy_node_key_placeholder_t *out_placeholder) {
+    // make sure that out_placeholder is a valid pointer, if the output is not needed
+    policy_node_key_placeholder_t tmp;
+    if (out_placeholder == NULL) {
+        out_placeholder = &tmp;
+    }
+
+    switch (policy->type) {
+        // terminal nodes with absolutely no keys
+        case TOKEN_0:
+        case TOKEN_1:
+        case TOKEN_OLDER:
+        case TOKEN_AFTER:
+        case TOKEN_SHA256:
+        case TOKEN_HASH256:
+        case TOKEN_RIPEMD160:
+        case TOKEN_HASH160:
+            return 0;
+
+        // terminal nodes with exactly 1 key
+        case TOKEN_PK_K:
+        case TOKEN_PK_H:
+        case TOKEN_PK:
+        case TOKEN_PKH:
+        case TOKEN_WPKH:
+        // tr has a key, plus a child script; for now, we only support key
+        case TOKEN_TR: {
+            if (i == 0) {
+                memcpy(out_placeholder,
+                       ((policy_node_with_key_t *) policy)->key_placeholder,
+                       sizeof(policy_node_key_placeholder_t));
+            }
+            return 1;
+        }
+
+        // terminal nodes with multiple keys
+        case TOKEN_MULTI:
+        case TOKEN_SORTEDMULTI: {
+            const policy_node_multisig_t *node = (const policy_node_multisig_t *) policy;
+
+            if (i < (unsigned int) node->n) {
+                memcpy(out_placeholder,
+                       &node->key_placeholders[i],
+                       sizeof(policy_node_key_placeholder_t));
+            }
+
+            return node->n;
+        }
+
+        // nodes with a single child script (including miniscript wrappers)
+        case TOKEN_SH:
+        case TOKEN_WSH:
+        case TOKEN_A:
+        case TOKEN_S:
+        case TOKEN_C:
+        case TOKEN_T:
+        case TOKEN_D:
+        case TOKEN_V:
+        case TOKEN_J:
+        case TOKEN_N:
+        case TOKEN_L:
+        case TOKEN_U: {
+            return get_key_placeholder_by_index(
+                ((const policy_node_with_script_t *) policy)->script,
+                i,
+                out_placeholder);
+        }
+
+        // nodes with exactly two child scripts
+        case TOKEN_AND_V:
+        case TOKEN_AND_B:
+        case TOKEN_AND_N:
+        case TOKEN_OR_B:
+        case TOKEN_OR_C:
+        case TOKEN_OR_D:
+        case TOKEN_OR_I: {
+            const policy_node_with_script2_t *node = (const policy_node_with_script2_t *) policy;
+            int ret1 = get_key_placeholder_by_index(node->scripts[0], i, out_placeholder);
+            if (ret1 < 0) return -1;
+
+            bool found = i < (unsigned int) ret1;
+            int ret2 = get_key_placeholder_by_index(node->scripts[1],
+                                                    found ? 0 : i - ret1,
+                                                    found ? NULL : out_placeholder);
+            if (ret2 < 0) return -1;
+
+            return ret1 + ret2;
+        }
+
+        // nodes with exactly three child scripts
+        case TOKEN_ANDOR: {
+            const policy_node_with_script3_t *node = (const policy_node_with_script3_t *) policy;
+            int ret1 = get_key_placeholder_by_index(node->scripts[0], i, out_placeholder);
+            if (ret1 < 0) return -1;
+
+            bool found = i < (unsigned int) ret1;
+            int ret2 = get_key_placeholder_by_index(node->scripts[1],
+                                                    found ? 0 : i - ret1,
+                                                    found ? NULL : out_placeholder);
+            if (ret2 < 0) return -1;
+
+            found = i < (unsigned int) (ret1 + ret2);
+            int ret3 = get_key_placeholder_by_index(node->scripts[2],
+                                                    found ? 0 : i - ret1 - ret2,
+                                                    found ? NULL : out_placeholder);
+            if (ret3 < 0) return -1;
+            return ret1 + ret2 + ret3;
+        }
+
+        // nodes with multiple child scripts
+        case TOKEN_THRESH: {
+            const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy;
+            bool found;
+            int ret = 0;
+            policy_node_scriptlist_t *cur_child = node->scriptlist;
+            for (int script_idx = 0; script_idx < node->n; script_idx++) {
+                found = i < (unsigned int) ret;
+                int ret_partial = get_key_placeholder_by_index(cur_child->script,
+                                                               found ? 0 : i - ret,
+                                                               found ? NULL : out_placeholder);
+                if (ret_partial < 0) return -1;
+
+                ret += ret_partial;
+                cur_child = cur_child->next;
+            }
+            return ret;
+        }
+
+        case TOKEN_INVALID:
+        default:
+            PRINTF("Unknown token type: %d\n", policy->type);
+            return -1;
+    }
+
+    // unreachable
+    assert(0);
+    return -1;
+}
+
+#pragma GCC diagnostic pop
