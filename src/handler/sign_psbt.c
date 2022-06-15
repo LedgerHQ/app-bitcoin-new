@@ -1148,8 +1148,9 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     }
 
     // TODO: add support for other sighash flags
-    if (state->cur.input.sighash_type != SIGHASH_ALL) {
-        PRINTF("Only SIGHASH_ALL is currently supported\n");
+    if ((state->cur.input.sighash_type != SIGHASH_ALL) &&
+        (state->cur.input.sighash_type != SIGHASH_DEFAULT)) {
+        PRINTF("Only SIGHASH_ALL or SIGHASH_DEFAULT is currently supported\n");
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
