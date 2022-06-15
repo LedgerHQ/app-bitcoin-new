@@ -345,10 +345,10 @@ def test_sign_psbt_multisig_wsh(client: Client):
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_taproot_1to2(client: Client):
+def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
 
     wallet = PolicyMapWallet(
         "",
@@ -380,6 +380,38 @@ def test_sign_psbt_taproot_1to2(client: Client):
 
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
+@has_automation("automations/sign_with_default_wallet_accept.json")
+def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
+    # PSBT for a p2tr 1-input 2-output spend (1 change address)
+
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
+
+    wallet = PolicyMapWallet(
+        "",
+        "tr(@0)",
+        [
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+        ],
+    )
+
+    result = client.sign_psbt(psbt, wallet, None)
+
+    # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
+    # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
+    # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
+
+    # sighash verified with bitcoin-core
+    sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
+
+    # get the (tweaked) pubkey from the scriptPubKey
+    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+
+    assert len(result) == 1
+    assert len(result[0]) == 64
+
+    sig0 = result[0]
+
+    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
