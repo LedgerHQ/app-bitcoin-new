@@ -8,10 +8,11 @@
 #include "../../common/buffer.h"
 
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
+                                          machine_context_t *state,
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,
-                                          dispatcher_callback_descriptor_t keys_callback,
+                                          merkle_tree_elements_callback_t callback,
                                           merkleized_map_commitment_t *out_ptr) {
     // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
 
@@ -36,7 +37,9 @@ int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_conte
     }
 
     return call_check_merkle_tree_sorted_with_callback(dispatcher_context,
+                                                       state,
                                                        out_ptr->keys_root,
                                                        out_ptr->size,
-                                                       keys_callback);
+                                                       callback,
+                                                       out_ptr);
 }

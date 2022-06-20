@@ -523,7 +523,13 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
  * Callback to process all the keys of the current input map.
  * Keeps track if the current input has a witness_utxo and/or a redeemScript.
  */
-static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
+static void input_keys_callback(dispatcher_context_t *dc,
+                                sign_psbt_state_t *state,
+                                const merkleized_map_commitment_t *map_commitment,
+                                int i,
+                                buffer_t *data) {
+    (void) dc;
+
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
@@ -573,13 +579,13 @@ static void process_input_map(dispatcher_context_t *dc) {
     // Reset cur struct
     memset(&state->cur, 0, sizeof(state->cur));
 
-    int res = call_get_merkleized_map_with_callback(
-        dc,
-        state->inputs_root,
-        state->n_inputs,
-        state->cur_input_index,
-        make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur.in_out.map);
+    int res = call_get_merkleized_map_with_callback(dc,
+                                                    (machine_context_t *) state,
+                                                    state->inputs_root,
+                                                    state->n_inputs,
+                                                    state->cur_input_index,
+                                                    input_keys_callback,
+                                                    &state->cur.in_out.map);
     if (res < 0) {
         PRINTF("Failed to process input map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -861,7 +867,13 @@ static void verify_outputs_init(dispatcher_context_t *dc) {
  * Callback to process all the keys of the current input map.
  * Keeps track if the current input has a witness_utxo and/or a redeemScript.
  */
-static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
+static void output_keys_callback(dispatcher_context_t *dc,
+                                 sign_psbt_state_t *state,
+                                 const merkleized_map_commitment_t *map,
+                                 int i,
+                                 buffer_t *data) {
+    (void) dc;
+
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
@@ -901,13 +913,13 @@ static void process_output_map(dispatcher_context_t *dc) {
     // Reset cur struct
     memset(&state->cur, 0, sizeof(state->cur));
 
-    int res = call_get_merkleized_map_with_callback(
-        dc,
-        state->outputs_root,
-        state->n_outputs,
-        state->cur_output_index,
-        make_callback(state, (dispatcher_callback_t) output_keys_callback),
-        &state->cur.in_out.map);
+    int res = call_get_merkleized_map_with_callback(dc,
+                                                    (machine_context_t *) state,
+                                                    state->outputs_root,
+                                                    state->n_outputs,
+                                                    state->cur_output_index,
+                                                    output_keys_callback,
+                                                    &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -1218,13 +1230,13 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     // Reset cur struct
     memset(&state->cur, 0, sizeof(state->cur));
 
-    int res = call_get_merkleized_map_with_callback(
-        dc,
-        state->inputs_root,
-        state->n_inputs,
-        state->cur_input_index,
-        make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur.in_out.map);
+    int res = call_get_merkleized_map_with_callback(dc,
+                                                    (machine_context_t *) state,
+                                                    state->inputs_root,
+                                                    state->n_inputs,
+                                                    state->cur_input_index,
+                                                    input_keys_callback,
+                                                    &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;

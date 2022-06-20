@@ -3,14 +3,17 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
 
+#include "check_merkle_tree_sorted.h"
+
 /**
  * TODO: docs
  */
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
+                                          machine_context_t *state,
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,
-                                          dispatcher_callback_descriptor_t keys_callback,
+                                          merkle_tree_elements_callback_t callback,
                                           merkleized_map_commitment_t *out_ptr);
 
 /**
@@ -22,9 +25,10 @@ static inline int call_get_merkleized_map(dispatcher_context_t *dispatcher_conte
                                           int index,
                                           merkleized_map_commitment_t *out_ptr) {
     return call_get_merkleized_map_with_callback(dispatcher_context,
+                                                 NULL,
                                                  root,
                                                  size,
                                                  index,
-                                                 make_callback(NULL, NULL),
+                                                 NULL,
                                                  out_ptr);
 }

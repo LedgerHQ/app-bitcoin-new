@@ -30,18 +30,6 @@ typedef struct machine_context_s {
     command_processor_t next_processor;
 } machine_context_t;
 
-typedef void (*dispatcher_callback_t)(machine_context_t *, buffer_t *);
-
-typedef struct {
-    void *state;
-    dispatcher_callback_t fn;
-} dispatcher_callback_descriptor_t;
-
-static inline dispatcher_callback_descriptor_t make_callback(void *state,
-                                                             dispatcher_callback_t fn) {
-    return (dispatcher_callback_descriptor_t){.state = state, .fn = fn};
-}
-
 /**
  * TODO: docs
  */
