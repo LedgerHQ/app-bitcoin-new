@@ -399,6 +399,7 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
 
     assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
 
+
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
@@ -407,9 +408,9 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
 
     wallet = PolicyMapWallet(
         "",
-        "tr(@0)",
+        "tr(@0/**)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
         ],
     )
 
@@ -423,14 +424,18 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
 
     # get the (tweaked) pubkey from the scriptPubKey
-    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+    expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
     assert len(result) == 1
-    assert len(result[0]) == 64
 
-    sig0 = result[0]
+    idx0, pubkey0, sig0 = result[0]
+
+    assert idx0 == 0
+    assert pubkey0 == expected_pubkey0
+    assert len(sig0) == 64
 
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)

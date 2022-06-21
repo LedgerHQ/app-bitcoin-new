@@ -286,7 +286,7 @@ def test_sign_psbt_multisig_wsh_v1(client: Client):
 def test_sign_psbt_taproot_1to2_v1(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2.psbt")
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
 
     wallet = PolicyMapWallet(
         "",
