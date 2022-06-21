@@ -55,6 +55,7 @@ extern global_context_t *G_coin_config;
 // Input validation
 static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
+static void check_sighash(dispatcher_context_t *dc);
 
 static void alert_external_inputs(dispatcher_context_t *dc);
 static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc);
@@ -682,6 +683,9 @@ static void check_input_owned(dispatcher_context_t *dc) {
         return;
     } else if (is_internal == 0) {
         PRINTF("INPUT %d is external\n", state->cur_input_index);
+        ++state->cur_input_index;
+        dc->next(process_input_map);
+
     } else {
         bitvector_set(state->internal_inputs, state->cur_input_index, 1);
         state->internal_inputs_total_value += state->cur.input.prevout_amount;
@@ -709,6 +713,61 @@ static void check_input_owned(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
+
+        dc->next(check_sighash);
+    }
+}
+
+// If any of the internal inputs has a sighash type that is not SIGHASH_DEFAULT or SIGHASH_ALL,
+// we show a warning
+static void check_sighash(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    if (!state->cur.input.has_sighash_type) {
+        ++state->cur_input_index;
+        dc->next(process_input_map);
+        return;
+    }
+
+    // get the sighash_type
+    if (4 != call_get_merkleized_map_value_u32_le(dc,
+                                                  &state->cur.in_out.map,
+                                                  (uint8_t[]){PSBT_IN_SIGHASH_TYPE},
+                                                  1,
+                                                  &state->cur.input.sighash_type)) {
+        PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", state->cur_input_index);
+
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    int segwit_version =
+        get_segwit_version(state->cur.in_out.scriptPubKey, state->cur.in_out.scriptPubKey_len);
+
+    if (((segwit_version > 0) && (state->cur.input.sighash_type == SIGHASH_DEFAULT)) ||
+        (state->cur.input.sighash_type == SIGHASH_ALL)) {
+        PRINTF("Sighash type is SIGHASH_DEFAULT or SIGHASH_ALL\n");
+
+    } else if ((segwit_version >= 0) &&
+               ((state->cur.input.sighash_type == SIGHASH_NONE) ||
+                (state->cur.input.sighash_type == SIGHASH_SINGLE) ||
+                (state->cur.input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_ALL)) ||
+                (state->cur.input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_NONE)) ||
+                (state->cur.input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_SINGLE)))) {
+        PRINTF("Sighash type is non-default, will show a warning.\n");
+        state->show_nondefault_sighash_warning = true;
+
+    } else {
+        PRINTF("Unsupported sighash\n");
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
+    if (((state->cur.input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
+        (state->cur_input_index >= state->n_outputs)) {
+        PRINTF("SIGHASH_SINGLE with input idx >= n_output is not allowed \n");
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
     }
 
     ++state->cur_input_index;
@@ -756,9 +815,9 @@ static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     if (state->show_missing_nonwitnessutxo_warning) {
-        ui_warn_unverified_segwit_inputs(dc, verify_outputs_init);
+        ui_warn_unverified_segwit_inputs(dc, alert_nondefault_sighash);
     } else {
-        dc->next(verify_outputs_init);
+        dc->next(alert_nondefault_sighash);
     }
 }
 
@@ -1172,14 +1231,6 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
-    }
-
-    // TODO: add support for other sighash flags
-    if ((state->cur.input.sighash_type != SIGHASH_ALL) &&
-        (state->cur.input.sighash_type != SIGHASH_DEFAULT)) {
-        PRINTF("Only SIGHASH_ALL or SIGHASH_DEFAULT is currently supported\n");
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return;
     }
 
     // get path, obtain change and address_index
