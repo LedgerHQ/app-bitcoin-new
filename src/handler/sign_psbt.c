@@ -106,50 +106,63 @@ the right paths to identify internal inputs/outputs.
 */
 
 // HELPER FUNCTIONS
+// Updates the hash_context with the output of given index
+// returns -1 on error. 0 on success.
+static int hash_output_n(dispatcher_context_t *dc, cx_hash_t *hash_context, unsigned int index) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    if (index >= state->n_outputs) {
+        return -1;
+    }
+
+    // get this output's map
+    merkleized_map_commitment_t ith_map;
+
+    int res = call_get_merkleized_map(dc, state->outputs_root, state->n_outputs, index, &ith_map);
+    if (res < 0) {
+        return -1;
+    }
+
+    // get output's amount
+    uint8_t amount_raw[8];
+    if (8 != call_get_merkleized_map_value(dc,
+                                           &ith_map,
+                                           (uint8_t[]){PSBT_OUT_AMOUNT},
+                                           1,
+                                           amount_raw,
+                                           8)) {
+        return -1;
+    }
+
+    crypto_hash_update(hash_context, amount_raw, 8);
+
+    // get output's scriptPubKey
+
+    uint8_t out_script[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
+    int out_script_len = call_get_merkleized_map_value(dc,
+                                                       &ith_map,
+                                                       (uint8_t[]){PSBT_OUT_SCRIPT},
+                                                       1,
+                                                       out_script,
+                                                       sizeof(out_script));
+    if (out_script_len == -1) {
+        return -1;
+    }
+
+    crypto_hash_update_varint(hash_context, out_script_len);
+    crypto_hash_update(hash_context, out_script, out_script_len);
+    return 0;
+}
 
 // Updates the hash_context with the network serialization of all the outputs
 // returns -1 on error. 0 on success.
 static int hash_outputs(dispatcher_context_t *dc, cx_hash_t *hash_context) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
-    // TODO: support other SIGHASH FLAGS
     for (unsigned int i = 0; i < state->n_outputs; i++) {
-        // get this output's map
-        merkleized_map_commitment_t ith_map;
-
-        int res = call_get_merkleized_map(dc, state->outputs_root, state->n_outputs, i, &ith_map);
-        if (res < 0) {
+        if (hash_output_n(dc, hash_context, i)) {
             return -1;
         }
-
-        // get output's amount
-        uint8_t amount_raw[8];
-        if (8 != call_get_merkleized_map_value(dc,
-                                               &ith_map,
-                                               (uint8_t[]){PSBT_OUT_AMOUNT},
-                                               1,
-                                               amount_raw,
-                                               8)) {
-            return -1;
-        }
-
-        crypto_hash_update(hash_context, amount_raw, 8);
-
-        // get output's scriptPubKey
-
-        uint8_t out_script[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
-        int out_script_len = call_get_merkleized_map_value(dc,
-                                                           &ith_map,
-                                                           (uint8_t[]){PSBT_OUT_SCRIPT},
-                                                           1,
-                                                           out_script,
-                                                           sizeof(out_script));
-        if (out_script_len == -1) {
-            return -1;
-        }
-
-        crypto_hash_update_varint(hash_context, out_script_len);
-        crypto_hash_update(hash_context, out_script, out_script_len);
     }
     return 0;
 }
@@ -1827,7 +1840,19 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
 
     // no annex
 
-    // TODO: SIGHASH_SINGLE not implemented
+    if ((sighash_byte & 3) == SIGHASH_SINGLE) {
+        // compute sha_output
+        cx_sha256_t sha_output_context;
+        cx_sha256_init(&sha_output_context);
+
+        if (hash_output_n(dc, &sha_output_context.header, state->cur_input_index) == -1) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+        crypto_hash_digest(&sha_output_context.header, tmp, 32);
+
+        crypto_hash_update(&sighash_context.header, tmp, 32);
+    }
 
     crypto_hash_digest(&sighash_context.header, state->sighash, 32);
 
