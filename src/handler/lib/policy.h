@@ -4,13 +4,6 @@
 #include "../../common/wallet.h"
 
 /**
- * The label used to derive the symmetric key used to register/verify wallet policies on device.
- */
-#define WALLET_SLIP0021_LABEL "\0LEDGER-Wallet policy"
-#define WALLET_SLIP0021_LABEL_LEN \
-    (sizeof(WALLET_SLIP0021_LABEL) - 1)  // sizeof counts the terminating 0
-
-/**
  * Parses a serialized wallet policy, saving the wallet header, the policy map descriptor and the
  * policy descriptor. Then, it parses the descriptor into the Abstract Syntax Tree into the
  * policy_map_bytes array.
@@ -81,13 +74,25 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 int get_policy_address_type(const policy_node_t *policy);
 
 /**
+ * Computes and returns the wallet_hmac, using the symmetric key derived
+ * with the WALLET_SLIP0021_LABEL label according to SLIP-0021.
+ *
+ * @param[in] wallet_id
+ *   Pointer to the a 32-bytes array containing the 32-byte wallet policy id.
+ * @param[out] wallet_hmac
+ *   Pointer to the a 32-bytes array containing the wallet policy registration hmac.
+ * @return true if the given hmac is valid, false otherwise.
+ */
+bool compute_wallet_hmac(const uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]);
+
+/**
  * Verifies if the wallet_hmac is correct for the given wallet_id, using the symmetric key derived
  * with the WALLET_SLIP0021_LABEL label according to SLIP-0021.
  *
  * @param[in] wallet_id
  *   Pointer to the a 32-bytes array containing the 32-byte wallet policy id.
  * @param[in] wallet_hmac
- *   Pointer to the a 32-bytes array containing the wallet policy registration hmac.
+ *   Pointer to the a 32-bytes array containing the expected wallet policy registration hmac.
  * @return true if the given hmac is valid, false otherwise.
  */
 bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_hmac[static 32]);

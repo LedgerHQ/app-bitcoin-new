@@ -25,6 +25,13 @@ extern global_context_t G_context;
 // The last processor ran out of output space
 #define PROCESSOR_FLAG_OUTPUT_OVERFLOW 128
 
+/**
+ * The label used to derive the symmetric key used to register/verify wallet policies on device.
+ */
+#define WALLET_SLIP0021_LABEL "\0LEDGER-Wallet policy"
+#define WALLET_SLIP0021_LABEL_LEN \
+    (sizeof(WALLET_SLIP0021_LABEL) - 1)  // sizeof counts the terminating 0
+
 typedef struct {
     const policy_node_t *policy_node;
 
@@ -1019,6 +1026,26 @@ int get_policy_address_type(const policy_node_t *policy) {
         default:
             return -1;
     }
+}
+
+bool compute_wallet_hmac(const uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
+    uint8_t key[32];
+
+    bool result = false;
+    BEGIN_TRY {
+        TRY {
+            crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
+
+            cx_hmac_sha256(key, sizeof(key), wallet_id, 32, wallet_hmac, 32);
+            result = true;
+        }
+        FINALLY {
+            explicit_bzero(key, sizeof(key));
+        }
+    }
+    END_TRY;
+
+    return result;
 }
 
 bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_hmac[static 32]) {
