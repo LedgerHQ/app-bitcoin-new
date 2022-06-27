@@ -1735,7 +1735,7 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
     // the first 0x00 byte is not part of SigMsg
     crypto_hash_update_u8(&sighash_context.header, 0x00);
 
-    uint8_t tmp[32];
+    uint8_t tmp[MAX(32, 8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN)];
 
     // hash type
     uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
@@ -1788,11 +1788,22 @@ static void sign_segwit_v1(dispatcher_context_t *dc) {
         }
         crypto_hash_update(&sighash_context.header, tmp, 4);
 
+        if (8 > call_get_merkleized_map_value(dc,
+                                              &state->cur.in_out.map,
+                                              (uint8_t[]){PSBT_IN_WITNESS_UTXO},
+                                              1,
+                                              tmp,
+                                              8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         // amount
-        write_u64_le(tmp, 0, state->cur.input.prevout_amount);
         crypto_hash_update(&sighash_context.header, tmp, 8);
 
         // scriptPubKey
+        crypto_hash_update_varint(&sighash_context.header, state->cur.in_out.scriptPubKey_len);
+
         crypto_hash_update(&sighash_context.header,
                            state->cur.in_out.scriptPubKey,
                            state->cur.in_out.scriptPubKey_len);
