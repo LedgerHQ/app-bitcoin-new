@@ -158,6 +158,21 @@ typedef struct policy_node_s {
     } flags;  // 1 byte
 } policy_node_t;
 
+typedef struct policy_node_ext_info_s {
+    uint16_t script_size;
+    uint16_t n_ops;
+    uint16_t n_stack_items;
+
+    unsigned int s : 1;  // has a signature
+
+    unsigned int f : 1;  // forced
+    unsigned int e : 1;
+
+    unsigned int m : 1;  // non-malleable property
+
+    unsigned int k : 1;
+} policy_node_ext_info_t;
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
@@ -263,7 +278,7 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
  *
  * For WALLET_POLICY_VERSION_V1, the final suffix /** must be present and is part of the key
  * information. For WALLET_POLICY_VERSION_V2, parsing stops at the xpub.
- *
+
  * Example (V1):
  * "[d34db33f/44'/0'/0']xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL/**"
  * Example (V2):
@@ -275,8 +290,12 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 
 /**
  * Parses `in_buf` as a policy map, constructing the abstract syntax tree in the buffer `out` of
- * size `out_len`.
  *
+ * When parsing descriptors containing miniscript, this fails if the miniscript is not correct,
+ * as defined by the miniscript type system.
+ * This does NOT check non-malleability of the miniscript.
+ *
+ * size `out_len`.
  * @param in_buf the buffer containing the policy map to parse
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
@@ -285,6 +304,17 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * output buffer is too small.
  */
 int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len, int version);
+
+/**
+ * Computes additional properties of the given miniscript, to detect malleability and other security
+ * properties to assess if the miniscript is sane.
+ *
+ * @param policy_node a pointer to a miniscript policy node
+ * @param out pointer to the output policy_node_ext_info_t
+ * @return a negative number on error; 0 on success.
+ */
+int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
+                                       policy_node_ext_info_t *out);
 
 #ifndef SKIP_FOR_CMOCKA
 

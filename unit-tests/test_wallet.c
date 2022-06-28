@@ -233,8 +233,8 @@ static void test_failures(void **state) {
 enum TestMode {
     TESTMODE_INVALID = 0,
     TESTMODE_VALID = 1,
-    TESTMODE_NONMAL = 2,      // ignored in our tests
-    TESTMODE_NEEDSIG = 4,     // ignored in our tests
+    TESTMODE_NONMAL = 2,
+    TESTMODE_NEEDSIG = 4,
     TESTMODE_TIMELOCKMIX = 8  // ignored in our tests
 };
 
@@ -263,6 +263,18 @@ static void Test(const char *ms, const char *hexscript, int mode) {
         assert_true(res < 0);
     } else {
         assert_true(res == 0);
+
+        policy_node_with_script_t *policy = (policy_node_with_script_t *) out;
+        policy_node_ext_info_t ext_info;
+        res = compute_miniscript_policy_ext_info(policy->script, &ext_info);
+
+        assert(res == 0);
+
+        int is_expected_needsig = (mode & TESTMODE_NEEDSIG) ? 1 : 0;
+        int is_expected_nonmal = (mode & TESTMODE_NONMAL) ? 1 : 0;
+
+        assert(ext_info.s == is_expected_needsig);
+        assert(ext_info.m == is_expected_nonmal);
     }
 }
 
