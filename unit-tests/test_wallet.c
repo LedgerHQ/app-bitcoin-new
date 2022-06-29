@@ -271,8 +271,12 @@ static void Test(const char *ms, int mode) {
         int is_expected_needsig = (mode & TESTMODE_NEEDSIG) ? 1 : 0;
         int is_expected_nonmal = (mode & TESTMODE_NONMAL) ? 1 : 0;
 
+        int is_k = (mode & TESTMODE_TIMELOCKMIX) ? 0 : 1;
+
         assert(ext_info.s == is_expected_needsig);
         assert(ext_info.m == is_expected_nonmal);
+
+        assert(ext_info.k == is_k);
     }
 }
 

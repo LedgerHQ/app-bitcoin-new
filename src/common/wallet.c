@@ -1740,7 +1740,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
     memset(out, 0, sizeof(policy_node_ext_info_t));
 
-    out->m = 1;  // it is 1 in most cases; will be zeroed when appropriate
+    // set flags that are 1 in most cases (they will be zeroed when appropriate)
+    out->m = 1;
+    out->k = 1;
 
     switch (policy_node->type) {
         case TOKEN_0:
@@ -1753,10 +1755,34 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->e = 1;
             return 0;
         case TOKEN_1:
-        case TOKEN_OLDER:
-        case TOKEN_AFTER:
             out->f = 1;
             return 0;
+
+        case TOKEN_OLDER: {
+            policy_node_with_uint32_t *node = (policy_node_with_uint32_t *) policy_node;
+
+            out->f = 1;
+
+            if (node->n & SEQUENCE_LOCKTIME_TYPE_FLAG) {
+                out->g = 1;
+            } else {
+                out->h = 1;
+            }
+
+            return 0;
+        }
+        case TOKEN_AFTER: {
+            policy_node_with_uint32_t *node = (policy_node_with_uint32_t *) policy_node;
+
+            out->f = 1;
+
+            if (node->n >= LOCKTIME_THRESHOLD) {
+                out->i = 1;
+            } else {
+                out->j = 1;
+            }
+            return 0;
+        }
         case TOKEN_SHA256:
         case TOKEN_HASH256:
         case TOKEN_RIPEMD160:
@@ -1778,6 +1804,14 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m & y.m & z.m & x.e & (x.s | y.s | z.s);
 
+            out->g = x.g | y.g | z.g;
+            out->h = x.h | y.h | z.h;
+            out->i = x.i | y.i | z.i;
+            out->j = x.j | y.j | z.j;
+
+            if (!(x.k & y.k & z.k) || (x.g & y.h) || (x.h & y.g) || (x.i & y.j) || (x.j & y.i)) {
+                out->k = 0;
+            }
             return 0;
         }
         case TOKEN_AND_V: {
@@ -1792,6 +1826,15 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->f = x.s | y.f;
 
             out->m = x.m & y.m;
+
+            out->g = x.g | y.g;
+            out->h = x.h | y.h;
+            out->i = x.i | y.i;
+            out->j = x.j | y.j;
+
+            if (!(x.k & y.k) || (x.g & y.h) || (x.h & y.g) || (x.i & y.j) || (x.j & y.i)) {
+                out->k = 0;
+            }
 
             return 0;
         }
@@ -1809,6 +1852,15 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m & y.m;
 
+            out->g = x.g | y.g;
+            out->h = x.h | y.h;
+            out->i = x.i | y.i;
+            out->j = x.j | y.j;
+
+            if (!(x.k & y.k) || (x.g & y.h) || (x.h & y.g) || (x.i & y.j) || (x.j & y.i)) {
+                out->k = 0;
+            }
+
             return 0;
         }
         case TOKEN_AND_N: {  // == andor(X,Y,0)
@@ -1823,6 +1875,15 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->e = x.s | y.f;
 
             out->m = x.m & y.m & x.e & (x.s | y.s);
+
+            out->g = x.g | y.g;
+            out->h = x.h | y.h;
+            out->i = x.i | y.i;
+            out->j = x.j | y.j;
+
+            if (!(x.k & y.k) || (x.g & y.h) || (x.h & y.g) || (x.i & y.j) || (x.j & y.i)) {
+                out->k = 0;
+            }
 
             return 0;
         }
@@ -1839,6 +1900,13 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m & z.m & x.e & z.e & (x.s | z.s);
 
+            out->g = x.g | z.g;
+            out->h = x.h | z.h;
+            out->i = x.i | z.i;
+            out->j = x.j | z.j;
+
+            out->k = x.k & z.k;
+
             return 0;
         }
         case TOKEN_OR_C: {
@@ -1853,6 +1921,13 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->f = 1;
 
             out->m = x.m & z.m & x.e & (x.s | z.s);
+
+            out->g = x.g | z.g;
+            out->h = x.h | z.h;
+            out->i = x.i | z.i;
+            out->j = x.j | z.j;
+
+            out->k = x.k & z.k;
 
             return 0;
         }
@@ -1870,6 +1945,13 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m & z.m & x.e & (x.s | z.s);
 
+            out->g = x.g | z.g;
+            out->h = x.h | z.h;
+            out->i = x.i | z.i;
+            out->j = x.j | z.j;
+
+            out->k = x.k & z.k;
+
             return 0;
         }
         case TOKEN_OR_I: {
@@ -1886,6 +1968,13 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m & z.m & (x.s | z.s);
 
+            out->g = x.g | z.g;
+            out->h = x.h | z.h;
+            out->i = x.i | z.i;
+            out->j = x.j | z.j;
+
+            out->k = x.k & z.k;
+
             return 0;
         }
         case TOKEN_THRESH: {
@@ -1897,19 +1986,32 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             int count_e = 0;
             int count_m = 0;
             while (cur != NULL) {
-                policy_node_ext_info_t child_ext_info;
-                if (0 > compute_miniscript_policy_ext_info(cur->script, &child_ext_info)) return -1;
+                policy_node_ext_info_t t;
+                if (0 > compute_miniscript_policy_ext_info(cur->script, &t)) return -1;
 
-                if (child_ext_info.e) {
+                if (t.e) {
                     ++count_e;
                 }
-                if (child_ext_info.s) {
+                if (t.s) {
                     ++count_s;
                 }
-                if (child_ext_info.m) {
+                if (t.m) {
                     ++count_m;
                 }
                 cur = cur->next;
+
+                out->g |= t.g;
+                out->h |= t.h;
+                out->i |= t.i;
+                out->j |= t.j;
+
+                out->k &= t.k;  // if any child doesn't have k, thresh doesn't have k
+
+                // if any two children have mixed timelocks, thresh doesn't have k
+                if (node->k >= 2 &&
+                    ((t.g & out->h) || (t.h & out->g) || (t.i & out->j) || (t.j & out->i))) {
+                    out->k = 0;
+                }
             }
 
             int count_not_s = node->n - count_s;
@@ -1935,6 +2037,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m;
 
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
+
             return 0;
         }
         case TOKEN_C: {
@@ -1949,6 +2057,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m;
 
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
+
             return 0;
         }
         case TOKEN_D: {
@@ -1961,6 +2075,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->e = 1;
 
             out->m = x.m;
+
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
 
             return 0;
         }
@@ -1976,6 +2096,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = x.m;
 
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
+
             return 0;
         }
         case TOKEN_J: {
@@ -1988,6 +2114,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->e = x.f;
 
             out->m = x.m;
+
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
 
             return 0;
         }
@@ -2003,6 +2135,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->e = x.f;
 
             out->m = x.m;
+
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
 
             return 0;
         }

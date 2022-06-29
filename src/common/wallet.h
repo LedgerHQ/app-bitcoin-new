@@ -170,7 +170,12 @@ typedef struct policy_node_ext_info_s {
 
     unsigned int m : 1;  // non-malleable property
 
-    unsigned int k : 1;
+    // flags related to timelocks
+    unsigned int g : 1;  // older: contains relative time timelock   (csv_time)
+    unsigned int h : 1;  // older: contains relative height timelock (csv_height)
+    unsigned int i : 1;  // after: contains time timelock   (cltv_time)
+    unsigned int j : 1;  // after: contains height timelock (cltv_height)
+    unsigned int k : 1;  // does not contain a combination of height and time locks
 } policy_node_ext_info_t;
 
 #pragma GCC diagnostic push
