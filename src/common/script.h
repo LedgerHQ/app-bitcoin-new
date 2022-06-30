@@ -171,6 +171,11 @@ static inline bool is_opreturn(const uint8_t script[], size_t script_len) {
 }
 
 /**
+ * Returns the size in bytes of the minimal push opcode for <n>, where n a uint32_t.
+ */
+size_t get_push_script_size(uint32_t n);
+
+/**
  * Returns a constant of type `script_type_e` indicating the type of known script type with an
  * address, or -1 for any invalid script, or valid script without an address.
  *

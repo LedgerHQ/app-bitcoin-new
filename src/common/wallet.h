@@ -176,6 +176,8 @@ typedef struct policy_node_ext_info_s {
     unsigned int i : 1;  // after: contains time timelock   (cltv_time)
     unsigned int j : 1;  // after: contains height timelock (cltv_height)
     unsigned int k : 1;  // does not contain a combination of height and time locks
+
+    unsigned int x : 1;  // the last opcode is not EQUAL, CHECKSIG, or CHECKMULTISIG
 } policy_node_ext_info_t;
 
 #pragma GCC diagnostic push

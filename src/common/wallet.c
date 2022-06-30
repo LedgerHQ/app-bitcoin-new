@@ -4,6 +4,7 @@
 
 #include "../common/bip32.h"
 #include "../common/buffer.h"
+#include "../common/script.h"
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"
 
@@ -1743,19 +1744,66 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
     // set flags that are 1 in most cases (they will be zeroed when appropriate)
     out->m = 1;
     out->k = 1;
+    out->x = 1;
 
     switch (policy_node->type) {
         case TOKEN_0:
-        case TOKEN_PK_K:
-        case TOKEN_PK_H:
-        case TOKEN_PK:   // TODO: pk(key) = c:pk_k(key)
-        case TOKEN_PKH:  // TODO: pkh(key) = c:pk_h(key)
-        case TOKEN_MULTI:
             out->s = 1;
             out->e = 1;
+
+            out->script_size = 1;
+
             return 0;
+        case TOKEN_PK_K:
+            out->s = 1;
+            out->e = 1;
+
+            out->script_size = 34;
+
+            return 0;
+        case TOKEN_PK_H:
+            out->s = 1;
+            out->e = 1;
+
+            out->script_size = 3 + 21;
+
+            return 0;
+        case TOKEN_PK:  // pk(key) = c:pk_k(key)
+            out->s = 1;
+            out->e = 1;
+
+            out->x = 0;
+
+            out->script_size = 34 + 1;
+
+            return 0;
+        case TOKEN_PKH:  // pkh(key) = c:pk_h(key)
+            out->s = 1;
+            out->e = 1;
+
+            out->x = 0;
+
+            out->script_size = 3 + 21 + 1;
+
+            return 0;
+        case TOKEN_MULTI: {
+            policy_node_multisig_t *node = (policy_node_multisig_t *) policy_node;
+
+            out->s = 1;
+            out->e = 1;
+
+            out->x = 0;
+
+            out->script_size =
+                1 + get_push_script_size(node->k) + get_push_script_size(node->n) + 34 * node->n;
+
+            return 0;
+        }
         case TOKEN_1:
             out->f = 1;
+
+            out->script_size = 1;
+
             return 0;
 
         case TOKEN_OLDER: {
@@ -1769,6 +1817,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->h = 1;
             }
 
+            out->script_size = 1 + get_push_script_size(node->n);
+
             return 0;
         }
         case TOKEN_AFTER: {
@@ -1781,12 +1831,23 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             } else {
                 out->j = 1;
             }
+
+            out->script_size = 1 + get_push_script_size(node->n);
+
             return 0;
         }
         case TOKEN_SHA256:
         case TOKEN_HASH256:
+            out->x = 0;
+
+            out->script_size = 4 + 2 + 33;
+
+            return 0;
         case TOKEN_RIPEMD160:
         case TOKEN_HASH160:
+            out->x = 0;
+
+            out->script_size = 4 + 2 + 21;
             return 0;
         case TOKEN_ANDOR: {
             policy_node_with_script3_t *node = (policy_node_with_script3_t *) policy_node;
@@ -1812,6 +1873,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             if (!(x.k & y.k & z.k) || (x.g & y.h) || (x.h & y.g) || (x.i & y.j) || (x.j & y.i)) {
                 out->k = 0;
             }
+
+            out->script_size = 3 + x.script_size + y.script_size + z.script_size;
+
             return 0;
         }
         case TOKEN_AND_V: {
@@ -1836,6 +1900,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->k = 0;
             }
 
+            out->x = y.x;
+
+            out->script_size = x.script_size + y.script_size;
             return 0;
         }
         case TOKEN_AND_B: {
@@ -1861,6 +1928,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->k = 0;
             }
 
+            out->script_size = 1 + x.script_size + y.script_size;
+
             return 0;
         }
         case TOKEN_AND_N: {  // == andor(X,Y,0)
@@ -1885,6 +1954,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->k = 0;
             }
 
+            out->script_size = 4 + x.script_size + y.script_size;
+
             return 0;
         }
         case TOKEN_OR_B: {
@@ -1907,6 +1978,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->k = x.k & z.k;
 
+            out->script_size = 1 + x.script_size + z.script_size;
+
             return 0;
         }
         case TOKEN_OR_C: {
@@ -1928,6 +2001,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->j = x.j | z.j;
 
             out->k = x.k & z.k;
+
+            out->script_size = 2 + x.script_size + z.script_size;
 
             return 0;
         }
@@ -1952,6 +2027,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->k = x.k & z.k;
 
+            out->script_size = 3 + x.script_size + z.script_size;
+
             return 0;
         }
         case TOKEN_OR_I: {
@@ -1975,6 +2052,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->k = x.k & z.k;
 
+            out->script_size = 3 + x.script_size + z.script_size;
+
             return 0;
         }
         case TOKEN_THRESH: {
@@ -1985,7 +2064,11 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             int count_s = 0;
             int count_e = 0;
             int count_m = 0;
+            size_t children_scriptsize = 0;
+            size_t n_children = 0;
             while (cur != NULL) {
+                ++n_children;
+
                 policy_node_ext_info_t t;
                 if (0 > compute_miniscript_policy_ext_info(cur->script, &t)) return -1;
 
@@ -2012,6 +2095,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                     ((t.g & out->h) || (t.h & out->g) || (t.i & out->j) || (t.j & out->i))) {
                     out->k = 0;
                 }
+
+                children_scriptsize += t.script_size;
             }
 
             int count_not_s = node->n - count_s;
@@ -2021,9 +2106,34 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             out->m = (count_e == node->n && count_not_s <= node->k) ? 1 : 0;
 
+            out->x = 0;
+
+            out->script_size = children_scriptsize + n_children + get_push_script_size(node->k);
+
             return 0;
         }
-        case TOKEN_A:
+        case TOKEN_A: {
+            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            policy_node_ext_info_t x;
+
+            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+
+            out->s = x.s;
+            out->f = x.f;
+            out->e = x.e;
+
+            out->m = x.m;
+
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
+
+            out->script_size = x.script_size + 2;
+
+            return 0;
+        }
         case TOKEN_S:
         case TOKEN_N: {
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
@@ -2042,6 +2152,10 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->i = x.i;
             out->j = x.j;
             out->k = x.k;
+
+            if (policy_node->type == TOKEN_S) out->x = x.x;
+
+            out->script_size = x.script_size + 1;
 
             return 0;
         }
@@ -2063,6 +2177,12 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->j = x.j;
             out->k = x.k;
 
+            out->x = x.x;
+
+            out->script_size = x.script_size + 1;
+
+            out->x = 0;
+
             return 0;
         }
         case TOKEN_D: {
@@ -2082,9 +2202,31 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->j = x.j;
             out->k = x.k;
 
+            out->script_size = x.script_size + 3;
+
             return 0;
         }
-        case TOKEN_T:  // and_v(X,1)
+        case TOKEN_T: {  // and_v(X,1)
+            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            policy_node_ext_info_t x;
+
+            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+
+            out->s = x.s;
+            out->f = 1;
+
+            out->m = x.m;
+
+            out->g = x.g;
+            out->h = x.h;
+            out->i = x.i;
+            out->j = x.j;
+            out->k = x.k;
+
+            out->script_size = x.script_size + 1;
+
+            return 0;
+        }
         case TOKEN_V: {
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
@@ -2101,6 +2243,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->i = x.i;
             out->j = x.j;
             out->k = x.k;
+
+            out->script_size = x.script_size + x.x;
 
             return 0;
         }
@@ -2120,6 +2264,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->i = x.i;
             out->j = x.j;
             out->k = x.k;
+
+            out->script_size = x.script_size + 4;
 
             return 0;
         }
@@ -2141,6 +2287,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->i = x.i;
             out->j = x.j;
             out->k = x.k;
+
+            out->script_size = x.script_size + 4;
 
             return 0;
         }

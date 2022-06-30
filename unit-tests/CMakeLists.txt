@@ -74,7 +74,7 @@ target_link_libraries(test_display_utils PUBLIC cmocka gcov display_utils)
 target_link_libraries(test_format PUBLIC cmocka gcov format)
 target_link_libraries(test_parser PUBLIC cmocka gcov parser buffer varint read write bip32)
 target_link_libraries(test_script PUBLIC cmocka gcov script buffer varint read write bip32)
-target_link_libraries(test_wallet PUBLIC cmocka gcov wallet buffer varint read write bip32)
+target_link_libraries(test_wallet PUBLIC cmocka gcov wallet script buffer varint read write bip32)
 target_link_libraries(test_write PUBLIC cmocka gcov write)
 #target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 
