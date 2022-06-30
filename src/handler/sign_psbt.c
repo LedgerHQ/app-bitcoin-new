@@ -1651,6 +1651,7 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
     cx_sha256_init(&sighash_context);
 
     uint8_t tmp[8];
+    uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
 
     // nVersion
     write_u32_le(tmp, 0, state->tx_version);
@@ -1659,12 +1660,20 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
     {
         uint8_t dbl_hash[32];
 
+        memset(dbl_hash, 0, 32);
         // add to hash: hashPrevouts = sha256(sha_prevouts)
-        cx_hash_sha256(state->hashes.sha_prevouts, 32, dbl_hash, 32);
+        if (!(sighash_byte & SIGHASH_ANYONECANPAY)) {
+            cx_hash_sha256(state->hashes.sha_prevouts, 32, dbl_hash, 32);
+        }
+
         crypto_hash_update(&sighash_context.header, dbl_hash, 32);
 
+        memset(dbl_hash, 0, 32);
         // add to hash: hashSequence sha256(sha_sequences)
-        cx_hash_sha256(state->hashes.sha_sequences, 32, dbl_hash, 32);
+        if (!(sighash_byte & SIGHASH_ANYONECANPAY) && (sighash_byte & 0x1f) != SIGHASH_SINGLE &&
+            (sighash_byte & 0x1f) != SIGHASH_NONE) {
+            cx_hash_sha256(state->hashes.sha_sequences, 32, dbl_hash, 32);
+        }
         crypto_hash_update(&sighash_context.header, dbl_hash, 32);
     }
 
@@ -1783,8 +1792,22 @@ static void sign_segwit_v0(dispatcher_context_t *dc) {
         // compute hashOutputs = sha256(sha_outputs)
 
         uint8_t hashOutputs[32];
-        cx_hash_sha256(state->hashes.sha_outputs, 32, hashOutputs, 32);
+        memset(hashOutputs, 0, 32);
 
+        if ((sighash_byte & 0x1f) != SIGHASH_SINGLE && (sighash_byte & 0x1f) != SIGHASH_NONE) {
+            cx_hash_sha256(state->hashes.sha_outputs, 32, hashOutputs, 32);
+
+        } else if ((sighash_byte & 0x1f) == SIGHASH_SINGLE &&
+                   state->cur_input_index < state->n_outputs) {
+            cx_sha256_t sha_output_context;
+            cx_sha256_init(&sha_output_context);
+            if (hash_output_n(dc, &sha_output_context.header, state->cur_input_index) == -1) {
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return;
+            }
+            crypto_hash_digest(&sha_output_context.header, hashOutputs, 32);
+            cx_hash_sha256(hashOutputs, 32, hashOutputs, 32);
+        }
         crypto_hash_update(&sighash_context.header, hashOutputs, 32);
     }
 
