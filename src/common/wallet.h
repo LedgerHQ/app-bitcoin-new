@@ -158,10 +158,23 @@ typedef struct policy_node_s {
     } flags;  // 1 byte
 } policy_node_t;
 
+typedef struct miniscript_ops_s {
+    uint16_t count;  // non-push opcodes
+    int16_t sat;     // number of keys in possibly executed OP_CHECKMULTISIG(VERIFY)s to satisfy (-1
+                     // for "invalid")
+    int16_t dsat;    // number of keys in possibly executed OP_CHECKMULTISIG(VERIFY)s to dissatisfy
+                     // (-1 for "invalid")
+} miniscript_ops_t;
+
+typedef struct miniscript_stacksize_s {
+    int16_t sat;   // Maximum stack size to satisfy
+    int16_t dsat;  // Maximum stack size to dissatisfy
+} miniscript_stacksize_t;
+
 typedef struct policy_node_ext_info_s {
+    miniscript_ops_t ops;
+    miniscript_stacksize_t ss;
     uint16_t script_size;
-    uint16_t n_ops;
-    uint16_t n_stack_items;
 
     unsigned int s : 1;  // has a signature
 

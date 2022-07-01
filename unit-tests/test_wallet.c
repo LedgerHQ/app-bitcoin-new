@@ -286,8 +286,19 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
             assert_int_equal(ext_info.script_size, scriptlen);
         }
 
-        // if (opslimit != -1) assert_int_equal(ext_info.n_ops, opslimit);
-        // if (stacklimit != -1) assert_int_equal(ext_info.n_stack_items, stacklimit);
+        if (opslimit != -1) {
+            // if ext_info.ops.sat, we want to use 0 (consistently with bitcoin-core's
+            // implementation)
+            int ops_sat = (ext_info.ops.sat == -1) ? 0 : ext_info.ops.sat;
+
+            int computed_opslimit = ext_info.ops.count + ops_sat;
+            assert_int_equal(computed_opslimit, opslimit);
+        }
+        if (stacklimit != -1) {
+            assert_true(ext_info.ss.sat >= 0);
+            int computed_stacklimit = ext_info.ss.sat + 1;
+            assert_int_equal(computed_stacklimit, stacklimit);
+        }
     }
 }
 
