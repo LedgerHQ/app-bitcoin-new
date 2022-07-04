@@ -1,13 +1,11 @@
 name: Build custom speculos-bitcoin image
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
       - develop
-    paths:
-      - .github/workflows/builder-image-workflow.yml
-      - .github/workflows/Dockerfile
 
 jobs:
   build:
