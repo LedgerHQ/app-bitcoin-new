@@ -99,6 +99,18 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
+    // make sure that the policy is sane (especially if it contains miniscript)
+    if (0 > is_policy_sane(dc,
+                           &state->policy_map,
+                           state->wallet_header.version,
+                           state->wallet_header.keys_info_merkle_root,
+                           state->wallet_header.n_keys)) {
+        PRINTF("Policy is not sane\n");
+
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
     state->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
     state->next_pubkey_index = 0;

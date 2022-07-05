@@ -112,3 +112,24 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
 int get_key_placeholder_by_index(const policy_node_t *policy,
                                  unsigned int i,
                                  policy_node_key_placeholder_t *out_placeholder);
+
+/**
+ * Checks if a wallet policy is sane, verifying that pubkeys are never repeated and (if miniscript)
+ * that the miniscript is "sane".
+ * @param[in] dispatcher_context
+ *   Pointer to the dispatcher context
+ * @param[in] policy
+ *   Pointer to the root node of the policy
+ * @param[in] wallet_version
+ *   The version of the wallet policy (since it affects the format of keys in the vector of keys)
+ * @param[in] keys_merkle_root
+ *   The root of the Merkle tree of the vector of keys information in the wallet policy
+ * @param[in] n_keys
+ *   The number of keys in the vector of keys
+ * @return 0 on success; -1 in case of error.
+ */
+int is_policy_sane(dispatcher_context_t *dispatcher_context,
+                   const policy_node_t *policy,
+                   int wallet_version,
+                   const uint8_t keys_merkle_root[static 32],
+                   uint32_t n_keys);

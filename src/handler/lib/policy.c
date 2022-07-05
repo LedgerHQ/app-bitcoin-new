@@ -9,6 +9,7 @@
 #include "../../common/bitvector.h"
 #include "../../common/script.h"
 #include "../../common/segwit_addr.h"
+#include "../../common/wallet.h"
 
 #include "debug-helpers/debug.h"
 
@@ -1216,6 +1217,157 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
     // unreachable
     assert(0);
     return -1;
+}
+
+// Utility function to extract the i-th xpub from the keys information vector
+static int get_xpub_from_merkle_tree(dispatcher_context_t *dispatcher_context,
+                                     int wallet_version,
+                                     const uint8_t keys_merkle_root[static 32],
+                                     uint32_t n_keys,
+                                     uint32_t index,
+                                     char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
+    char key_info_str[MAX_POLICY_KEY_INFO_LEN];
+    int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
+                                                    keys_merkle_root,
+                                                    n_keys,
+                                                    index,
+                                                    (uint8_t *) key_info_str,
+                                                    sizeof(key_info_str));
+    if (key_info_len == -1) {
+        return WITH_ERROR(-1, "Failed to retrieve key info");
+    }
+
+    // Make a sub-buffer for the pubkey info
+    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+    policy_map_key_info_t key_info;
+    if (parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_version) == -1) {
+        return WITH_ERROR(-1, "Failed to parse key information");
+    }
+    strncpy(out, key_info.ext_pubkey, MAX_SERIALIZED_PUBKEY_LENGTH + 1);
+    return 0;
+}
+
+int is_policy_sane(dispatcher_context_t *dispatcher_context,
+                   const policy_node_t *policy,
+                   int wallet_version,
+                   const uint8_t keys_merkle_root[static 32],
+                   uint32_t n_keys) {
+    if (policy->type == TOKEN_WSH) {
+        const policy_node_t *inner = ((policy_node_with_script_t *) policy)->script;
+        if (inner->flags.is_miniscript) {
+            // Top level node in miniscript must be type B
+            if (inner->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+                return WITH_ERROR(-1, "Top level miniscript node must be of type B");
+            }
+
+            // check miniscript sanity conditions
+            policy_node_ext_info_t ext_info;
+            if (0 > compute_miniscript_policy_ext_info(inner, &ext_info)) {
+                return WITH_ERROR(-1, "Error analyzing miniscript policy");
+            }
+
+            // Check the maximum stack size to satisfy the policy
+            if (!ext_info.m) {
+                return WITH_ERROR(-1, "Miniscript cannot always be satisfied non-malleably");
+            }
+
+            // Check the maximum stack size to satisfy the policy
+            if (!ext_info.s) {
+                return WITH_ERROR(-1, "Miniscript does not always require a signature");
+            }
+
+            // Check that there is no time-lock mix
+            if (!ext_info.k) {
+                return WITH_ERROR(-1, "Miniscript with time-lock mix");
+            }
+
+            // Check the maximum stack size to satisfy the policy
+            if (ext_info.ss.sat == -1 ||
+                (uint32_t) ext_info.ss.sat > MAX_STANDARD_P2WSH_STACK_ITEMS) {
+                return WITH_ERROR(-1, "Miniscript exceeds maximum standard stack size");
+            }
+
+            if (ext_info.ops.sat == -1) {
+                // Should never happen for non-malleable scripts
+                return WITH_ERROR(-1, "Invalid maximum ops computations");
+            }
+
+            // Check ops limit
+            if ((uint32_t) ext_info.ops.count + (uint32_t) ext_info.ops.sat > MAX_OPS_PER_SCRIPT) {
+                return WITH_ERROR(-1, "Miniscript exceeds maximum ops");
+            }
+
+            // Check the script size
+            if (ext_info.script_size > MAX_STANDARD_P2WSH_SCRIPT_SIZE) {
+                return WITH_ERROR(-1, "Miniscript exceeds maximum script size");
+            }
+        }
+    }
+
+    // check that all the xpubs are different
+    for (unsigned int i = 0; i < n_keys - 1; i++) {  // no point in running this for the last key
+        char xpub_i[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+        if (0 > get_xpub_from_merkle_tree(dispatcher_context,
+                                          wallet_version,
+                                          keys_merkle_root,
+                                          n_keys,
+                                          i,
+                                          xpub_i)) {
+            return -1;
+        }
+
+        for (unsigned int j = i + 1; j < n_keys; j++) {
+            char xpub_j[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+            if (0 > get_xpub_from_merkle_tree(dispatcher_context,
+                                              wallet_version,
+                                              keys_merkle_root,
+                                              n_keys,
+                                              j,
+                                              xpub_j)) {
+                return -1;
+            }
+
+            if (strncmp(xpub_i, xpub_j, sizeof(xpub_i)) == 0) {
+                // duplicated pubkey
+                return WITH_ERROR(-1, "Repeated pubkey in wallet policy");
+            }
+        }
+    }
+
+    // check that all the key placeholders for the same xpub do indeed have different derivations
+    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL);
+    if (n_placeholders < 0) {
+        return WITH_ERROR(-1, "Unexpected error while counting placeholders");
+    }
+
+    // The following loop computationally very inefficient (quadratic in the number of
+    // placeholders), but more efficient solutions likely require a substantial amount of RAM
+    // (proportional to the number of key placeholders). Instead, this only requires stack depth
+    // proportional to the depth of the wallet policy's abstract syntax tree.
+    for (int i = 0; i < n_placeholders - 1;
+         i++) {  // no point in running this for the last placeholder
+        policy_node_key_placeholder_t kp_i;
+        if (0 > get_key_placeholder_by_index(policy, i, &kp_i)) {
+            return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
+        }
+        for (int j = i + 1; j < n_placeholders; j++) {
+            policy_node_key_placeholder_t kp_j;
+            if (0 > get_key_placeholder_by_index(policy, j, &kp_j)) {
+                return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
+            }
+
+            // placeholders for the same key must have disjoint derivation options
+            if (kp_i.key_index == kp_j.key_index) {
+                if (kp_i.num_first == kp_j.num_first || kp_i.num_first == kp_j.num_second ||
+                    kp_i.num_second == kp_j.num_first || kp_i.num_second == kp_j.num_second) {
+                    return WITH_ERROR(-1,
+                                      "Key placeholders with repeated derivations in miniscript");
+                }
+            }
+        }
+    }
+    return 0;
 }
 
 #pragma GCC diagnostic pop

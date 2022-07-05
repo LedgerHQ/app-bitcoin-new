@@ -136,7 +136,7 @@ def test_register_wallet_unsupported_policy_v1(client: Client):
             version=WalletType.WALLET_POLICY_V1
         ))
 
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(NotSupportedError):
         # Not supporting keys without wildcard
         client.register_wallet(MultisigWallet(
             name="Cold storage",
