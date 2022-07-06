@@ -35,7 +35,7 @@
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
 #define MAX_WALLET_POLICY_STR_LENGTH_V1 40
 
-#define MAX_WALLET_POLICY_STR_LENGTH_V2 128  // TODO: increase limit, at least on non-NanoS
+#define MAX_WALLET_POLICY_STR_LENGTH_V2 192  // TODO: increase limit, at least on non-NanoS
 
 #define MAX_WALLET_POLICY_STR_LENGTH \
     MAX(MAX_WALLET_POLICY_STR_LENGTH_V1, MAX_WALLET_POLICY_STR_LENGTH_V2)
@@ -65,7 +65,7 @@
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
 
 // Maximum size of a parsed wallet descriptor template in memory
-#define MAX_WALLET_POLICY_BYTES 256  // TODO: this is too large on Nano S
+#define MAX_WALLET_POLICY_BYTES 264  // TODO: this is too large on Nano S
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
@@ -145,6 +145,7 @@ typedef enum {
 #define MINISCRIPT_TYPE_K 2
 #define MINISCRIPT_TYPE_W 3
 
+// 2 bytes
 typedef struct policy_node_s {
     PolicyNodeType type;
     struct {
@@ -193,6 +194,16 @@ typedef struct policy_node_ext_info_s {
     unsigned int x : 1;  // the last opcode is not EQUAL, CHECKSIG, or CHECKMULTISIG
 } policy_node_ext_info_t;
 
+// The various structures used to represent the wallet policy abstract syntax tree contain a lot
+// pointers; using a regular pointer would make each of them 4 bytes long, moreover causing
+// additional loss of memory due to padding. Instead, we use a 2-bytes relative pointer to point to
+// policy_nodes, representing a non-negative offset from the position of the structure itself.
+// This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
+// in other structures, as they no longer contain 32-bit pointers.
+typedef struct ptr_node_s {
+    uint16_t offset;
+} ptr_node_t;
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
@@ -204,6 +215,8 @@ typedef struct policy_node_ext_info_s {
  * numbers a, b in the /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations
  * array don't have extra derivation steps.
  */
+#pragma GCC diagnostic pop
+// 12 bytes
 typedef struct {
     // the following fields are only used in V2
     uint32_t num_first;   // NUM_a of /<NUM_a,NUM_b>/*
@@ -212,40 +225,46 @@ typedef struct {
     // common between V1 and V2
     int16_t key_index;  // index of the key
 } policy_node_key_placeholder_t;
-#pragma GCC diagnostic pop
 
+// 4 bytes
 typedef struct {
     struct policy_node_s base;
 } policy_node_constant_t;
 
+// 4 bytes (instead of 8)
 typedef struct {
     struct policy_node_s base;
-    policy_node_t *script;
+    ptr_node_t script;
 } policy_node_with_script_t;
 
+// 6 bytes (instead of 12)
 typedef struct {
     struct policy_node_s base;
-    policy_node_t *scripts[2];
+    ptr_node_t scripts[2];
 } policy_node_with_script2_t;
 
+// 8 bytes (instead of 16)
 typedef struct {
     struct policy_node_s base;
-    policy_node_t *scripts[3];
+    ptr_node_t scripts[3];
 } policy_node_with_script3_t;
 
 // generic type with pointer for up to 3 (but constant) number of child scripts
 typedef policy_node_with_script3_t policy_node_with_scripts_t;
 
+// 4 bytes (instead of 8)
 typedef struct {
     struct policy_node_s base;
     policy_node_key_placeholder_t *key_placeholder;
 } policy_node_with_key_t;
 
+// 8 bytes
 typedef struct {
     struct policy_node_s base;
     uint32_t n;
 } policy_node_with_uint32_t;
 
+// 12 bytes
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
     int16_t k;                  // threshold
@@ -254,11 +273,13 @@ typedef struct {
         *key_placeholders;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
+// 8 bytes
 typedef struct policy_node_scriptlist_s {
-    policy_node_t *script;
     struct policy_node_scriptlist_s *next;
+    ptr_node_t script;
 } policy_node_scriptlist_t;
 
+// 12 bytes, (+ 8 bytes for every script)
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
     int16_t k;                  // threshold
@@ -276,6 +297,21 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_SHA256 or TOKEN_HASH256
     uint8_t h[32];
 } policy_node_with_hash_256_t;
+
+// The following helpers function simplifies dealing with relative pointers to scripts
+
+// Converts a relative pointer to the corresponding pointer to a policy node
+static inline policy_node_t *node_ptr(const ptr_node_t *ptr) {
+    return (policy_node_t *) ((uint8_t *) ptr + ptr->offset);
+}
+
+// Initializes a relative pointer so that it points to node.
+// IMPORTANT: the assumption is that node is located in memory at an address larger than
+// relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
+// is potentially dangerous to use.
+static inline void init_node_ptr(ptr_node_t *relative_ptr, const policy_node_t *node) {
+    relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
+}
 
 /**
  * Parses the string in the `buffer` as a serialized policy map into `header`

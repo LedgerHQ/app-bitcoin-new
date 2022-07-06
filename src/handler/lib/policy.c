@@ -575,20 +575,23 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
             case CMD_CODE_PROCESS_CHILD: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, policy->scripts[cmd_data], node->mode, 0);
+                state_stack_push(state, node_ptr(&policy->scripts[cmd_data]), node->mode, 0);
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_V: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, policy->scripts[cmd_data], node->mode, node->flags);
+                state_stack_push(state,
+                                 node_ptr(&policy->scripts[cmd_data]),
+                                 node->mode,
+                                 node->flags);
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_VV: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
                 state_stack_push(state,
-                                 policy->scripts[cmd_data],
+                                 node_ptr(&policy->scripts[cmd_data]),
                                  node->mode,
                                  node->flags | PROCESSOR_FLAG_V);
                 break;
@@ -668,7 +671,7 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
             update_output_u8(state, OP_ADD);
         }
 
-        if (-1 == state_stack_push(state, cur->script, node->mode, 0)) {
+        if (-1 == state_stack_push(state, node_ptr(&cur->script), node->mode, 0)) {
             return -1;
         }
         ++node->step;
@@ -807,10 +810,11 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
 
     int script_type = -1;
     if (policy->type == TOKEN_SH) {
-        const policy_node_t *child = ((const policy_node_with_script_t *) policy)->script;
+        const policy_node_t *child =
+            node_ptr(&((const policy_node_with_script_t *) policy)->script);
         if (child->type == TOKEN_WSH) {
             script_type = WRAPPED_SCRIPT_TYPE_SH_WSH;
-            core_policy = ((const policy_node_with_script_t *) child)->script;
+            core_policy = node_ptr(&((const policy_node_with_script_t *) child)->script);
         } else {
             script_type = WRAPPED_SCRIPT_TYPE_SH;
             core_policy = child;
@@ -819,7 +823,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
     } else if (policy->type == TOKEN_WSH) {
         script_type = WRAPPED_SCRIPT_TYPE_WSH;
         core_mode = MODE_OUT_HASH;
-        core_policy = ((const policy_node_with_script_t *) policy)->script;
+        core_policy = node_ptr(&((const policy_node_with_script_t *) policy)->script);
     } else {
         core_policy = policy;
     }
@@ -1018,7 +1022,7 @@ int get_policy_address_type(const policy_node_t *policy) {
             return ADDRESS_TYPE_WIT;
         case TOKEN_SH:
             // wrapped segwit
-            if (((policy_node_with_script_t *) policy)->script->type == TOKEN_WPKH) {
+            if (node_ptr(&((policy_node_with_script_t *) policy)->script)->type == TOKEN_WPKH) {
                 return ADDRESS_TYPE_SH_WIT;
             }
             return -1;
@@ -1143,7 +1147,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_L:
         case TOKEN_U: {
             return get_key_placeholder_by_index(
-                ((const policy_node_with_script_t *) policy)->script,
+                node_ptr(&((const policy_node_with_script_t *) policy)->script),
                 i,
                 out_placeholder);
         }
@@ -1157,11 +1161,12 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_OR_D:
         case TOKEN_OR_I: {
             const policy_node_with_script2_t *node = (const policy_node_with_script2_t *) policy;
-            int ret1 = get_key_placeholder_by_index(node->scripts[0], i, out_placeholder);
+            int ret1 =
+                get_key_placeholder_by_index(node_ptr(&node->scripts[0]), i, out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(node->scripts[1],
+            int ret2 = get_key_placeholder_by_index(node_ptr(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
                                                     found ? NULL : out_placeholder);
             if (ret2 < 0) return -1;
@@ -1172,17 +1177,18 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         // nodes with exactly three child scripts
         case TOKEN_ANDOR: {
             const policy_node_with_script3_t *node = (const policy_node_with_script3_t *) policy;
-            int ret1 = get_key_placeholder_by_index(node->scripts[0], i, out_placeholder);
+            int ret1 =
+                get_key_placeholder_by_index(node_ptr(&node->scripts[0]), i, out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(node->scripts[1],
+            int ret2 = get_key_placeholder_by_index(node_ptr(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
                                                     found ? NULL : out_placeholder);
             if (ret2 < 0) return -1;
 
             found = i < (unsigned int) (ret1 + ret2);
-            int ret3 = get_key_placeholder_by_index(node->scripts[2],
+            int ret3 = get_key_placeholder_by_index(node_ptr(&node->scripts[2]),
                                                     found ? 0 : i - ret1 - ret2,
                                                     found ? NULL : out_placeholder);
             if (ret3 < 0) return -1;
@@ -1197,7 +1203,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             policy_node_scriptlist_t *cur_child = node->scriptlist;
             for (int script_idx = 0; script_idx < node->n; script_idx++) {
                 found = i < (unsigned int) ret;
-                int ret_partial = get_key_placeholder_by_index(cur_child->script,
+                int ret_partial = get_key_placeholder_by_index(node_ptr(&cur_child->script),
                                                                found ? 0 : i - ret,
                                                                found ? NULL : out_placeholder);
                 if (ret_partial < 0) return -1;
@@ -1254,7 +1260,7 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const uint8_t keys_merkle_root[static 32],
                    uint32_t n_keys) {
     if (policy->type == TOKEN_WSH) {
-        const policy_node_t *inner = ((policy_node_with_script_t *) policy)->script;
+        const policy_node_t *inner = node_ptr(&((policy_node_with_script_t *) policy)->script);
         if (inner->flags.is_miniscript) {
             // Top level node in miniscript must be type B
             if (inner->flags.miniscript_type != MINISCRIPT_TYPE_B) {

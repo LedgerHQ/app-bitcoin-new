@@ -481,7 +481,7 @@ static int parse_script(buffer_t *in_buf,
 static int parse_child_scripts(buffer_t *in_buf,
                                buffer_t *out_buf,
                                size_t depth,
-                               policy_node_t *child_scripts[],
+                               ptr_node_t child_scripts[],
                                int n_children,
                                int version,
                                unsigned int context_flags) {
@@ -490,7 +490,7 @@ static int parse_child_scripts(buffer_t *in_buf,
 
     for (int child_index = 0; child_index < n_children; child_index++) {
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        child_scripts[child_index] = (policy_node_t *) buffer_get_cur(out_buf);
+        init_node_ptr(&child_scripts[child_index], (policy_node_t *) buffer_get_cur(out_buf));
 
         if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
             // failed while parsing internal script
@@ -582,7 +582,7 @@ static int parse_script(buffer_t *in_buf,
                 }
 
                 if (inner_wrapper != NULL) {
-                    inner_wrapper->script = (policy_node_t *) node;
+                    init_node_ptr(&inner_wrapper->script, (policy_node_t *) node);
                 }
                 inner_wrapper = node;
             }
@@ -686,7 +686,7 @@ static int parse_script(buffer_t *in_buf,
             // the internal script is recursively parsed (if successful) in the current location
             // of the output buffer
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->script = (policy_node_t *) buffer_get_cur(out_buf);
+            init_node_ptr(&node->script, (policy_node_t *) buffer_get_cur(out_buf));
 
             if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                 // failed while parsing internal script
@@ -770,7 +770,7 @@ static int parse_script(buffer_t *in_buf,
             }
 
             for (int i = 0; i < 3; i++) {
-                if (!node->scripts[i]->flags.is_miniscript) {
+                if (!node_ptr(&node->scripts[i])->flags.is_miniscript) {
                     return WITH_ERROR(-1, "children of andor must be miniscript");
                 }
             }
@@ -778,9 +778,9 @@ static int parse_script(buffer_t *in_buf,
             // andor(X, Y, Z)
             // X is Bdu; Y and Z are both B, K, or V
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Y = node->scripts[1];
-            const policy_node_t *Z = node->scripts[2];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Y = node_ptr(&node->scripts[1]);
+            const policy_node_t *Z = node_ptr(&node->scripts[2]);
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -833,12 +833,13 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of and_v must be miniscript");
             }
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Y = node_ptr(&node->scripts[1]);
 
             // and_v(X,Y)
             // X is V; Y is B, K, or V
@@ -891,12 +892,13 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of and_b must be miniscript");
             }
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Y = node_ptr(&node->scripts[1]);
 
             // and_b(X,Y)
             // X is B; Y is W
@@ -946,15 +948,16 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of and_n must be miniscript");
             }
 
             // and_n(X, Y) is equivalent to andor(X, Y, 1)
             // X is Bdu; Y is B
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Y = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Y = node_ptr(&node->scripts[1]);
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -1000,15 +1003,16 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of or_b must be miniscript");
             }
 
             // or_b(X, Z)
             // X is Bd; Z is Wd
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Z = node_ptr(&node->scripts[1]);
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d) {
                 return WITH_ERROR(-1, "invalid type");
@@ -1055,15 +1059,16 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of or_c must be miniscript");
             }
 
             // or_c(X, Z)
             // X is Bdu; Z is V
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Z = node_ptr(&node->scripts[1]);
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -1108,15 +1113,16 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of or_d must be miniscript");
             }
 
             // or_d(X, Z)
             // X is Bdu; Z is B
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Z = node_ptr(&node->scripts[1]);
 
             if (X->flags.miniscript_type != MINISCRIPT_TYPE_B || !X->flags.miniscript_mod_d ||
                 !X->flags.miniscript_mod_u) {
@@ -1161,15 +1167,16 @@ static int parse_script(buffer_t *in_buf,
                 return -1;
             }
 
-            if (!node->scripts[0]->flags.is_miniscript || !node->scripts[1]->flags.is_miniscript) {
+            if (!node_ptr(&node->scripts[0])->flags.is_miniscript ||
+                !node_ptr(&node->scripts[1])->flags.is_miniscript) {
                 return WITH_ERROR(-1, "children of or_i must be miniscript");
             }
 
             // or_i(X, Z)
             // both are B, K, or V
 
-            const policy_node_t *X = node->scripts[0];
-            const policy_node_t *Z = node->scripts[1];
+            const policy_node_t *X = node_ptr(&node->scripts[0]);
+            const policy_node_t *Z = node_ptr(&node->scripts[1]);
 
             if (X->flags.miniscript_type == MINISCRIPT_TYPE_W) {
                 return WITH_ERROR(-1, "invalid type");  // must be B, K or V
@@ -1235,24 +1242,24 @@ static int parse_script(buffer_t *in_buf,
                 ++node->n;
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-                cur->script = (policy_node_t *) buffer_get_cur(out_buf);
+                init_node_ptr(&cur->script, (policy_node_t *) buffer_get_cur(out_buf));
                 if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
                     // failed while parsing internal script
                     return -1;
                 }
 
-                if (!cur->script->flags.is_miniscript) {
+                if (!node_ptr(&cur->script)->flags.is_miniscript) {
                     return WITH_ERROR(-1, "children of thresh must be miniscript");
                 }
 
                 if (node->n == 1) {
                     // the first child's type must be B
-                    if (cur->script->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+                    if (node_ptr(&cur->script)->flags.miniscript_type != MINISCRIPT_TYPE_B) {
                         return WITH_ERROR(-1, "the first children of thresh must be of type B");
                     }
                 } else {
                     // every other child's type must be W
-                    if (cur->script->flags.miniscript_type != MINISCRIPT_TYPE_W) {
+                    if (node_ptr(&cur->script)->flags.miniscript_type != MINISCRIPT_TYPE_W) {
                         return WITH_ERROR(
                             -1,
                             "each child of thresh (except the first) must be of type W");
@@ -1260,14 +1267,15 @@ static int parse_script(buffer_t *in_buf,
                 }
 
                 // all children must have properties du
-                if (!cur->script->flags.miniscript_mod_d || !cur->script->flags.miniscript_mod_u) {
+                if (!node_ptr(&cur->script)->flags.miniscript_mod_d ||
+                    !node_ptr(&cur->script)->flags.miniscript_mod_u) {
                     return WITH_ERROR(-1, "each child of thresh must have properties d and u");
                 }
 
-                if (cur->script->flags.miniscript_mod_z) {
+                if (node_ptr(&cur->script)->flags.miniscript_mod_z) {
                     ++count_z;
                 }
-                if (cur->script->flags.miniscript_mod_o) {
+                if (node_ptr(&cur->script)->flags.miniscript_mod_o) {
                     ++count_o;
                 }
 
@@ -1547,7 +1555,7 @@ static int parse_script(buffer_t *in_buf,
     // if there was one or more wrappers, the script of the most internal node must point
     // to the parsed node
     if (inner_wrapper != NULL) {
-        inner_wrapper->script = parsed_node;
+        init_node_ptr(&inner_wrapper->script, parsed_node);
     }
 
     // Validate and compute the flags (miniscript type and modifiers) for all the wrapper, if any
@@ -1559,14 +1567,14 @@ static int parse_script(buffer_t *in_buf,
         // find the actual node by traversing the list
         policy_node_with_script_t *node = (policy_node_with_script_t *) outermost_node;
         for (int j = 0; j < i; j++) {
-            node = (policy_node_with_script_t *) node->script;
+            node = (policy_node_with_script_t *) node_ptr(&node->script);
         }
 
-        if (!node->script->flags.is_miniscript) {
+        if (!node_ptr(&node->script)->flags.is_miniscript) {
             return WITH_ERROR(-1, "wrappers can only be applied to miniscript");
         }
 
-        const policy_node_t *X = node->script;
+        const policy_node_t *X = node_ptr(&node->script);
 
         uint8_t X_type = X->flags.miniscript_type;
 
@@ -1789,7 +1797,7 @@ static int compute_thresh_ops(const policy_node_thresh_t *node, miniscript_ops_t
 
     while (cur != NULL) {
         policy_node_ext_info_t t;
-        if (0 > compute_miniscript_policy_ext_info(cur->script, &t)) return -1;
+        if (0 > compute_miniscript_policy_ext_info(node_ptr(&cur->script), &t)) return -1;
 
         out->count += t.ops.count + 1;
 
@@ -1833,7 +1841,7 @@ static int compute_thresh_stacksize(const policy_node_thresh_t *node, miniscript
 
     while (cur != NULL) {
         policy_node_ext_info_t t;
-        if (0 > compute_miniscript_policy_ext_info(cur->script, &t)) return -1;
+        if (0 > compute_miniscript_policy_ext_info(node_ptr(&cur->script), &t)) return -1;
 
         next_sats[0] = sumcheck(sats[0], t.ss.dsat);
         for (int j = 1; j < sats_size; j++) {
@@ -2007,9 +2015,9 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t y;
             policy_node_ext_info_t z;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &y)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[2], &z)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &y)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[2]), &z)) return -1;
 
             out->s = z.s & (x.s | y.s);
             out->f = z.f & (x.s | y.f);
@@ -2043,8 +2051,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &y)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &y)) return -1;
 
             out->s = x.s | y.s;
             out->f = x.s | y.f;
@@ -2074,8 +2082,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &y)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &y)) return -1;
 
             out->s = x.s | y.s;
             out->f = (x.f & y.f) | (x.s & x.f) | (y.s & y.f);
@@ -2107,8 +2115,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &y)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &y)) return -1;
 
             out->s = x.s | y.s;
             out->e = x.s | y.f;
@@ -2137,8 +2145,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &z)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &z)) return -1;
 
             out->s = x.s & z.s;
             out->e = 1;
@@ -2168,8 +2176,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &z)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &z)) return -1;
 
             out->s = x.s & z.s;
             out->f = 1;
@@ -2197,8 +2205,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &z)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &z)) return -1;
 
             out->s = x.s & z.s;
             out->f = z.f;
@@ -2227,8 +2235,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[0], &x)) return -1;
-            if (0 > compute_miniscript_policy_ext_info(node->scripts[1], &z)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[0]), &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->scripts[1]), &z)) return -1;
 
             out->s = x.s & z.s;
             out->f = x.f & z.f;
@@ -2268,7 +2276,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 ++n_children;
 
                 policy_node_ext_info_t t;
-                if (0 > compute_miniscript_policy_ext_info(cur->script, &t)) return -1;
+                if (0 > compute_miniscript_policy_ext_info(node_ptr(&cur->script), &t)) return -1;
 
                 if (t.e) {
                     ++count_e;
@@ -2317,7 +2325,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->f = x.f;
@@ -2343,7 +2351,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->f = x.f;
@@ -2370,7 +2378,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = 1;
             out->f = x.f;
@@ -2399,7 +2407,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->e = 1;
@@ -2423,7 +2431,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->f = 1;
@@ -2448,7 +2456,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->f = 1;
@@ -2472,7 +2480,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->e = x.f;
@@ -2497,7 +2505,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
-            if (0 > compute_miniscript_policy_ext_info(node->script, &x)) return -1;
+            if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
 
             out->s = x.s;
             out->f = 0;

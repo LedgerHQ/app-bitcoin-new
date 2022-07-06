@@ -58,7 +58,7 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) root->script;
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&root->script);
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
     assert_int_equal(inner->key_placeholder->key_index, 0);
@@ -82,11 +82,11 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) root->script;
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) node_ptr(&root->script);
 
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) mid->script;
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&mid->script);
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
     assert_int_equal(inner->key_placeholder->key_index, 0);
@@ -138,7 +138,7 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) root->script;
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) node_ptr(&root->script);
     assert_int_equal(inner->base.type, TOKEN_MULTI);
 
     assert_int_equal(inner->k, 3);
@@ -166,10 +166,10 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) root->script;
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) node_ptr(&root->script);
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) mid->script;
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) node_ptr(&mid->script);
     assert_int_equal(inner->base.type, TOKEN_SORTEDMULTI);
 
     assert_int_equal(inner->k, 3);
@@ -264,7 +264,7 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
 
         policy_node_with_script_t *policy = (policy_node_with_script_t *) out;
         policy_node_ext_info_t ext_info;
-        res = compute_miniscript_policy_ext_info(policy->script, &ext_info);
+        res = compute_miniscript_policy_ext_info(node_ptr(&policy->script), &ext_info);
 
         assert_true(res == 0);
 

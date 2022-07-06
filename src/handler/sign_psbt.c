@@ -43,7 +43,6 @@
 
 #include "sign_psbt.h"
 
-#include "sign_psbt/compare_wallet_script_at_path.h"
 #include "sign_psbt/is_in_out_internal.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
@@ -418,6 +417,8 @@ int read_change_and_index_from_psbt_bip32_derivation(
  * it.
  */
 void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     // Device must be unlocked
@@ -436,7 +437,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     if (!buffer_read_bytes(&dc->read_buffer, global_map.keys_root, 32) ||
         !buffer_read_bytes(&dc->read_buffer, global_map.values_root, 32)) {
-        LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }

@@ -73,7 +73,7 @@ typedef struct {
 
     uint32_t master_key_fingerprint;
 
-    // bitmap to track of which inputs are internal
+    // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
 
     int cur_placeholder_index;  // index of the current key placeholder during input signing
