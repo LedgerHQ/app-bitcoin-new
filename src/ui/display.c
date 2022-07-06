@@ -52,8 +52,12 @@ typedef struct {
 
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
-    char policy_map[MAX_WALLET_POLICY_STR_LENGTH + 1];
-    char address[MAX_ADDRESS_LENGTH_STR + 1];
+
+    // no flows show together both a policy map and an address, therefore we share memory
+    union {
+        char policy_map[MAX_WALLET_POLICY_STR_LENGTH + 1];
+        char address[MAX_ADDRESS_LENGTH_STR + 1];
+    };
 } ui_wallet_state_t;
 
 typedef struct {
