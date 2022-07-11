@@ -497,38 +497,58 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
     }
     state->n_outputs = (unsigned int) n_outputs;
 
-    uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
-    if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
-        !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32)) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    // Fetch the serialized wallet policy from the client
-    uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
-    int serialized_wallet_policy_len = call_get_preimage(dc,
-                                                         wallet_id,
-                                                         serialized_wallet_policy,
-                                                         sizeof(serialized_wallet_policy));
-    if (serialized_wallet_policy_len < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    buffer_t serialized_wallet_policy_buf =
-        buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
-
-    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
     policy_map_wallet_header_t wallet_header;
-    if (0 > read_and_parse_wallet_policy(dc,
-                                         &serialized_wallet_policy_buf,
-                                         &wallet_header,
-                                         policy_map_descriptor,
-                                         state->wallet_policy_map_bytes,
-                                         sizeof(state->wallet_policy_map_bytes))) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+    {  // declare some local variables in a block to optimize stack usage
+        uint8_t wallet_id[32];
+        if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
+            !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32)) {
+            SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+            return;
+        }
+        uint8_t hmac_or =
+            0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+        for (int i = 0; i < 32; i++) {
+            hmac_or = hmac_or | wallet_hmac[i];
+        }
+
+        if (hmac_or != 0) {
+            // Verify hmac
+            if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
+                PRINTF("Incorrect hmac\n");
+                SEND_SW(dc, SW_SIGNATURE_FAIL);
+                return;
+            }
+
+            state->is_wallet_canonical = false;
+        } else {
+            state->is_wallet_canonical = true;
+        }
+
+        // Fetch the serialized wallet policy from the client
+        uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
+        int serialized_wallet_policy_len = call_get_preimage(dc,
+                                                             wallet_id,
+                                                             serialized_wallet_policy,
+                                                             sizeof(serialized_wallet_policy));
+        if (serialized_wallet_policy_len < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        buffer_t serialized_wallet_policy_buf =
+            buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+
+        uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+        if (0 > read_and_parse_wallet_policy(dc,
+                                             &serialized_wallet_policy_buf,
+                                             &wallet_header,
+                                             policy_map_descriptor,
+                                             state->wallet_policy_map_bytes,
+                                             sizeof(state->wallet_policy_map_bytes))) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
     }
 
     state->wallet_header_version = wallet_header.version;
@@ -537,13 +557,8 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
            sizeof(wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = wallet_header.n_keys;
 
-    uint8_t hmac_or =
-        0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
-    for (int i = 0; i < 32; i++) {
-        hmac_or = hmac_or | wallet_hmac[i];
-    }
-    if (hmac_or == 0) {
-        // No hmac, verify that the policy is a canonical one that is allowed by default
+    if (state->is_wallet_canonical) {
+        // verify that the policy is indeed a canonical one that is allowed by default
 
         if (state->wallet_header_n_keys != 1) {
             PRINTF("Non-standard policy, it should only have 1 key\n");
@@ -606,16 +621,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
-    } else {
-        // Verify hmac
-
-        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
-            PRINTF("Incorrect hmac\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return;
-        }
-
-        state->is_wallet_canonical = false;
     }
 
     // Swap feature: check that wallet is canonical
