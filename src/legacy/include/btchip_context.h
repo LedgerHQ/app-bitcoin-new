@@ -24,7 +24,10 @@
 #include "btchip_secure_value.h"
 #include "btchip_filesystem_tx.h"
 
+#ifndef MAX_OUTPUT_TO_CHECK
+//end_qtum
 #define MAX_OUTPUT_TO_CHECK 100
+#endif
 #define MAX_COIN_ID 13
 #define MAX_SHORT_COIN_ID 5
 
@@ -96,7 +99,9 @@ typedef enum btchip_output_parsing_state_e btchip_output_parsing_state_t;
 
 typedef union multi_hash {
     cx_sha256_t sha256;
+#ifndef USE_NO_OVERWINTER
     cx_blake2b_t blake2b;
+#endif
 } multi_hash;
 
 struct segwit_hash_s {
@@ -171,6 +176,9 @@ struct btchip_context_s {
     cx_sha256_t transactionHashAuthorization;
     /** Current hash to perform (TRANSACTION_HASH_) */
     unsigned char transactionHashOption;
+    #ifdef HAVE_QTUM_SUPPORT
+    cx_sha256_t transactionOutputHash;
+    #endif
 
     /* Segregated Witness changes */
 
@@ -185,6 +193,9 @@ struct btchip_context_s {
     unsigned char segwitParsedOnce;
     /** Prevents display of segwit input warning at each InputHashStart APDU */
     unsigned char segwitWarningSeen;
+    #ifdef HAVE_QTUM_SUPPORT
+    unsigned char signOpSender;
+    #endif
 
     /* /Segregated Witness changes */
 
