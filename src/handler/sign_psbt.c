@@ -43,7 +43,7 @@
 
 #include "sign_psbt.h"
 
-#include "sign_psbt/is_in_out_internal.h"
+#include "sign_psbt/compare_wallet_script_at_path.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
@@ -375,41 +375,76 @@ int read_change_and_index_from_psbt_bip32_derivation(
 
     if (fpr == state->cur_placeholder_fingerprint &&
         der_len == state->cur_placeholder_key_derivation_length + 2) {
-        bool found = true;
-
         uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
         for (int i = 0; i < state->cur_placeholder_key_derivation_length; i++) {
             uint32_t der_step = read_u32_le(derivation_path, 4 * i);
 
             if (state->cur_placeholder_key_derivation[i] != der_step) {
-                found = false;
-                break;
+                return 0;
             }
         }
 
-        // TODO: here we should check that we can indeed derive the key, or it could be a collision
+        uint32_t change = read_u32_le(derivation_path, 4 * (der_len - 2));
+        uint32_t addr_index = read_u32_le(derivation_path, 4 * (der_len - 1));
 
-        if (found) {
-            uint32_t change = read_u32_le(derivation_path, 4 * (der_len - 2));
-            uint32_t addr_index = read_u32_le(derivation_path, 4 * (der_len - 1));
-            // change derivation step, check if indeed coherent with placeholder
-            if (change == state->cur_placeholder.num_first) {
-                state->cur.in_out.is_change = false;
-                state->cur.in_out.address_index = addr_index;
-            } else if (change == state->cur_placeholder.num_second) {
-                state->cur.in_out.is_change = true;
-                state->cur.in_out.address_index = addr_index;
-            } else {
-                found = false;
-            }
+        // check that we can indeed derive the same key from the current placeholder
+        serialized_extended_pubkey_t pubkey;
+        if (0 > bip32_CKDpub(&state->cur_placeholder_pubkey, change, &pubkey)) return -1;
+        if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey)) return -1;
+
+        int pk_offset = (key_len == 33 ? 0 : 1);  // skip the first byte if x-only pubkey
+        if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0) {
+            return 0;
         }
 
-        if (found) {
-            state->cur.in_out.placeholder_found = true;
-            return true;
+        // check if the 'change' derivation step is indeed coherent with placeholder
+        if (change == state->cur_placeholder.num_first) {
+            state->cur.in_out.is_change = false;
+            state->cur.in_out.address_index = addr_index;
+        } else if (change == state->cur_placeholder.num_second) {
+            state->cur.in_out.is_change = true;
+            state->cur.in_out.address_index = addr_index;
+        } else {
+            return 0;
         }
+
+        state->cur.in_out.placeholder_found = true;
+        return 1;
     }
-    return false;
+    return 0;
+}
+
+/**
+ * Verifies if a certain input/output is internal (that is, controlled by the wallet being used for
+ * signing). This uses the state of sign_psbt and is not meant as a general-purpose function;
+ * rather, it avoids some substantial code duplication and removes complexity from sign_psbt.
+ *
+ * @return 1 if the given input/output is internal; 0 if external; -1 on error.
+ */
+static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
+                              const sign_psbt_state_t *state,
+                              const in_out_info_t *in_out_info,
+                              bool is_input) {
+    // If we did not find any info about the pubkey associated to the placeholder we're considering,
+    // then it's external
+    if (!state->cur.in_out.placeholder_found) {
+        return 0;
+    }
+
+    if (!is_input && state->cur.in_out.is_change != 1) {
+        // unlike for inputs, we only consider outputs internal if they are on the change path
+        return 0;
+    }
+
+    return compare_wallet_script_at_path(dispatcher_context,
+                                         state->cur.in_out.is_change,
+                                         state->cur.in_out.address_index,
+                                         &state->wallet_policy_map,
+                                         state->wallet_header_version,
+                                         state->wallet_header_keys_info_merkle_root,
+                                         state->wallet_header_n_keys,
+                                         in_out_info->scriptPubKey,
+                                         in_out_info->scriptPubKey_len);
 }
 
 /**
@@ -709,7 +744,8 @@ static void find_first_internal_key_placeholder(dispatcher_context_t *dc) {
                 get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                        key_info.master_key_derivation_len,
                                                        G_coin_config->bip32_pubkey_version,
-                                                       pubkey_derived);
+                                                       pubkey_derived,
+                                                       &state->cur_placeholder_pubkey);
             if (serialized_pubkey_len == -1) {
                 SEND_SW(dc, SW_BAD_STATE);
                 return;
@@ -1405,7 +1441,8 @@ static void sign_find_next_internal_key_placeholder(dispatcher_context_t *dc) {
                 get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                        key_info.master_key_derivation_len,
                                                        G_coin_config->bip32_pubkey_version,
-                                                       pubkey_derived);
+                                                       pubkey_derived,
+                                                       &state->cur_placeholder_pubkey);
             if (serialized_pubkey_len == -1) {
                 SEND_SW(dc, SW_BAD_STATE);
                 return;

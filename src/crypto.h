@@ -279,16 +279,19 @@ uint32_t crypto_get_master_key_fingerprint();
  *   Number of steps in the BIP32 derivation.
  * @param[in]  bip32_pubkey_version
  *   Version prefix to use for the pubkey.
- * @param[out] out
- *   Pointer to the output buffer, which must be long enough to contain the result (including the
- * terminating null).
+ * @param[out] out_xpub
+ *   Pointer to the output buffer, which must be long enough to contain the result
+ * (including the terminating null character).
+ * @param[out] out_pubkey
+ *   If not NULL, pointer to a serialized_extended_pubkey_t.
  *
  * @return the length of the output pubkey (not including the null character), or -1 on error.
  */
 int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                            uint8_t bip32_path_len,
                                            uint32_t bip32_pubkey_version,
-                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]);
+                                           char out_xpub[static MAX_SERIALIZED_PUBKEY_LENGTH + 1],
+                                           serialized_extended_pubkey_t *out_pubkey);
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.

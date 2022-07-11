@@ -159,7 +159,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
             get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                    key_info.master_key_derivation_len,
                                                    G_coin_config->bip32_pubkey_version,
-                                                   pubkey_derived);
+                                                   pubkey_derived,
+                                                   NULL);
         if (serialized_pubkey_len == -1) {
             SEND_SW(dc, SW_BAD_STATE);
             return;

@@ -160,7 +160,8 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
         get_serialized_extended_pubkey_at_path(bip32_path,
                                                bip32_path_len,
                                                G_coin_config->bip32_pubkey_version,
-                                               state->serialized_pubkey_str);
+                                               state->serialized_pubkey_str,
+                                               NULL);
     if (serialized_pubkey_len == -1) {
         SEND_SW(dc, SW_BAD_STATE);
         return;

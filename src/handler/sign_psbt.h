@@ -81,6 +81,7 @@ typedef struct {
     int cur_placeholder_key_derivation_length;
     uint32_t cur_placeholder_key_derivation[MAX_BIP32_PATH_STEPS];
     policy_node_key_placeholder_t cur_placeholder;
+    serialized_extended_pubkey_t cur_placeholder_pubkey;
 
     union {
         unsigned int cur_input_index;

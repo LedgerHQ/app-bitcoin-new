@@ -355,7 +355,8 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                            uint8_t bip32_path_len,
                                            uint32_t bip32_pubkey_version,
-                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
+                                           char out_xpub[static MAX_SERIALIZED_PUBKEY_LENGTH + 1],
+                                           serialized_extended_pubkey_t *out_pubkey) {
     // find parent key's fingerprint and child number
     uint32_t parent_fingerprint = 0;
     uint32_t child_number = 0;
@@ -388,11 +389,17 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                          ext_pubkey->chain_code);
     crypto_get_checksum((uint8_t *) ext_pubkey, 78, ext_pubkey_check.checksum);
 
-    int serialized_pubkey_len =
-        base58_encode((uint8_t *) &ext_pubkey_check, 78 + 4, out, MAX_SERIALIZED_PUBKEY_LENGTH);
+    if (out_pubkey != NULL) {
+        memcpy(out_pubkey, &ext_pubkey_check.ext_pubkey, sizeof(ext_pubkey_check.ext_pubkey));
+    }
+
+    int serialized_pubkey_len = base58_encode((uint8_t *) &ext_pubkey_check,
+                                              78 + 4,
+                                              out_xpub,
+                                              MAX_SERIALIZED_PUBKEY_LENGTH);
 
     if (serialized_pubkey_len > 0) {
-        out[serialized_pubkey_len] = '\0';
+        out_xpub[serialized_pubkey_len] = '\0';
     }
     return serialized_pubkey_len;
 }
