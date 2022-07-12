@@ -753,7 +753,6 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     return 1;
 }
 
-// TODO: this can only be toplevel
 static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
@@ -1022,7 +1021,8 @@ int get_policy_address_type(const policy_node_t *policy) {
             return ADDRESS_TYPE_WIT;
         case TOKEN_SH:
             // wrapped segwit
-            if (node_ptr(&((policy_node_with_script_t *) policy)->script)->type == TOKEN_WPKH) {
+            if (node_ptr(&((const policy_node_with_script_t *) policy)->script)->type ==
+                TOKEN_WPKH) {
                 return ADDRESS_TYPE_SH_WIT;
             }
             return -1;
@@ -1260,7 +1260,8 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const uint8_t keys_merkle_root[static 32],
                    uint32_t n_keys) {
     if (policy->type == TOKEN_WSH) {
-        const policy_node_t *inner = node_ptr(&((policy_node_with_script_t *) policy)->script);
+        const policy_node_t *inner =
+            node_ptr(&((const policy_node_with_script_t *) policy)->script);
         if (inner->flags.is_miniscript) {
             // Top level node in miniscript must be type B
             if (inner->flags.miniscript_type != MINISCRIPT_TYPE_B) {

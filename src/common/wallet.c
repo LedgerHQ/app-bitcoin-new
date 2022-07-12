@@ -1938,15 +1938,15 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             return 0;
         case TOKEN_MULTI: {
-            policy_node_multisig_t *node = (policy_node_multisig_t *) policy_node;
+            const policy_node_multisig_t *node = (const policy_node_multisig_t *) policy_node;
 
             out->s = 1;
             out->e = 1;
 
             out->x = 0;
 
-            out->script_size =
-                1 + get_push_script_size(node->k) + get_push_script_size(node->n) + 34 * node->n;
+            out->script_size = (uint16_t) (1 + get_push_script_size(node->k) +
+                                           get_push_script_size(node->n) + 34 * node->n);
 
             out->ops = (miniscript_ops_t){1, node->n, node->n};
             out->ss = (miniscript_stacksize_t){node->k + 1, node->k + 1};
@@ -1954,7 +1954,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_OLDER: {
-            policy_node_with_uint32_t *node = (policy_node_with_uint32_t *) policy_node;
+            const policy_node_with_uint32_t *node = (const policy_node_with_uint32_t *) policy_node;
 
             out->f = 1;
 
@@ -1964,7 +1964,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->h = 1;
             }
 
-            out->script_size = 1 + get_push_script_size(node->n);
+            out->script_size = (uint16_t) (1 + get_push_script_size(node->n));
 
             out->ops = (miniscript_ops_t){1, 0, -1};
             out->ss = (miniscript_stacksize_t){0, -1};
@@ -1972,7 +1972,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_AFTER: {
-            policy_node_with_uint32_t *node = (policy_node_with_uint32_t *) policy_node;
+            const policy_node_with_uint32_t *node = (const policy_node_with_uint32_t *) policy_node;
 
             out->f = 1;
 
@@ -1982,7 +1982,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 out->j = 1;
             }
 
-            out->script_size = 1 + get_push_script_size(node->n);
+            out->script_size = (uint16_t) (1 + get_push_script_size(node->n));
 
             out->ops = (miniscript_ops_t){1, 0, -1};
             out->ss = (miniscript_stacksize_t){0, -1};
@@ -2010,7 +2010,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
 
             return 0;
         case TOKEN_ANDOR: {
-            policy_node_with_script3_t *node = (policy_node_with_script3_t *) policy_node;
+            const policy_node_with_script3_t *node =
+                (const policy_node_with_script3_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
             policy_node_ext_info_t z;
@@ -2047,7 +2048,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_AND_V: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
@@ -2078,7 +2080,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_AND_B: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
@@ -2111,7 +2114,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_AND_N: {  // == andor(X,Y,0)
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t y;
 
@@ -2141,7 +2145,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_OR_B: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
@@ -2172,7 +2177,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_OR_C: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
@@ -2201,7 +2207,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_OR_D: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
@@ -2231,7 +2238,8 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_OR_I: {
-            policy_node_with_script2_t *node = (policy_node_with_script2_t *) policy_node;
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
             policy_node_ext_info_t x;
             policy_node_ext_info_t z;
 
@@ -2263,7 +2271,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_THRESH: {
-            policy_node_thresh_t *node = (policy_node_thresh_t *) policy_node;
+            const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy_node;
 
             policy_node_scriptlist_t *cur = node->scriptlist;
 
@@ -2322,7 +2330,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_A: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2348,7 +2356,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
         }
         case TOKEN_S:
         case TOKEN_N: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2375,7 +2383,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_C: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2404,7 +2412,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_D: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2428,7 +2436,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_T: {  // and_v(X,1)
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2453,7 +2461,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_V: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2477,7 +2485,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             return 0;
         }
         case TOKEN_J: {
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;
@@ -2502,7 +2510,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
         }
         case TOKEN_L:    // or_i(0,X)
         case TOKEN_U: {  // or_i(X,0)
-            policy_node_with_script_t *node = (policy_node_with_script_t *) policy_node;
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
             policy_node_ext_info_t x;
 
             if (0 > compute_miniscript_policy_ext_info(node_ptr(&node->script), &x)) return -1;

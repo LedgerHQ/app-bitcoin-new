@@ -301,15 +301,15 @@ typedef struct {
 // The following helpers function simplifies dealing with relative pointers to scripts
 
 // Converts a relative pointer to the corresponding pointer to a policy node
-static inline policy_node_t *node_ptr(const ptr_node_t *ptr) {
-    return (policy_node_t *) ((uint8_t *) ptr + ptr->offset);
+static inline const policy_node_t *node_ptr(const ptr_node_t *ptr) {
+    return (const policy_node_t *) ((const uint8_t *) ptr + ptr->offset);
 }
 
 // Initializes a relative pointer so that it points to node.
 // IMPORTANT: the assumption is that node is located in memory at an address larger than
 // relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
 // is potentially dangerous to use.
-static inline void init_node_ptr(ptr_node_t *relative_ptr, const policy_node_t *node) {
+static inline void init_node_ptr(ptr_node_t *relative_ptr, policy_node_t *node) {
     relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
 }
 

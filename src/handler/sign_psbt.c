@@ -317,13 +317,10 @@ int read_change_and_index_from_psbt_bip32_derivation(
     bool is_output,
     const merkleized_map_commitment_t *map_commitment,
     int index) {
-    int psbt_key_type_pretaproot;  // legacy or segwitv0
-    int psbt_key_type_taproot;     // segwitv1 (taproot)
+    int psbt_key_type_taproot;  // segwitv1 (taproot) keys are 32-byte x-only keys
     if (is_output) {
-        psbt_key_type_pretaproot = PSBT_OUT_BIP32_DERIVATION;
         psbt_key_type_taproot = PSBT_OUT_TAP_BIP32_DERIVATION;
     } else {
-        psbt_key_type_pretaproot = PSBT_IN_BIP32_DERIVATION;
         psbt_key_type_taproot = PSBT_IN_TAP_BIP32_DERIVATION;
     }
 
@@ -346,7 +343,7 @@ int read_change_and_index_from_psbt_bip32_derivation(
     uint8_t hasheslen_fpt_der[1 + 4 + 4 * MAX_BIP32_PATH_STEPS];
     int len = call_get_merkle_leaf_element(dc,
                                            map_commitment->values_root,
-                                           map_commitment->size,
+                                           (uint32_t) map_commitment->size,
                                            index,
                                            hasheslen_fpt_der,
                                            sizeof(hasheslen_fpt_der));
@@ -375,7 +372,7 @@ int read_change_and_index_from_psbt_bip32_derivation(
 
     if (fpr == state->cur_placeholder_fingerprint &&
         der_len == state->cur_placeholder_key_derivation_length + 2) {
-        uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
+        const uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
         for (int i = 0; i < state->cur_placeholder_key_derivation_length; i++) {
             uint32_t der_step = read_u32_le(derivation_path, 4 * i);
 
