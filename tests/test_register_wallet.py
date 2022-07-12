@@ -150,6 +150,33 @@ def test_register_wallet_unsupported_policy(client: Client):
         ))
 
 
+@has_automation("automations/register_wallet_accept.json")
+def test_register_miniscript_long_policy(client: Client, speculos_globals, model):
+    # This test makes sure that policies longer than 256 bytes work as expected on all devices,
+    # except on Nano S that has 196 bytes as a technical limitation.
+    wallet = PolicyMapWallet(
+        name="Long policy",
+        policy_map=f"wsh(and_v(and_v(v:pk(@0/**),or_c(pk(@1/**),or_c(pk(@2/**),v:older(1000)))),and_v(v:hash256(0563fb3e85cbc61b134941ad6610a2b0dfd77543dfb77a5433ff3cb538213807),and_v(v:hash256(ad3391a00bad00a6a03f907b3fcc2f369a88be038c63c7db7f43b01e097efbbe),hash256(137dfa9b54a538200c94e3c9dd1a59b431e3b89aef8093fc910df48a98cb06d9)))))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+        ])
+
+    if (model == "nanos"):
+        with pytest.raises(IncorrectDataError):  # TODO: NotSupportedError would be a better error result
+            client.register_wallet(wallet)
+    else:
+        wallet_id, wallet_hmac = client.register_wallet(wallet)
+
+        assert wallet_id == wallet.id
+
+        assert hmac.compare_digest(
+            hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+            wallet_hmac,
+        )
+
+
 def test_register_wallet_not_sane_policy(client: Client):
     # pubkeys in the keys vector must be all different
     with pytest.raises(NotSupportedError):

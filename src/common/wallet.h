@@ -35,7 +35,15 @@
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
 #define MAX_WALLET_POLICY_STR_LENGTH_V1 40
 
-#define MAX_WALLET_POLICY_STR_LENGTH_V2 192  // TODO: increase limit, at least on non-NanoS
+#ifdef TARGET_NANOS
+// this amount should be enough for many useful policies
+#define MAX_WALLET_POLICY_STR_LENGTH_V2 192
+#define MAX_WALLET_POLICY_BYTES         264
+#else
+// on larger devices, we can afford to reserve a lot more memory
+#define MAX_WALLET_POLICY_STR_LENGTH_V2 512
+#define MAX_WALLET_POLICY_BYTES         512
+#endif
 
 #define MAX_WALLET_POLICY_STR_LENGTH \
     MAX(MAX_WALLET_POLICY_STR_LENGTH_V1, MAX_WALLET_POLICY_STR_LENGTH_V2)
@@ -63,9 +71,6 @@
 
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH \
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
-
-// Maximum size of a parsed wallet descriptor template in memory
-#define MAX_WALLET_POLICY_BYTES 264  // TODO: this is too large on Nano S
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
