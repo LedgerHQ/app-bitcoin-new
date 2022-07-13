@@ -10,17 +10,17 @@ tests_root: Path = Path(__file__).parent
 
 tr_wallet = PolicyMapWallet(
     "",
-    "tr(@0)",
+    "tr(@0/**)",
     [
-        "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+        "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
     ],
 )
 
 wpkh_wallet = PolicyMapWallet(
     "",
-    "wpkh(@0)",
+    "wpkh(@0/**)",
     [
-        "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+        "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
     ],
 )
 
@@ -61,17 +61,16 @@ def test_sighash_all_sign_psbt(client: Client):
 
     assert len(result) == 2
 
-    assert len(result[0]) == 64+1
-    assert result[0][-1] == 0x01
+    _, _, sig0 = result[0]
+    assert len(sig0) == 64+1
+    assert sig0[-1] == 0x01
 
-    assert len(result[0]) == 64+1
-    assert result[1][-1] == 0x01
+    _, _, sig1 = result[1]
+    assert len(sig1) == 64+1
+    assert sig1[-1] == 0x01
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
-
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1) 
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -85,11 +84,11 @@ def test_sighash_all_input_modified(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -103,11 +102,11 @@ def test_sighash_all_output_modified(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -122,16 +121,16 @@ def test_sighash_none_sign_psbt(client: Client):
 
     assert len(result) == 2
 
-    assert len(result[0]) == 64+1
-    assert len(result[1]) == 64+1
-    assert result[0][-1] == 0x02
-    assert result[1][-1] == 0x02
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    assert len(sig0) == 64+1
+    assert len(sig1) == 64+1
+    assert sig0[-1] == 0x02
+    assert sig1[-1] == 0x02
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -146,29 +145,30 @@ def test_sighash_none_input_modified(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[0][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_none_output_modified(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -183,16 +183,16 @@ def test_sighash_single_sign_psbt(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    assert len(result[0]) == 64+1
-    assert len(result[1]) == 64+1
-    assert result[0][-1] == 0x03
-    assert result[1][-1] == 0x03
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    assert len(sig0) == 64+1
+    assert len(sig1) == 64+1
+    assert sig0[-1] == 0x03
+    assert sig1[-1] == 0x03
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -208,18 +208,18 @@ def test_sighash_single_input_modified(client: Client):
 
     assert len(result) == 2
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1) == 0 
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_single_output_same_index_modified(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -228,18 +228,18 @@ def test_sighash_single_output_same_index_modified(client: Client):
 
     assert len(result) == 2
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_single_output_different_index_modified(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-sign.psbt")
     psbt.tx.vout[1].nValue = psbt.tx.vout[1].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
 
     # get the (tweaked) pubkey from the scriptPubKey
@@ -248,11 +248,11 @@ def test_sighash_single_output_different_index_modified(client: Client):
 
     assert len(result) == 2
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -275,52 +275,56 @@ def test_sighash_all_anyone_sign(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    assert len(result[0]) == 64+1
-    assert len(result[1]) == 64+1
-    assert result[0][-1] == 0x81
-    assert result[1][-1] == 0x81
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    assert len(sig0) == 64+1
+    assert len(sig1) == 64+1
+    assert sig0[-1] == 0x81
+    assert sig1[-1] == 0x81
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_all_anyone_input_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_all_anyone_output_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-all-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_all_anyone_1, pubkey1, sig1[:-1]) == 0
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -335,52 +339,56 @@ def test_sighash_none_anyone_sign(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    assert len(result[0]) == 64+1
-    assert len(result[1]) == 64+1
-    assert result[0][-1] == 0x82
-    assert result[1][-1] == 0x82
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    assert len(sig0) == 64+1
+    assert len(sig1) == 64+1
+    assert sig0[-1] == 0x82
+    assert sig1[-1] == 0x82
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_none_anyone_input_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_none_anyone_output_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-none-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_none_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -395,52 +403,56 @@ def test_sighash_single_anyone_sign(client: Client):
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    assert len(result[0]) == 64+1
-    assert len(result[1]) == 64+1
-    assert result[0][-1] == 0x83
-    assert result[1][-1] == 0x83
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    assert len(sig0) == 64+1
+    assert len(sig1) == 64+1
+    assert sig0[-1] == 0x83
+    assert sig1[-1] == 0x83
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0)
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_single_anyone_input_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
     psbt.tx.vin[0].nSequence = psbt.tx.vin[0].nSequence - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_single_anyone_output_changed(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/sighash/sighash-single-anyone-can-pay-sign.psbt")
     psbt.tx.vout[0].nValue = psbt.tx.vout[0].nValue - 1
-    
+
     result = client.sign_psbt(psbt, tr_wallet, None)
+
+    assert len(result) == 2
 
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
     pubkey1 = psbt.inputs[1].witness_utxo.scriptPubKey[2:]
 
-    sig0 = result[0][:-1]
-    sig1 = result[1][:-1]
+    _, _, sig0 = result[0]
+    _, _, sig1 = result[1]
 
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0) == 0
-    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1)
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_0, pubkey0, sig0[:-1]) == 0
+    assert bip0340.schnorr_verify(sighash_bitcoin_core_single_anyone_1, pubkey1, sig1[:-1])
 
 
 def test_sighash_unsupported(client: Client):
@@ -476,7 +488,7 @@ def test_sighash_segwitv0_sighash1(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 1
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
+    assert result[0][2] == expected_sig
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -486,8 +498,8 @@ def test_sighash_segwitv0_sighash2(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 2
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
-    
+    assert result[0][2] == expected_sig
+
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_segwitv0_sighash3(client: Client):
@@ -496,7 +508,7 @@ def test_sighash_segwitv0_sighash3(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 3
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
+    assert result[0][2] == expected_sig
 
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
@@ -506,8 +518,8 @@ def test_sighash_segwitv0_sighash81(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x81
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
-    
+    assert result[0][2] == expected_sig
+
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_segwitv0_sighash82(client: Client):
@@ -516,8 +528,8 @@ def test_sighash_segwitv0_sighash82(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x82
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
-    
+    assert result[0][2] == expected_sig
+
 
 @has_automation("automations/sign_with_default_wallet_accept_nondefault_sighash.json")
 def test_sighash_segwitv0_sighash83(client: Client):
@@ -526,4 +538,4 @@ def test_sighash_segwitv0_sighash83(client: Client):
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
     psbt.inputs[0].sighash = 0x83
     result = client.sign_psbt(psbt, wpkh_wallet, None)
-    assert result[0] == expected_sig
+    assert result[0][2] == expected_sig

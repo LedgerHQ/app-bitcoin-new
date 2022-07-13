@@ -34,7 +34,9 @@ static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
 
-void handler_sign_message(dispatcher_context_t *dc) {
+void handler_sign_message(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     sign_message_state_t *state = (sign_message_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -111,6 +113,7 @@ static void send_response(dispatcher_context_t *dc) {
     int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(state->bip32_path,
                                                          state->bip32_path_len,
                                                          state->bsm_digest,
+                                                         NULL,
                                                          sig,
                                                          &info);
 

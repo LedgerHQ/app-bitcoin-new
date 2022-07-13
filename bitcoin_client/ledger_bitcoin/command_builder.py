@@ -5,6 +5,8 @@ from .common import bip32_path_from_string, AddressType, sha256, hash256, write_
 from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
 from .wallet import Wallet
 
+# p2 encodes the protocol version implemented
+CURRENT_PROTOCOL_VERSION = 1
 
 def chunkify(data: bytes, chunk_len: int) -> Iterator[Tuple[bool, bytes]]:
     size: int = len(data)
@@ -52,7 +54,7 @@ class BitcoinCommandBuilder:
         cla: int,
         ins: Union[int, enum.IntEnum],
         p1: int = 0,
-        p2: int = 0,
+        p2: int = CURRENT_PROTOCOL_VERSION,
         cdata: bytes = b"",
     ) -> dict:
         """Serialize the whole APDU command (header + data).

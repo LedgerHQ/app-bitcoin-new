@@ -7,6 +7,8 @@
 #include "../../crypto.h"
 #include "../client_commands.h"
 
+#include "debug-helpers/debug.h"
+
 // TODO: refactor common code with stream_preimage.c
 
 int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,

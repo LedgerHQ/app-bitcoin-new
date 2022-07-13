@@ -116,7 +116,9 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     return true;
 }
 
-void handler_get_extended_pubkey(dispatcher_context_t *dc) {
+void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -158,7 +160,8 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc) {
         get_serialized_extended_pubkey_at_path(bip32_path,
                                                bip32_path_len,
                                                G_coin_config->bip32_pubkey_version,
-                                               state->serialized_pubkey_str);
+                                               state->serialized_pubkey_str,
+                                               NULL);
     if (serialized_pubkey_len == -1) {
         SEND_SW(dc, SW_BAD_STATE);
         return;

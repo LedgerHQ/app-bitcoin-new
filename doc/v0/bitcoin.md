@@ -1,14 +1,12 @@
 # Bitcoin application: Technical Specifications
 
-This page details the protocol implemented since version 2.1.0 of the app.
-
-The protocol documentation for version from 2.0.0 and before 2.1.0 is [here](./v0/bitcoin.md) and is now deprecated.
+This page described the _deprecated_ version 0 of the protocol, as implemented in the v2.0.0 of the Bitcoin app. This protocol is still supported at this time, but we encourage integrations to switch to [version 1 of the protocol](../bitcoin.md).
 
 ## Framework
 
 ### APDUs
 
-The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` field is reserved for future use and must be set to `0` in all messages. The `P2` field is used as a protocol version identifier; the current version is `1`, while version `0` is still supported. No other value must be used.
+The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` and `P2` fields are reserved for future use and must be set to `0` in all messages.
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
@@ -143,8 +141,6 @@ After user's validation is completed successfully, the application returns the `
 
 #### Client commands
 
-`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`; moreover, it must know and respond for the sha256 hash of its descriptor template.
-
 The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` queries related to the Merkle tree of the list of keys information.
 
 The `GET_MORE_ELEMENTS` command must be handled.
@@ -188,7 +184,7 @@ If the `display` parameter is `1`, the resulting wallet address is also shown on
 
 #### Client commands
 
-`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`; moreover, it must know and respond for the sha256 hash of its descriptor template.
+`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
 
 The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` queries related to the Merkle tree of the list of keys information.
 
@@ -226,17 +222,16 @@ No output data; the signature are returned using the YIELD client command.
 
 #### Description
 
-Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, encoded as `<input_index> <pubkey_len> <pubkey> <signature>`, where the `input_index` is a Bitcoin style varint.
-
-If `P2` is `0` (version `0` of the protocol), `pubkey_len` and `pubkey` are omitted in the YIELD messages.
+Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, encoded as `<input_index> <signature>`, where the `input_index` is a Bitcoin style varint (currently, always 1 byte).
 
 For a registered wallet, the hmac must be correct.
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
+
 #### Client commands
 
-`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`; moreover, it must know and respond for the sha256 hash of its descriptor template.
+`GET_PREIMAGE` must know and respond for the full serialized wallet policy whose sha256 hash is `wallet_id`.
 
 The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_MERKLE_LEAF_INDEX` queries for all the Merkle trees in the input, including each of the Merkle trees for keys and values of the Merkleized map commitments of each of the inputs/outputs maps of the psbt.
 
@@ -342,7 +337,7 @@ The `YIELD` client command is sent to the client to communicate some result duri
 
 The client must respond with an empty message.
 
-### GET_PREIMAGE
+### 40 GET_PREIMAGE
 
 **Command code**: 0x40
 

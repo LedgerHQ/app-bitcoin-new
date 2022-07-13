@@ -130,8 +130,10 @@ enum opcodetype {
     // expansion
     OP_NOP1 = 0xb0,
     OP_CHECKLOCKTIMEVERIFY = 0xb1,
+    OP_CLTV = OP_CHECKLOCKTIMEVERIFY,
     OP_NOP2 = OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY = 0xb2,
+    OP_CSV = OP_CHECKSEQUENCEVERIFY,
     OP_NOP3 = OP_CHECKSEQUENCEVERIFY,
     OP_NOP4 = 0xb3,
     OP_NOP5 = 0xb4,
@@ -167,6 +169,11 @@ static inline bool is_p2wsh(const uint8_t script[], size_t script_len) {
 static inline bool is_opreturn(const uint8_t script[], size_t script_len) {
     return script_len > 0 && script_len <= 83 && script[0] == OP_RETURN;
 }
+
+/**
+ * Returns the size in bytes of the minimal push opcode for <n>, where n a uint32_t.
+ */
+size_t get_push_script_size(uint32_t n);
 
 /**
  * Returns a constant of type `script_type_e` indicating the type of known script type with an

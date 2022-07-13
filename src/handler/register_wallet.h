@@ -14,7 +14,7 @@ typedef struct {
 
     uint8_t wallet_id[32];
     union {
-        uint8_t policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        uint8_t policy_map_bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t policy_map;
     };
     size_t n_internal_keys;
@@ -25,4 +25,4 @@ typedef struct {
     uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN + 1];
 } register_wallet_state_t;
 
-void handler_register_wallet(dispatcher_context_t *dispatcher_context);
+void handler_register_wallet(dispatcher_context_t *dispatcher_context, uint8_t p2);

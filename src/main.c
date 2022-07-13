@@ -31,6 +31,8 @@
 #include "boilerplate/constants.h"
 #include "boilerplate/dispatcher.h"
 
+#include "debug-helpers/debug.h"
+
 #include "commands.h"
 
 // common declarations between legacy and new code; will refactor it out later

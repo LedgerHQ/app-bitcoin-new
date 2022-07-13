@@ -279,16 +279,19 @@ uint32_t crypto_get_master_key_fingerprint();
  *   Number of steps in the BIP32 derivation.
  * @param[in]  bip32_pubkey_version
  *   Version prefix to use for the pubkey.
- * @param[out] out
- *   Pointer to the output buffer, which must be long enough to contain the result (including the
- * terminating null).
+ * @param[out] out_xpub
+ *   Pointer to the output buffer, which must be long enough to contain the result
+ * (including the terminating null character).
+ * @param[out] out_pubkey
+ *   If not NULL, pointer to a serialized_extended_pubkey_t.
  *
  * @return the length of the output pubkey (not including the null character), or -1 on error.
  */
 int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                            uint8_t bip32_path_len,
                                            uint32_t bip32_pubkey_version,
-                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]);
+                                           char out_xpub[static MAX_SERIALIZED_PUBKEY_LENGTH + 1],
+                                           serialized_extended_pubkey_t *out_pubkey);
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.
@@ -334,6 +337,9 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
  *   Number of steps in the BIP32 derivation.
  * @param[in]  hash
  *   Pointer to a 32-byte SHA-256 hash digest.
+ * @param[out]  pubkey
+ *   Either NULL, or a pointer to a 33-bytes array that will receive the compressed pubkey
+ * corresponding to the private key used for signing.
  * @param[out]  out
  *   The pointer to the output array to contain the signature, that must be of length
  * `MAX_DER_SIG_LEN`.
@@ -345,6 +351,7 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                            size_t bip32_path_len,
                                            const uint8_t hash[static 32],
+                                           uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
                                            uint32_t *info);
 

@@ -164,12 +164,12 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
-    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
-        if (cmd->p1 != 0 || cmd->p2 != 0) {
-            io_send_sw(SW_WRONG_P1P2);
-            return;
-        }
+    if (cmd->p1 != 0 || cmd->p2 > 1) {
+        io_send_sw(SW_WRONG_P1P2);
+        return;
+    }
 
+    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (G_dispatcher_context.machine_context_ptr == NULL ||
             G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
             PRINTF("Unexpected INS_CONTINUE.\n");
@@ -206,7 +206,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         }
 
         io_start_processing_timeout();
-        handler(&G_dispatcher_context);
+        handler(&G_dispatcher_context, cmd->p2);
     }
 
     dispatcher_loop();
