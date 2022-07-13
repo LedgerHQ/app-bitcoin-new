@@ -26,8 +26,6 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
-extern global_context_t *G_coin_config;
-
 static void send_response(dispatcher_context_t *dc);
 
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',

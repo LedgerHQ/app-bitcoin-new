@@ -48,8 +48,6 @@
 
 #include "../swap/swap_globals.h"
 
-extern global_context_t *G_coin_config;
-
 // Input validation
 static void find_first_internal_key_placeholder(dispatcher_context_t *dc);
 static void process_input_map(dispatcher_context_t *dc);
@@ -606,7 +604,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
             }
         }
 
-        uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+        uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
         if (key_info.master_key_derivation_len != 3 ||
             !is_pubkey_path_standard(key_info.master_key_derivation,
                                      key_info.master_key_derivation_len,
@@ -743,7 +741,7 @@ static void find_first_internal_key_placeholder(dispatcher_context_t *dc) {
             int serialized_pubkey_len =
                 get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                        key_info.master_key_derivation_len,
-                                                       G_coin_config->bip32_pubkey_version,
+                                                       BIP32_PUBKEY_VERSION,
                                                        pubkey_derived,
                                                        &state->cur_placeholder_pubkey);
             if (serialized_pubkey_len == -1) {
@@ -1256,7 +1254,6 @@ static void output_validate_external(dispatcher_context_t *dc) {
     char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     int address_len = get_script_address(state->cur.in_out.scriptPubKey,
                                          state->cur.in_out.scriptPubKey_len,
-                                         G_coin_config,
                                          output_address,
                                          sizeof(output_address));
     if (address_len < 0) {
@@ -1297,7 +1294,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
         ui_validate_output(dc,
                            state->external_outputs_count,
                            output_address,
-                           G_coin_config->name_short,
+                           COIN_COINID_SHORT,
                            state->cur.output.value,
                            output_next);
         return;
@@ -1362,7 +1359,7 @@ static void confirm_transaction(dispatcher_context_t *dc) {
         dc->next(sign_init);
     } else {
         // Show final user validation UI
-        ui_validate_transaction(dc, G_coin_config->name_short, fee, sign_init);
+        ui_validate_transaction(dc, COIN_COINID_SHORT, fee, sign_init);
     }
 }
 
@@ -1440,7 +1437,7 @@ static void sign_find_next_internal_key_placeholder(dispatcher_context_t *dc) {
             int serialized_pubkey_len =
                 get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                        key_info.master_key_derivation_len,
-                                                       G_coin_config->bip32_pubkey_version,
+                                                       BIP32_PUBKEY_VERSION,
                                                        pubkey_derived,
                                                        &state->cur_placeholder_pubkey);
             if (serialized_pubkey_len == -1) {
