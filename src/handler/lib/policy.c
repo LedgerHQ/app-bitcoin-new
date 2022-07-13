@@ -13,8 +13,6 @@
 
 #include "debug-helpers/debug.h"
 
-extern global_context_t G_context;
-
 #define MAX_POLICY_DEPTH 10
 
 #define MODE_OUT_BYTES 0

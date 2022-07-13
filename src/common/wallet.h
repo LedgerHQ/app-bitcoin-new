@@ -8,7 +8,6 @@
 #include "../constants.h"
 
 #ifndef SKIP_FOR_CMOCKA
-#include "../context.h"
 #include "os.h"
 #include "cx.h"
 #endif
