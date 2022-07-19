@@ -21,12 +21,12 @@
 #include "../globals.h"
 #include "menu.h"
 
-// We have a screen with the icon and "Bitcoin is ready" for Bitcoin,
-// "Bitcoin Testnet is ready" for Bitcoin Testnet, "Application is ready" for all the altcoins
-UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_bitcoin_logo, "Bitcoin", "is ready"});
+// We have a screen with the icon and "Bitcoin HSM is ready" for Bitcoin,
+// "Bitcoin Test HSM is ready" for Bitcoin Testnet, "Application is ready" for all the altcoins
+UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_bitcoin_logo, "Bitcoin HSM", "is ready"});
 UX_STEP_NOCB(ux_menu_ready_step_bitcoin_testnet,
              pnn,
-             {&C_bitcoin_logo, "Bitcoin Testnet", "is ready"});
+             {&C_bitcoin_logo, "Bitcoin Test", "HSM is ready"});
 UX_STEP_NOCB(ux_menu_ready_step_altcoin, nn, {"Application", "is ready"});
 
 UX_STEP_NOCB(ux_menu_version_step, bn, {"Version", APPVERSION});

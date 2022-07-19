@@ -8,6 +8,7 @@
 #include "commands.h"
 #include "constants.h"
 #include "context.h"
+#include "types.h"
 
 /**
  * Global buffer for interactions between SE and MCU.
@@ -38,3 +39,7 @@ extern global_context_t *G_coin_config;
  * State of the current APDU interaction, if any.
  */
 extern command_state_t G_command_state;
+
+extern const internalStorage_t N_storage_real;
+
+#define N_storage (*(volatile internalStorage_t *) PIC(&N_storage_real))

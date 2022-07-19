@@ -89,6 +89,8 @@ btchip_context_t btchip_context_D;
 #endif  // DISABLE_LEGACY_SUPPORT
 #endif
 
+const internalStorage_t N_storage_real;
+
 // shared between legacy and new
 global_context_t *G_coin_config;  // same type as btchip_altcoin_config_t
 
@@ -179,6 +181,18 @@ void init_coin_config(btchip_altcoin_config_t *coin_config) {
 #endif  // COIN_FLAGS
     coin_config->kind = COIN_KIND;
 #endif
+}
+
+void app_init_persistent_storage() {
+    if (N_storage.magic != STORAGE_MAGIC) {
+        uint8_t tmp_key[32];
+        cx_trng_get_random_data(tmp_key, 32);
+        nvm_write((void *) &N_storage.wallet_registration_key, (void *) &tmp_key, 32);
+        explicit_bzero(tmp_key, 32);
+
+        uint32_t tmp = STORAGE_MAGIC;
+        nvm_write((void *) &N_storage.magic, (void *) &tmp, sizeof(uint32_t));
+    }
 }
 
 void app_main() {
@@ -354,6 +368,8 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
         BEGIN_TRY {
             TRY {
                 io_seproxyhal_init();
+
+                app_init_persistent_storage();
 
 #ifdef TARGET_NANOX
                 // grab the current plane mode setting

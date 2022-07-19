@@ -50,12 +50,6 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     if (!buffer_read_u8(&dc->read_buffer, &state->display_address) ||
         !buffer_read_bytes(&dc->read_buffer, state->wallet_id, 32) ||
         !buffer_read_bytes(&dc->read_buffer, state->wallet_hmac, 32)) {
@@ -110,92 +104,9 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
     }
 
     if (hmac_or == 0) {
-        // No hmac, verify that the policy is a canonical one that is allowed by default
-        state->address_type = get_policy_address_type(&state->wallet_policy_map);
-        if (state->address_type == -1) {
-            PRINTF("Non-standard policy, and no hmac provided\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return;
-        }
-
-        if (state->wallet_header.n_keys != 1) {
-            PRINTF("Standard wallets must have exactly 1 key\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // we check if the key is indeed internal
-        uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
-
-        int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        state->wallet_header.keys_info_merkle_root,
-                                                        state->wallet_header.n_keys,
-                                                        0,  // only one key
-                                                        state->key_info_str,
-                                                        sizeof(state->key_info_str));
-        if (key_info_len < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // Make a sub-buffer for the pubkey info
-        buffer_t key_info_buffer = buffer_create(state->key_info_str, key_info_len);
-
-        policy_map_key_info_t key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header.version) ==
-            -1) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        if (read_u32_be(key_info.master_key_fingerprint, 0) != master_key_fingerprint) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // generate pubkey and check if it matches
-        char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-        int serialized_pubkey_len =
-            get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
-                                                   key_info.master_key_derivation_len,
-                                                   G_coin_config->bip32_pubkey_version,
-                                                   pubkey_derived,
-                                                   NULL);
-        if (serialized_pubkey_len == -1) {
-            SEND_SW(dc, SW_BAD_STATE);
-            return;
-        }
-
-        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        // check if derivation path is indeed standard
-
-        // Based on the address type, we set the expected bip44 purpose for this canonical wallet
-        int bip44_purpose = get_bip44_purpose(state->address_type);
-
-        if (key_info.master_key_derivation_len != 3) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
-
-        uint32_t bip32_path[5];
-        for (int i = 0; i < 3; i++) {
-            bip32_path[i] = key_info.master_key_derivation[i];
-        }
-        bip32_path[3] = state->is_change ? 1 : 0;
-        bip32_path[4] = state->address_index;
-
-        if (!is_address_path_standard(bip32_path, 5, bip44_purpose, coin_types, 2, -1)) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return;
-        }
-
-        state->is_wallet_canonical = true;
+        // Only registered wallets are supported in HSM mode
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
     } else {
         // Verify hmac
 

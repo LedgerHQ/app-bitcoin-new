@@ -453,12 +453,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     state->p2 = p2;
 
     merkleized_map_commitment_t global_map;
@@ -519,7 +513,9 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
             state->is_wallet_canonical = false;
         } else {
-            state->is_wallet_canonical = true;
+            // Only registered wallets are allowed in HSM mode
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
         }
 
         // Fetch the serialized wallet policy from the client
@@ -681,13 +677,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     state->cur_input_index = 0;
 
-    if (state->is_wallet_canonical) {
-        // Canonical wallet, we start processing the psbt directly
-        dc->next(find_first_internal_key_placeholder);
-    } else {
-        // Show screen to authorize spend from a registered wallet
-        ui_authorize_wallet_spend(dc, wallet_header.name, find_first_internal_key_placeholder);
-    }
+    dc->next(find_first_internal_key_placeholder);
 }
 
 // finds the first placeholder that corresponds to an internal key
@@ -1067,8 +1057,8 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
             return;
         }
 
-        // some internal and some external inputs, warn the user first
-        ui_warn_external_inputs(dc, alert_missing_nonwitnessutxo);
+        // external inputs not allowed in HSM mode
+        SEND_SW(dc, SW_INCORRECT_DATA);
     }
 }
 
@@ -1078,11 +1068,9 @@ static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->show_missing_nonwitnessutxo_warning) {
-        ui_warn_unverified_segwit_inputs(dc, alert_nondefault_sighash);
-    } else {
-        dc->next(alert_nondefault_sighash);
-    }
+    // In HSM mode, we skip missing witness UTXO warnings
+    // TODO: assess security impact; it might be better to not support legacy inputs in HSM mode
+    dc->next(verify_outputs_init);
 }
 
 // If any input has non-default sighash, we warn the user
@@ -1091,8 +1079,10 @@ static void alert_nondefault_sighash(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    // In HSM mode, we only allow default sighashes
+
     if (state->show_nondefault_sighash_warning) {
-        ui_warn_nondefault_sighash(dc, verify_outputs_init);
+        SEND_SW(dc, SW_INCORRECT_DATA);
     } else {
         dc->next(verify_outputs_init);
     }
@@ -1295,13 +1285,7 @@ static void output_validate_external(dispatcher_context_t *dc) {
             return;
         }
     } else {
-        // Show address to the user
-        ui_validate_output(dc,
-                           state->external_outputs_count,
-                           output_address,
-                           G_coin_config->name_short,
-                           state->cur.output.value,
-                           output_next);
+        dc->next(output_next);
         return;
     }
 }
@@ -1363,8 +1347,8 @@ static void confirm_transaction(dispatcher_context_t *dc) {
         // No user validation required during swap
         dc->next(sign_init);
     } else {
-        // Show final user validation UI
-        ui_validate_transaction(dc, G_coin_config->name_short, fee, sign_init);
+        // Skip UI in HSM mode
+        dc->next(sign_init);
     }
 }
 
