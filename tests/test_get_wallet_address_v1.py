@@ -1,4 +1,7 @@
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+# Tests using the V1 version of the wallet policy language, used before version 2.1.0 of the app
+# Make sure we remain compatible for some time.
+
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet, WalletType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
 
 
@@ -7,54 +10,58 @@ import pytest
 # TODO: add tests with UI
 
 
-def test_get_wallet_address_singlesig_legacy(client: Client):
+def test_get_wallet_address_singlesig_legacy_v1(client: Client):
     # legacy address (P2PKH)
     wallet = PolicyMapWallet(
         name="",
-        policy_map="pkh(@0/**)",
+        policy_map="pkh(@0)",
         keys_info=[
-            f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     assert client.get_wallet_address(wallet, None, 0,  0, False) == "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
 
 
-def test_get_wallet_address_singlesig_wit(client: Client):
+def test_get_wallet_address_singlesig_wit_v1(client: Client):
     # bech32 address (P2WPKH)
     wallet = PolicyMapWallet(
         name="",
-        policy_map="wpkh(@0/**)",
+        policy_map="wpkh(@0)",
         keys_info=[
-            f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+            f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     assert client.get_wallet_address(wallet, None, 0,  0, False) == "tb1qzdr7s2sr0dwmkwx033r4nujzk86u0cy6fmzfjk"
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "tb1qlrvzyx8jcjfj2xuy69du9trtxnsvjuped7e289"
 
 
-def test_get_wallet_address_singlesig_sh_wit(client: Client):
+def test_get_wallet_address_singlesig_sh_wit_v1(client: Client):
     # wrapped segwit addresses (P2SH-P2WPKH)
     wallet = PolicyMapWallet(
         name="",
-        policy_map="sh(wpkh(@0/**))",
+        policy_map="sh(wpkh(@0))",
         keys_info=[
-            f"[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3",
+            f"[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     assert client.get_wallet_address(wallet, None, 0,  0, False) == "2MyHkbusvLomaarGYMqyq7q9pSBYJRwWcsw"
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "2NAbM4FSeBQG4o85kbXw2YNfKypcnEZS9MR"
 
 
-def test_get_wallet_address_singlesig_taproot(client: Client):
+def test_get_wallet_address_singlesig_taproot_v1(client: Client):
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 
     wallet = PolicyMapWallet(
         name="",
-        policy_map="tr(@0/**)",
+        policy_map="tr(@0)",
         keys_info=[
-            f"[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
+            f"[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
 
     res = client.get_wallet_address(wallet, None, 0, 0, False)
@@ -72,23 +79,24 @@ def test_get_wallet_address_singlesig_taproot(client: Client):
 
 # Failure cases for default wallets
 
-def test_get_wallet_address_default_fail_wrongkeys(client: Client):
+def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
     # 0 keys info should be rejected
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[],
+            version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
 
     # more than 1 key should be rejected
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[
-                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
-                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
             ],
         ), None, 0,  0, False)
 
@@ -96,19 +104,20 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[
-                f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+                f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
             ],
+            version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
 
-    # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended pubkey for "84'/1'/0'"")
+    # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended dpubkey for "84'/1'/0'"")
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[
-                f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
+                f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
             ],
         ), None, 0,  0, False)
 
@@ -116,27 +125,28 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[
-                f"[42424242/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+                f"[42424242/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
             ],
+            version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
 
     # too large address_index, cannot be done non-silently
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(PolicyMapWallet(
             name="",
-            policy_map="pkh(@0/**)",
+            policy_map="pkh(@0)",
             keys_info=[
-                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
             ],
+            version=WalletType.WALLET_POLICY_V1
         ), None, 0,  100000, False)
 
 
 # Multisig
 
-
-def test_get_wallet_address_multisig_legacy(client: Client):
+def test_get_wallet_address_multisig_legacy_v1(client: Client):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
@@ -144,19 +154,20 @@ def test_get_wallet_address_multisig_legacy(client: Client):
         address_type=AddressType.LEGACY,
         threshold=2,
         keys_info=[
-            f"[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
-            f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
+            f"[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW/**",
+            f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     wallet_hmac = bytes.fromhex(
-        "fa73e36119324fbe4cc1ca94aa842c6261526d44112a22164bc57c3335102b04"
+        "1980a07cde99fbdec0d487671d3bb296507e47b3ddfa778600a9d73d501983bc"
     )
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
 
-def test_get_wallet_address_multisig_sh_wit(client: Client):
+def test_get_wallet_address_multisig_sh_wit_v1(client: Client):
     # test for a wrapped segwit multisig wallet
 
     wallet = MultisigWallet(
@@ -164,19 +175,20 @@ def test_get_wallet_address_multisig_sh_wit(client: Client):
         address_type=AddressType.SH_WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
-            f"[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            f"[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g/**",
+            f"[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     wallet_hmac = bytes.fromhex(
-        "1f498e7444841b883c4a63e2b88a5cad297c289d235794f8e3e17cf559ed0654"
+        "ff96c09cfacf89f836ded409b7315b9d7f242db8033e4de4db1cb4c275153988"
     )
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
 
 
-def test_get_wallet_address_multisig_wit(client: Client):
+def test_get_wallet_address_multisig_wit_v1(client: Client):
     # test for a native segwit multisig wallet (bech32 address)
 
     wallet = MultisigWallet(
@@ -184,12 +196,13 @@ def test_get_wallet_address_multisig_wit(client: Client):
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
         ],
+        version=WalletType.WALLET_POLICY_V1
     )
     wallet_hmac = bytes.fromhex(
-        "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+        "d6434852fb3caa7edbd1165084968f1691444b3cfc10cf1e431acbbc7f48451f"
     )
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)

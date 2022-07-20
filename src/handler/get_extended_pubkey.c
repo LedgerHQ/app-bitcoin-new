@@ -26,8 +26,6 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
-extern global_context_t *G_coin_config;
-
 static void send_response(dispatcher_context_t *dc);
 
 static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
@@ -116,7 +114,9 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     return true;
 }
 
-void handler_get_extended_pubkey(dispatcher_context_t *dc) {
+void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
@@ -146,7 +146,7 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc) {
         return;
     }
 
-    uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+    uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
     bool is_safe = is_path_safe_for_pubkey_export(bip32_path, bip32_path_len, coin_types, 2);
 
     if (!is_safe && !display) {
@@ -154,11 +154,11 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc) {
         return;
     }
 
-    int serialized_pubkey_len =
-        get_serialized_extended_pubkey_at_path(bip32_path,
-                                               bip32_path_len,
-                                               G_coin_config->bip32_pubkey_version,
-                                               state->serialized_pubkey_str);
+    int serialized_pubkey_len = get_serialized_extended_pubkey_at_path(bip32_path,
+                                                                       bip32_path_len,
+                                                                       BIP32_PUBKEY_VERSION,
+                                                                       state->serialized_pubkey_str,
+                                                                       NULL);
     if (serialized_pubkey_len == -1) {
         SEND_SW(dc, SW_BAD_STATE);
         return;

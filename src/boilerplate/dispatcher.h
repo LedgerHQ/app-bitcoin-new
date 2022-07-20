@@ -23,24 +23,12 @@ typedef struct dispatcher_context_s dispatcher_context_t;
 
 typedef void (*command_processor_t)(dispatcher_context_t *);
 
-typedef command_processor_t command_handler_t;
+typedef void (*command_handler_t)(dispatcher_context_t *, uint8_t p2);
 
 typedef struct machine_context_s {
     struct machine_context_s *parent_context;
     command_processor_t next_processor;
 } machine_context_t;
-
-typedef void (*dispatcher_callback_t)(machine_context_t *, buffer_t *);
-
-typedef struct {
-    void *state;
-    dispatcher_callback_t fn;
-} dispatcher_callback_descriptor_t;
-
-static inline dispatcher_callback_descriptor_t make_callback(void *state,
-                                                             dispatcher_callback_t fn) {
-    return (dispatcher_callback_descriptor_t){.state = state, .fn = fn};
-}
 
 /**
  * TODO: docs
@@ -132,9 +120,6 @@ static inline void print_dispatcher_info(dispatcher_context_t *dc,
                                          const char *file,
                                          int line,
                                          const char *func) {
-    // prevent warnings when DEBUG is 0
-    (void) file, (void) line, (void) func;
-
     machine_context_t *ctx = dc->machine_context_ptr;
     while (ctx->parent_context != NULL) {
         PRINTF("----");
