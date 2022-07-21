@@ -26,7 +26,6 @@ typedef void (*command_processor_t)(dispatcher_context_t *);
 typedef void (*command_handler_t)(dispatcher_context_t *, uint8_t p2);
 
 typedef struct machine_context_s {
-    struct machine_context_s *parent_context;
     command_processor_t next_processor;
 } machine_context_t;
 
@@ -117,10 +116,6 @@ static inline void print_dispatcher_info(dispatcher_context_t *dc,
                                          int line,
                                          const char *func) {
     machine_context_t *ctx = dc->machine_context_ptr;
-    while (ctx->parent_context != NULL) {
-        PRINTF("----");
-        ctx = ctx->parent_context;
-    }
     PRINTF("->%s %d: %s\n", file, line, func);
 }
 

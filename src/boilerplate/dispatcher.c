@@ -190,37 +190,13 @@ static void dispatcher_loop() {
         return;
     }
 
-    while (true) {
-        if (G_dispatcher_state.sw != 0) {
-            break;
-        }
+    while (G_dispatcher_state.sw == 0 && G_dispatcher_context.machine_context_ptr->next_processor) {
+        // there is a next processor, continue in the same context
 
-        if (G_dispatcher_context.machine_context_ptr->next_processor) {
-            // there is a next processor, continue in the same context
+        command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
+        G_dispatcher_context.machine_context_ptr->next_processor = NULL;
 
-            command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
-            G_dispatcher_context.machine_context_ptr->next_processor = NULL;
-
-            proc(&G_dispatcher_context);
-
-            // if an interruption is sent, should exit the loop and persist the context for the next
-            // call in that case, there MUST be a next_processor
-            if (G_dispatcher_state.sw == SW_INTERRUPTED_EXECUTION) {
-                if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
-                    PRINTF("Interruption requested, but the next processor was not set.\n");
-                }
-
-                io_clear_processing_timeout();
-                return;
-            }
-        } else if (G_dispatcher_context.machine_context_ptr->parent_context != NULL) {
-            // the current submachine ended, continue from parent's context
-            G_dispatcher_context.machine_context_ptr =
-                G_dispatcher_context.machine_context_ptr->parent_context;
-            continue;
-        } else {
-            break;  // all done
-        }
+        proc(&G_dispatcher_context);
     }
 
     // Here a response (either success or error) should have been send.
