@@ -24,7 +24,9 @@
 
 #include "get_master_fingerprint.h"
 
-void handler_get_master_fingerprint(dispatcher_context_t *dc) {
+void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
         SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);

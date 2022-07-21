@@ -103,7 +103,7 @@ bool buffer_read_u8(buffer_t *buffer, uint8_t *value);
 
 /**
  * Read 1 byte from buffer into uint8_t without advancing the current position in the buffer.
- * Returns `true` on success, `false` if the buffer was empty; `value` is not change in case of
+ * Returns `true` on success, `false` if the buffer was empty; `value` is not changed in case of
  * failure.
  *
  * @param[in]  buffer
@@ -114,6 +114,22 @@ bool buffer_read_u8(buffer_t *buffer, uint8_t *value);
  * @return true if success, false otherwise.
  */
 bool buffer_peek(const buffer_t *buffer, uint8_t *value);
+
+/**
+ * Read 1 byte at position `n` from buffer into uint8_t without advancing the current position in
+ * the buffer. Returns `true` on success, `false` if the buffer is not large enough; `value` is not
+ * changed in case of failure.
+ *
+ * @param[in]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]  n
+ *   Index of the byte to read, where the immediate next byte has index 0.
+ * @param[out]  value
+ *   Pointer to 8-bit unsigned integer read from buffer.
+ *
+ * @return true if success, false otherwise.
+ */
+bool buffer_peek_n(const buffer_t *buffer, size_t n, uint8_t *value);
 
 /**
  * Read 2 bytes from buffer into uint16_t.

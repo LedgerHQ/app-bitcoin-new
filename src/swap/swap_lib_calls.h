@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdbool.h"
+#include <stdbool.h>
 
 #define RUN_APPLICATION 1
 

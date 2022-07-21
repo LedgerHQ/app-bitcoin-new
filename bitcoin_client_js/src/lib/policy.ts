@@ -49,7 +49,7 @@ export class WalletPolicy {
     const m = new Merkle(keyBuffers.map((k) => hashLeaf(k)));
 
     const buf = new BufferWriter();
-    buf.writeUInt8(0x01); // wallet type (policy map)
+    buf.writeUInt8(0x01); // wallet type (policy map) // TODO: support version 2 
     buf.writeVarSlice(Buffer.from(this.name, 'ascii'));
     buf.writeVarSlice(Buffer.from(this.descriptorTemplate, 'ascii'));
     buf.writeVarInt(this.keys.length);

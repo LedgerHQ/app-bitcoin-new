@@ -191,6 +191,43 @@ static void test_buffer_peek(void **state) {
     assert_int_equal(c, 0x55); // unchanged because of failure
 }
 
+static void test_buffer_peek_n(void **state) {
+    (void) state;
+
+    uint8_t temp[6] = {
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55
+    };
+    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
+
+    bool result;
+    uint8_t c;
+
+    for (int i = 0; i < 6; i++) {
+        result = buffer_peek_n(&buf, i, &c);
+        assert_true(result);
+        assert_int_equal(c, temp[i]);
+    }
+
+    c = 42;
+    result = buffer_peek_n(&buf, 6, &c); // past the end
+    assert_false(result);
+    assert_int_equal(c, 42); // c should not change on failure
+
+    buf.offset += 3;
+
+    for (int i = 0; i < 3; i++) {
+        result = buffer_peek_n(&buf, i, &c);
+        assert_true(result);
+        assert_int_equal(c, temp[3+i]);
+    }
+
+    c = 42;
+    result = buffer_peek_n(&buf, 4, &c); // past the end
+    assert_false(result);
+    assert_int_equal(c, 42); // c should not change on failure
+}
+
+
 static void test_buffer_write(void **state) {
     (void) state;
 
@@ -420,6 +457,7 @@ int main() {
                                        cmocka_unit_test(test_buffer_get_cur),
                                        cmocka_unit_test(test_buffer_read),
                                        cmocka_unit_test(test_buffer_peek),
+                                       cmocka_unit_test(test_buffer_peek_n),
                                        cmocka_unit_test(test_buffer_write),
                                        cmocka_unit_test(test_buffer_create),
                                        cmocka_unit_test(test_buffer_alloc),

@@ -9,6 +9,8 @@
 #include "../../boilerplate/sw.h"
 #include "../client_commands.h"
 
+#include "debug-helpers/debug.h"
+
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
 int call_get_merkle_leaf_hash(dispatcher_context_t *dc,
                               const uint8_t merkle_root[static 32],

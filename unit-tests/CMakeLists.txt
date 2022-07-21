@@ -33,7 +33,7 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there. You may need to remove CMakeCache.txt. ")
 endif()
 
-add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA)
+add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA PRINTF=printf)
 
 include_directories(../src)
 include_directories(mock_includes)
@@ -74,7 +74,7 @@ target_link_libraries(test_display_utils PUBLIC cmocka gcov display_utils)
 target_link_libraries(test_format PUBLIC cmocka gcov format)
 target_link_libraries(test_parser PUBLIC cmocka gcov parser buffer varint read write bip32)
 target_link_libraries(test_script PUBLIC cmocka gcov script buffer varint read write bip32)
-target_link_libraries(test_wallet PUBLIC cmocka gcov wallet buffer varint read write bip32)
+target_link_libraries(test_wallet PUBLIC cmocka gcov wallet script buffer varint read write bip32)
 target_link_libraries(test_write PUBLIC cmocka gcov write)
 #target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 

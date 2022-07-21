@@ -33,7 +33,6 @@ extern bool G_was_processing_screen_shown;
 // Private state that is not made accessible from the dispatcher context
 struct {
     void (*termination_cb)(void);
-    bool paused;
     uint16_t sw;
     bool had_ux_flow;  // set to true if there was any UX flow during the APDU processing
 } G_dispatcher_state;
@@ -57,33 +56,9 @@ static void send_response() {
     io_confirm_response();
 }
 
-static void pause() {
-    G_dispatcher_state.paused = true;
-
-    // pause() is _always_ called for ux flows that wait for user input.
-    // No other flows should exist.
+static void set_ui_dirty() {
+    // signals that the screen was changed while processing a command handler
     G_dispatcher_state.had_ux_flow = true;
-}
-
-static void run() {
-    G_dispatcher_state.paused = false;
-
-    io_start_processing_timeout();
-    dispatcher_loop();
-}
-
-static void start_flow(command_processor_t first_processor,
-                       machine_context_t *subcontext,
-                       command_processor_t return_processor) {
-    // set the return_processor as the next processor for the current flow
-    G_dispatcher_context.machine_context_ptr->next_processor = return_processor;
-
-    // initialize subcontext's parent context and initial processor
-    subcontext->parent_context = G_dispatcher_context.machine_context_ptr;
-    subcontext->next_processor = first_processor;
-
-    // switch machine context to subcontext
-    G_dispatcher_context.machine_context_ptr = subcontext;
 }
 
 // TODO: refactor code in common with the main apdu loop
@@ -150,26 +125,23 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_state.had_ux_flow = false;
 
     G_dispatcher_state.termination_cb = termination_cb;
-    G_dispatcher_state.paused = false;
     G_dispatcher_state.sw = 0;
 
     G_dispatcher_context.next = next;
     G_dispatcher_context.add_to_response = add_to_response;
     G_dispatcher_context.finalize_response = finalize_response;
     G_dispatcher_context.send_response = send_response;
-    G_dispatcher_context.pause = pause;
-    G_dispatcher_context.run = run;
-    G_dispatcher_context.start_flow = start_flow;
+    G_dispatcher_context.set_ui_dirty = set_ui_dirty;
     G_dispatcher_context.process_interruption = process_interruption;
 
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
-    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
-        if (cmd->p1 != 0 || cmd->p2 != 0) {
-            io_send_sw(SW_WRONG_P1P2);
-            return;
-        }
+    if (cmd->p1 != 0 || cmd->p2 > 1) {
+        io_send_sw(SW_WRONG_P1P2);
+        return;
+    }
 
+    if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         if (G_dispatcher_context.machine_context_ptr == NULL ||
             G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
             PRINTF("Unexpected INS_CONTINUE.\n");
@@ -206,7 +178,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         }
 
         io_start_processing_timeout();
-        handler(&G_dispatcher_context);
+        handler(&G_dispatcher_context, cmd->p2);
     }
 
     dispatcher_loop();
@@ -218,42 +190,13 @@ static void dispatcher_loop() {
         return;
     }
 
-    while (true) {
-        if (G_dispatcher_state.paused) {
-            io_clear_processing_timeout();
-            return;
-        }
+    while (G_dispatcher_state.sw == 0 && G_dispatcher_context.machine_context_ptr->next_processor) {
+        // there is a next processor, continue in the same context
 
-        if (G_dispatcher_state.sw != 0) {
-            break;
-        }
+        command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
+        G_dispatcher_context.machine_context_ptr->next_processor = NULL;
 
-        if (G_dispatcher_context.machine_context_ptr->next_processor) {
-            // there is a next processor, continue in the same context
-
-            command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
-            G_dispatcher_context.machine_context_ptr->next_processor = NULL;
-
-            proc(&G_dispatcher_context);
-
-            // if an interruption is sent, should exit the loop and persist the context for the next
-            // call in that case, there MUST be a next_processor
-            if (G_dispatcher_state.sw == SW_INTERRUPTED_EXECUTION) {
-                if (G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
-                    PRINTF("Interruption requested, but the next processor was not set.\n");
-                }
-
-                io_clear_processing_timeout();
-                return;
-            }
-        } else if (G_dispatcher_context.machine_context_ptr->parent_context != NULL) {
-            // the current submachine ended, continue from parent's context
-            G_dispatcher_context.machine_context_ptr =
-                G_dispatcher_context.machine_context_ptr->parent_context;
-            continue;
-        } else {
-            break;  // all done
-        }
+        proc(&G_dispatcher_context);
     }
 
     // Here a response (either success or error) should have been send.
