@@ -39,7 +39,6 @@
 #include "client_commands.h"
 
 static void compute_address(dispatcher_context_t *dc);
-static void send_response(dispatcher_context_t *dc);
 
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
@@ -248,20 +247,15 @@ static void compute_address(dispatcher_context_t *dc) {
         return;
     }
 
-    if (state->display_address == 0) {
-        dc->next(send_response);
-    } else {
-        ui_display_wallet_address(dc,
-                                  state->is_wallet_canonical ? NULL : state->wallet_header.name,
-                                  state->address,
-                                  send_response);
+    if (state->display_address != 0) {
+        if (!ui_display_wallet_address(
+                dc,
+                state->is_wallet_canonical ? NULL : state->wallet_header.name,
+                state->address)) {
+            SEND_SW(dc, SW_DENY);
+            return;
+        }
     }
-}
-
-static void send_response(dispatcher_context_t *dc) {
-    get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     SEND_RESPONSE(dc, state->address, state->address_len, SW_OK);
 }

@@ -677,13 +677,13 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     state->cur_input_index = 0;
 
-    if (state->is_wallet_canonical) {
-        // Canonical wallet, we start processing the psbt directly
-        dc->next(find_first_internal_key_placeholder);
-    } else {
-        // Show screen to authorize spend from a registered wallet
-        ui_authorize_wallet_spend(dc, wallet_header.name, find_first_internal_key_placeholder);
+    // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
+    if (!state->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
+        SEND_SW(dc, SW_DENY);
+        return;
     }
+
+    dc->next(find_first_internal_key_placeholder);
 }
 
 // finds the first placeholder that corresponds to an internal key
@@ -1064,7 +1064,12 @@ static void alert_external_inputs(dispatcher_context_t *dc) {
         }
 
         // some internal and some external inputs, warn the user first
-        ui_warn_external_inputs(dc, alert_missing_nonwitnessutxo);
+        if (!ui_warn_external_inputs(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return;
+        }
+
+        dc->next(alert_missing_nonwitnessutxo);
     }
 }
 
@@ -1074,11 +1079,13 @@ static void alert_missing_nonwitnessutxo(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->show_missing_nonwitnessutxo_warning) {
-        ui_warn_unverified_segwit_inputs(dc, alert_nondefault_sighash);
-    } else {
-        dc->next(alert_nondefault_sighash);
+    // abort if user denies after the missing non-witness-utxo warning
+    if (state->show_missing_nonwitnessutxo_warning && !ui_warn_unverified_segwit_inputs(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return;
     }
+
+    dc->next(alert_nondefault_sighash);
 }
 
 // If any input has non-default sighash, we warn the user
@@ -1087,11 +1094,12 @@ static void alert_nondefault_sighash(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
-    if (state->show_nondefault_sighash_warning) {
-        ui_warn_nondefault_sighash(dc, verify_outputs_init);
-    } else {
-        dc->next(verify_outputs_init);
+    if (state->show_nondefault_sighash_warning && !ui_warn_nondefault_sighash(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return;
     }
+
+    dc->next(verify_outputs_init);
 }
 
 /** OUTPUTS VERIFICATION FLOW
@@ -1284,21 +1292,20 @@ static void output_validate_external(dispatcher_context_t *dc) {
             PRINTF("Mismatching address for swap\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
-        } else {
-            // no need for user vaidation during swap
-            dc->next(output_next);
-            return;
         }
     } else {
         // Show address to the user
-        ui_validate_output(dc,
-                           state->external_outputs_count,
-                           output_address,
-                           COIN_COINID_SHORT,
-                           state->cur.output.value,
-                           output_next);
-        return;
+        if (!ui_validate_output(dc,
+                                state->external_outputs_count,
+                                output_address,
+                                COIN_COINID_SHORT,
+                                state->cur.output.value)) {
+            SEND_SW(dc, SW_DENY);
+            return;
+        }
     }
+
+    dc->next(output_next);
 }
 
 static void output_next(dispatcher_context_t *dc) {
@@ -1355,12 +1362,15 @@ static void confirm_transaction(dispatcher_context_t *dc) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
-        // No user validation required during swap
-        dc->next(sign_init);
     } else {
         // Show final user validation UI
-        ui_validate_transaction(dc, COIN_COINID_SHORT, fee, sign_init);
+        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
+            SEND_SW(dc, SW_DENY);
+            return;
+        };
     }
+
+    dc->next(sign_init);
 }
 
 /** SIGNING FLOW

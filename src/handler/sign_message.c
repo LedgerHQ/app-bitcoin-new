@@ -97,7 +97,12 @@ void handler_sign_message(dispatcher_context_t *dc, uint8_t p2) {
         snprintf(message_hash_str + 2 * i, 3, "%02X", state->message_hash[i]);
     }
 
-    ui_display_message_hash(dc, path_str, message_hash_str, send_response);
+    if (!ui_display_message_hash(dc, path_str, message_hash_str)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(send_response);
 }
 
 static void send_response(dispatcher_context_t *dc) {
