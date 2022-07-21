@@ -37,15 +37,11 @@ struct dispatcher_context_s {
     machine_context_t *machine_context_ptr;
     buffer_t read_buffer;
 
-    void (*pause)();
-    void (*run)();
+    void (*set_ui_dirty)();
     void (*next)(command_processor_t next_processor);
     void (*add_to_response)(const void *rdata, size_t rdata_len);
     void (*finalize_response)(uint16_t sw);
     void (*send_response)(void);
-    void (*start_flow)(command_processor_t first_processor,
-                       machine_context_t *subcontext,
-                       command_processor_t return_processor);
     int (*process_interruption)(dispatcher_context_t *dispatcher_context);
 };
 

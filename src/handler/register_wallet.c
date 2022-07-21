@@ -113,10 +113,12 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 
     state->next_pubkey_index = 0;
 
-    ui_display_register_wallet(dc,
-                               &state->wallet_header,
-                               (char *) policy_map_descriptor,
-                               process_cosigner_info);
+    if (!ui_display_register_wallet(dc, &state->wallet_header, (char *) policy_map_descriptor)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(process_cosigner_info);
 }
 
 /**
@@ -186,12 +188,16 @@ static void process_cosigner_info(dispatcher_context_t *dc) {
     // checksum)
     //       Currently we are showing to the user whichever string is passed by the host.
 
-    ui_display_policy_map_cosigner_pubkey(dc,
-                                          (char *) state->next_pubkey_info,
-                                          state->next_pubkey_index,  // 1-indexed for the UI
-                                          state->wallet_header.n_keys,
-                                          is_key_internal,
-                                          next_cosigner);
+    if (!ui_display_policy_map_cosigner_pubkey(dc,
+                                               (char *) state->next_pubkey_info,
+                                               state->next_pubkey_index,  // 1-indexed for the UI
+                                               state->wallet_header.n_keys,
+                                               is_key_internal)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+
+    dc->next(next_cosigner);
 }
 
 static void next_cosigner(dispatcher_context_t *dc) {

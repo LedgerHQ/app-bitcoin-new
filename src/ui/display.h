@@ -13,67 +13,51 @@ typedef void (*action_validate_cb)(dispatcher_context_t *dispatcher_context, boo
 /**
  * Display the derivation path and pubkey, and asks the confirmation to export.
  *
- * @return 0 if success, negative integer otherwise.
- * TODO: document params
+ * TODO: docs
  */
-void ui_display_pubkey(dispatcher_context_t *context,
+bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *bip32_path_str,
                        bool is_path_suspicious,
-                       const char *pubkey,
-                       command_processor_t on_success);
+                       const char *pubkey);
 
 // TODO: docs
-void ui_display_message_hash(dispatcher_context_t *context,
+bool ui_display_message_hash(dispatcher_context_t *context,
                              const char *bip32_path_str,
-                             const char *message_hash,
-                             command_processor_t on_success);
+                             const char *message_hash);
 
-void ui_display_address(dispatcher_context_t *dispatcher_context,
+bool ui_display_address(dispatcher_context_t *dispatcher_context,
                         const char *address,
                         bool is_path_suspicious,
-                        const char *bip32_path_str,
-                        command_processor_t on_success);
+                        const char *bip32_path_str);
 
-void ui_display_register_wallet(dispatcher_context_t *context,
+bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
-                                const char *policy_descriptor,
-                                command_processor_t on_success);
+                                const char *policy_descriptor);
 
-void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
+bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
                                            const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
-                                           bool is_internal,
-                                           command_processor_t on_success);
+                                           bool is_internal);
 
-void ui_display_wallet_address(dispatcher_context_t *context,
+bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
-                               const char *address,
-                               command_processor_t on_success);
+                               const char *address);
 
-void ui_display_unusual_path(dispatcher_context_t *context,
-                             const char *bip32_path_str,
-                             command_processor_t on_success);
+bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
 
-void ui_authorize_wallet_spend(dispatcher_context_t *context,
-                               const char *wallet_name,
-                               command_processor_t on_success);
+bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name);
 
-void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t on_success);
+bool ui_warn_external_inputs(dispatcher_context_t *context);
 
-void ui_warn_unverified_segwit_inputs(dispatcher_context_t *context,
-                                      command_processor_t on_success);
+bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context);
 
-void ui_warn_nondefault_sighash(dispatcher_context_t *context, command_processor_t on_success);
+bool ui_warn_nondefault_sighash(dispatcher_context_t *context);
 
-void ui_validate_output(dispatcher_context_t *context,
+bool ui_validate_output(dispatcher_context_t *context,
                         int index,
                         const char *address_or_description,
                         const char *coin_name,
-                        uint64_t amount,
-                        command_processor_t on_success);
+                        uint64_t amount);
 
-void ui_validate_transaction(dispatcher_context_t *context,
-                             const char *coin_name,
-                             uint64_t fee,
-                             command_processor_t on_success);
+bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee);
