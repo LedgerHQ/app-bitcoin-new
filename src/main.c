@@ -61,7 +61,7 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
-command_state_t G_command_state;
+machine_context_t G_command_state;
 dispatcher_context_t G_dispatcher_context;
 
 // clang-format off
@@ -201,10 +201,6 @@ void coin_main() {
 
 #if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
     PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
-#endif
-
-#ifdef HAVE_SEMIHOSTED_PRINTF
-    PRINTF("APDU State size: %d\n", sizeof(command_state_t));
 #endif
 
     // Reset dispatcher state

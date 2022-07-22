@@ -8,7 +8,7 @@
 #include "../../common/buffer.h"
 
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
-                                          machine_context_t *state,
+                                          void *callback_state,
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,
@@ -37,7 +37,7 @@ int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_conte
     }
 
     return call_check_merkle_tree_sorted_with_callback(dispatcher_context,
-                                                       state,
+                                                       callback_state,
                                                        out_ptr->keys_root,
                                                        out_ptr->size,
                                                        callback,

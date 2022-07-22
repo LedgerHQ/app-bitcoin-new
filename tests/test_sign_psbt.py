@@ -179,7 +179,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
-    # PSBT for a legacy 1-input 2-output spend (1 change address)
+    # PSBT for a segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
     wallet = PolicyMapWallet(
@@ -208,7 +208,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
-    # PSBT for a legacy 2-input 2-output spend (1 change address)
+    # PSBT for a segwit 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 

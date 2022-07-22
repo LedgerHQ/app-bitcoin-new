@@ -9,7 +9,7 @@
  * TODO: docs
  */
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
-                                          machine_context_t *state,
+                                          void *callback_state,
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,

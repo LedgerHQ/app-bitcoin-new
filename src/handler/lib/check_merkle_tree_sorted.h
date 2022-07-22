@@ -8,7 +8,7 @@
 #define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE 80
 
 typedef void (*merkle_tree_elements_callback_t)(struct dispatcher_context_s *,
-                                                machine_context_t *,
+                                                void *,
                                                 const merkleized_map_commitment_t *,
                                                 int,
                                                 buffer_t *);
@@ -22,7 +22,7 @@ typedef void (*merkle_tree_elements_callback_t)(struct dispatcher_context_s *,
  * Returns 0 on success, or a negative number on failure.
  */
 int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
-                                                machine_context_t *state,
+                                                void *callback_state,
                                                 const uint8_t root[static 32],
                                                 size_t size,
                                                 merkle_tree_elements_callback_t callback,

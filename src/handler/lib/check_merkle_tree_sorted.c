@@ -11,7 +11,7 @@ static int compare_byte_arrays(const uint8_t array1[],
                                size_t array2_len);
 
 int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
-                                                machine_context_t *state,
+                                                void *callback_state,
                                                 const uint8_t root[static 32],
                                                 size_t size,
                                                 merkle_tree_elements_callback_t callback,
@@ -46,7 +46,7 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
         if (callback != NULL) {
             // call callback with data
             buffer_t buf = buffer_create(cur_el, cur_el_len);
-            callback(dispatcher_context, state, map_commitment, cur_el_idx, &buf);
+            callback(dispatcher_context, callback_state, map_commitment, cur_el_idx, &buf);
         }
     }
     return 0;
