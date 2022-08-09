@@ -53,8 +53,6 @@ struct libargs_s {
     };
 };
 
-#include "main.h"
-
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
 #endif
@@ -65,8 +63,6 @@ bolos_ux_params_t G_ux_params;
 
 command_state_t G_command_state;
 dispatcher_context_t G_dispatcher_context;
-
-uint8_t G_app_mode;
 
 // clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
@@ -104,6 +100,8 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 // clang-format on
 
 void app_main() {
+    explicit_bzero(&G_command_state, sizeof(G_command_state));
+
     for (;;) {
         // Length of APDU command received in G_io_apdu_buffer
         int input_len = 0;
@@ -120,12 +118,6 @@ void app_main() {
         if (input_len < 0) {
             PRINTF("=> io_exchange error\n");
             return;
-        }
-
-        if (G_app_mode != APP_MODE_NEW) {
-            explicit_bzero(&G_command_state, sizeof(G_command_state));
-
-            G_app_mode = APP_MODE_NEW;
         }
 
         // Reset structured APDU command
@@ -207,8 +199,6 @@ void coin_main() {
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
-    G_app_mode = APP_MODE_UNINITIALIZED;
-
 #if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
     PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
 #endif
@@ -280,8 +270,6 @@ static void swap_library_main_helper(struct libargs_s *args) {
             initialize_app_globals();
             if (args_are_copied) {
                 // never returns
-
-                G_app_mode = APP_MODE_UNINITIALIZED;
 
                 G_swap_state.called_from_swap = 1;
 

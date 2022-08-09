@@ -6,7 +6,6 @@
 
 #include "handle_swap_sign_transaction.h"
 
-#include "../main.h"
 #include "../globals.h"
 #include "../swap/swap_globals.h"
 #include "../common/read.h"
