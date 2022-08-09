@@ -519,8 +519,8 @@ static int parse_script(buffer_t *in_buf,
     policy_node_t *outermost_node = (policy_node_t *) buffer_get_cur(out_buf);
     policy_node_with_script_t *inner_wrapper = NULL;  // pointer to the inner wrapper, if any
 
-    // miniscript-related parsing only within WSH
-    if ((context_flags & CONTEXT_WITHIN_WSH) != 0) {
+    // miniscript-related parsing only within top-level WSH
+    if ((context_flags & CONTEXT_WITHIN_WSH) != 0 && (context_flags & CONTEXT_WITHIN_SH) == 0) {
         // look ahead to finds out if the buffer starts with alphanumeric digits that could be
         // wrappers, followed by a colon
         char c;
@@ -610,6 +610,20 @@ static int parse_script(buffer_t *in_buf,
         }
     }
 
+    if ((context_flags & CONTEXT_WITHIN_SH) != 0 && (context_flags & CONTEXT_WITHIN_WSH) != 0 &&
+        depth == 2) {
+        // whitelist of allowed tokens within sh(wsh()); only few simple wallet types are supported
+        switch (token) {
+            case TOKEN_PK:
+            case TOKEN_PKH:
+            case TOKEN_MULTI:
+            case TOKEN_SORTEDMULTI:
+                break;
+            default:
+                return WITH_ERROR(-1, "Token not allowed within sh(wsh())");
+        }
+    }
+
     // all tokens but '0' and '1' have opening and closing parentheses
     bool has_parentheses = token != TOKEN_0 && token != TOKEN_1;
 
@@ -680,8 +694,8 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.flags.is_miniscript = 0;
 
-            unsigned int inner_context_flags =
-                (token == TOKEN_SH) ? CONTEXT_WITHIN_SH : CONTEXT_WITHIN_WSH;
+            unsigned int inner_context_flags = context_flags;
+            inner_context_flags |= (token == TOKEN_SH) ? CONTEXT_WITHIN_SH : CONTEXT_WITHIN_WSH;
 
             // the internal script is recursively parsed (if successful) in the current location
             // of the output buffer
@@ -1468,9 +1482,14 @@ static int parse_script(buffer_t *in_buf,
             }
 
             if (token == TOKEN_SORTEDMULTI) {
-                if (((context_flags & CONTEXT_WITHIN_SH) != 0) &&
-                    ((context_flags & CONTEXT_WITHIN_WSH) != 0)) {
-                    return WITH_ERROR(-1, "sortedmulti can only be directly under sh or wsh");
+                size_t n_sh_wrappers = 0;
+                if (context_flags & CONTEXT_WITHIN_SH) ++n_sh_wrappers;
+                if (context_flags & CONTEXT_WITHIN_WSH) ++n_sh_wrappers;
+
+                // sortedmulti cannot be used bare, and can only be directly under sh() or sh(wsh())
+                if (depth != n_sh_wrappers) {
+                    return WITH_ERROR(-1,
+                                      "sortedmulti can only be bare, or directly under sh or wsh");
                 }
             }
 

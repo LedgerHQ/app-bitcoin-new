@@ -320,11 +320,14 @@ def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGloba
     run_test_invalid(client, "wsh(sh(pkh(@0/**)))", [internal_xpub_orig])
     run_test_invalid(client, "wsh(wsh(pkh(@0/**)))", [internal_xpub_orig])
 
+    # sh(wsh(...)) is meaningful with valid miniscript, but current implementation of miniscript assumes wsh(...)
+    run_test_invalid(client, "sh(wsh(or_d(pk(@0/**),pkh(@1/**))))", [internal_xpub_orig, core_xpub_orig1])
+
     # tr must be top-level
     run_test_invalid(client, "wsh(tr(pk(@0/**)))", [internal_xpub_orig])
     run_test_invalid(client, "sh(tr(pk(@0/**)))", [internal_xpub_orig])
 
-    # valid miniscript must be inside wsh() or sh(wsh())
+    # valid miniscript must be inside wsh()
     run_test_invalid(client, "or_d(pk(@0/**),pkh(@1/**))", [internal_xpub_orig, core_xpub_orig1])
     run_test_invalid(client, "sh(or_d(pk(@0/**),pkh(@1/**)))", [internal_xpub_orig, core_xpub_orig1])
 
