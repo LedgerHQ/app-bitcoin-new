@@ -935,7 +935,7 @@ static int parse_script(buffer_t *in_buf,
                 |
                 (X->flags.miniscript_mod_z & Y->flags.miniscript_mod_n);
             node->base.flags.miniscript_mod_d = X->flags.miniscript_mod_d & Y->flags.miniscript_mod_d;
-            node->base.flags.miniscript_mod_u = Y->flags.miniscript_mod_u;
+            node->base.flags.miniscript_mod_u = 1;
             // clang-format on
 
             break;
