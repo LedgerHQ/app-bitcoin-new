@@ -570,8 +570,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
             return;
         }
 
-        state->is_wallet_canonical = true;
-
         // Based on the address type, we set the expected bip44 purpose for this canonical wallet
         int bip44_purpose = get_bip44_purpose(address_type);
         if (bip44_purpose < 0) {

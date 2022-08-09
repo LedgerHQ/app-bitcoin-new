@@ -1274,12 +1274,12 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                 return WITH_ERROR(-1, "Error analyzing miniscript policy");
             }
 
-            // Check the maximum stack size to satisfy the policy
+            // Check that non-malleability can be guaranteed
             if (!ext_info.m) {
                 return WITH_ERROR(-1, "Miniscript cannot always be satisfied non-malleably");
             }
 
-            // Check the maximum stack size to satisfy the policy
+            // Check that a signature is always required to satisfy the miniscript
             if (!ext_info.s) {
                 return WITH_ERROR(-1, "Miniscript does not always require a signature");
             }

@@ -268,7 +268,7 @@ def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = C
 
     # Use the legacy client for versions before 2.1, the new client otherwise.
     version = parse_version(app_version)
-    if version.major >= 2 and version.major >= 1:
+    if version.major >= 2 and version.minor >= 1:
         return NewClient(comm_client, chain, debug)
     else:
         return LegacyClient(comm_client, chain, debug)
