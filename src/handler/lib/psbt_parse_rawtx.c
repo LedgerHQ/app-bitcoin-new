@@ -523,7 +523,7 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
                           int key_len,
                           int output_index,
                           txid_parser_outputs_t *outputs) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);

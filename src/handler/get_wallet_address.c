@@ -45,7 +45,7 @@ bool parse_and_validate_wallet_policy(dispatcher_context_t *dc);
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {

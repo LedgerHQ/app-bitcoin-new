@@ -53,7 +53,7 @@ static bool is_policy_name_acceptable(const char *name, size_t name_len);
 void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     policy_map_wallet_header_t wallet_header;
 

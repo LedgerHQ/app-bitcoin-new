@@ -16,7 +16,7 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
                                                 size_t size,
                                                 merkle_tree_elements_callback_t callback,
                                                 const merkleized_map_commitment_t *map_commitment) {
-    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     int prev_el_len = 0;
     uint8_t prev_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];

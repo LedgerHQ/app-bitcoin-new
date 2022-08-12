@@ -116,7 +116,7 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
 void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
 
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {

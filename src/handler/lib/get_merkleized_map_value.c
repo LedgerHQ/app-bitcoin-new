@@ -11,7 +11,7 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   int key_len,
                                   uint8_t *out,
                                   int out_len) {
-    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t key_merkle_hash[32];
     merkle_compute_element_hash(key, key_len, key_merkle_hash);
