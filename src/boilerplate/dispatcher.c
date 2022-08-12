@@ -37,12 +37,6 @@ struct {
     bool had_ux_flow;  // set to true if there was any UX flow during the APDU processing
 } G_dispatcher_state;
 
-static void dispatcher_loop();
-
-static void next(command_processor_t next_processor) {
-    G_dispatcher_context.machine_context_ptr->next_processor = next_processor;
-}
-
 static void add_to_response(const void *rdata, size_t rdata_len) {
     io_add_to_response(rdata, rdata_len);
 }
@@ -118,8 +112,6 @@ static int process_interruption(dispatcher_context_t *dc) {
 
 void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
                      int n_descriptors,
-                     machine_context_t *top_context,
-                     size_t top_context_size,
                      void (*termination_cb)(void),
                      const command_t *cmd) {
     G_dispatcher_state.had_ux_flow = false;
@@ -127,7 +119,6 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_state.termination_cb = termination_cb;
     G_dispatcher_state.sw = 0;
 
-    G_dispatcher_context.next = next;
     G_dispatcher_context.add_to_response = add_to_response;
     G_dispatcher_context.finalize_response = finalize_response;
     G_dispatcher_context.send_response = send_response;
@@ -142,21 +133,10 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     }
 
     if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
-        if (G_dispatcher_context.machine_context_ptr == NULL ||
-            G_dispatcher_context.machine_context_ptr->next_processor == NULL) {
-            PRINTF("Unexpected INS_CONTINUE.\n");
-            io_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
-            return;
-        }
+        PRINTF("Unexpected INS_CONTINUE.\n");
+        io_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
+        return;
     } else {
-        // If a previous command was interrupted but any command other than INS_CONTINUE is
-        // received, the interrupted command is discarded.
-
-        G_dispatcher_context.machine_context_ptr = top_context;
-
-        // Safety measure: reset to 0 the entire context before starting.
-        explicit_bzero(top_context, top_context_size);
-
         bool cla_found = false, ins_found = false;
         command_handler_t handler;
         for (int i = 0; i < n_descriptors; i++) {
@@ -179,24 +159,6 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
         io_start_processing_timeout();
         handler(&G_dispatcher_context, cmd->p2);
-    }
-
-    dispatcher_loop();
-}
-
-static void dispatcher_loop() {
-    if (G_dispatcher_context.machine_context_ptr == NULL) {
-        PRINTF("dispatcher_loop called when the machine context is not set.");
-        return;
-    }
-
-    while (G_dispatcher_state.sw == 0 && G_dispatcher_context.machine_context_ptr->next_processor) {
-        // there is a next processor, continue in the same context
-
-        command_processor_t proc = G_dispatcher_context.machine_context_ptr->next_processor;
-        G_dispatcher_context.machine_context_ptr->next_processor = NULL;
-
-        proc(&G_dispatcher_context);
     }
 
     // Here a response (either success or error) should have been send.
