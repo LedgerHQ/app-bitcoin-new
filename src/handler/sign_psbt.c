@@ -1784,7 +1784,40 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
     return true;
 }
 
-// TODO: unnatural signature, might be worth refactoring
+static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
+                                                      sign_psbt_state_t *st,
+                                                      unsigned int cur_input_index,
+                                                      uint8_t *pubkey,
+                                                      uint8_t pubkey_len,
+                                                      uint8_t *sig,
+                                                      size_t sig_len) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    // yield signature
+    uint8_t cmd = CCMD_YIELD;
+    dc->add_to_response(&cmd, 1);
+
+    uint8_t buf[9];
+    int input_index_varint_len = varint_write(buf, 0, cur_input_index);
+    dc->add_to_response(&buf, input_index_varint_len);
+
+    // the pubkey is not output in version 0 of the protocol
+    if (st->p2 >= 1) {
+        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(pubkey, pubkey_len);
+    }
+
+    dc->add_to_response(sig, sig_len);
+
+    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
+
+    if (dc->process_interruption(dc) < 0) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+    return true;
+}
+
 static bool __attribute__((noinline))
 sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
                              sign_psbt_state_t *st,
@@ -1805,7 +1838,7 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
 
     int sign_path_len = placeholder_info->key_derivation_length + 2;
 
-    uint8_t sig[MAX_DER_SIG_LEN];
+    uint8_t sig[MAX_DER_SIG_LEN + 1];  // extra byte for the appended sighash-type
 
     uint8_t pubkey[33];
 
@@ -1821,35 +1854,15 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
         return false;
     }
 
-    // yield signature
-    uint8_t cmd = CCMD_YIELD;
-    dc->add_to_response(&cmd, 1);
-
-    uint8_t buf[9];
-    int input_index_varint_len = varint_write(buf, 0, cur_input_index);
-    dc->add_to_response(&buf, input_index_varint_len);
-
-    // pubkey is not present in version 0 of the protocol
-    if (st->p2 >= 1) {
-        uint8_t pubkey_len = 33;
-        dc->add_to_response(&pubkey_len, 1);
-        dc->add_to_response(pubkey, 33);
-    }
-
-    dc->add_to_response(&sig, sig_len);
+    // append the sighash type byte
     uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
-    dc->add_to_response(&sighash_byte, 1);
+    sig[sig_len++] = sighash_byte;
 
-    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
+    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, sig, sig_len)) return false;
 
-    if (dc->process_interruption(dc) < 0) {
-        SEND_SW(dc, SW_BAD_STATE);
-        return false;
-    }
     return true;
 }
 
-// TODO: unnatural signature, might be worth refactoring
 static bool __attribute__((noinline))
 sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                                sign_psbt_state_t *st,
@@ -1875,7 +1888,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
     int sign_path_len = placeholder_info->key_derivation_length + 2;
 
-    uint8_t sig[64];
+    uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
     size_t sig_len = 0;
 
     cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
@@ -1925,35 +1938,15 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
         return false;
     }
 
-    // yield signature
-    uint8_t cmd = CCMD_YIELD;
-    dc->add_to_response(&cmd, 1);
-
-    uint8_t buf[9];
-    int input_index_varint_len = varint_write(buf, 0, cur_input_index);
-    dc->add_to_response(&buf, input_index_varint_len);
-
-    // pubkey is not present in version 0 of the protocol
-    if (st->p2 >= 1) {
-        uint8_t pubkey_len = 32;
-        dc->add_to_response(&pubkey_len, 1);
-        dc->add_to_response(pubkey_tweaked_compr + 1, 32);  // skip the prefix for x-only pubkey
-    }
-
-    dc->add_to_response(&sig, sizeof(sig));
-
     // only append the sighash type byte if it is non-zero
     uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     if (sighash_byte != 0x00) {
         // only add the sighash byte if not 0
-        dc->add_to_response(&sighash_byte, 1);
+        sig[sig_len++] = sighash_byte;
     }
-    dc->finalize_response(SW_INTERRUPTED_EXECUTION);
 
-    if (dc->process_interruption(dc) < 0) {
-        SEND_SW(dc, SW_BAD_STATE);
+    if (!yield_signature(dc, st, cur_input_index, pubkey_tweaked_compr + 1, 32, sig, sig_len))
         return false;
-    }
 
     return true;
 }
