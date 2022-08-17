@@ -45,8 +45,6 @@ static void process_cosigner_info(dispatcher_context_t *dc);
 static void next_cosigner(dispatcher_context_t *dc);
 static void finalize_response(dispatcher_context_t *dc);
 
-extern global_context_t *G_coin_config;
-
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
 
@@ -170,7 +168,7 @@ static void process_cosigner_info(dispatcher_context_t *dc) {
         int serialized_pubkey_len =
             get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                    key_info.master_key_derivation_len,
-                                                   G_coin_config->bip32_pubkey_version,
+                                                   BIP32_PUBKEY_VERSION,
                                                    pubkey_derived,
                                                    NULL);
         if (serialized_pubkey_len == -1) {

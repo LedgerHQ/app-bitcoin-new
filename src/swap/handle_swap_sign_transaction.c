@@ -6,12 +6,6 @@
 
 #include "handle_swap_sign_transaction.h"
 
-#ifndef DISABLE_LEGACY_SUPPORT
-#include "../legacy/btchip_display_variables.h"
-#include "../legacy/btchip_public_ram_variables.h"
-#endif
-
-#include "../main.h"
 #include "../globals.h"
 #include "../swap/swap_globals.h"
 #include "../common/read.h"
@@ -46,21 +40,6 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     memcpy(fees + 8 - sign_transaction_params->fee_amount_length,
            sign_transaction_params->fee_amount,
            sign_transaction_params->fee_amount_length);
-
-#ifndef DISABLE_LEGACY_SUPPORT
-    // fill vars.swap_data, used by the legacy app only
-    memset(&vars.swap_data, 0, sizeof(vars.swap_data));
-
-    _Static_assert(sizeof(vars.swap_data.destination_address) == sizeof(destination_address),
-                   "Wrong size");
-    _Static_assert(sizeof(vars.swap_data.amount) == 8, "Wrong size");
-    _Static_assert(sizeof(vars.swap_data.fees) == 8, "Wrong size");
-    memcpy(vars.swap_data.destination_address,
-           destination_address,
-           sizeof(vars.swap_data.destination_address));
-    memcpy(vars.swap_data.amount, amount, 8);
-    memcpy(vars.swap_data.fees, fees, 8);
-#endif
 
     G_swap_state.amount = read_u64_be(amount, 0);
     G_swap_state.fees = read_u64_be(fees, 0);

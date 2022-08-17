@@ -38,8 +38,6 @@
 #include "get_wallet_address.h"
 #include "client_commands.h"
 
-extern global_context_t *G_coin_config;
-
 static void compute_address(dispatcher_context_t *dc);
 static void send_response(dispatcher_context_t *dc);
 
@@ -158,7 +156,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
         int serialized_pubkey_len =
             get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                    key_info.master_key_derivation_len,
-                                                   G_coin_config->bip32_pubkey_version,
+                                                   BIP32_PUBKEY_VERSION,
                                                    pubkey_derived,
                                                    NULL);
         if (serialized_pubkey_len == -1) {
@@ -181,7 +179,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
             return;
         }
 
-        uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+        uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
 
         uint32_t bip32_path[5];
         for (int i = 0; i < 3; i++) {
@@ -242,11 +240,8 @@ static void compute_address(dispatcher_context_t *dc) {
         return;
     }
 
-    state->address_len = get_script_address(state->script,
-                                            script_len,
-                                            G_coin_config,
-                                            state->address,
-                                            sizeof(state->address));
+    state->address_len =
+        get_script_address(state->script, script_len, state->address, sizeof(state->address));
 
     if (state->address_len < 0) {
         SEND_SW(dc, SW_BAD_STATE);  // unexpected

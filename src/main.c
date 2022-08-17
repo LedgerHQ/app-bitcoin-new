@@ -36,31 +36,22 @@
 #include "commands.h"
 
 // common declarations between legacy and new code; will refactor it out later
-#include "legacy/include/btchip_context.h"
 #include "swap/swap_lib_calls.h"
 #include "swap/swap_globals.h"
 #include "swap/handle_swap_sign_transaction.h"
 #include "swap/handle_get_printable_amount.h"
 #include "swap/handle_check_address.h"
 
-#ifndef DISABLE_LEGACY_SUPPORT
-#include "legacy/main_old.h"
-#include "legacy/btchip_display_variables.h"
-#else
 // we don't import main_old.h in legacy-only mode, but we still need libargs_s; will refactor later
 struct libargs_s {
     unsigned int id;
     unsigned int command;
-    btchip_altcoin_config_t *coin_config;
     union {
         check_address_parameters_t *check_address;
         create_transaction_parameters_t *create_transaction;
         get_printable_amount_parameters_t *get_printable_amount;
     };
 };
-#endif
-
-#include "main.h"
 
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
@@ -70,29 +61,8 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
-#ifdef TARGET_NANOS
-// on NanoS only, we optimize the usage of the globals with a custom linker script
-command_state_t __attribute__((section(".new_globals"))) G_command_state;
-dispatcher_context_t __attribute__((section(".new_globals"))) G_dispatcher_context;
-
-#ifndef DISABLE_LEGACY_SUPPORT
-// legacy variables
-btchip_context_t __attribute__((section(".legacy_globals"))) btchip_context_D;
-#endif  // DISABLE_LEGACY_SUPPORT
-#else   // #ifndef TARGET_NANOS
 command_state_t G_command_state;
 dispatcher_context_t G_dispatcher_context;
-
-// legacy variables
-#ifndef DISABLE_LEGACY_SUPPORT
-btchip_context_t btchip_context_D;
-#endif  // DISABLE_LEGACY_SUPPORT
-#endif
-
-// shared between legacy and new
-global_context_t *G_coin_config;  // same type as btchip_altcoin_config_t
-
-uint8_t G_app_mode;
 
 // clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
@@ -129,59 +99,9 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 };
 // clang-format on
 
-void init_coin_config(btchip_altcoin_config_t *coin_config) {
-    memset(coin_config, 0, sizeof(btchip_altcoin_config_t));
-
-    // new app only
-    coin_config->bip32_pubkey_version = BIP32_PUBKEY_VERSION;
-
-    // new app and legacy
-    coin_config->bip44_coin_type = BIP44_COIN_TYPE;
-    coin_config->bip44_coin_type2 = BIP44_COIN_TYPE_2;
-    coin_config->p2pkh_version = COIN_P2PKH_VERSION;
-    coin_config->p2sh_version = COIN_P2SH_VERSION;
-
-    // we assume in display.c that the ticker size is at most 5 characters (+ null)
-    _Static_assert(sizeof(COIN_COINID_SHORT) <= 6, "COIN_COINID_SHORT too large");
-    _Static_assert(sizeof(COIN_COINID_SHORT) <= sizeof(coin_config->name_short),
-                   "COIN_COINID_SHORT too large");
-    strcpy(coin_config->name_short, COIN_COINID_SHORT);
-
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
-    _Static_assert(
-        sizeof(COIN_NATIVE_SEGWIT_PREFIX) <= sizeof(coin_config->native_segwit_prefix_val),
-        "COIN_NATIVE_SEGWIT_PREFIX too large");
-    strcpy(coin_config->native_segwit_prefix_val, COIN_NATIVE_SEGWIT_PREFIX);
-    coin_config->native_segwit_prefix = coin_config->native_segwit_prefix_val;
-#else
-    coin_config->native_segwit_prefix = 0;
-#endif  // #ifdef COIN_NATIVE_SEGWIT_PREFIX
-
-#ifndef DISABLE_LEGACY_SUPPORT
-    // legacy only
-    coin_config->family = COIN_FAMILY;
-
-    _Static_assert(sizeof(COIN_COINID) <= sizeof(coin_config->coinid), "COIN_COINID too large");
-    strcpy(coin_config->coinid, COIN_COINID);
-
-    _Static_assert(sizeof(COIN_COINID_NAME) <= sizeof(coin_config->name),
-                   "COIN_COINID_NAME too large");
-
-    strcpy(coin_config->name, COIN_COINID_NAME);
-#ifdef COIN_FORKID
-    coin_config->forkid = COIN_FORKID;
-#endif  // COIN_FORKID
-#ifdef COIN_CONSENSUS_BRANCH_ID
-    coin_config->zcash_consensus_branch_id = COIN_CONSENSUS_BRANCH_ID;
-#endif  // COIN_CONSENSUS_BRANCH_ID
-#ifdef COIN_FLAGS
-    coin_config->flags = COIN_FLAGS;
-#endif  // COIN_FLAGS
-    coin_config->kind = COIN_KIND;
-#endif
-}
-
 void app_main() {
+    explicit_bzero(&G_command_state, sizeof(G_command_state));
+
     for (;;) {
         // Length of APDU command received in G_io_apdu_buffer
         int input_len = 0;
@@ -200,86 +120,44 @@ void app_main() {
             return;
         }
 
-#ifndef DISABLE_LEGACY_SUPPORT
-        if (G_io_apdu_buffer[0] == CLA_APP_LEGACY || G_io_apdu_buffer[0] == CLA_APP_LEGACY_JC_EXT) {
-            if (G_app_mode != APP_MODE_LEGACY) {
-                explicit_bzero(&btchip_context_D, sizeof(btchip_context_D));
-
-                btchip_context_init();
-
-                G_app_mode = APP_MODE_LEGACY;
-            }
-
-            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
-                btchip_context_D.io_flags |= IO_RETURN_AFTER_TX;
-            }
-
-            // legacy codes, use old dispatcher
-            btchip_context_D.inLength = input_len;
-
-            app_dispatch();
-
-            if (G_swap_state.called_from_swap && vars.swap_data.should_exit) {
-                os_sched_exit(0);
-            }
-        } else {
-#endif
-            // if not Bitcoin or Bitcoin-testnet, we only support the legacy APDUS.
-            // to be removed once the apps are split
-            if (G_coin_config->bip32_pubkey_version != 0x0488B21E &&
-                G_coin_config->bip32_pubkey_version != 0x043587CF) {
-                io_send_sw(SW_CLA_NOT_SUPPORTED);
-                return;
-            }
-
-            if (G_app_mode != APP_MODE_NEW) {
-                explicit_bzero(&G_command_state, sizeof(G_command_state));
-
-                G_app_mode = APP_MODE_NEW;
-            }
-
-            // Reset structured APDU command
-            memset(&cmd, 0, sizeof(cmd));
-            // Parse APDU command from G_io_apdu_buffer
-            if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
-                PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
-                io_send_sw(SW_WRONG_DATA_LENGTH);
-                return;
-            }
-
-            PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
-                   cmd.cla,
-                   cmd.ins,
-                   cmd.p1,
-                   cmd.p2,
-                   cmd.lc);
-            for (int i = 0; i < cmd.lc; i++) {
-                PRINTF("%02X", cmd.data[i]);
-            }
-            PRINTF("\n");
-
-            if (G_swap_state.called_from_swap &&
-                (cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT)) {
-                PRINTF("Only SIGN_PSBT and GET_MASTER_FINGERPRINT can be called during swap\n");
-                io_send_sw(SW_INS_NOT_SUPPORTED);
-                return;
-            }
-
-            // Dispatch structured APDU command to handler
-            apdu_dispatcher(COMMAND_DESCRIPTORS,
-                            sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
-                            (machine_context_t *) &G_command_state,
-                            sizeof(G_command_state),
-                            ui_menu_main,
-                            &cmd);
-
-            if (G_swap_state.called_from_swap && G_swap_state.should_exit) {
-                os_sched_exit(0);
-            }
-
-#ifndef DISABLE_LEGACY_SUPPORT
+        // Reset structured APDU command
+        memset(&cmd, 0, sizeof(cmd));
+        // Parse APDU command from G_io_apdu_buffer
+        if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
+            PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
+            io_send_sw(SW_WRONG_DATA_LENGTH);
+            return;
         }
-#endif
+
+        PRINTF("=> CLA=%02X | INS=%02X | P1=%02X | P2=%02X | Lc=%02X | CData=",
+               cmd.cla,
+               cmd.ins,
+               cmd.p1,
+               cmd.p2,
+               cmd.lc);
+        for (int i = 0; i < cmd.lc; i++) {
+            PRINTF("%02X", cmd.data[i]);
+        }
+        PRINTF("\n");
+
+        if (G_swap_state.called_from_swap &&
+            (cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT)) {
+            PRINTF("Only SIGN_PSBT and GET_MASTER_FINGERPRINT can be called during swap\n");
+            io_send_sw(SW_INS_NOT_SUPPORTED);
+            return;
+        }
+
+        // Dispatch structured APDU command to handler
+        apdu_dispatcher(COMMAND_DESCRIPTORS,
+                        sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
+                        (machine_context_t *) &G_command_state,
+                        sizeof(G_command_state),
+                        ui_menu_main,
+                        &cmd);
+
+        if (G_swap_state.called_from_swap && G_swap_state.should_exit) {
+            os_sched_exit(0);
+        }
     }
 }
 
@@ -311,7 +189,7 @@ static void initialize_app_globals() {
 /**
  * Handle APDU command received and send back APDU response using handlers.
  */
-void coin_main(btchip_altcoin_config_t *coin_config) {
+void coin_main() {
     PRINT_STACK_POINTER();
 
     initialize_app_globals();
@@ -321,25 +199,12 @@ void coin_main(btchip_altcoin_config_t *coin_config) {
     _Static_assert(sizeof(cx_sha256_t) <= 108, "cx_sha256_t too large");
     _Static_assert(sizeof(policy_map_key_info_t) <= 148, "policy_map_key_info_t too large");
 
-    G_app_mode = APP_MODE_UNINITIALIZED;
-
-    btchip_altcoin_config_t config;
-    if (coin_config == NULL) {
-        init_coin_config(&config);
-        G_coin_config = &config;
-    } else {
-        G_coin_config = coin_config;
-    }
-
 #if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
     PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
 #endif
 
 #ifdef HAVE_SEMIHOSTED_PRINTF
     PRINTF("APDU State size: %d\n", sizeof(command_state_t));
-#ifndef DISABLE_LEGACY_SUPPORT
-    PRINTF("Legacy State size: %d\n", sizeof(btchip_context_D));
-#endif
 #endif
 
     // Reset dispatcher state
@@ -396,8 +261,7 @@ static void swap_library_main_helper(struct libargs_s *args) {
         case CHECK_ADDRESS:
             // ensure result is zero if an exception is thrown
             args->check_address->result = 0;
-            args->check_address->result =
-                handle_check_address(args->check_address, args->coin_config);
+            args->check_address->result = handle_check_address(args->check_address);
             break;
         case SIGN_TRANSACTION: {
             // copying arguments (pointing to globals) to context *before*
@@ -407,16 +271,6 @@ static void swap_library_main_helper(struct libargs_s *args) {
             if (args_are_copied) {
                 // never returns
 
-                G_coin_config = args->coin_config;
-#ifndef DISABLE_LEGACY_SUPPORT
-                // We make sure to initialize the app in "legacy" mode, otherwise the state
-                // would be wiped in app_main
-                memset(&btchip_context_D, 0, sizeof(btchip_context_D));
-                btchip_context_init();
-                G_app_mode = APP_MODE_LEGACY;
-#else
-                G_app_mode = APP_MODE_UNINITIALIZED;
-#endif
                 G_swap_state.called_from_swap = 1;
 
                 io_seproxyhal_init();
@@ -444,21 +298,14 @@ static void swap_library_main_helper(struct libargs_s *args) {
             // until LL is ready)
             // args->get_printable_amount->result = 0;
             // args->get_printable_amount->result =
-            handle_get_printable_amount(args->get_printable_amount, args->coin_config);
+            handle_get_printable_amount(args->get_printable_amount);
             break;
         default:
             break;
     }
 }
 
-void init_coin_config(btchip_altcoin_config_t *coin_config);
-
 void swap_library_main(struct libargs_s *args) {
-    btchip_altcoin_config_t coin_config;
-    if (args->coin_config == NULL) {
-        init_coin_config(&coin_config);
-        args->coin_config = &coin_config;
-    }
     bool end = false;
     /* This loop ensures that swap_library_main_helper and os_lib_end are called
      * within a try context, even if an exception is thrown */
@@ -479,39 +326,6 @@ void swap_library_main(struct libargs_s *args) {
 }
 
 __attribute__((section(".boot"))) int main(int arg0) {
-#ifdef USE_LIB_BITCOIN
-    BEGIN_TRY {
-        TRY {
-            unsigned int libcall_params[5];
-            btchip_altcoin_config_t coin_config;
-            init_coin_config(&coin_config);
-
-            PRINTF("Hello from litecoin\n");
-            check_api_level(CX_COMPAT_APILEVEL);
-            // delegate to bitcoin app/lib
-            libcall_params[0] = "Bitcoin";
-            libcall_params[1] = 0x100;
-            libcall_params[2] = RUN_APPLICATION;
-            libcall_params[3] = &coin_config;
-            libcall_params[4] = 0;
-            if (arg0) {
-                // call as a library
-                libcall_params[2] = ((unsigned int *) arg0)[1];
-                libcall_params[4] = ((unsigned int *) arg0)[3];  // library arguments
-                os_lib_call(&libcall_params);
-                ((unsigned int *) arg0)[0] = libcall_params[1];
-                os_lib_end();
-            } else {
-                // launch coin application
-                os_lib_call(&libcall_params);
-            }
-        }
-        FINALLY {
-        }
-    }
-    END_TRY;
-    // no return
-#else
     // exit critical section
     __asm volatile("cpsie i");
 
@@ -519,28 +333,19 @@ __attribute__((section(".boot"))) int main(int arg0) {
     os_boot();
 
     if (!arg0) {
-        // Bitcoin application launched from dashboard
-        coin_main(NULL);
+        // Application launched from dashboard
+        coin_main();
         return 0;
     }
 
+    // Application launched as library (for swap support)
     struct libargs_s *args = (struct libargs_s *) arg0;
     if (args->id != 0x100) {
         app_exit();
         return 0;
     }
-    switch (args->command) {
-        case RUN_APPLICATION:
-            // coin application launched from dashboard
-            if (args->coin_config == NULL)
-                app_exit();
-            else
-                coin_main(args->coin_config);
-            break;
-        default:
-            // called as bitcoin or altcoin library during swap
-            swap_library_main(args);
-    }
-#endif  // USE_LIB_BITCOIN
+
+    swap_library_main(args);
+
     return 0;
 }

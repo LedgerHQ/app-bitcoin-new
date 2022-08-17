@@ -1,9 +1,5 @@
 #pragma once
 
-#ifndef SKIP_FOR_CMOCKA
-#include "../context.h"
-#endif
-
 /** Script opcodes */
 // from bitcoin-core
 enum opcodetype {
@@ -193,18 +189,13 @@ int get_script_type(const uint8_t script[], size_t script_len);
  *
  * @param script the scriptPubKey
  * @param script_len the length of `script`
- * @param coin_config the configuration for the coin
  * @param out the output buffer
  * @param out_len the length of the output buffer
  * @return the length of the computed address on success; -1 if the script is invalid, if it does
  * not have an associated address (e.g. OP_RETURN), or the resulting address is too long to fit in
  * out.
  */
-int get_script_address(const uint8_t script[],
-                       size_t script_len,
-                       const global_context_t *coin_config,
-                       char *out,
-                       size_t out_len);
+int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len);
 
 #endif
 
