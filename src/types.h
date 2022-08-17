@@ -6,3 +6,10 @@
 #include "constants.h"
 #include "common/bip32.h"
 #include "commands.h"
+
+#define STORAGE_MAGIC 0xDEAD1337
+
+typedef struct internalStorage_t {
+    uint32_t magic;
+    uint8_t wallet_registration_key[32];
+} internalStorage_t;

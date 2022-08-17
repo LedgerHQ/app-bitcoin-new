@@ -614,7 +614,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         st->is_wallet_canonical = false;
     } else {
-        st->is_wallet_canonical = true;
+        // Only registered wallets are allowed in HSM mode
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
 
     {
@@ -719,12 +721,6 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     if (G_swap_state.called_from_swap && !st->is_wallet_canonical) {
         PRINTF("Must be a canonical wallet for swap feature\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
-    }
-
-    // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
-    if (!st->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
-        SEND_SW(dc, SW_DENY);
         return false;
     }
 
@@ -1088,31 +1084,22 @@ show_alerts(dispatcher_context_t *dc,
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         } else {
-            // Swap feature: no external inputs allowed
-            if (G_swap_state.called_from_swap) {
-                PRINTF("External inputs not allowed in swap transactions\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
-            }
-
-            // some internal and some external inputs, warn the user first
-            if (!ui_warn_external_inputs(dc)) {
-                SEND_SW(dc, SW_DENY);
-                return false;
-            }
+            // external inputs not allowed in HSM mode
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
         }
     }
 
-    // If any segwitv0 input is missing the non-witness-utxo, we warn the user and ask for
-    // confirmation
-    if (st->show_missing_nonwitnessutxo_warning && !ui_warn_unverified_segwit_inputs(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
+    // In HSM mode, we skip missing witness UTXO warnings
+    // TODO: assess security impact; it might be better to not support legacy inputs in HSM mode
+    // if (st->show_missing_nonwitnessutxo_warning && !ui_warn_unverified_segwit_inputs(dc)) {
+    //     SEND_SW(dc, SW_DENY);
+    //     return false;
+    // }
 
-    // If any input has non-default sighash, we warn the user
-    if (st->show_nondefault_sighash_warning && !ui_warn_nondefault_sighash(dc)) {
-        SEND_SW(dc, SW_DENY);
+    // In HSM mode, we only allow default sighashes
+    if (st->show_nondefault_sighash_warning) {
+        SEND_SW(dc, SW_NOT_SUPPORTED);
         return false;
     }
 
@@ -1276,15 +1263,7 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                     return false;
                 }
             } else {
-                // Show address to the user
-                if (!ui_validate_output(dc,
-                                        st->external_outputs_count,
-                                        output_address,
-                                        COIN_COINID_SHORT,
-                                        output.value)) {
-                    SEND_SW(dc, SW_DENY);
-                    return false;
-                }
+                // nothing to do in HSM mode (would normally show the address to the user, here)
             }
         } else {
             // valid change address, nothing to show to the user
@@ -1340,11 +1319,7 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
     } else {
-        // Show final user validation UI
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        };
+        // Skip final user validation UI in HSM mode
     }
 
     return true;
@@ -2296,12 +2271,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     sign_psbt_state_t st;
     memset(&st, 0, sizeof(st));
-
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
 
     st.p2 = p2;
 

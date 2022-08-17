@@ -67,6 +67,8 @@ bolos_ux_params_t G_ux_params;
 
 dispatcher_context_t G_dispatcher_context;
 
+const internalStorage_t N_storage_real;
+
 // clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
@@ -101,6 +103,18 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     },
 };
 // clang-format on
+
+void app_init_persistent_storage() {
+    if (N_storage.magic != STORAGE_MAGIC) {
+        uint8_t tmp_key[32];
+        cx_trng_get_random_data(tmp_key, 32);
+        nvm_write((void *) &N_storage.wallet_registration_key, (void *) &tmp_key, 32);
+        explicit_bzero(tmp_key, 32);
+
+        uint32_t tmp = STORAGE_MAGIC;
+        nvm_write((void *) &N_storage.magic, (void *) &tmp, sizeof(uint32_t));
+    }
+}
 
 void app_main() {
     for (;;) {
@@ -214,6 +228,8 @@ void coin_main() {
         BEGIN_TRY {
             TRY {
                 io_seproxyhal_init();
+
+                app_init_persistent_storage();
 
 #ifdef TARGET_NANOX
                 // grab the current plane mode setting

@@ -7,6 +7,7 @@
 #include "boilerplate/io.h"
 #include "commands.h"
 #include "constants.h"
+#include "types.h"
 
 /**
  * Global buffer for interactions between SE and MCU.
@@ -27,3 +28,7 @@ extern ux_state_t G_ux;
  * Global structure with the parameters to exchange with the BOLOS UX application.
  */
 extern bolos_ux_params_t G_ux_params;
+
+extern const internalStorage_t N_storage_real;
+
+#define N_storage (*(volatile internalStorage_t *) PIC(&N_storage_real))

@@ -118,12 +118,6 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     uint8_t display;
     uint8_t bip32_path_len;
     if (!buffer_read_u8(&dc->read_buffer, &display) ||
@@ -134,6 +128,12 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
 
     if (display > 1 || bip32_path_len > MAX_BIP32_PATH_STEPS) {
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
+    // Device must be unlocked if display == 1, in HSM mode
+    if (display && os_global_pin_is_validated() != BOLOS_UX_OK) {
+        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
 
