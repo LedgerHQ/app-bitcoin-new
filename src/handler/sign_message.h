@@ -18,4 +18,4 @@ typedef struct {
     uint8_t bsm_digest[32];
 } sign_message_state_t;
 
-void handler_sign_message(dispatcher_context_t *dispatcher_context);
+void handler_sign_message(dispatcher_context_t *dispatcher_context, uint8_t p2);

@@ -1,6 +1,4 @@
 import random
-import binascii
-import hashlib
 from typing import Tuple
 
 from test_utils.fixtures import *
@@ -134,7 +132,8 @@ def get_unique_wallet_name() -> str:
 
 def create_new_wallet() -> Tuple[str, str]:
     """Creates a new descriptor-enabled wallet in bitcoin-core. Each new wallet has an increasing counter as
-    part of it's name in order to avoid conflicts."""
+    part of it's name in order to avoid conflicts. Returns the wallet name and the xpub (dropping the key origin
+    information)."""
 
     wallet_name = get_unique_wallet_name()
 
@@ -144,11 +143,14 @@ def create_new_wallet() -> Tuple[str, str]:
     get_rpc().createwallet(wallet_name=wallet_name, descriptors=True)
     wallet_rpc = get_wallet_rpc(wallet_name)
 
+    all_descriptors = wallet_rpc.listdescriptors()["descriptors"]
     descriptor: str = next(filter(lambda d: d["desc"].startswith(
-        "pkh"), wallet_rpc.listdescriptors()["descriptors"]))["desc"]
-    core_xpub_orig = descriptor[descriptor.index("(")+1: descriptor.index("/0/*")]
+        "pkh") and "/0/*" in d["desc"], all_descriptors))["desc"]
 
-    return wallet_name, core_xpub_orig
+    core_xpub_orig = descriptor[descriptor.index("(")+1: descriptor.index("/0/*")]
+    core_xpub = core_xpub_orig[core_xpub_orig.find("]") + 1:]
+
+    return wallet_name, core_xpub
 
 
 def generate_blocks(n):

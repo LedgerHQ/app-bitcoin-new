@@ -44,8 +44,6 @@
 #include "sign_psbt.h"
 
 #include "sign_psbt/compare_wallet_script_at_path.h"
-#include "sign_psbt/get_fingerprint_and_path.h"
-#include "sign_psbt/is_in_out_internal.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
@@ -53,6 +51,7 @@
 extern global_context_t *G_coin_config;
 
 // Input validation
+static void find_first_internal_key_placeholder(dispatcher_context_t *dc);
 static void process_input_map(dispatcher_context_t *dc);
 static void check_input_owned(dispatcher_context_t *dc);
 static void check_sighash(dispatcher_context_t *dc);
@@ -73,6 +72,7 @@ static void confirm_transaction(dispatcher_context_t *dc);
 
 // Signing process (all)
 static void sign_init(dispatcher_context_t *dc);
+static void sign_find_next_internal_key_placeholder(dispatcher_context_t *dc);
 static void sign_process_input_map(dispatcher_context_t *dc);
 
 // Legacy sighash computation (P2PKH and P2SH)
@@ -307,11 +307,150 @@ static int get_amount_scriptpubkey_from_psbt(
                                                         NULL);
 }
 
+// Convenience function to share common logic when processing all the
+// PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
+int read_change_and_index_from_psbt_bip32_derivation(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *state,
+    int psbt_key_type,
+    buffer_t *data,
+    bool is_output,
+    const merkleized_map_commitment_t *map_commitment,
+    int index) {
+    int psbt_key_type_taproot;  // segwitv1 (taproot) keys are 32-byte x-only keys
+    if (is_output) {
+        psbt_key_type_taproot = PSBT_OUT_TAP_BIP32_DERIVATION;
+    } else {
+        psbt_key_type_taproot = PSBT_IN_TAP_BIP32_DERIVATION;
+    }
+
+    // x-only pubkeys for taproot, normal compressed pubkeys otherwise
+    size_t key_len = (psbt_key_type == psbt_key_type_taproot ? 32 : 33);
+
+    uint8_t bip32_derivation_pubkey[33];
+    if (!buffer_read_bytes(data,
+                           bip32_derivation_pubkey,
+                           key_len)  // read compressed pubkey or x-only pubkey
+        || buffer_can_read(data, 1)  // ...but should not be able to read more
+    ) {
+        PRINTF("Unexpected pubkey length\n");
+        state->cur.in_out.unexpected_pubkey_error = true;
+        return -1;
+    }
+
+    // get the corresponding value in the values Merkle tree (note: it doesn't work for
+    // taproot scripts)
+    uint8_t hasheslen_fpt_der[1 + 4 + 4 * MAX_BIP32_PATH_STEPS];
+    int len = call_get_merkle_leaf_element(dc,
+                                           map_commitment->values_root,
+                                           (uint32_t) map_commitment->size,
+                                           index,
+                                           hasheslen_fpt_der,
+                                           sizeof(hasheslen_fpt_der));
+    int prefix_len = (psbt_key_type == psbt_key_type_taproot) ? 1 : 0;
+
+    // length sanity checks: at least 4 bytes for the fingerprint, and two derivation steps
+    if (len < prefix_len + 4 + 2 * 4 || (len - prefix_len) % 4 != 0) {
+        PRINTF("Invalid length of _BIP32_DERIVATION value: %d\n", len);
+        return -1;
+    }
+
+    // for PSBT_{IN,OUT}_TAP_BIP32_DERIVATION, there is a 1 byte 0x00 prefix
+    // anything with a different initial byte is a possible script path spend,
+    // which is not yet supported
+    if (psbt_key_type == psbt_key_type_taproot && hasheslen_fpt_der[0] != 0) {
+        PRINTF("PSBT_{IN,OUT}_TAP_BIP32_DERIVATION must have a 0-length list of hashes");
+        return -1;
+    }
+
+    int der_len = (len - prefix_len - 4) / 4;
+
+    // if this derivation path matches the internal placeholder,
+    // we use it to detect whether the current input is change or not,
+    // and store its address index
+    uint32_t fpr = read_u32_be(hasheslen_fpt_der, prefix_len);
+
+    if (fpr == state->cur_placeholder_fingerprint &&
+        der_len == state->cur_placeholder_key_derivation_length + 2) {
+        const uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
+        for (int i = 0; i < state->cur_placeholder_key_derivation_length; i++) {
+            uint32_t der_step = read_u32_le(derivation_path, 4 * i);
+
+            if (state->cur_placeholder_key_derivation[i] != der_step) {
+                return 0;
+            }
+        }
+
+        uint32_t change = read_u32_le(derivation_path, 4 * (der_len - 2));
+        uint32_t addr_index = read_u32_le(derivation_path, 4 * (der_len - 1));
+
+        // check that we can indeed derive the same key from the current placeholder
+        serialized_extended_pubkey_t pubkey;
+        if (0 > bip32_CKDpub(&state->cur_placeholder_pubkey, change, &pubkey)) return -1;
+        if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey)) return -1;
+
+        int pk_offset = (key_len == 33 ? 0 : 1);  // skip the first byte if x-only pubkey
+        if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0) {
+            return 0;
+        }
+
+        // check if the 'change' derivation step is indeed coherent with placeholder
+        if (change == state->cur_placeholder.num_first) {
+            state->cur.in_out.is_change = false;
+            state->cur.in_out.address_index = addr_index;
+        } else if (change == state->cur_placeholder.num_second) {
+            state->cur.in_out.is_change = true;
+            state->cur.in_out.address_index = addr_index;
+        } else {
+            return 0;
+        }
+
+        state->cur.in_out.placeholder_found = true;
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Verifies if a certain input/output is internal (that is, controlled by the wallet being used for
+ * signing). This uses the state of sign_psbt and is not meant as a general-purpose function;
+ * rather, it avoids some substantial code duplication and removes complexity from sign_psbt.
+ *
+ * @return 1 if the given input/output is internal; 0 if external; -1 on error.
+ */
+static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
+                              const sign_psbt_state_t *state,
+                              const in_out_info_t *in_out_info,
+                              bool is_input) {
+    // If we did not find any info about the pubkey associated to the placeholder we're considering,
+    // then it's external
+    if (!state->cur.in_out.placeholder_found) {
+        return 0;
+    }
+
+    if (!is_input && state->cur.in_out.is_change != 1) {
+        // unlike for inputs, we only consider outputs internal if they are on the change path
+        return 0;
+    }
+
+    return compare_wallet_script_at_path(dispatcher_context,
+                                         state->cur.in_out.is_change,
+                                         state->cur.in_out.address_index,
+                                         &state->wallet_policy_map,
+                                         state->wallet_header_version,
+                                         state->wallet_header_keys_info_merkle_root,
+                                         state->wallet_header_n_keys,
+                                         in_out_info->scriptPubKey,
+                                         in_out_info->scriptPubKey_len);
+}
+
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
  */
-void handler_sign_psbt(dispatcher_context_t *dc) {
+void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
     // Device must be unlocked
@@ -319,6 +458,8 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
         return;
     }
+
+    state->p2 = p2;
 
     merkleized_map_commitment_t global_map;
     if (!buffer_read_varint(&dc->read_buffer, &global_map.size)) {
@@ -328,7 +469,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
 
     if (!buffer_read_bytes(&dc->read_buffer, global_map.keys_root, 32) ||
         !buffer_read_bytes(&dc->read_buffer, global_map.values_root, 32)) {
-        LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
@@ -340,7 +480,6 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
         return;
     }
     if (n_inputs > MAX_N_INPUTS_CAN_SIGN) {
-        // TODO: remove this limitation
         PRINTF("At most %d inputs are supported\n", MAX_N_INPUTS_CAN_SIGN);
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
@@ -355,55 +494,68 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
     }
     state->n_outputs = (unsigned int) n_outputs;
 
-    uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
-    if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
-        !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32)) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
-    }
-
-    // Fetch the serialized wallet policy from the client
-    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
-    int serialized_wallet_policy_len = call_get_preimage(dc,
-                                                         wallet_id,
-                                                         serialized_wallet_policy,
-                                                         sizeof(serialized_wallet_policy));
-    if (serialized_wallet_policy_len < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
     policy_map_wallet_header_t wallet_header;
-    buffer_t serialized_wallet_policy_buf =
-        buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &wallet_header)) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+    {  // declare some local variables in a block to optimize stack usage
+        uint8_t wallet_id[32];
+        if (!buffer_read_bytes(&dc->read_buffer, wallet_id, 32) ||
+            !buffer_read_bytes(&dc->read_buffer, wallet_hmac, 32)) {
+            SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+            return;
+        }
+        uint8_t hmac_or =
+            0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
+        for (int i = 0; i < 32; i++) {
+            hmac_or = hmac_or | wallet_hmac[i];
+        }
+
+        if (hmac_or != 0) {
+            // Verify hmac
+            if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
+                PRINTF("Incorrect hmac\n");
+                SEND_SW(dc, SW_SIGNATURE_FAIL);
+                return;
+            }
+
+            state->is_wallet_canonical = false;
+        } else {
+            state->is_wallet_canonical = true;
+        }
+
+        // Fetch the serialized wallet policy from the client
+        uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
+        int serialized_wallet_policy_len = call_get_preimage(dc,
+                                                             wallet_id,
+                                                             serialized_wallet_policy,
+                                                             sizeof(serialized_wallet_policy));
+        if (serialized_wallet_policy_len < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
+        buffer_t serialized_wallet_policy_buf =
+            buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
+
+        uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+        if (0 > read_and_parse_wallet_policy(dc,
+                                             &serialized_wallet_policy_buf,
+                                             &wallet_header,
+                                             policy_map_descriptor,
+                                             state->wallet_policy_map_bytes,
+                                             sizeof(state->wallet_policy_map_bytes))) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
     }
 
+    state->wallet_header_version = wallet_header.version;
     memcpy(state->wallet_header_keys_info_merkle_root,
            wallet_header.keys_info_merkle_root,
            sizeof(wallet_header.keys_info_merkle_root));
     state->wallet_header_n_keys = wallet_header.n_keys;
 
-    buffer_t policy_map_buffer =
-        buffer_create(&wallet_header.policy_map, wallet_header.policy_map_len);
-
-    if (parse_policy_map(&policy_map_buffer,
-                         state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes)) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
-
-    uint8_t hmac_or =
-        0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
-    for (int i = 0; i < 32; i++) {
-        hmac_or = hmac_or | wallet_hmac[i];
-    }
-    if (hmac_or == 0) {
-        // No hmac, verify that the policy is a canonical one that is allowed by default
+    if (state->is_wallet_canonical) {
+        // verify that the policy is indeed a canonical one that is allowed by default
 
         if (state->wallet_header_n_keys != 1) {
             PRINTF("Non-standard policy, it should only have 1 key\n");
@@ -411,34 +563,59 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
             return;
         }
 
-        state->address_type = get_policy_address_type(&state->wallet_policy_map);
-        if (state->address_type == -1) {
+        int address_type = get_policy_address_type(&state->wallet_policy_map);
+        if (address_type == -1) {
             PRINTF("Non-standard policy, and no hmac provided\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
 
-        state->is_wallet_canonical = true;
-
         // Based on the address type, we set the expected bip44 purpose for this canonical wallet
-        state->bip44_purpose = get_bip44_purpose(state->address_type);
-        if (state->bip44_purpose < 0) {
+        int bip44_purpose = get_bip44_purpose(address_type);
+        if (bip44_purpose < 0) {
             SEND_SW(dc, SW_BAD_STATE);
             return;
         }
 
-        // We do not check here that the purpose field, coin_type and account (first three step of
-        // the bip44 derivation) are standard. Will check at signing time that the path is valid.
-    } else {
-        // Verify hmac
+        // We check that the pubkey has indeed 3 derivation steps, and it follows bip44 standards
+        // We skip checking that we can indeed deriva the same pubkey (no security risk here, as the
+        // xpub itself isn't really used for the canonical wallet policies).
+        policy_map_key_info_t key_info;
+        {
+            char key_info_str[MAX_POLICY_KEY_INFO_LEN];
 
-        if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
-            PRINTF("Incorrect hmac\n");
-            SEND_SW(dc, SW_SIGNATURE_FAIL);
-            return;
+            int key_info_len =
+                call_get_merkle_leaf_element(dc,
+                                             state->wallet_header_keys_info_merkle_root,
+                                             state->wallet_header_n_keys,
+                                             0,
+                                             (uint8_t *) key_info_str,
+                                             sizeof(key_info_str));
+            if (key_info_len == -1) {
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return;
+            }
+
+            buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+            if (parse_policy_map_key_info(&key_info_buffer,
+                                          &key_info,
+                                          state->wallet_header_version) == -1) {
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return;
+            }
         }
 
-        state->is_wallet_canonical = false;
+        uint32_t coin_types[2] = {G_coin_config->bip44_coin_type, G_coin_config->bip44_coin_type2};
+        if (key_info.master_key_derivation_len != 3 ||
+            !is_pubkey_path_standard(key_info.master_key_derivation,
+                                     key_info.master_key_derivation_len,
+                                     bip44_purpose,
+                                     coin_types,
+                                     2)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
     }
 
     // Swap feature: check that wallet is canonical
@@ -504,11 +681,98 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
 
     if (state->is_wallet_canonical) {
         // Canonical wallet, we start processing the psbt directly
-        dc->next(process_input_map);
+        dc->next(find_first_internal_key_placeholder);
     } else {
         // Show screen to authorize spend from a registered wallet
-        ui_authorize_wallet_spend(dc, wallet_header.name, process_input_map);
+        ui_authorize_wallet_spend(dc, wallet_header.name, find_first_internal_key_placeholder);
     }
+}
+
+// finds the first placeholder that corresponds to an internal key
+static void find_first_internal_key_placeholder(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
+    state->cur_placeholder_index = 0;
+
+    // find and parse our registered key info in the wallet
+    while (true) {
+        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+
+        int n_key_placeholders = get_key_placeholder_by_index(&state->wallet_policy_map,
+                                                              state->cur_placeholder_index,
+                                                              &state->cur_placeholder);
+        if (n_key_placeholders < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return;
+        }
+
+        if (state->cur_placeholder_index >= n_key_placeholders) {
+            // all keys have been processed
+            break;
+        }
+
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        state->wallet_header_keys_info_merkle_root,
+                                                        state->wallet_header_n_keys,
+                                                        state->cur_placeholder.key_index,
+                                                        key_info_str,
+                                                        sizeof(key_info_str));
+
+        if (key_info_len < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return;
+        }
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+        policy_map_key_info_t key_info;
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header_version) ==
+            -1) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return;
+        }
+
+        uint32_t fpr = read_u32_be(key_info.master_key_fingerprint, 0);
+        if (fpr == state->master_key_fingerprint) {
+            // it could be a collision on the fingerprint; we verify that we can actually generate
+            // the same pubkey
+            char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+            int serialized_pubkey_len =
+                get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                                       key_info.master_key_derivation_len,
+                                                       G_coin_config->bip32_pubkey_version,
+                                                       pubkey_derived,
+                                                       &state->cur_placeholder_pubkey);
+            if (serialized_pubkey_len == -1) {
+                SEND_SW(dc, SW_BAD_STATE);
+                return;
+            }
+
+            if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+                state->cur_placeholder_key_derivation_length = key_info.master_key_derivation_len;
+                for (int i = 0; i < key_info.master_key_derivation_len; i++) {
+                    state->cur_placeholder_key_derivation[i] = key_info.master_key_derivation[i];
+                }
+
+                state->cur_placeholder_fingerprint = fpr;
+
+                // internal key in placeholder, start processing the inputs
+                state->cur_input_index = 0;
+                dc->next(process_input_map);
+                return;
+            }
+        }
+
+        // Not an internal key, move on
+        ++state->cur_placeholder_index;
+    }
+
+    PRINTF("No internal key found in wallet policy");
+    SEND_SW(dc, SW_INCORRECT_DATA);
+    return;
 }
 
 /** Inputs verification flow
@@ -523,7 +787,11 @@ void handler_sign_psbt(dispatcher_context_t *dc) {
  * Callback to process all the keys of the current input map.
  * Keeps track if the current input has a witness_utxo and/or a redeemScript.
  */
-static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
+static void input_keys_callback(dispatcher_context_t *dc,
+                                sign_psbt_state_t *state,
+                                const merkleized_map_commitment_t *map_commitment,
+                                int i,
+                                buffer_t *data) {
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
@@ -538,21 +806,14 @@ static void input_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
             state->cur.input.has_sighash_type = true;
         } else if ((key_type == PSBT_IN_BIP32_DERIVATION ||
                     key_type == PSBT_IN_TAP_BIP32_DERIVATION) &&
-                   !state->cur.in_out.has_bip32_derivation) {
-            // The first time that we encounter a PSBT_IN_BIP32_DERIVATION or
-            // PSBT_IN_TAP_BIP32_DERIVATION (handled below) key, we store the pubkey. Since we only
-            // use this to identify the change and address_index, it does not matter which of the
-            // keys we use here (if there are multiple), as per the assumptions above.
-            state->cur.in_out.has_bip32_derivation = true;
-
-            // x-only pubkeys for taproot, normal compressed pubkeys otherwise
-            size_t key_len = (key_type == PSBT_IN_TAP_BIP32_DERIVATION ? 32 : 33);
-
-            if (!buffer_read_bytes(data,
-                                   state->cur.in_out.bip32_derivation_pubkey,
-                                   key_len)  // read compressed pubkey or x-only pubkey
-                || buffer_can_read(data, 1)  // ...but should not be able to read more
-            ) {
+                   !state->cur.in_out.placeholder_found) {
+            if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
+                                                                     state,
+                                                                     key_type,
+                                                                     data,
+                                                                     false,
+                                                                     map_commitment,
+                                                                     i)) {
                 state->cur.in_out.unexpected_pubkey_error = true;
             }
         }
@@ -573,13 +834,14 @@ static void process_input_map(dispatcher_context_t *dc) {
     // Reset cur struct
     memset(&state->cur, 0, sizeof(state->cur));
 
-    int res = call_get_merkleized_map_with_callback(
-        dc,
-        state->inputs_root,
-        state->n_inputs,
-        state->cur_input_index,
-        make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur.in_out.map);
+    int res =
+        call_get_merkleized_map_with_callback(dc,
+                                              (machine_context_t *) state,
+                                              state->inputs_root,
+                                              state->n_inputs,
+                                              state->cur_input_index,
+                                              (merkle_tree_elements_callback_t) input_keys_callback,
+                                              &state->cur.in_out.map);
     if (res < 0) {
         PRINTF("Failed to process input map\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -861,26 +1123,25 @@ static void verify_outputs_init(dispatcher_context_t *dc) {
  * Callback to process all the keys of the current input map.
  * Keeps track if the current input has a witness_utxo and/or a redeemScript.
  */
-static void output_keys_callback(sign_psbt_state_t *state, buffer_t *data) {
+static void output_keys_callback(dispatcher_context_t *dc,
+                                 sign_psbt_state_t *state,
+                                 const merkleized_map_commitment_t *map_commitment,
+                                 int i,
+                                 buffer_t *data) {
     size_t data_len = data->size - data->offset;
     if (data_len >= 1) {
         uint8_t key_type;
         buffer_read_u8(data, &key_type);
 
         if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
-            !state->cur.in_out.has_bip32_derivation) {
-            // The first time that we encounter a PSBT_OUT_BIP32_DERIVATION or
-            // PSBT_OUT_TAP_BIP32_DERIVATION key, we store the pubkey.
-            state->cur.in_out.has_bip32_derivation = true;
-
-            // x-only pubkeys for taproot, normal compressed pubkeys otherwise
-            size_t key_len = (key_type == PSBT_OUT_TAP_BIP32_DERIVATION ? 32 : 33);
-
-            if (!buffer_read_bytes(data,
-                                   state->cur.in_out.bip32_derivation_pubkey,
-                                   key_len)  // read compressed pubkey or x-only pubkey
-                || buffer_can_read(data, 1)  // ...but should not be able to read more
-            ) {
+            !state->cur.in_out.placeholder_found) {
+            if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
+                                                                     state,
+                                                                     key_type,
+                                                                     data,
+                                                                     true,
+                                                                     map_commitment,
+                                                                     i)) {
                 state->cur.in_out.unexpected_pubkey_error = true;
             }
         }
@@ -903,10 +1164,11 @@ static void process_output_map(dispatcher_context_t *dc) {
 
     int res = call_get_merkleized_map_with_callback(
         dc,
+        (machine_context_t *) state,
         state->outputs_root,
         state->n_outputs,
         state->cur_output_index,
-        make_callback(state, (dispatcher_callback_t) output_keys_callback),
+        (merkle_tree_elements_callback_t) output_keys_callback,
         &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1106,7 +1368,11 @@ static void confirm_transaction(dispatcher_context_t *dc) {
 
 /** SIGNING FLOW
  *
- * Iterate over all inputs. For each input that should be signed, compute and sign sighash.
+ * For each internal key, iterate over all inputs.
+ * For each input that should be signed, compute and sign the sighash.
+ *
+ * There is certainly repeated work that could be optimized in the case of multiple internal keys.
+ * Not worth optimizing at this time, yet it is useful to support it as an advanced use case.
  */
 
 // entry point for the signing flow
@@ -1115,15 +1381,39 @@ static void sign_init(dispatcher_context_t *dc) {
 
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
+    state->segwit_hashes_computed = false;
+
+    state->cur_placeholder_index = 0;
+    dc->next(sign_find_next_internal_key_placeholder);
+}
+
+// iterate over all the keys, start the input processing for each internal key found
+static void sign_find_next_internal_key_placeholder(dispatcher_context_t *dc) {
+    sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
+
+    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+
     // find and parse our registered key info in the wallet
-    bool our_key_found = false;
-    for (unsigned int i = 0; i < state->wallet_header_n_keys; i++) {
+    while (true) {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+
+        int n_key_placeholders = get_key_placeholder_by_index(&state->wallet_policy_map,
+                                                              state->cur_placeholder_index,
+                                                              &state->cur_placeholder);
+        if (n_key_placeholders < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return;
+        }
+
+        if (state->cur_placeholder_index >= n_key_placeholders) {
+            // all keys have been processed
+            break;
+        }
 
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         state->wallet_header_keys_info_merkle_root,
                                                         state->wallet_header_n_keys,
-                                                        i,
+                                                        state->cur_placeholder.key_index,
                                                         key_info_str,
                                                         sizeof(key_info_str));
 
@@ -1135,55 +1425,54 @@ static void sign_init(dispatcher_context_t *dc) {
         // Make a sub-buffer for the pubkey info
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
-        policy_map_key_info_t our_key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &our_key_info) == -1) {
+        policy_map_key_info_t key_info;
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header_version) ==
+            -1) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return;
         }
 
-        uint32_t fpr = read_u32_be(our_key_info.master_key_fingerprint, 0);
+        uint32_t fpr = read_u32_be(key_info.master_key_fingerprint, 0);
         if (fpr == state->master_key_fingerprint) {
             // it could be a collision on the fingerprint; we verify that we can actually generate
             // the same pubkey
             char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
             int serialized_pubkey_len =
-                get_serialized_extended_pubkey_at_path(our_key_info.master_key_derivation,
-                                                       our_key_info.master_key_derivation_len,
+                get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                                       key_info.master_key_derivation_len,
                                                        G_coin_config->bip32_pubkey_version,
-                                                       pubkey_derived);
+                                                       pubkey_derived,
+                                                       &state->cur_placeholder_pubkey);
             if (serialized_pubkey_len == -1) {
                 SEND_SW(dc, SW_BAD_STATE);
                 return;
             }
 
-            if (strncmp(our_key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) ==
-                0) {
-                our_key_found = true;
-
-                state->our_key_derivation_length = our_key_info.master_key_derivation_len;
-                for (int i = 0; i < our_key_info.master_key_derivation_len; i++) {
-                    state->our_key_derivation[i] = our_key_info.master_key_derivation[i];
+            if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+                state->cur_placeholder_key_derivation_length = key_info.master_key_derivation_len;
+                for (int i = 0; i < key_info.master_key_derivation_len; i++) {
+                    state->cur_placeholder_key_derivation[i] = key_info.master_key_derivation[i];
                 }
 
-                break;
+                state->cur_placeholder_fingerprint =
+                    read_u32_be(key_info.master_key_fingerprint, 0);
+
+                // internal key in placeholder, start processing the inputs
+                state->cur_input_index = 0;
+                dc->next(sign_process_input_map);
+                return;
             }
         }
+
+        // Not an internal key, move on
+        ++state->cur_placeholder_index;
     }
 
-    if (!our_key_found) {
-        PRINTF("Couldn't find internal key\n");
-        SEND_SW(
-            dc,
-            SW_BAD_STATE);  // should never happen if we only register wallets with an internal key
-        return;
-    }
-
-    state->segwit_hashes_computed = false;
-
-    state->cur_input_index = 0;
-    dc->next(sign_process_input_map);
+    // no more keys to process; we're done
+    dc->next(finalize);
 }
 
+// process an input (or move on to the the next key if we're already done with all the inputs)
 static void sign_process_input_map(dispatcher_context_t *dc) {
     sign_psbt_state_t *state = (sign_psbt_state_t *) &G_command_state;
 
@@ -1197,21 +1486,23 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
     }
 
     if (state->cur_input_index >= state->n_inputs) {
-        // all inputs already processed
-        dc->next(finalize);
+        // all inputs already processed, move on to the next internal key (if any)
+        ++state->cur_placeholder_index;
+        dc->next(sign_find_next_internal_key_placeholder);
         return;
     }
 
     // Reset cur struct
     memset(&state->cur, 0, sizeof(state->cur));
 
-    int res = call_get_merkleized_map_with_callback(
-        dc,
-        state->inputs_root,
-        state->n_inputs,
-        state->cur_input_index,
-        make_callback(state, (dispatcher_callback_t) input_keys_callback),
-        &state->cur.in_out.map);
+    int res =
+        call_get_merkleized_map_with_callback(dc,
+                                              (machine_context_t *) state,
+                                              state->inputs_root,
+                                              state->n_inputs,
+                                              state->cur_input_index,
+                                              (merkle_tree_elements_callback_t) input_keys_callback,
+                                              &state->cur.in_out.map);
     if (res < 0) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
@@ -1232,46 +1523,6 @@ static void sign_process_input_map(dispatcher_context_t *dc) {
             return;
         }
     }
-
-    // get path, obtain change and address_index
-
-    int bip32_path_len;
-    uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-    uint32_t fingerprint;
-
-    if (state->wallet_policy_map.type == TOKEN_TR) {
-        // taproot input, use PSBT_IN_TAP_BIP32_DERIVATION
-        uint8_t key[1 + 32];
-        key[0] = PSBT_IN_TAP_BIP32_DERIVATION;
-        memcpy(key + 1, state->cur.in_out.bip32_derivation_pubkey, 32);
-
-        bip32_path_len = get_emptyhashes_fingerprint_and_path(dc,
-                                                              &state->cur.in_out.map,
-                                                              key,
-                                                              sizeof(key),
-                                                              &fingerprint,
-                                                              bip32_path);
-    } else {
-        // legacy or segwitv0 input, use PSBT_IN_BIP32_DERIVATION
-        uint8_t key[1 + 33];
-        key[0] = PSBT_IN_BIP32_DERIVATION;
-        memcpy(key + 1, state->cur.in_out.bip32_derivation_pubkey, 33);
-
-        bip32_path_len = get_fingerprint_and_path(dc,
-                                                  &state->cur.in_out.map,
-                                                  key,
-                                                  sizeof(key),
-                                                  &fingerprint,
-                                                  bip32_path);
-    }
-
-    if (bip32_path_len < 2) {
-        SEND_SW(dc, SW_BAD_STATE);
-        return;
-    }
-
-    state->cur.input.change = bip32_path[bip32_path_len - 2];
-    state->cur.input.address_index = bip32_path[bip32_path_len - 1];
 
     // Sign as segwit input iff it has a witness utxo
     if (!state->cur.input.has_witnessUtxo) {
@@ -1954,18 +2205,26 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < state->our_key_derivation_length; i++) {
-        sign_path[i] = state->our_key_derivation[i];
+    for (int i = 0; i < state->cur_placeholder_key_derivation_length; i++) {
+        sign_path[i] = state->cur_placeholder_key_derivation[i];
     }
-    sign_path[state->our_key_derivation_length] = state->cur.input.change;
-    sign_path[state->our_key_derivation_length + 1] = state->cur.input.address_index;
+    sign_path[state->cur_placeholder_key_derivation_length] =
+        state->cur.in_out.is_change ? state->cur_placeholder.num_second
+                                    : state->cur_placeholder.num_first;
+    sign_path[state->cur_placeholder_key_derivation_length + 1] = state->cur.in_out.address_index;
 
-    int sign_path_len = state->our_key_derivation_length + 2;
+    int sign_path_len = state->cur_placeholder_key_derivation_length + 2;
 
     uint8_t sig[MAX_DER_SIG_LEN];
 
-    int sig_len =
-        crypto_ecdsa_sign_sha256_hash_with_key(sign_path, sign_path_len, state->sighash, sig, NULL);
+    uint8_t pubkey[33];
+
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(sign_path,
+                                                         sign_path_len,
+                                                         state->sighash,
+                                                         pubkey,
+                                                         sig,
+                                                         NULL);
     if (sig_len < 0) {
         // unexpected error when signing
         SEND_SW(dc, SW_BAD_STATE);
@@ -1979,6 +2238,13 @@ static void sign_sighash_ecdsa(dispatcher_context_t *dc) {
     uint8_t buf[9];
     int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
+
+    // pubkey is not present in version 0 of the protocol
+    if (state->p2 >= 1) {
+        uint8_t pubkey_len = 33;
+        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(pubkey, 33);
+    }
 
     dc->add_to_response(&sig, sig_len);
     uint8_t sighash_byte = (uint8_t) (state->cur.input.sighash_type & 0xFF);
@@ -2007,22 +2273,33 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     uint8_t chain_code[32] = {0};
 
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < state->our_key_derivation_length; i++) {
-        sign_path[i] = state->our_key_derivation[i];
+    for (int i = 0; i < state->cur_placeholder_key_derivation_length; i++) {
+        sign_path[i] = state->cur_placeholder_key_derivation[i];
     }
-    sign_path[state->our_key_derivation_length] = state->cur.input.change;
-    sign_path[state->our_key_derivation_length + 1] = state->cur.input.address_index;
+    sign_path[state->cur_placeholder_key_derivation_length] =
+        state->cur.in_out.is_change ? state->cur_placeholder.num_second
+                                    : state->cur_placeholder.num_first;
+    sign_path[state->cur_placeholder_key_derivation_length + 1] = state->cur.in_out.address_index;
 
-    int sign_path_len = state->our_key_derivation_length + 2;
+    int sign_path_len = state->cur_placeholder_key_derivation_length + 2;
 
     uint8_t sig[64];
     size_t sig_len;
+
+    cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
+    uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
 
     bool error = false;
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
             crypto_tr_tweak_seckey(seckey);
+
+            // generate corresponding public key
+            cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
+            if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
+                error = true;
+            }
 
             unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
                                                           CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
@@ -2063,6 +2340,13 @@ static void sign_sighash_schnorr(dispatcher_context_t *dc) {
     uint8_t buf[9];
     int input_index_varint_len = varint_write(buf, 0, state->cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
+
+    // pubkey is not present in version 0 of the protocol
+    if (state->p2 >= 1) {
+        uint8_t pubkey_len = 32;
+        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(pubkey_tweaked_compr + 1, 32);  // skip the prefix for x-only pubkey
+    }
 
     dc->add_to_response(&sig, sizeof(sig));
 

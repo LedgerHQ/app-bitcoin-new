@@ -155,7 +155,7 @@ class LegacyClient(Client):
         assert isinstance(output["address"], str)
         return output['address'][12:-2] # HACK: A bug in getWalletPublicKey results in the address being returned as the string "bytearray(b'<address>')". This extracts the actual address to work around this.
 
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> Mapping[int, bytes]:
+    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         if wallet_hmac != None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
@@ -278,7 +278,7 @@ class LegacyClient(Client):
 
             all_signature_attempts[i_num] = signature_attempts
 
-        result = {}
+        result: List[int, bytes, bytes] = []
 
         # Sign any segwit inputs
         if has_segwit:
@@ -296,7 +296,8 @@ class LegacyClient(Client):
                     self.app.startUntrustedTransaction(False, 0, [segwit_inputs[i]], script_codes[i], c_tx.nVersion)
 
                     # tx.inputs[i].partial_sigs[signature_attempt[1]] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
-                    result[i] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
+
+                    result.append((i, b'', self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
         elif has_legacy:
             first_input = True
             # Legacy signing if all inputs are legacy
@@ -307,7 +308,7 @@ class LegacyClient(Client):
                     self.app.finalizeInput(b"DUMMY", -1, -1, change_path, tx_bytes)
 
                     #tx.inputs[i].partial_sigs[signature_attempt[1]] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
-                    result[i] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
+                    result.append((i, b'', self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
 
                     first_input = False
 

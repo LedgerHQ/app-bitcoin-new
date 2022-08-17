@@ -70,7 +70,7 @@
 /**
  * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
  */
-#define MAX_WALLET_NAME_LENGTH 16
+#define MAX_WALLET_NAME_LENGTH 64
 
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
@@ -83,3 +83,10 @@
 #define SIGHASH_NONE         0x00000002
 #define SIGHASH_SINGLE       0x00000003
 #define SIGHASH_ANYONECANPAY 0x00000080
+
+#define SEQUENCE_LOCKTIME_TYPE_FLAG (1 << 22)
+#define LOCKTIME_THRESHOLD          500000000
+
+#define MAX_STANDARD_P2WSH_STACK_ITEMS 100U
+#define MAX_STANDARD_P2WSH_SCRIPT_SIZE 3600U
+#define MAX_OPS_PER_SCRIPT             201U

@@ -1,7 +1,7 @@
 from random import randint
 
 from typing import List, Tuple, Optional
-from bitcoin_client.ledger_bitcoin import PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import PolicyMapWallet, WalletType
 from bitcoin_client.ledger_bitcoin.key import KeyOriginInfo, parse_path, get_taproot_output_key
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
@@ -47,15 +47,16 @@ def getScriptPubkeyFromWallet(wallet: PolicyMapWallet, change: bool, address_ind
     # prefix of substrings identifying a large-index key (like @12), but not the other way around
     # A more structural parsing would be more robust
     for i, key_info_str in enumerate(reversed(wallet.keys_info)):
-        if key_info_str[-3:] != "/**":
+        if wallet.version == WalletType.WALLET_POLICY_V1 and key_info_str[-3:] != "/**":
             raise ValueError("All the keys must have wildcard (/**)")
-
-        key_info_str = key_info_str[:-3] + f"/{1 if change else 0}/*"
 
         if f"@{i}" not in descriptor_str:
             raise ValueError(f"Invalid policy: not using key @{i}")
 
         descriptor_str = descriptor_str.replace(f"@{i}", key_info_str)
+
+    # by doing the text substitution of '/**' at the end, this works for either V1 or V2
+    descriptor_str = descriptor_str.replace("/**", f"/{1 if change else 0}/*")
 
     return Descriptor.from_string(descriptor_str).derive(address_index).script_pubkey()
 
@@ -127,8 +128,15 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
 
     if wallet.n_keys != 1:
         raise NotImplementedError("Only 1-key wallets supported")
-    if wallet.policy_map not in ["pkh(@0)", "wpkh(@0)", "tr(@0)"]:
-        raise NotImplementedError("Unsupported policy type")
+    if wallet.version == WalletType.WALLET_POLICY_V1:
+        if wallet.policy_map not in ["pkh(@0)", "wpkh(@0)", "tr(@0)"]:
+            raise NotImplementedError("Unsupported policy type")
+    elif wallet.version == WalletType.WALLET_POLICY_V2:
+        if wallet.policy_map not in ["pkh(@0/**)", "wpkh(@0/**)", "tr(@0/**)"]:
+            raise NotImplementedError("Unsupported policy type")
+    else:
+        raise ValueError(
+            f"Unknown wallet policy version: {wallet.version}")
 
     vin: List[CTxIn] = [CTxIn() for _ in input_amounts]
     vout: List[CTxOut] = [CTxOut() for _ in output_amounts]

@@ -24,6 +24,9 @@
 #include "cx_stubs.h"
 #include "cx_ecfp.h"
 #include "ox_ec.h"
+#include "cx_ram.h"
+#include "lcx_ripemd160.h"
+#include "cx_ripemd160.h"
 
 #include "common/base58.h"
 #include "common/bip32.h"
@@ -31,12 +34,10 @@
 #include "common/read.h"
 #include "common/write.h"
 
-#include "crypto.h"
+#include "cxram_stash.h"
+#include "debug-helpers/debug.h"
 
-#include "cx_ram.h"
-#include "lcx_ripemd160.h"
-#include "cx_ripemd160.h"
-#include "../../cxram_stash.h"
+#include "crypto.h"
 
 /**
  * Generator for secp256k1, value 'g' defined in "Standards for Efficient Cryptography"
@@ -354,7 +355,8 @@ void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                            uint8_t bip32_path_len,
                                            uint32_t bip32_pubkey_version,
-                                           char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
+                                           char out_xpub[static MAX_SERIALIZED_PUBKEY_LENGTH + 1],
+                                           serialized_extended_pubkey_t *out_pubkey) {
     // find parent key's fingerprint and child number
     uint32_t parent_fingerprint = 0;
     uint32_t child_number = 0;
@@ -387,11 +389,17 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
                                          ext_pubkey->chain_code);
     crypto_get_checksum((uint8_t *) ext_pubkey, 78, ext_pubkey_check.checksum);
 
-    int serialized_pubkey_len =
-        base58_encode((uint8_t *) &ext_pubkey_check, 78 + 4, out, MAX_SERIALIZED_PUBKEY_LENGTH);
+    if (out_pubkey != NULL) {
+        memcpy(out_pubkey, &ext_pubkey_check.ext_pubkey, sizeof(ext_pubkey_check.ext_pubkey));
+    }
+
+    int serialized_pubkey_len = base58_encode((uint8_t *) &ext_pubkey_check,
+                                              78 + 4,
+                                              out_xpub,
+                                              MAX_SERIALIZED_PUBKEY_LENGTH);
 
     if (serialized_pubkey_len > 0) {
-        out[serialized_pubkey_len] = '\0';
+        out_xpub[serialized_pubkey_len] = '\0';
     }
     return serialized_pubkey_len;
 }
@@ -419,9 +427,11 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                            size_t bip32_path_len,
                                            const uint8_t hash[static 32],
+                                           uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
                                            uint32_t *info) {
     cx_ecfp_private_key_t private_key = {0};
+    cx_ecfp_public_key_t public_key;
     uint8_t chain_code[32] = {0};
     uint32_t info_internal = 0;
 
@@ -438,6 +448,16 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                     out,
                                     MAX_DER_SIG_LEN,
                                     &info_internal);
+
+            // generate corresponding public key
+            cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
+
+            if (pubkey != NULL) {
+                // compute compressed public key
+                if (crypto_get_compressed_pubkey(public_key.W, pubkey) < 0) {
+                    error = true;
+                }
+            }
         }
         CATCH_ALL {
             error = true;

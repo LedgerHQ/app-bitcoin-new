@@ -43,7 +43,9 @@ extern global_context_t *G_coin_config;
 static void compute_address(dispatcher_context_t *dc);
 static void send_response(dispatcher_context_t *dc);
 
-void handler_get_wallet_address(dispatcher_context_t *dc) {
+void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
+    (void) p2;
+
     LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
 
     get_wallet_address_state_t *state = (get_wallet_address_state_t *) &G_command_state;
@@ -89,22 +91,14 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
 
     buffer_t serialized_wallet_policy_buf =
         buffer_create(state->serialized_wallet_policy, serialized_wallet_policy_len);
-    if ((read_policy_map_wallet(&serialized_wallet_policy_buf, &state->wallet_header)) < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
-    }
 
-    memcpy(state->wallet_header_keys_info_merkle_root,
-           state->wallet_header.keys_info_merkle_root,
-           sizeof(state->wallet_header.keys_info_merkle_root));
-    state->wallet_header_n_keys = state->wallet_header.n_keys;
-
-    buffer_t policy_map_buffer =
-        buffer_create(&state->wallet_header.policy_map, state->wallet_header.policy_map_len);
-
-    if (parse_policy_map(&policy_map_buffer,
-                         state->wallet_policy_map_bytes,
-                         sizeof(state->wallet_policy_map_bytes)) < 0) {
+    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+    if (0 > read_and_parse_wallet_policy(dc,
+                                         &serialized_wallet_policy_buf,
+                                         &state->wallet_header,
+                                         policy_map_descriptor,
+                                         state->wallet_policy_map_bytes,
+                                         sizeof(state->wallet_policy_map_bytes))) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -134,8 +128,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
 
         int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        state->wallet_header_keys_info_merkle_root,
-                                                        state->wallet_header_n_keys,
+                                                        state->wallet_header.keys_info_merkle_root,
+                                                        state->wallet_header.n_keys,
                                                         0,  // only one key
                                                         state->key_info_str,
                                                         sizeof(state->key_info_str));
@@ -148,7 +142,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
         buffer_t key_info_buffer = buffer_create(state->key_info_str, key_info_len);
 
         policy_map_key_info_t key_info;
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info) == -1) {
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, state->wallet_header.version) ==
+            -1) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return;
         }
@@ -164,7 +159,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
             get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
                                                    key_info.master_key_derivation_len,
                                                    G_coin_config->bip32_pubkey_version,
-                                                   pubkey_derived);
+                                                   pubkey_derived,
+                                                   NULL);
         if (serialized_pubkey_len == -1) {
             SEND_SW(dc, SW_BAD_STATE);
             return;
@@ -216,6 +212,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc) {
     get_policy_wallet_id(&state->wallet_header, state->computed_wallet_id);
 
     if (memcmp(state->wallet_id, state->computed_wallet_id, sizeof(state->wallet_id)) != 0) {
+        PRINTF("Mismatching wallet policy id\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -233,12 +230,14 @@ static void compute_address(dispatcher_context_t *dc) {
 
     int script_len = call_get_wallet_script(dc,
                                             &state->wallet_policy_map,
-                                            state->wallet_header_keys_info_merkle_root,
-                                            state->wallet_header_n_keys,
+                                            state->wallet_header.version,
+                                            state->wallet_header.keys_info_merkle_root,
+                                            state->wallet_header.n_keys,
                                             state->is_change,
                                             state->address_index,
                                             &script_buf);
     if (script_len < 0) {
+        PRINTF("Couldn't produce wallet script\n");
         SEND_SW(dc, SW_BAD_STATE);  // unexpected
         return;
     }

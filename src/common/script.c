@@ -12,6 +12,21 @@
 #include "../crypto.h"
 #endif
 
+size_t get_push_script_size(uint32_t n) {
+    if (n <= 16)
+        return 1;  // OP_0 and OP_1 .. OP_16
+    else if (n < 0x80)
+        return 2;  // 01 nn
+    else if (n < 0x8000)
+        return 3;  // 02 nnnn
+    else if (n < 0x800000)
+        return 4;  // 03 nnnnnn
+    else if (n < 0x80000000)
+        return 5;  // 04 nnnnnnnn
+    else
+        return 6;  // 05 nnnnnnnnnn
+}
+
 int get_script_type(const uint8_t script[], size_t script_len) {
     if (script_len == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2] == 0x14 &&
         script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG) {

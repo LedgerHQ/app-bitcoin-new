@@ -19,7 +19,7 @@ typedef struct {
 
     // as deriving wallet addresses is stack-intensive, we move some
     // variables here to use less stack overall
-    uint8_t serialized_wallet_policy[MAX_POLICY_MAP_SERIALIZED_LENGTH];
+    uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
 
     policy_map_wallet_header_t wallet_header;
 
@@ -28,10 +28,8 @@ typedef struct {
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
 
-    uint8_t wallet_header_keys_info_merkle_root[32];
-    size_t wallet_header_n_keys;
     union {
-        uint8_t wallet_policy_map_bytes[MAX_POLICY_MAP_BYTES];
+        uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t wallet_policy_map;
     };
 
@@ -43,4 +41,4 @@ typedef struct {
     uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
 } get_wallet_address_state_t;
 
-void handler_get_wallet_address(dispatcher_context_t *dispatcher_context);
+void handler_get_wallet_address(dispatcher_context_t *dispatcher_context, uint8_t p2);
