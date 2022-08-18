@@ -11,7 +11,7 @@ int call_stream_merkle_leaf_element(dispatcher_context_t *dispatcher_context,
                                     void (*len_callback)(size_t, void *),
                                     void (*callback)(buffer_t *, void *),
                                     void *callback_state) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t leaf_hash[32];
     int res = call_get_merkle_leaf_hash(dispatcher_context,

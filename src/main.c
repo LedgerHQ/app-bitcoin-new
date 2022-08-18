@@ -33,7 +33,10 @@
 
 #include "debug-helpers/debug.h"
 
+#include "handler/handlers.h"
 #include "commands.h"
+
+#include "common/wallet.h"
 
 // common declarations between legacy and new code; will refactor it out later
 #include "swap/swap_lib_calls.h"
@@ -61,7 +64,6 @@ uint8_t G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 ux_state_t G_ux;
 bolos_ux_params_t G_ux_params;
 
-command_state_t G_command_state;
 dispatcher_context_t G_dispatcher_context;
 
 // clang-format off
@@ -100,8 +102,6 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 // clang-format on
 
 void app_main() {
-    explicit_bzero(&G_command_state, sizeof(G_command_state));
-
     for (;;) {
         // Length of APDU command received in G_io_apdu_buffer
         int input_len = 0;
@@ -150,8 +150,6 @@ void app_main() {
         // Dispatch structured APDU command to handler
         apdu_dispatcher(COMMAND_DESCRIPTORS,
                         sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
-                        (machine_context_t *) &G_command_state,
-                        sizeof(G_command_state),
                         ui_menu_main,
                         &cmd);
 
@@ -201,10 +199,6 @@ void coin_main() {
 
 #if defined(HAVE_PRINT_STACK_POINTER) && defined(HAVE_BOLOS_APP_STACK_CANARY)
     PRINTF("STACK CANARY ADDRESS: %08x\n", &app_stack_canary);
-#endif
-
-#ifdef HAVE_SEMIHOSTED_PRINTF
-    PRINTF("APDU State size: %d\n", sizeof(command_state_t));
 #endif
 
     // Reset dispatcher state

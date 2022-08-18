@@ -20,13 +20,12 @@
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
+#include "../common/bip32.h"
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
-
-static void send_response(dispatcher_context_t *dc);
 
 static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
                                            size_t bip32_path_len,
@@ -117,9 +116,7 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
 void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
 
-    get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
@@ -154,10 +151,12 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
+    char serialized_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+
     int serialized_pubkey_len = get_serialized_extended_pubkey_at_path(bip32_path,
                                                                        bip32_path_len,
                                                                        BIP32_PUBKEY_VERSION,
-                                                                       state->serialized_pubkey_str,
+                                                                       serialized_pubkey_str,
                                                                        NULL);
     if (serialized_pubkey_len == -1) {
         SEND_SW(dc, SW_BAD_STATE);
@@ -169,17 +168,10 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    if (display) {
-        ui_display_pubkey(dc, path_str, !is_safe, state->serialized_pubkey_str, send_response);
-    } else {
-        dc->next(send_response);
+    if (display && !ui_display_pubkey(dc, path_str, !is_safe, serialized_pubkey_str)) {
+        SEND_SW(dc, SW_DENY);
+        return;
     }
-}
 
-static void send_response(dispatcher_context_t *dc) {
-    get_extended_pubkey_state_t *state = (get_extended_pubkey_state_t *) &G_command_state;
-
-    LOG_PROCESSOR(dc, __FILE__, __LINE__, __func__);
-
-    SEND_RESPONSE(dc, state->serialized_pubkey_str, strlen(state->serialized_pubkey_str), SW_OK);
+    SEND_RESPONSE(dc, serialized_pubkey_str, strlen(serialized_pubkey_str), SW_OK);
 }

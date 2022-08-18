@@ -36,6 +36,11 @@
  */
 #define MAX_SERIALIZED_PUBKEY_LENGTH 113
 
+/**
+ * Maximum number of inputs supported while signing a transaction.
+ */
+#define MAX_N_INPUTS_CAN_SIGN 512
+
 // SIGHASH flags
 #define SIGHASH_DEFAULT      0x00000000
 #define SIGHASH_ALL          0x00000001

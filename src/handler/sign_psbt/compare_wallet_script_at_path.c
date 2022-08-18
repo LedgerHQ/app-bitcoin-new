@@ -17,7 +17,7 @@ int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
                                   uint32_t n_keys,
                                   const uint8_t expected_script[],
                                   size_t expected_script_len) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // derive wallet's scriptPubKey, check if it matches the expected one
     uint8_t wallet_script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];

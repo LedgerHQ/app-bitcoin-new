@@ -27,8 +27,3 @@ extern ux_state_t G_ux;
  * Global structure with the parameters to exchange with the BOLOS UX application.
  */
 extern bolos_ux_params_t G_ux_params;
-
-/**
- * State of the current APDU interaction, if any.
- */
-extern command_state_t G_command_state;

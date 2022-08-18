@@ -11,7 +11,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
                          void (*len_callback)(size_t, void *),
                          void (*callback)(buffer_t *, void *),
                          void *callback_state) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t cmd = CCMD_GET_PREIMAGE;
     dispatcher_context->add_to_response(&cmd, 1);
