@@ -22,7 +22,7 @@
 #include "../commands.h"
 #include "../crypto.h"
 
-#include "get_master_fingerprint.h"
+#include "handlers.h"
 
 void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;

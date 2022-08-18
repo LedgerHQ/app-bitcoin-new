@@ -44,7 +44,7 @@
 #include "lib/get_merkle_leaf_element.h"
 #include "lib/psbt_parse_rawtx.h"
 
-#include "sign_psbt.h"
+#include "handlers.h"
 
 #include "sign_psbt/compare_wallet_script_at_path.h"
 #include "sign_psbt/update_hashes_with_map_value.h"

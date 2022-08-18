@@ -41,7 +41,7 @@
 
 #include "client_commands.h"
 
-#include "register_wallet.h"
+#include "handlers.h"
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);

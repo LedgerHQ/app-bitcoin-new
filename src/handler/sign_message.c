@@ -28,6 +28,8 @@
 #include "../ui/menu.h"
 #include "lib/get_merkle_leaf_element.h"
 
+#include "handlers.h"
+
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};

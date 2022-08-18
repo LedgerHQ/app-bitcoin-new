@@ -33,7 +33,10 @@
 
 #include "debug-helpers/debug.h"
 
+#include "handler/handlers.h"
 #include "commands.h"
+
+#include "common/wallet.h"
 
 // common declarations between legacy and new code; will refactor it out later
 #include "swap/swap_lib_calls.h"

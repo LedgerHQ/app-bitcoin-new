@@ -37,10 +37,8 @@
 #include "lib/get_preimage.h"
 #include "lib/get_merkle_leaf_element.h"
 
-#include "get_wallet_address.h"
+#include "handlers.h"
 #include "client_commands.h"
-
-bool parse_and_validate_wallet_policy(dispatcher_context_t *dc);
 
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
     (void) p2;
