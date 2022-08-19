@@ -3,6 +3,7 @@ import { crypto } from 'bitcoinjs-lib';
 import { BufferReader } from './buffertools';
 import { hashLeaf, Merkle } from './merkle';
 import { MerkleMap } from './merkleMap';
+import { WalletPolicy } from './policy';
 import { createVarint, sanitizeBigintToNumber } from './varint';
 
 enum ClientCommandCode {
@@ -322,6 +323,14 @@ export class ClientCommandInterpreter {
   addKnownMapping(mm: MerkleMap): void {
     this.addKnownList(mm.keys);
     this.addKnownList(mm.values);
+  }
+
+  addKnownWalletPolicy(wp: WalletPolicy): void {
+    this.addKnownPreimage(wp.serialize());
+    this.addKnownList(
+      wp.keys.map((k) => Buffer.from(k, 'ascii'))
+    );
+    this.addKnownPreimage(Buffer.from(wp.descriptorTemplate));
   }
 
   execute(request: Buffer): Buffer {
