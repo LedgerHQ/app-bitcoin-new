@@ -1,8 +1,5 @@
 #pragma once
 
-#include "boilerplate/dispatcher.h"
-#include "constants.h"
-
 /**
  * Enumeration with expected INS of APDU commands.
  */
