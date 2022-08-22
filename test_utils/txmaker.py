@@ -1,7 +1,7 @@
 from random import randint
 
 from typing import List, Tuple, Optional
-from bitcoin_client.ledger_bitcoin import PolicyMapWallet, WalletType
+from bitcoin_client.ledger_bitcoin import WalletPolicy, WalletType
 from bitcoin_client.ledger_bitcoin.key import KeyOriginInfo, parse_path, get_taproot_output_key
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
@@ -40,8 +40,8 @@ def random_txid() -> bytes:
     return random_bytes(32)
 
 
-def getScriptPubkeyFromWallet(wallet: PolicyMapWallet, change: bool, address_index: int) -> Script:
-    descriptor_str = wallet.policy_map
+def getScriptPubkeyFromWallet(wallet: WalletPolicy, change: bool, address_index: int) -> Script:
+    descriptor_str = wallet.descriptor_template
 
     # Iterate in reverse order, as strings identifying a small-index key (like @1) can be a
     # prefix of substrings identifying a large-index key (like @12), but not the other way around
@@ -61,7 +61,7 @@ def getScriptPubkeyFromWallet(wallet: PolicyMapWallet, change: bool, address_ind
     return Descriptor.from_string(descriptor_str).derive(address_index).script_pubkey()
 
 
-def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: int, wallet: PolicyMapWallet) -> Tuple[CTransaction, int, int, int]:
+def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: int, wallet: WalletPolicy) -> Tuple[CTransaction, int, int, int]:
     """
     Creates a (fake) transaction that has n_inputs inputs and n_outputs outputs, with a random output equal to output_amount.
     Each output of the transaction is a spend to wallet (possibly to a change address); the change/address_index of the
@@ -116,7 +116,7 @@ def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: in
     return tx, selected_output_index, selected_output_change, selected_output_address_index
 
 
-def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool], output_wallet: Optional[List[Optional[PolicyMapWallet]]] = None) -> PSBT:
+def createPsbt(wallet: WalletPolicy, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool], output_wallet: Optional[List[Optional[WalletPolicy]]] = None) -> PSBT:
     if output_wallet is None:
         output_wallet = [None] * len(output_amounts)
 
@@ -129,10 +129,10 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
     if wallet.n_keys != 1:
         raise NotImplementedError("Only 1-key wallets supported")
     if wallet.version == WalletType.WALLET_POLICY_V1:
-        if wallet.policy_map not in ["pkh(@0)", "wpkh(@0)", "tr(@0)"]:
+        if wallet.descriptor_template not in ["pkh(@0)", "wpkh(@0)", "tr(@0)"]:
             raise NotImplementedError("Unsupported policy type")
     elif wallet.version == WalletType.WALLET_POLICY_V2:
-        if wallet.policy_map not in ["pkh(@0/**)", "wpkh(@0/**)", "tr(@0/**)"]:
+        if wallet.descriptor_template not in ["pkh(@0/**)", "wpkh(@0/**)", "tr(@0/**)"]:
             raise NotImplementedError("Unsupported policy type")
     else:
         raise ValueError(
@@ -172,10 +172,10 @@ def createPsbt(wallet: PolicyMapWallet, input_amounts: List[int], output_amounts
     psbt.outputs = [PartiallySignedOutput(0) for _ in output_amounts]
 
     # simplification; good enough for the scripts we support now, but will need more work
-    is_legacy = wallet.policy_map.startswith("pkh(")
-    is_segwitv0 = wallet.policy_map.startswith(
-        "wpkh(") or wallet.policy_map.startswith("sh(wpkh(")
-    is_taproot = wallet.policy_map.startswith("tr(")
+    is_legacy = wallet.descriptor_template.startswith("pkh(")
+    is_segwitv0 = wallet.descriptor_template.startswith(
+        "wpkh(") or wallet.descriptor_template.startswith("sh(wpkh(")
+    is_taproot = wallet.descriptor_template.startswith("tr(")
 
     key_origin = wallet.keys_info[0][1:wallet.keys_info[0].index("]")]
 

@@ -12,12 +12,12 @@ import base64
 
 from .client import Client, TransportClient
 
-from typing import List, Tuple, Mapping, Optional, Union
+from typing import List, Tuple, Optional, Union
 
 from .common import AddressType, Chain, hash160
 from .key import ExtendedKey, parse_path
 from .psbt import PSBT
-from .wallet import Wallet, PolicyMapWallet
+from .wallet import WalletPolicy
 
 from ._script import is_p2sh, is_witness, is_p2wpkh, is_p2wsh
 
@@ -26,12 +26,12 @@ from .btchip.btchipUtils import compress_public_key
 from .btchip.bitcoinTransaction import bitcoinTransaction
 
 
-def get_address_type_for_policy(policy: PolicyMapWallet) -> AddressType:
-    if policy.policy_map == "pkh(@0)":
+def get_address_type_for_policy(policy: WalletPolicy) -> AddressType:
+    if policy.descriptor_template in ["pkh(@0/**)", "pkh(@0/<0;1>/*)"]:
         return AddressType.LEGACY
-    elif policy.policy_map == "wpkh(@0)":
+    elif policy.descriptor_template in ["wpkh(@0/**)", "wpkh(@0/<0:1>/*)"]:
         return AddressType.WIT
-    elif policy.policy_map == "sh(wpkh(@0))":
+    elif policy.descriptor_template in ["sh(wpkh(@0/**))", "sh(wpkh(@0/<0;1>/*))"]:
         return AddressType.SH_WIT
     else:
         raise ValueError("Invalid or unsupported policy")
@@ -116,12 +116,12 @@ class LegacyClient(Client):
         )
         return xpub.to_string()
 
-    def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
+    def register_wallet(self, wallet: WalletPolicy) -> Tuple[bytes, bytes]:
         raise NotImplementedError # legacy app does not have this functionality
 
     def get_wallet_address(
         self,
-        wallet: Wallet,
+        wallet: WalletPolicy,
         wallet_hmac: Optional[bytes],
         change: int,
         address_index: int,
@@ -132,8 +132,8 @@ class LegacyClient(Client):
         if wallet_hmac != None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
-        if not isinstance(wallet, PolicyMapWallet):
-            raise ValueError("Invalid wallet policy type, it must be PolicyMapWallet")
+        if not isinstance(wallet, WalletPolicy):
+            raise ValueError("Invalid wallet policy type, it must be WalletPolicy")
 
         key_info = wallet.keys_info[0]
         try:
@@ -155,14 +155,14 @@ class LegacyClient(Client):
         assert isinstance(output["address"], str)
         return output['address'][12:-2] # HACK: A bug in getWalletPublicKey results in the address being returned as the string "bytearray(b'<address>')". This extracts the actual address to work around this.
 
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+    def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         if wallet_hmac != None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
-        if not isinstance(wallet, PolicyMapWallet):
-            raise ValueError("Invalid wallet policy type, it must be PolicyMapWallet")
+        if not isinstance(wallet, WalletPolicy):
+            raise ValueError("Invalid wallet policy type, it must be WalletPolicy")
 
-        if not wallet.policy_map in ['pkh(@0)', 'wpkh(@0)', 'sh(wpkh(@0))']:
+        if not wallet.descriptor_template in ["pkh(@0/**)", "pkh(@0/<0;1>/*)", "wpkh(@0/**)", "wpkh(@0/<0:1>/*)", "sh(wpkh(@0/**))", "sh(wpkh(@0/<0;1>/*))"]:
             raise NotImplementedError("Unsupported policy")
 
         # the rest of the code is basically the HWI code, and it ignores wallet

@@ -53,7 +53,7 @@ Testing the `sign_psbt` method requires producing a valid PSBT (with any externa
 
 ```python
 from typing import Optional
-from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, PolicyMapWallet, AddressType, TransportClient
+from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, WalletPolicy, AddressType, TransportClient
 from ledger_bitcoin.psbt import PSBT
 
 
@@ -71,9 +71,9 @@ def main():
         # ==> Get and display on screen the first taproot address
 
         first_taproot_account_pubkey = client.get_extended_pubkey("m/86'/1'/0'")
-        first_taproot_account_policy = PolicyMapWallet(
+        first_taproot_account_policy = WalletPolicy(
             "",
-            "tr(@0)",
+            "tr(@0/**)",
             [
                 f"[{fpr}/86'/1'/0']{first_taproot_account_pubkey}/**"
             ],
@@ -98,8 +98,8 @@ def main():
             address_type=AddressType.WIT,
             threshold=2,
             keys_info=[
-                other_key_info,                          # some other bitcoiner
-                f"[{fpr}/48'/1'/0'/2']{our_pubkey}/**",  # that's us
+                other_key_info,                       # some other bitcoiner
+                f"[{fpr}/48'/1'/0'/2']{our_pubkey}",  # that's us
             ],
         )
 
@@ -118,7 +118,7 @@ def main():
 
         # TODO: set a wallet policy and a valid psbt file in order to test psbt signing
         psbt_filename: Optional[str] = None
-        signing_policy: Optional[PolicyMapWallet] = None
+        signing_policy: Optional[WalletPolicy] = None
         signing_policy_hmac: Optional[bytes] = None
         if not psbt_filename or not signing_policy:
             print("Nothing to sign :(")

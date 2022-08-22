@@ -1,7 +1,7 @@
 # Tests using the V1 version of the wallet policy language, used before version 2.1.0 of the app
 # Make sure we remain compatible for some time.
 
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet, WalletType
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy, WalletType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.exception import DenyError
 
@@ -127,9 +127,9 @@ def test_register_wallet_unsupported_policy_v1(client: Client):
     # valid policies, but not supported (might change in the future)
 
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Unsupported",
-            policy_map="pk(@0)",  # bare pubkey, not supported
+            descriptor_template="pk(@0)",  # bare pubkey, not supported
             keys_info=[
                 f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
             ],

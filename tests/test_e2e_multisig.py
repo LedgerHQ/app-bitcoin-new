@@ -9,7 +9,7 @@ from decimal import Decimal
 from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
 from bitcoin_client.ledger_bitcoin.client_base import TransportClient
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
 
 from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
@@ -20,7 +20,7 @@ from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name
 from .conftest import AuthServiceProxy
 
 
-def run_test(wallet_policy: PolicyMapWallet, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     with automation(comm, "automations/register_wallet_accept.json"):
         wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
 

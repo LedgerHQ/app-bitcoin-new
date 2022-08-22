@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 
@@ -26,11 +26,11 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "pkh(@0)",
+        "pkh(@0/**)",
         [
-            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
         ],
     )
 
@@ -54,11 +54,11 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "sh(wpkh(@0))",
+        "sh(wpkh(@0/**))",
         [
-            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"
+            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"
         ],
     )
 
@@ -82,11 +82,11 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     # PSBT for a legacy 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -111,11 +111,11 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 

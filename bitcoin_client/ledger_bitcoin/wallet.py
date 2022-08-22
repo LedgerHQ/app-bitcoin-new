@@ -14,7 +14,7 @@ class WalletType(IntEnum):
 
 
 # should not be instantiated directly
-class Wallet:
+class WalletPolicyBase:
     def __init__(self, name: str, version: WalletType) -> None:
         self.name = name
         self.version = version
@@ -33,7 +33,7 @@ class Wallet:
         return sha256(self.serialize()).digest()
 
 
-class PolicyMapWallet(Wallet):
+class WalletPolicy(WalletPolicyBase):
     """
     Represents a wallet stored with a wallet policy.
     For version V2, the wallet is serialized as follows:
@@ -48,9 +48,9 @@ class PolicyMapWallet(Wallet):
     The specific format of the keys is deferred to subclasses.
     """
 
-    def __init__(self, name: str, policy_map: str, keys_info: List[str], version: WalletType = WalletType.WALLET_POLICY_V2):
+    def __init__(self, name: str, descriptor_template: str, keys_info: List[str], version: WalletType = WalletType.WALLET_POLICY_V2):
         super().__init__(name, version)
-        self.policy_map = policy_map
+        self.descriptor_template = descriptor_template
         self.keys_info = keys_info
 
     @property
@@ -60,18 +60,18 @@ class PolicyMapWallet(Wallet):
     def serialize(self) -> bytes:
         keys_info_hashes = map(lambda k: element_hash(k.encode()), self.keys_info)
 
-        policy_map_sha256 = sha256(self.policy_map.encode()).digest()
+        descriptor_template_sha256 = sha256(self.descriptor_template.encode()).digest()
 
         return b"".join([
             super().serialize(),
-            write_varint(len(self.policy_map.encode())),
-            self.policy_map.encode() if self.version == WalletType.WALLET_POLICY_V1 else policy_map_sha256,
+            write_varint(len(self.descriptor_template.encode())),
+            self.descriptor_template.encode() if self.version == WalletType.WALLET_POLICY_V1 else descriptor_template_sha256,
             write_varint(len(self.keys_info)),
             MerkleTree(keys_info_hashes).root
         ])
 
     def get_descriptor(self, change: bool) -> str:
-        desc = self.policy_map
+        desc = self.descriptor_template
         for i in reversed(range(self.n_keys)):
             key = self.keys_info[i]
             desc = desc.replace(f"@{i}", key)
@@ -86,7 +86,7 @@ class PolicyMapWallet(Wallet):
 
         return desc
 
-class MultisigWallet(PolicyMapWallet):
+class MultisigWallet(WalletPolicy):
     def __init__(self, name: str, address_type: AddressType, threshold: int, keys_info: List[str], sorted: bool = True, version: WalletType = WalletType.WALLET_POLICY_V2) -> None:
         n_keys = len(keys_info)
 
@@ -109,13 +109,13 @@ class MultisigWallet(PolicyMapWallet):
 
         key_placeholder_suffix = "/**" if version == WalletType.WALLET_POLICY_V2 else ""
 
-        policy_map = "".join([
+        descriptor_template = "".join([
             policy_prefix,
             str(threshold) + ",",
             ",".join("@" + str(l) + key_placeholder_suffix for l in range(n_keys)),
             policy_suffix
         ])
 
-        super().__init__(name, policy_map, keys_info, version)
+        super().__init__(name, descriptor_template, keys_info, version)
 
         self.threshold = threshold

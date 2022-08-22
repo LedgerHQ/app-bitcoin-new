@@ -1,4 +1,4 @@
-from packaging.version import parse as parse_version, Version
+from packaging.version import parse as parse_version
 from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
@@ -10,7 +10,7 @@ from .client_base import Client, TransportClient
 from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .merkle import get_merkleized_map_commitment
-from .wallet import Wallet, WalletType, PolicyMapWallet
+from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT
 from ._serialize import deser_string
 
@@ -66,7 +66,7 @@ class NewClient(Client):
 
         return response.decode()
 
-    def register_wallet(self, wallet: Wallet) -> Tuple[bytes, bytes]:
+    def register_wallet(self, wallet: WalletPolicy) -> Tuple[bytes, bytes]:
         if wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
             raise ValueError("invalid wallet policy version")
 
@@ -75,7 +75,7 @@ class NewClient(Client):
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
 
         # necessary for V2
-        client_intepreter.add_known_preimage(wallet.policy_map.encode())
+        client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         sw, response = self._make_request(
             self.builder.register_wallet(wallet), client_intepreter
@@ -94,15 +94,15 @@ class NewClient(Client):
 
     def get_wallet_address(
         self,
-        wallet: Wallet,
+        wallet: WalletPolicy,
         wallet_hmac: Optional[bytes],
         change: int,
         address_index: int,
         display: bool,
     ) -> str:
 
-        if not isinstance(wallet, PolicyMapWallet) or wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
-            raise ValueError("wallet type must be POLICYMAP")
+        if not isinstance(wallet, WalletPolicy) or wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
+            raise ValueError("wallet type must be WalletPolicy, with version either WALLET_POLICY_V1 or WALLET_POLICY_V2")
 
         if change != 0 and change != 1:
             raise ValueError("Invalid change")
@@ -112,7 +112,7 @@ class NewClient(Client):
         client_intepreter.add_known_preimage(wallet.serialize())
 
         # necessary for V2
-        client_intepreter.add_known_preimage(wallet.policy_map.encode())
+        client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         sw, response = self._make_request(
             self.builder.get_wallet_address(
@@ -126,7 +126,7 @@ class NewClient(Client):
 
         return response.decode()
 
-    def sign_psbt(self, psbt: PSBT, wallet: Wallet, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+    def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
         Signature requires explicit approval from the user.
@@ -139,7 +139,7 @@ class NewClient(Client):
             The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
             signing. This is not required for Taproot inputs.
 
-        wallet : Wallet
+        wallet : WalletPolicy
             The registered wallet policy, or a standard wallet policy.
 
         wallet_hmac: Optional[bytes]
@@ -178,7 +178,7 @@ class NewClient(Client):
         client_intepreter.add_known_preimage(wallet.serialize())
 
         # necessary for V2
-        client_intepreter.add_known_preimage(wallet.policy_map.encode())
+        client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
         client_intepreter.add_known_mapping(global_map)

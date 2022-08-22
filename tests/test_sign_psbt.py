@@ -8,7 +8,7 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
@@ -124,7 +124,7 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "pkh(@0/**)",
         [
@@ -153,7 +153,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "sh(wpkh(@0/**))",
         [
@@ -182,7 +182,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     # PSBT for a segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -212,7 +212,7 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -256,7 +256,7 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
     for input in psbt.inputs:
         input.non_witness_utxo = None
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -368,7 +368,7 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "tr(@0/**)",
         [
@@ -406,7 +406,7 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "tr(@0/**)",
         [
@@ -444,7 +444,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -507,7 +507,7 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -557,7 +557,7 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     n_inputs = 512
     n_outputs = 256
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "tr(@0/**)",
         [
@@ -581,7 +581,7 @@ def test_sign_psbt_fail_11_changes(client: Client):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -607,7 +607,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -635,7 +635,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
 
 
 def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -662,7 +662,7 @@ def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
         [
@@ -684,21 +684,21 @@ def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
     psbt.deserialize(psbt_b64)
 
     wallets = [
-        PolicyMapWallet(
+        WalletPolicy(
             "",
             "pkh(@0/**)",
             [
                 "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
             ],
         ),
-        PolicyMapWallet(
+        WalletPolicy(
             "",
             "tr(@0/**)",
             [
                 "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
             ],
         ),
-        PolicyMapWallet(
+        WalletPolicy(
             "",
             "wpkh(@0/**)",
             [
@@ -725,7 +725,7 @@ def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "Me and Bob or me and Carl",
         "wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
         [
