@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.1.0] - TODO
+
+### Changed
+
+Upgraded library to version 2.1.0 of the app.
+
 ## [0.0.3] - 25-04-2022
 
 ### Changed
