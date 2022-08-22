@@ -118,25 +118,27 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
     }
     header->name[header->name_len] = '\0';
 
-    uint64_t policy_map_len;
-    if (!buffer_read_varint(buffer, &policy_map_len)) {
+    uint64_t descriptor_template_len;
+    if (!buffer_read_varint(buffer, &descriptor_template_len)) {
         return WITH_ERROR(-1, "Invalid wallet policy header");
     }
-    header->policy_map_len = (uint16_t) policy_map_len;
+    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     if (header->version == WALLET_POLICY_VERSION_V1) {
-        if (policy_map_len > MAX_WALLET_POLICY_STR_LENGTH_V1) {
+        if (descriptor_template_len > MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1) {
             return WITH_ERROR(-1, "Invalid wallet policy header: descriptor template too long");
         }
-        if (!buffer_read_bytes(buffer, (uint8_t *) header->policy_map, header->policy_map_len)) {
+        if (!buffer_read_bytes(buffer,
+                               (uint8_t *) header->descriptor_template,
+                               header->descriptor_template_len)) {
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     } else {  // WALLET_POLICY_VERSION_V2
-        if (policy_map_len > MAX_WALLET_POLICY_STR_LENGTH_V2) {
+        if (descriptor_template_len > MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2) {
             return WITH_ERROR(-1, "Invalid wallet policy header: descriptor template too long");
         }
 
-        if (!buffer_read_bytes(buffer, (uint8_t *) header->policy_map_sha256, 32)) {
+        if (!buffer_read_bytes(buffer, (uint8_t *) header->descriptor_template_sha256, 32)) {
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     }
@@ -1748,7 +1750,7 @@ static int parse_script(buffer_t *in_buf,
     return 0;
 }
 
-int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len, int version) {
+int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int version) {
     if ((unsigned long) out % 4 != 0) {
         return WITH_ERROR(-1, "Unaligned pointer");
     }
@@ -2577,14 +2579,16 @@ void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out
     crypto_hash_update_u8(&wallet_hash_context.header, wallet_header->name_len);
     crypto_hash_update(&wallet_hash_context.header, wallet_header->name, wallet_header->name_len);
 
-    crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->policy_map_len);
+    crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->descriptor_template_len);
 
     if (wallet_header->version == WALLET_POLICY_VERSION_V1) {
         crypto_hash_update(&wallet_hash_context.header,
-                           wallet_header->policy_map,
-                           wallet_header->policy_map_len);
+                           wallet_header->descriptor_template,
+                           wallet_header->descriptor_template_len);
     } else {  // WALLET_POLICY_VERSION_V2
-        crypto_hash_update(&wallet_hash_context.header, wallet_header->policy_map_sha256, 32);
+        crypto_hash_update(&wallet_hash_context.header,
+                           wallet_header->descriptor_template_sha256,
+                           32);
     }
 
     crypto_hash_update_varint(&wallet_hash_context.header, wallet_header->n_keys);
