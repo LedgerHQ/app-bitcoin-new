@@ -99,6 +99,11 @@ async function main(transport) {
     const psbt = new PsbtV2();
     psbt.deserialize(rawPsbtBase64);
 
+    // result will be a list of triples [i, pubkey, signature], where:
+    // - i is the input index
+    // - pubkey is either a 33-byte compressed pubkey, or a 32-byte x-only pubkey
+    // - signature is the signature for the corresponding input/pubkey; the signature is concatenated with
+    //   the 1-byte sighash-type (except if the sighash type is SIGHASH_DEFAULT in taproot signing).
     const result = await app.signPsbt(psbt, signingPolicy, signingPolicyHmac);
 
     console.log("Returned signatures:");
