@@ -38,7 +38,7 @@ class PolicyMapWallet(Wallet):
     Represents a wallet stored with a wallet policy.
     For version V2, the wallet is serialized as follows:
        - 1 byte   : wallet version
-       - 1 byte   : length of the wallet name (max 16)
+       - 1 byte   : length of the wallet name (max 64)
        - (var)    : wallet name (ASCII string)
        - (varint) : length of the descriptor template
        - 32-bytes : sha256 hash of the descriptor template
