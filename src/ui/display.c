@@ -372,17 +372,6 @@ UX_FLOW(ux_display_pubkey_suspicious_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-// FLOW to display a receive address, for a standard path:
-// #1 screen: eye icon + "Confirm Address"
-// #2 screen: display address
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_address_flow,
-        &ux_display_confirm_address_step,
-        &ux_display_address_step,
-        &ux_display_approve_step,
-        &ux_display_reject_step);
-
 // FLOW to display a receive address, for a non-standard path:
 // #1 screen: warning icon + "The derivation path is unusual"
 // #2 screen: display BIP32 Path
@@ -580,24 +569,6 @@ bool ui_display_message_hash(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-bool ui_display_address(dispatcher_context_t *context,
-                        const char *address,
-                        bool is_path_suspicious,
-                        const char *path_str) {
-    ui_path_and_address_state_t *state = (ui_path_and_address_state_t *) &g_ui_state;
-
-    strncpy(state->address, address, sizeof(state->address));
-
-    if (!is_path_suspicious) {
-        ux_flow_init(0, ux_display_address_flow, NULL);
-    } else {
-        strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-        ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
-    }
-
-    return io_ui_process(context);
-}
-
 bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
                                 const char *policy_descriptor) {
@@ -655,15 +626,6 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
         strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
         ux_flow_init(0, ux_display_receive_in_wallet_flow, NULL);
     }
-
-    return io_ui_process(context);
-}
-
-bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str) {
-    ui_path_state_t *state = (ui_path_state_t *) &g_ui_state;
-
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    ux_flow_init(0, ux_display_unusual_derivation_path_flow, NULL);
 
     return io_ui_process(context);
 }
