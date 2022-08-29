@@ -5,7 +5,7 @@ from .client_base import Client, TransportClient
 from .client import createClient
 from .common import Chain
 
-from .wallet import AddressType, Wallet, MultisigWallet, PolicyMapWallet, WalletType
+from .wallet import AddressType, WalletPolicy, MultisigWallet, WalletType
 
 __all__ = [
     "Client",
@@ -13,8 +13,7 @@ __all__ = [
     "createClient",
     "Chain",
     "AddressType",
-    "Wallet",
+    "WalletPolicy",
     "MultisigWallet",
-    "PolicyMapWallet",
     "WalletType"
 ]

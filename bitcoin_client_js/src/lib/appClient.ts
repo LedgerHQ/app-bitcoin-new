@@ -6,10 +6,12 @@ import { MerkelizedPsbt } from './merkelizedPsbt';
 import { hashLeaf, Merkle } from './merkle';
 import { WalletPolicy } from './policy';
 import { PsbtV2 } from './psbtv2';
-import { createVarint } from './varint';
+import { createVarint, parseVarint } from './varint';
 
 const CLA_BTC = 0xe1;
 const CLA_FRAMEWORK = 0xf8;
+
+const CURRENT_PROTOCOL_VERSION = 1; // from supported from version 2.1.0 of the app
 
 enum BitcoinIns {
   GET_PUBKEY = 0x00,
@@ -44,7 +46,7 @@ export class AppClient {
       CLA_BTC,
       ins,
       0,
-      0,
+      CURRENT_PROTOCOL_VERSION,
       data,
       [0x9000, 0xe000]
     );
@@ -109,14 +111,12 @@ export class AppClient {
   async registerWallet(
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
-    const serializedWalletPolicy = walletPolicy.serialize();
 
     const clientInterpreter = new ClientCommandInterpreter();
-    clientInterpreter.addKnownPreimage(serializedWalletPolicy);
-    clientInterpreter.addKnownList(
-      walletPolicy.keys.map((k) => Buffer.from(k, 'ascii'))
-    );
 
+    clientInterpreter.addKnownWalletPolicy(walletPolicy);
+
+    const serializedWalletPolicy = walletPolicy.serialize();
     const response = await this.makeRequest(
       BitcoinIns.REGISTER_WALLET,
       Buffer.concat([
@@ -163,10 +163,8 @@ export class AppClient {
     }
 
     const clientInterpreter = new ClientCommandInterpreter();
-    clientInterpreter.addKnownList(
-      walletPolicy.keys.map((k) => Buffer.from(k, 'ascii'))
-    );
-    clientInterpreter.addKnownPreimage(walletPolicy.serialize());
+
+    clientInterpreter.addKnownWalletPolicy(walletPolicy);
 
     const addressIndexBuffer = Buffer.alloc(4);
     addressIndexBuffer.writeUInt32BE(addressIndex, 0);
@@ -195,15 +193,17 @@ export class AppClient {
    * @param walletHMAC the 32-byte hmac obtained during wallet policy registration, or `null` for a standard policy
    * @param progressCallback optionally, a callback that will be called every time a signature is produced during
    * the signing process. The callback does not receive any argument, but can be used to track progress.
-   * @returns a map from numbers to signatures. For each input index `i` that is a key of the returned map, the
-   * corresponding value is the signature for the `i`-th input of the `psbt`.
+   * @returns an array of of tuples with 3 elements containing:
+   *    - the index of the input being signed;
+   *    - a Buffer with either a 33-byte compressed pubkey or a 32-byte x-only pubkey whose corresponding secret key was used to sign;
+   *    - a Buffer with the corresponding signature.
    */
   async signPsbt(
     psbt: PsbtV2,
     walletPolicy: WalletPolicy,
     walletHMAC: Buffer | null,
     progressCallback?: () => void
-  ): Promise<Map<number, Buffer>> {
+  ): Promise<[number, Buffer, Buffer][]> {
     const merkelizedPsbt = new MerkelizedPsbt(psbt);
 
     if (walletHMAC != null && walletHMAC.length != 32) {
@@ -213,10 +213,7 @@ export class AppClient {
     const clientInterpreter = new ClientCommandInterpreter(progressCallback);
 
     // prepare ClientCommandInterpreter
-    clientInterpreter.addKnownList(
-      walletPolicy.keys.map((k) => Buffer.from(k, 'ascii'))
-    );
-    clientInterpreter.addKnownPreimage(walletPolicy.serialize());
+    clientInterpreter.addKnownWalletPolicy(walletPolicy);
 
     clientInterpreter.addKnownMapping(merkelizedPsbt.globalMerkleMap);
     for (const map of merkelizedPsbt.inputMerkleMaps) {
@@ -251,9 +248,16 @@ export class AppClient {
 
     const yielded = clientInterpreter.getYielded();
 
-    const ret: Map<number, Buffer> = new Map();
+    const ret: [number, Buffer, Buffer][] = [];
     for (const inputAndSig of yielded) {
-      ret.set(inputAndSig[0], inputAndSig.slice(1));
+      // inputAndSig contains:
+      // <inputIndex : varint> <pubkeyLen : 1 byte> <pubkey : pubkeyLen bytes (32 or 33)> <signature : variable length>
+      const [inputIndex, inputIndexLen] = parseVarint(inputAndSig, 0);
+      const pubkeyLen = inputAndSig[inputIndexLen];
+      const pubkey = inputAndSig.subarray(inputIndexLen + 1, inputIndexLen + 1 + pubkeyLen);
+      const signature = inputAndSig.subarray(inputIndexLen + 1 + pubkeyLen)
+
+      ret.push([Number(inputIndex), pubkey, signature]);
     }
     return ret;
   }

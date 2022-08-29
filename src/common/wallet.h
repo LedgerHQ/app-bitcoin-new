@@ -32,31 +32,31 @@
 #define MAX_POLICY_KEY_INFO_LEN MAX(MAX_POLICY_KEY_INFO_LEN_V1, MAX_POLICY_KEY_INFO_LEN_V2)
 
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
-#define MAX_WALLET_POLICY_STR_LENGTH_V1 40
+#define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 40
 
 #ifdef TARGET_NANOS
 // this amount should be enough for many useful policies
-#define MAX_WALLET_POLICY_STR_LENGTH_V2 192
-#define MAX_WALLET_POLICY_BYTES         264
+#define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 192
+#define MAX_WALLET_POLICY_BYTES           264
 #else
 // on larger devices, we can afford to reserve a lot more memory
-#define MAX_WALLET_POLICY_STR_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES         512
+#define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
+#define MAX_WALLET_POLICY_BYTES           512
 #endif
 
-#define MAX_WALLET_POLICY_STR_LENGTH \
-    MAX(MAX_WALLET_POLICY_STR_LENGTH_V1, MAX_WALLET_POLICY_STR_LENGTH_V2)
+#define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
+    MAX(MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1, MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2)
 
 // at most 92 bytes
 // wallet type (1 byte)
 // name length (1 byte)
 // name (max MAX_WALLET_NAME_LENGTH bytes)
 // policy length (1 byte)
-// policy (max MAX_WALLET_POLICY_STR_LENGTH bytes)
+// policy (max MAX_DESCRIPTOR_TEMPLATE_LENGTH bytes)
 // n_keys (1 byte)
 // keys_merkle_root (32 bytes)
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1 \
-    (1 + 1 + MAX_WALLET_NAME_LENGTH + 1 + MAX_WALLET_POLICY_STR_LENGTH_V1 + 1 + 32)
+    (1 + 1 + MAX_WALLET_NAME_LENGTH + 1 + MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 + 1 + 32)
 
 // at most 100 bytes
 // wallet type (1 byte)
@@ -83,12 +83,12 @@ typedef struct {
 typedef struct {
     uint8_t version;  // supported values: WALLET_POLICY_VERSION_V1 and WALLET_POLICY_VERSION_V2
     uint8_t name_len;
-    uint16_t policy_map_len;
+    uint16_t descriptor_template_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
     union {
         // TODO: rename to "descriptor_template"?
-        char policy_map[MAX_WALLET_POLICY_STR_LENGTH_V1];  // used in V1
-        uint8_t policy_map_sha256[32];                     // used in V2
+        char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1];  // used in V1
+        uint8_t descriptor_template_sha256[32];                       // used in V2
     };
     size_t n_keys;
     uint8_t keys_info_merkle_root[32];  // root of the Merkle tree of the keys information
@@ -349,21 +349,20 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 #pragma GCC diagnostic pop
 
 /**
- * Parses `in_buf` as a policy map, constructing the abstract syntax tree in the buffer `out` of
+ * Parses `in_buf` as a wallet policy descriptor template, constructing the abstract syntax tree in
+ * the buffer `out` of size `out_len`.
  *
  * When parsing descriptors containing miniscript, this fails if the miniscript is not correct,
  * as defined by the miniscript type system.
  * This does NOT check non-malleability of the miniscript.
- *
- * size `out_len`.
- * @param in_buf the buffer containing the policy map to parse
+ * * @param in_buf the buffer containing the policy map to parse
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
  * @param version either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
  * @return 0 on success; -1 in case of parsing error, if the output buffer is unaligned, or if the
  * output buffer is too small.
  */
-int parse_policy_map(buffer_t *in_buf, void *out, size_t out_len, int version);
+int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int version);
 
 /**
  * Computes additional properties of the given miniscript, to detect malleability and other security

@@ -77,7 +77,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
-    uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+    uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
     if (0 > read_and_parse_wallet_policy(dc,
                                          &dc->read_buffer,
                                          &wallet_header,

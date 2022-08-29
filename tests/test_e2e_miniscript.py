@@ -10,7 +10,7 @@ from bitcoin_client.ledger_bitcoin import Client
 from bitcoin_client.ledger_bitcoin.client_base import TransportClient
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
 
 from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
@@ -21,7 +21,7 @@ from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name
 from .conftest import AuthServiceProxy
 
 
-def run_test_e2e(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def run_test_e2e(wallet_policy: WalletPolicy, rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     with automation(comm, "automations/register_wallet_accept.json"):
         wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
 
@@ -104,10 +104,10 @@ def run_test_e2e(wallet_policy: PolicyMapWallet, rpc: AuthServiceProxy, rpc_test
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
 
 
-def run_test_invalid(client: Client, policy_map: str, keys_info: List[str]):
-    wallet_policy = PolicyMapWallet(
+def run_test_invalid(client: Client, descriptor_template: str, keys_info: List[str]):
+    wallet_policy = WalletPolicy(
         name="Invalid wallet",
-        policy_map=policy_map,
+        descriptor_template=descriptor_template,
         keys_info=keys_info)
 
     with pytest.raises((IncorrectDataError, NotSupportedError)):
@@ -121,9 +121,9 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
     path = "499'/1'/0'"
     _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Joint account",
-        policy_map="wsh(or_b(pk(@0/**),s:pk(@1/**)))",
+        descriptor_template="wsh(or_b(pk(@0/**),s:pk(@1/**)))",
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
             f"{core_xpub_orig}",
@@ -139,9 +139,9 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
     path = "499'/1'/0'"
     _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Joint account",
-        policy_map="wsh(or_d(pk(@0/**),pkh(@1/**)))",
+        descriptor_template="wsh(or_d(pk(@0/**),pkh(@1/**)))",
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
             f"{core_xpub_orig}",
@@ -157,9 +157,9 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
     path = "48'/1'/0'/2'"
     _, core_xpub_orig = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="2FA wallet",
-        policy_map="wsh(and_v(v:pk(@0/**),or_d(pk(@1/**),older(12960))))",
+        descriptor_template="wsh(and_v(v:pk(@0/**),or_d(pk(@1/**),older(12960))))",
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
             f"{core_xpub_orig}",
@@ -176,9 +176,9 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
     _, core_xpub_orig1 = create_new_wallet()
     _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Decaying 3of3",
-        policy_map="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@2/**),sln:older(12960)))",
+        descriptor_template="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@2/**),sln:older(12960)))",
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
             f"{core_xpub_orig1}",
@@ -197,9 +197,9 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
     _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="BOLT #3 offered",
-        policy_map=f"wsh(t:or_c(pk(@0/**),and_v(v:pk(@1/**),or_c(pk(@2/**),v:hash160({H})))))",
+        descriptor_template=f"wsh(t:or_c(pk(@0/**),and_v(v:pk(@1/**),or_c(pk(@2/**),v:hash160({H})))))",
         keys_info=[
             f"{core_xpub_orig1}",
             f"{core_xpub_orig2}",
@@ -218,9 +218,9 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
     _, core_xpub_orig2 = create_new_wallet()
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     H = "395e368b267d64945f30e4b71de1054f364c9473"  # random
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="BOLT #3 received",
-        policy_map=f"wsh(andor(pk(@0/**),or_i(and_v(v:pkh(@1/**),hash160({H})),older(1008)),pk(@2/**)))",
+        descriptor_template=f"wsh(andor(pk(@0/**),or_i(and_v(v:pkh(@1/**),hash160({H})),older(1008)),pk(@2/**)))",
         keys_info=[
             f"{core_xpub_orig1}",
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
@@ -240,9 +240,9 @@ def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculo
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
 
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Me or them",
-        policy_map=f"wsh(or_d(pk(@0/**),multi(3,@1/**,@2/**,@3/**,@4/**,@5/**)))",
+        descriptor_template=f"wsh(or_d(pk(@0/**),multi(3,@1/**,@2/**,@3/**,@4/**,@5/**)))",
         keys_info=[
             internal_xpub_orig,
             f"{core_xpub_orig1}",
@@ -269,9 +269,9 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(rpc, rpc_test_wallet, client
     internal_xpub_2 = get_internal_xpub(speculos_globals.seed, path2)
     internal_xpub_orig_2 = f"[{speculos_globals.master_key_fingerprint.hex()}/{path2}]{internal_xpub_2}"
 
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Me and Bob or me and Carl",
-        policy_map=f"wsh(c:andor(pk(@0/**),pk_k(@1/**),and_v(v:pk(@2/**),pk_k(@3/**))))",
+        descriptor_template=f"wsh(c:andor(pk(@0/**),pk_k(@1/**),and_v(v:pk(@2/**),pk_k(@3/**))))",
         keys_info=[
             internal_xpub_orig_1,
             f"{core_xpub_orig1}",
@@ -293,9 +293,9 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl_2(rpc, rpc_test_wallet, client
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
 
-    wallet_policy = PolicyMapWallet(
+    wallet_policy = WalletPolicy(
         name="Me and Bob or me and Carl",
-        policy_map=f"wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
+        descriptor_template=f"wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
         keys_info=[
             internal_xpub_orig,
             f"{core_xpub_orig1}",

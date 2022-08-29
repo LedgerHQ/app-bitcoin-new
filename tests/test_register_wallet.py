@@ -1,4 +1,4 @@
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from bitcoin_client.ledger_bitcoin.exception import DenyError
 
@@ -141,9 +141,9 @@ def test_register_wallet_unsupported_policy(client: Client):
     # valid policies, but not supported (might change in the future)
 
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Unsupported",
-            policy_map="pk(@0/**)",  # bare pubkey, not supported
+            descriptor_template="pk(@0/**)",  # bare pubkey, not supported
             keys_info=[
                 f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
             ]
@@ -154,9 +154,9 @@ def test_register_wallet_unsupported_policy(client: Client):
 def test_register_miniscript_long_policy(client: Client, speculos_globals, model):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices,
     # except on Nano S that has 196 bytes as a technical limitation.
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="Long policy",
-        policy_map=f"wsh(and_v(and_v(v:pk(@0/**),or_c(pk(@1/**),or_c(pk(@2/**),v:older(1000)))),and_v(v:hash256(0563fb3e85cbc61b134941ad6610a2b0dfd77543dfb77a5433ff3cb538213807),and_v(v:hash256(ad3391a00bad00a6a03f907b3fcc2f369a88be038c63c7db7f43b01e097efbbe),hash256(137dfa9b54a538200c94e3c9dd1a59b431e3b89aef8093fc910df48a98cb06d9)))))",
+        descriptor_template=f"wsh(and_v(and_v(v:pk(@0/**),or_c(pk(@1/**),or_c(pk(@2/**),v:older(1000)))),and_v(v:hash256(0563fb3e85cbc61b134941ad6610a2b0dfd77543dfb77a5433ff3cb538213807),and_v(v:hash256(ad3391a00bad00a6a03f907b3fcc2f369a88be038c63c7db7f43b01e097efbbe),hash256(137dfa9b54a538200c94e3c9dd1a59b431e3b89aef8093fc910df48a98cb06d9)))))",
         keys_info=[
             "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
             "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
@@ -180,9 +180,9 @@ def test_register_miniscript_long_policy(client: Client, speculos_globals, model
 def test_register_wallet_not_sane_policy(client: Client):
     # pubkeys in the keys vector must be all different
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Unsupported policy",
-            policy_map=f"wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@2/<2;3>/*),pk_k(@3/**))))",
+            descriptor_template=f"wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@2/<2;3>/*),pk_k(@3/**))))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
@@ -193,18 +193,18 @@ def test_register_wallet_not_sane_policy(client: Client):
 
     # Key placeholders referring to the same key must have distinct derivations
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Unsupported policy",
-            policy_map="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@0/**),sln:older(12960)))",
+            descriptor_template="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@0/**),sln:older(12960)))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
             ]))
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Unsupported policy",
             # even a partial overlap (derivation @0/1 being used twice) is not acceptable
-            policy_map="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@0/<1;2>/*),sln:older(12960)))",
+            descriptor_template="wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@0/<1;2>/*),sln:older(12960)))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
@@ -212,9 +212,9 @@ def test_register_wallet_not_sane_policy(client: Client):
 
     # Miniscript policy with timelock mixing
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Timelock mixing is bad",
-            policy_map="wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),altv:after(1000000000),altv:after(100)))",
+            descriptor_template="wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),altv:after(1000000000),altv:after(100)))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
@@ -222,9 +222,9 @@ def test_register_wallet_not_sane_policy(client: Client):
 
     # Miniscript policy that does not always require a signature
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="No need for sig",
-            policy_map="wsh(or_d(multi(1,@0/**),or_b(multi(3,@1/**,@2/**,@3/**),su:after(500000))))",
+            descriptor_template="wsh(or_d(multi(1,@0/**),or_b(multi(3,@1/**,@2/**,@3/**),su:after(500000))))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
@@ -234,9 +234,9 @@ def test_register_wallet_not_sane_policy(client: Client):
 
     # Malleable policy, even if it requires a signature
     with pytest.raises(NotSupportedError):
-        client.register_wallet(PolicyMapWallet(
+        client.register_wallet(WalletPolicy(
             name="Malleable",
-            policy_map="wsh(c:andor(ripemd160(6ad07d21fd5dfc646f0b30577045ce201616b9ba),pk_h(@0/**),and_v(v:hash256(8a35d9ca92a48eaade6f53a64985e9e2afeb74dcf8acb4c3721e0dc7e4294b25),pk_h(@1/**))))",
+            descriptor_template="wsh(c:andor(ripemd160(6ad07d21fd5dfc646f0b30577045ce201616b9ba),pk_h(@0/**),and_v(v:hash256(8a35d9ca92a48eaade6f53a64985e9e2afeb74dcf8acb4c3721e0dc7e4294b25),pk_h(@1/**))))",
             keys_info=[
                 "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
                 "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",

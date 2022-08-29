@@ -149,64 +149,64 @@ describe("test AppClient", () => {
     }[] = [
       // legacy
       {
-        policy: new DefaultWalletPolicy("pkh(@0)", "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"),
+        policy: new DefaultWalletPolicy("pkh(@0/**)", "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"),
         change: 0,
         addrIndex: 0,
         expResult: "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm",
       },
       {
-        policy: new DefaultWalletPolicy("pkh(@0)", "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"),
+        policy: new DefaultWalletPolicy("pkh(@0/**)", "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"),
         change: 1,
         addrIndex: 15,
         expResult: "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT",
       },
       // native segwit
       {
-        policy: new DefaultWalletPolicy("wpkh(@0)", "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"),
+        policy: new DefaultWalletPolicy("wpkh(@0/**)", "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"),
         change: 0,
         addrIndex: 0,
         expResult: "tb1qzdr7s2sr0dwmkwx033r4nujzk86u0cy6fmzfjk",
       },
       {
-        policy: new DefaultWalletPolicy("wpkh(@0)", "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"),
+        policy: new DefaultWalletPolicy("wpkh(@0/**)", "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"),
         change: 1,
         addrIndex: 15,
         expResult: "tb1qlrvzyx8jcjfj2xuy69du9trtxnsvjuped7e289",
       },
       // wrapped segwit
       {
-        policy: new DefaultWalletPolicy("sh(wpkh(@0))", "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"),
+        policy: new DefaultWalletPolicy("sh(wpkh(@0/**))", "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"),
         change: 0,
         addrIndex: 0,
         expResult: "2MyHkbusvLomaarGYMqyq7q9pSBYJRwWcsw",
       },
       {
-        policy: new DefaultWalletPolicy("sh(wpkh(@0))", "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"),
+        policy: new DefaultWalletPolicy("sh(wpkh(@0/**))", "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"),
         change: 1,
         addrIndex: 15,
         expResult: "2NAbM4FSeBQG4o85kbXw2YNfKypcnEZS9MR",
       },
       // taproot
       {
-        policy: new DefaultWalletPolicy("tr(@0)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"),
+        policy: new DefaultWalletPolicy("tr(@0/**)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"),
         change: 0,
         addrIndex: 0,
         expResult: "tb1pws8wvnj99ca6acf8kq7pjk7vyxknah0d9mexckh5s0vu2ccy68js9am6u7",
       },
       {
-        policy: new DefaultWalletPolicy("tr(@0)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"),
+        policy: new DefaultWalletPolicy("tr(@0/**)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"),
         change: 0,
         addrIndex: 9,
         expResult: "tb1psl7eyk2jyjzq6evqvan854fts7a5j65rth25yqahkd2a765yvj0qggs5ne",
       },
       {
-        policy: new DefaultWalletPolicy("tr(@0)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"),
+        policy: new DefaultWalletPolicy("tr(@0/**)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"),
         change: 1,
         addrIndex: 0,
         expResult: "tb1pmr60r5vfjmdkrwcu4a2z8h39mzs7a6wf2rfhuml6qgcp940x9cxs7t9pdy",
       },
       {
-        policy: new DefaultWalletPolicy("tr(@0)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"),
+        policy: new DefaultWalletPolicy("tr(@0/**)", "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"),
         change: 1,
         addrIndex: 9,
         expResult: "tb1p98d6s9jkf0la8ras4nnm72zme5r03fexn29e3pgz4qksdy84ndpqgjak72",
@@ -215,16 +215,16 @@ describe("test AppClient", () => {
       {
         policy: new WalletPolicy(
           "Cold storage",
-          "wsh(sortedmulti(2,@0,@1))",
+          "wsh(sortedmulti(2,@0/**,@1/**))",
           [
-            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
-            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
           ]
         ),
         change: 0,
         addrIndex: 0,
         expResult: "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28",
-        walletHmac: Buffer.from("d6434852fb3caa7edbd1165084968f1691444b3cfc10cf1e431acbbc7f48451f", "hex")
+        walletHmac: Buffer.from("d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371", "hex")
       },
     ];
 
@@ -238,10 +238,29 @@ describe("test AppClient", () => {
   it("can register a multisig wallet", async () => {
     const walletPolicy = new WalletPolicy(
       "Cold storage",
-      "wsh(sortedmulti(2,@0,@1))",
+      "wsh(sortedmulti(2,@0/**,@1/**))",
       [
-        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
-        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/register_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const [walletId, walletHmac] = await app.registerWallet(walletPolicy);
+
+    expect(walletId).toEqual(walletPolicy.getId());
+    expect(walletHmac.length).toEqual(32);
+  });
+
+  it("can register a miniscript wallet", async () => {
+    const walletPolicy = new WalletPolicy(
+      "Decaying 3-of-3",
+      "wsh(thresh(3,pk(@0/**),s:pk(@1/**),s:pk(@2/**),sln:older(12960)))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
       ]
     );
 
@@ -265,20 +284,33 @@ describe("test AppClient", () => {
     await setSpeculosAutomation(transport, automation);
 
     const walletPolicy = new DefaultWalletPolicy(
-      "wpkh(@0)",
-      "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+      "wpkh(@0/**)",
+      "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
     );
 
     const psbt = new PsbtV2();
     psbt.deserialize(psbtBuf);
     const result = await app.signPsbt(psbt, walletPolicy, null, () => {});
 
-    expect(result.size).toEqual(2);
-    expect(result.get(0)).toEqual(Buffer.from(
+    expect(result.length).toEqual(2);
+
+    expect(result[0][0]).toEqual(0);
+    expect(result[0][1]).toEqual(Buffer.from(
+      "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3",
+      "hex"
+    ));
+    expect(result[0][2]).toEqual(Buffer.from(
       "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01",
       "hex"
     ));
-    expect(result.get(1)).toEqual(Buffer.from(
+
+
+    expect(result[1][0]).toEqual(1);
+    expect(result[1][1]).toEqual(Buffer.from(
+      "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
+      "hex"
+    ));
+    expect(result[1][2]).toEqual(Buffer.from(
       "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001",
       "hex"
     ));

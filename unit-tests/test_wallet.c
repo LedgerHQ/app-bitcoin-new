@@ -29,10 +29,14 @@ static void test_parse_policy_map_singlesig_1(void **state) {
 
     int res;
 
-    char *policy = "pkh(@0/**)";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "pkh(@0/**)";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
@@ -49,10 +53,14 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     int res;
 
-    char *policy = "sh(wpkh(@0/**))";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "sh(wpkh(@0/**))";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -73,10 +81,14 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     int res;
 
-    char *policy = "sh(wsh(pkh(@0/**)))";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "sh(wsh(pkh(@0/**)))";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -101,10 +113,14 @@ static void test_parse_policy_map_multisig_1(void **state) {
 
     int res;
 
-    char *policy = "sortedmulti(2,@0/**,@1/**,@2/**)";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "sortedmulti(2,@0/**,@1/**,@2/**)";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_multisig_t *node_1 = (policy_node_multisig_t *) out;
 
@@ -129,10 +145,14 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     int res;
 
-    char *policy = "wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -157,10 +177,14 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     int res;
 
-    char *policy = "sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))";
-    buffer_t policy_buf = buffer_create((void *) policy, strlen(policy));
+    char *descriptor_template = "sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))";
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -185,7 +209,7 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
 static int parse_policy(char *policy, size_t policy_len, uint8_t *out, size_t out_len) {
     buffer_t in_buf = buffer_create((void *) policy, policy_len);
-    return parse_policy_map(&in_buf, out, out_len, WALLET_POLICY_VERSION_V2);
+    return parse_descriptor_template(&in_buf, out, out_len, WALLET_POLICY_VERSION_V2);
 }
 
 #define PARSE_POLICY(policy, out, out_len) parse_policy(policy, sizeof(policy) - 1, out, out_len)
@@ -253,9 +277,12 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
     int res;
-    buffer_t policy_buf = buffer_create((void *) descriptor, strlen(descriptor));
+    buffer_t descriptor_template_buf = buffer_create((void *) descriptor, strlen(descriptor));
 
-    res = parse_policy_map(&policy_buf, out, sizeof(out), WALLET_POLICY_VERSION_V2);
+    res = parse_descriptor_template(&descriptor_template_buf,
+                                    out,
+                                    sizeof(out),
+                                    WALLET_POLICY_VERSION_V2);
 
     if (mode == TESTMODE_INVALID) {
         assert_true(res < 0);

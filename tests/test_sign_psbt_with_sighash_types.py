@@ -1,14 +1,14 @@
 import pytest
 import threading
 from pathlib import Path
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy
 from bitcoin_client.ledger_bitcoin.exception.errors import NotSupportedError
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
 from test_utils import has_automation, bip0340
 
 tests_root: Path = Path(__file__).parent
 
-tr_wallet = PolicyMapWallet(
+tr_wallet = WalletPolicy(
     "",
     "tr(@0/**)",
     [
@@ -16,7 +16,7 @@ tr_wallet = PolicyMapWallet(
     ],
 )
 
-wpkh_wallet = PolicyMapWallet(
+wpkh_wallet = WalletPolicy(
     "",
     "wpkh(@0/**)",
     [

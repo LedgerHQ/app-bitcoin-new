@@ -55,7 +55,7 @@ typedef struct {
 
     // no flows show together both a policy map and an address, therefore we share memory
     union {
-        char policy_map[MAX_WALLET_POLICY_STR_LENGTH + 1];
+        char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
         char address[MAX_ADDRESS_LENGTH_STR + 1];
     };
 } ui_wallet_state_t;
@@ -189,16 +189,16 @@ UX_STEP_NOCB(ux_display_address_step,
                  .text = g_ui_state.path_and_address.address,
              });
 
-// Step with description of a policy wallet
+// Step with description of a wallet policy
 UX_STEP_NOCB(ux_display_wallet_policy_map_step,
              bnnn_paging,
              {
-                 .title = "Policy map:",
-                 .text = g_ui_state.wallet.policy_map,
+                 .title = "Wallet policy:",
+                 .text = g_ui_state.wallet.descriptor_template,
              });
 
 // Step with index and xpub of a cosigner of a policy_map wallet
-UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
+UX_STEP_NOCB(ux_display_wallet_policy_cosigner_pubkey_step,
              bnnn_paging,
              {
                  .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
@@ -432,7 +432,7 @@ UX_FLOW(ux_display_register_wallet_flow,
 // #2 screen: approve button
 // #3 screen: reject button
 UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
-        &ux_display_wallet_policy_map_cosigner_pubkey_step,
+        &ux_display_wallet_policy_cosigner_pubkey_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -605,8 +605,8 @@ bool ui_display_register_wallet(dispatcher_context_t *context,
 
     strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
     state->wallet_name[wallet_header->name_len] = 0;
-    strncpy(state->policy_map, policy_descriptor, sizeof(state->policy_map));
-    state->policy_map[wallet_header->policy_map_len] = 0;
+    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
+    state->descriptor_template[wallet_header->descriptor_template_len] = 0;
 
     ux_flow_init(0, ux_display_register_wallet_flow, NULL);
 

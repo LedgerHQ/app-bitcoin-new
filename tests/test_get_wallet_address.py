@@ -1,4 +1,4 @@
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
 
 
@@ -9,9 +9,9 @@ import pytest
 
 def test_get_wallet_address_singlesig_legacy(client: Client):
     # legacy address (P2PKH)
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="",
-        policy_map="pkh(@0/**)",
+        descriptor_template="pkh(@0/**)",
         keys_info=[
             f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
         ],
@@ -22,9 +22,9 @@ def test_get_wallet_address_singlesig_legacy(client: Client):
 
 def test_get_wallet_address_singlesig_wit(client: Client):
     # bech32 address (P2WPKH)
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="",
-        policy_map="wpkh(@0/**)",
+        descriptor_template="wpkh(@0/**)",
         keys_info=[
             f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
         ],
@@ -35,9 +35,9 @@ def test_get_wallet_address_singlesig_wit(client: Client):
 
 def test_get_wallet_address_singlesig_sh_wit(client: Client):
     # wrapped segwit addresses (P2SH-P2WPKH)
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="",
-        policy_map="sh(wpkh(@0/**))",
+        descriptor_template="sh(wpkh(@0/**))",
         keys_info=[
             f"[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3",
         ],
@@ -49,9 +49,9 @@ def test_get_wallet_address_singlesig_sh_wit(client: Client):
 def test_get_wallet_address_singlesig_taproot(client: Client):
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="",
-        policy_map="tr(@0/**)",
+        descriptor_template="tr(@0/**)",
         keys_info=[
             f"[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U",
         ],
@@ -75,17 +75,17 @@ def test_get_wallet_address_singlesig_taproot(client: Client):
 def test_get_wallet_address_default_fail_wrongkeys(client: Client):
     # 0 keys info should be rejected
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[],
         ), None, 0,  0, False)
 
     # more than 1 key should be rejected
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
@@ -94,9 +94,9 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
 
     # wrong BIP44 purpose should be rejected (here using 84' for a P2PKH address)
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[
                 f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
             ],
@@ -104,9 +104,9 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
 
     # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended pubkey for "84'/1'/0'"")
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[
                 f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
             ],
@@ -114,9 +114,9 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
 
     # wrong master fingerprint
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[
                 f"[42424242/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
@@ -124,9 +124,9 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
 
     # too large address_index, cannot be done non-silently
     with pytest.raises(IncorrectDataError):
-        client.get_wallet_address(PolicyMapWallet(
+        client.get_wallet_address(WalletPolicy(
             name="",
-            policy_map="pkh(@0/**)",
+            descriptor_template="pkh(@0/**)",
             keys_info=[
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],

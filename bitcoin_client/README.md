@@ -35,7 +35,7 @@ It is possible to run the app and the library with the [speculos](https://github
 ⚠️ Currently, speculos does not correctly emulate the version of the app, always returning a dummy value; in order to use the library, it is necessary to set the `SPECULOS_APPNAME` environment variable before starting speculos, for example with:
 
 ```
-$ export SPECULOS_APPNAME="Bitcoin Test:2.0.0"
+$ export SPECULOS_APPNAME="Bitcoin Test:2.1.0"
 ```
 
 Similarly, to test the library behavior on a legacy version of the app, one can set the version to `1.6.5` (the final version of the 1.X series).
@@ -53,7 +53,7 @@ Testing the `sign_psbt` method requires producing a valid PSBT (with any externa
 
 ```python
 from typing import Optional
-from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, PolicyMapWallet, AddressType, TransportClient
+from ledger_bitcoin import createClient, Chain, MultisigWallet, MultisigWallet, WalletPolicy, AddressType, TransportClient
 from ledger_bitcoin.psbt import PSBT
 
 
@@ -71,9 +71,9 @@ def main():
         # ==> Get and display on screen the first taproot address
 
         first_taproot_account_pubkey = client.get_extended_pubkey("m/86'/1'/0'")
-        first_taproot_account_policy = PolicyMapWallet(
+        first_taproot_account_policy = WalletPolicy(
             "",
-            "tr(@0)",
+            "tr(@0/**)",
             [
                 f"[{fpr}/86'/1'/0']{first_taproot_account_pubkey}/**"
             ],
@@ -98,8 +98,8 @@ def main():
             address_type=AddressType.WIT,
             threshold=2,
             keys_info=[
-                other_key_info,                          # some other bitcoiner
-                f"[{fpr}/48'/1'/0'/2']{our_pubkey}/**",  # that's us
+                other_key_info,                       # some other bitcoiner
+                f"[{fpr}/48'/1'/0'/2']{our_pubkey}",  # that's us
             ],
         )
 
@@ -118,7 +118,7 @@ def main():
 
         # TODO: set a wallet policy and a valid psbt file in order to test psbt signing
         psbt_filename: Optional[str] = None
-        signing_policy: Optional[PolicyMapWallet] = None
+        signing_policy: Optional[WalletPolicy] = None
         signing_policy_hmac: Optional[bytes] = None
         if not psbt_filename or not signing_policy:
             print("Nothing to sign :(")

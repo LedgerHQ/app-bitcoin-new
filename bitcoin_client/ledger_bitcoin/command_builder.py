@@ -1,9 +1,9 @@
 import enum
 from typing import List, Tuple, Mapping, Union, Iterator, Optional
 
-from .common import bip32_path_from_string, AddressType, sha256, hash256, write_varint
+from .common import bip32_path_from_string, write_varint
 from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
-from .wallet import Wallet
+from .wallet import WalletPolicy
 
 # p2 encodes the protocol version implemented
 CURRENT_PROTOCOL_VERSION = 1
@@ -96,7 +96,7 @@ class BitcoinCommandBuilder:
             cdata=cdata,
         )
 
-    def register_wallet(self, wallet: Wallet):
+    def register_wallet(self, wallet: WalletPolicy):
         wallet_bytes = wallet.serialize()
 
         return self.serialize(
@@ -107,7 +107,7 @@ class BitcoinCommandBuilder:
 
     def get_wallet_address(
         self,
-        wallet: Wallet,
+        wallet: WalletPolicy,
         wallet_hmac: Optional[bytes],
         address_index: int,
         change: bool,
@@ -134,7 +134,7 @@ class BitcoinCommandBuilder:
         global_mapping: Mapping[bytes, bytes],
         input_mappings: List[Mapping[bytes, bytes]],
         output_mappings: List[Mapping[bytes, bytes]],
-        wallet: Wallet,
+        wallet: WalletPolicy,
         wallet_hmac: Optional[bytes],
     ):
 

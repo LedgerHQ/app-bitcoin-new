@@ -632,7 +632,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         buffer_t serialized_wallet_policy_buf =
             buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
 
-        uint8_t policy_map_descriptor[MAX_WALLET_POLICY_STR_LENGTH];
+        uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
         if (0 > read_and_parse_wallet_policy(dc,
                                              &serialized_wallet_policy_buf,
                                              &wallet_header,

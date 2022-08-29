@@ -4,7 +4,7 @@ from typing import Literal, Union
 from mnemonic import Mnemonic
 from bip32 import BIP32
 
-from bitcoin_client.ledger_bitcoin.wallet import PolicyMapWallet
+from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
 
 from .slip21 import Slip21Node
 
@@ -83,7 +83,7 @@ def get_internal_xpub(seed: str, path: str) -> str:
     return bip32.get_xpub_from_path(f"m/{path}")
 
 
-def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: PolicyMapWallet) -> int:
+def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy) -> int:
     """Count how many of the keys in wallet_policy are indeed internal"""
 
     bip32 = BIP32.from_seed(seed, network)
@@ -105,6 +105,7 @@ def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test
                 computed_xpub = get_internal_xpub(seed, path)
                 if computed_xpub == xpub:
                     # there could be multiple placeholders using the same key; we must count all of them
-                    count += wallet_policy.policy_map.count(f"@{key_index}/")
+                    count += wallet_policy.descriptor_template.count(
+                        f"@{key_index}/")
 
     return count

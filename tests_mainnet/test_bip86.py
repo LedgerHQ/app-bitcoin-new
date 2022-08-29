@@ -1,4 +1,4 @@
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy
 
 from test_utils import SpeculosGlobals, mnemonic
 
@@ -13,9 +13,9 @@ def test_bip86(client: Client, speculos_globals: SpeculosGlobals):
 
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         name="",
-        policy_map="tr(@0/**)",
+        descriptor_template="tr(@0/**)",
         keys_info=[
             f"[{fpr}/86'/0'/0']xpub6BgBgsespWvERF3LHQu6CnqdvfEvtMcQjYrcRzx53QJjSxarj2afYWcLteoGVky7D3UKDP9QyrLprQ3VCECoY49yfdDEHGCtMMj92pReUsQ",
         ],

@@ -261,36 +261,39 @@ static const generic_processor_command_t commands_u[] = {{CMD_CODE_OP, OP_IF},
                                                          {CMD_CODE_OP_V, OP_ENDIF},
                                                          {CMD_CODE_END, 0}};
 
-int read_and_parse_wallet_policy(dispatcher_context_t *dispatcher_context,
-                                 buffer_t *buf,
-                                 policy_map_wallet_header_t *wallet_header,
-                                 uint8_t policy_map_descriptor[static MAX_WALLET_POLICY_STR_LENGTH],
-                                 uint8_t *policy_map_bytes,
-                                 size_t policy_map_bytes_len) {
+int read_and_parse_wallet_policy(
+    dispatcher_context_t *dispatcher_context,
+    buffer_t *buf,
+    policy_map_wallet_header_t *wallet_header,
+    uint8_t policy_map_descriptor_template[static MAX_DESCRIPTOR_TEMPLATE_LENGTH],
+    uint8_t *policy_map_bytes,
+    size_t policy_map_bytes_len) {
     if ((read_wallet_policy_header(buf, wallet_header)) < 0) {
         return WITH_ERROR(-1, "Failed reading wallet policy header");
     }
 
     if (wallet_header->version == WALLET_POLICY_VERSION_V1) {
-        memcpy(policy_map_descriptor, wallet_header->policy_map, wallet_header->policy_map_len);
+        memcpy(policy_map_descriptor_template,
+               wallet_header->descriptor_template,
+               wallet_header->descriptor_template_len);
     } else {
-        // if V2, stream and parse policy from client first
-        int policy_descriptor_len = call_get_preimage(dispatcher_context,
-                                                      wallet_header->policy_map_sha256,
-                                                      policy_map_descriptor,
-                                                      MAX_WALLET_POLICY_STR_LENGTH);
-        if (policy_descriptor_len < 0) {
-            return WITH_ERROR(-1, "Failed getting wallet policy descriptor");
+        // if V2, stream and parse descriptor template from client first
+        int descriptor_template_len = call_get_preimage(dispatcher_context,
+                                                        wallet_header->descriptor_template_sha256,
+                                                        policy_map_descriptor_template,
+                                                        MAX_DESCRIPTOR_TEMPLATE_LENGTH);
+        if (descriptor_template_len < 0) {
+            return WITH_ERROR(-1, "Failed getting wallet policy descriptor template");
         }
     }
 
     buffer_t policy_map_buffer =
-        buffer_create(policy_map_descriptor, wallet_header->policy_map_len);
-    if (parse_policy_map(&policy_map_buffer,
-                         policy_map_bytes,
-                         policy_map_bytes_len,
-                         wallet_header->version) < 0) {
-        return WITH_ERROR(-1, "Failed parsing policy map");
+        buffer_create(policy_map_descriptor_template, wallet_header->descriptor_template_len);
+    if (parse_descriptor_template(&policy_map_buffer,
+                                  policy_map_bytes,
+                                  policy_map_bytes_len,
+                                  wallet_header->version) < 0) {
+        return WITH_ERROR(-1, "Failed parsing descriptor template");
     }
     return 0;
 }
