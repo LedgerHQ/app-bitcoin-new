@@ -527,9 +527,11 @@ bool io_ui_process(dispatcher_context_t *context) {
     // We are not waiting for the client's input, nor we are doing computations on the device
     io_clear_processing_timeout();
 
+    io_seproxyhal_general_status();
     do {
         io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer), 0);
         io_seproxyhal_handle_event();
+        io_seproxyhal_general_status();
     } while (io_seproxyhal_spi_is_status_sent() && !g_ux_flow_ended);
 
     // We're back at work, we want to show the "Processing..." screen when appropriate
