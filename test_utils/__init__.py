@@ -44,9 +44,15 @@ def mnemonic(mnemo: str):
 
 
 def ripemd160(x: bytes) -> bytes:
-    h = hashlib.new("ripemd160")
-    h.update(x)
-    return h.digest()
+    try:
+        h = hashlib.new("ripemd160")
+        h.update(x)
+        return h.digest()
+    except BaseException:
+        # ripemd160 is not always present in hashlib.
+        # Fallback to custom implementation if missing.
+        from . import ripemd
+        return ripemd.ripemd160(x)
 
 
 def sha256(s: bytes) -> bytes:
