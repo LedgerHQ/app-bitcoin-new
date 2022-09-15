@@ -125,14 +125,19 @@ def read_uint(buf: BytesIO,
 
 
 def serialize_str(value: str) -> bytes:
-    return len(value).to_bytes(1, byteorder="big") + value.encode("latin-1")
+    return len(value.encode()).to_bytes(1, byteorder="big") + value.encode()
 
 
 def ripemd160(x: bytes) -> bytes:
-    h = hashlib.new("ripemd160")
-    h.update(x)
-    return h.digest()
-
+    try:
+        h = hashlib.new("ripemd160")
+        h.update(x)
+        return h.digest()
+    except BaseException:
+        # ripemd160 is not always present in hashlib.
+        # Fallback to custom implementation if missing.
+        from . import ripemd
+        return ripemd.ripemd160(x)
 
 def sha256(s: bytes) -> bytes:
     return hashlib.new('sha256', s).digest()

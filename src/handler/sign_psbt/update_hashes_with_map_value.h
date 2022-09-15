@@ -4,7 +4,7 @@
 #include "../../common/merkle.h"
 
 /**
- * Streams the requested preimage from a merkleized map, updating the given has contexts
+ * Streams the requested preimage from a merkleized map, updating the given hash contexts
  * appropriately. Both hash_unprefixed and hash_prefixed are optional, but if not NULL, it is
  * responsibility of the caller to ensure that they are initialized.
  *

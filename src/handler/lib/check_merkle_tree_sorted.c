@@ -3,16 +3,20 @@
 #include "check_merkle_tree_sorted.h"
 #include "get_merkle_leaf_element.h"
 
+#include "../../common/merkle.h"
+
 static int compare_byte_arrays(const uint8_t array1[],
                                size_t array1_len,
                                const uint8_t array2[],
                                size_t array2_len);
 
 int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher_context,
+                                                void *callback_state,
                                                 const uint8_t root[static 32],
                                                 size_t size,
-                                                dispatcher_callback_descriptor_t callback) {
-    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+                                                merkle_tree_elements_callback_t callback,
+                                                const merkleized_map_commitment_t *map_commitment) {
+    // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     int prev_el_len = 0;
     uint8_t prev_el[MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE];
@@ -39,10 +43,10 @@ int call_check_merkle_tree_sorted_with_callback(dispatcher_context_t *dispatcher
         memcpy(prev_el, cur_el, cur_el_len);
         prev_el_len = cur_el_len;
 
-        if (callback.fn != NULL) {
+        if (callback != NULL) {
             // call callback with data
             buffer_t buf = buffer_create(cur_el, cur_el_len);
-            callback.fn(callback.state, &buf);
+            callback(dispatcher_context, callback_state, map_commitment, cur_el_idx, &buf);
         }
     }
     return 0;

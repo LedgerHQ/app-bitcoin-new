@@ -3,6 +3,8 @@ import { crypto } from 'bitcoinjs-lib';
 import { BufferWriter } from './buffertools';
 import { hashLeaf, Merkle } from './merkle';
 
+const WALLET_POLICY_V2 = 2;
+
 /**
  * The Bitcon hardware app uses a descriptors-like thing to describe
  * how to construct output scripts from keys. A "Wallet Policy" consists
@@ -49,20 +51,29 @@ export class WalletPolicy {
     const m = new Merkle(keyBuffers.map((k) => hashLeaf(k)));
 
     const buf = new BufferWriter();
-    buf.writeUInt8(0x01); // wallet type (policy map)
+    buf.writeUInt8(WALLET_POLICY_V2); // wallet version
+
+    // length of wallet name, and wallet name
     buf.writeVarSlice(Buffer.from(this.name, 'ascii'));
-    buf.writeVarSlice(Buffer.from(this.descriptorTemplate, 'ascii'));
+
+    // length of descriptor template
+    buf.writeVarInt(this.descriptorTemplate.length);
+    // sha256 hash of descriptor template
+    buf.writeSlice(crypto.sha256(Buffer.from(this.descriptorTemplate)));
+
+    // number of keys
     buf.writeVarInt(this.keys.length);
+    // root of Merkle tree of keys
     buf.writeSlice(m.getRoot());
     return buf.buffer();
   }
 }
 
 export type DefaultDescriptorTemplate =
-  | 'pkh(@0)'
-  | 'sh(wpkh(@0))'
-  | 'wpkh(@0)'
-  | 'tr(@0)';
+  | 'pkh(@0/**)'
+  | 'sh(wpkh(@0/**))'
+  | 'wpkh(@0/**)'
+  | 'tr(@0/**)';
 
 /**
  * Simplified class to handle default wallet policies that can be used without policy registration.

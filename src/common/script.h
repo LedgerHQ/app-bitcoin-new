@@ -1,9 +1,5 @@
 #pragma once
 
-#ifndef SKIP_FOR_CMOCKA
-#include "../context.h"
-#endif
-
 /** Script opcodes */
 // from bitcoin-core
 enum opcodetype {
@@ -130,8 +126,10 @@ enum opcodetype {
     // expansion
     OP_NOP1 = 0xb0,
     OP_CHECKLOCKTIMEVERIFY = 0xb1,
+    OP_CLTV = OP_CHECKLOCKTIMEVERIFY,
     OP_NOP2 = OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY = 0xb2,
+    OP_CSV = OP_CHECKSEQUENCEVERIFY,
     OP_NOP3 = OP_CHECKSEQUENCEVERIFY,
     OP_NOP4 = 0xb3,
     OP_NOP5 = 0xb4,
@@ -169,6 +167,11 @@ static inline bool is_opreturn(const uint8_t script[], size_t script_len) {
 }
 
 /**
+ * Returns the size in bytes of the minimal push opcode for <n>, where n a uint32_t.
+ */
+size_t get_push_script_size(uint32_t n);
+
+/**
  * Returns a constant of type `script_type_e` indicating the type of known script type with an
  * address, or -1 for any invalid script, or valid script without an address.
  *
@@ -186,18 +189,13 @@ int get_script_type(const uint8_t script[], size_t script_len);
  *
  * @param script the scriptPubKey
  * @param script_len the length of `script`
- * @param coin_config the configuration for the coin
  * @param out the output buffer
  * @param out_len the length of the output buffer
  * @return the length of the computed address on success; -1 if the script is invalid, if it does
  * not have an associated address (e.g. OP_RETURN), or the resulting address is too long to fit in
  * out.
  */
-int get_script_address(const uint8_t script[],
-                       size_t script_len,
-                       const global_context_t *coin_config,
-                       char *out,
-                       size_t out_len);
+int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len);
 
 #endif
 

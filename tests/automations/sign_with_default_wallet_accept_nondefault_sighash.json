@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "regexp": "Review|Amount|Address|Confirm|Fees|Non-default sighash|Reject",
+      "actions": [
+        ["button", 2, true],
+        ["button", 2, false]
+      ]
+    },
+    {
+      "regexp": "Approve|Accept|Continue",
+      "actions": [
+        [ "button", 1, true ],
+        [ "button", 2, true ],
+        [ "button", 2, false ],
+        [ "button", 1, false ]
+      ]
+    }
+  ]
+}

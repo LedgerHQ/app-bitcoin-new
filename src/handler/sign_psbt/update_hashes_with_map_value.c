@@ -37,7 +37,7 @@ int update_hashes_with_map_value(dispatcher_context_t *dispatcher_context,
                                  int key_len,
                                  cx_hash_t *hash_unprefixed,
                                  cx_hash_t *hash_prefixed) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     callback_state_t cb_state = {.hash_unprefixed = hash_unprefixed,
                                  .hash_prefixed = hash_prefixed};

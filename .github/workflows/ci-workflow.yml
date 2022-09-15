@@ -39,8 +39,6 @@ jobs:
           make DEBUG=0 COIN=bitcoin BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-bin/
           make clean
           make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
-          make clean
-          make DEBUG=0 COIN=bitcoin_testnet_lib BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-lib-bin/
       - name: Upload Bitcoin app binary
         uses: actions/upload-artifact@v2
         with:
@@ -52,12 +50,6 @@ jobs:
         with:
           name: bitcoin-testnet-app-${{ matrix.model }}
           path: bitcoin-testnet-bin
-
-      - name: Upload Bitcoin Testnet app binary (lib version)
-        uses: actions/upload-artifact@v2
-        with:
-          name: bitcoin-testnet-lib-app-${{ matrix.model }}
-          path: bitcoin-testnet-lib-bin
 
   job_unit_test:
     name: Unit test
@@ -122,7 +114,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
+      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-custom:latest
       ports:
         - 1234:1234
         - 9999:9999
@@ -164,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
+      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-custom:latest
       ports:
         - 1234:1234
         - 9999:9999
@@ -190,13 +182,40 @@ jobs:
           pip install -r requirements.txt
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
 
+  job_test_python_lib_legacyapp:
+    name: Tests with the Python library and legacy Bitcoin app
+    needs: job_build
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-custom:latest
+      ports:
+        - 1234:1234
+        - 9999:9999
+        - 40000:40000
+        - 41000:41000
+        - 42000:42000
+        - 43000:43000
+      options: --entrypoint /bin/bash
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Run tests
+        run: |
+          cd bitcoin_client/tests
+          pip install -r requirements.txt
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+
+
   job_test_js_lib:
     name: Tests with the JS library
     needs: job_build
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
+      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-custom:latest
       ports:
         - 1234:1234
         - 9999:9999
@@ -230,75 +249,3 @@ jobs:
           cd bitcoin_client_js
           yarn install
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
-
-  job_test_legacy_native:
-    name: Legacy tests
-    needs: job_build
-    runs-on: ubuntu-latest
-
-    container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v2
-
-      - name: Download Bitcoin Testnet app binary
-        uses: actions/download-artifact@v2
-        with:
-          name: bitcoin-testnet-app-nanos
-          path: tests-legacy/bitcoin-testnet-bin
-
-      - name: Run tests
-        run: |
-          cd tests-legacy
-          pip install -r requirements.txt
-          PATH=$PATH:/speculos pytest
-
-
-  job_test_legacy_lib:
-    name: Legacy tests (library)
-    needs: job_build
-    runs-on: ubuntu-latest
-
-    container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v2
-
-      - name: Download Bitcoin app binary
-        uses: actions/download-artifact@v2
-        with:
-          name: bitcoin-app-nanos
-          path: tests-legacy/bitcoin-bin
-
-      - name: Download Bitcoin Testnet app binary (library version)
-        uses: actions/download-artifact@v2
-        with:
-          name: bitcoin-testnet-lib-app-nanos
-          path: tests-legacy/bitcoin-testnet-bin
-
-
-      - name: Run tests
-        run: |
-          cd tests-legacy
-          pip install -r requirements.txt
-          PATH=$PATH:/speculos pytest

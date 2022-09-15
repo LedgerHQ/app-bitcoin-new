@@ -18,6 +18,26 @@ unsigned int pic(unsigned int linked_address) {
 
 #include "common/script.h"
 
+static void test_get_push_script_size(void **state) {
+    (void) state;
+
+    assert_int_equal(get_push_script_size((uint32_t) 0), 1);
+    assert_int_equal(get_push_script_size((uint32_t) 1), 1);
+    assert_int_equal(get_push_script_size((uint32_t) 15), 1);
+    assert_int_equal(get_push_script_size((uint32_t) 16), 1);
+    assert_int_equal(get_push_script_size((uint32_t) 17), 2);
+    assert_int_equal(get_push_script_size((uint32_t) 0x7f), 2);
+    assert_int_equal(get_push_script_size((uint32_t) 0x80), 3);
+    assert_int_equal(get_push_script_size((uint32_t) 0xff), 3);
+    assert_int_equal(get_push_script_size((uint32_t) 0x7fff), 3);
+    assert_int_equal(get_push_script_size((uint32_t) 0x8000), 4);
+    assert_int_equal(get_push_script_size((uint32_t) 0x7fffff), 4);
+    assert_int_equal(get_push_script_size((uint32_t) 0x800000), 5);
+    assert_int_equal(get_push_script_size((uint32_t) 0x7fffffff), 5);
+    assert_int_equal(get_push_script_size((uint32_t) 0x80000000), 6);
+    assert_int_equal(get_push_script_size((uint32_t) 0xffffffff), 6);
+}
+
 static void test_get_script_type_valid(void **state) {
     (void) state;
 
@@ -252,6 +272,7 @@ static void test_format_opscript_script_invalid(void **state) {
 
 int main() {
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_get_push_script_size),
         cmocka_unit_test(test_get_script_type_valid),
         cmocka_unit_test(test_get_script_type_invalid),
         cmocka_unit_test(test_format_opscript_script_valid),

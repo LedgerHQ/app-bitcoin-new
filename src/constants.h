@@ -1,61 +1,20 @@
 #pragma once
 
 /**
- * Instruction class of the Legacy Bitcoin application.
- */
-#define CLA_APP_LEGACY 0xE0
-
-/**
- * Other instruction class used in the legacy Bitcoin application for certain extensions.
- * This is added for compatibility and can be removed once the legacy support is dropped.
- */
-#define CLA_APP_LEGACY_JC_EXT 0xF0
-
-/**
  * Instruction class of the Bitcoin application.
  */
 #define CLA_APP 0xE1
 
 /**
- * Length of APPNAME variable in the Makefile.
- */
-#define APPNAME_LEN (sizeof(APPNAME) - 1)
-
-/**
- * Maximum length of MAJOR_VERSION || MINOR_VERSION || PATCH_VERSION.
- */
-#define APPVERSION_LEN 3
-
-/**
- * Maximum length of application name.
- */
-#define MAX_APPNAME_LEN 64
-
-/**
  * Maximum length of a serialized address (in characters).
  * Segwit addresses can reach 74 characters; 76 on regtest because of the longer "bcrt" prefix.
  */
-#ifdef COIN_NATIVE_SEGWIT_PREFIX
 #define MAX_ADDRESS_LENGTH_STR (72 + sizeof(COIN_NATIVE_SEGWIT_PREFIX))
-#else
-// To be removed once altcoins are moved to a separate repo, as COIN_NATIVE_SEGWIT_PREFIX
-// will always be defined
-#define MAX_ADDRESS_LENGTH_STR 74
-#endif
-/**
- * Maximum transaction length (bytes).
- */
-#define MAX_TRANSACTION_LEN 510
 
 /**
  * Maximum DER-encoded signature length (bytes).
  */
 #define MAX_DER_SIG_LEN 72
-
-/**
- * Exponent used to convert mBTC to BTC unit (N BTC = N * 10^3 mBTC).
- */
-#define EXPONENT_SMALLEST_UNIT 3
 
 /**
  * Maximum scriptPubKey length for an input that we can sign.
@@ -70,12 +29,17 @@
 /**
  * Maximum length of a wallet registered into the device (characters), excluding terminating NULL.
  */
-#define MAX_WALLET_NAME_LENGTH 16
+#define MAX_WALLET_NAME_LENGTH 64
 
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
  */
 #define MAX_SERIALIZED_PUBKEY_LENGTH 113
+
+/**
+ * Maximum number of inputs supported while signing a transaction.
+ */
+#define MAX_N_INPUTS_CAN_SIGN 512
 
 // SIGHASH flags
 #define SIGHASH_DEFAULT      0x00000000
@@ -83,3 +47,10 @@
 #define SIGHASH_NONE         0x00000002
 #define SIGHASH_SINGLE       0x00000003
 #define SIGHASH_ANYONECANPAY 0x00000080
+
+#define SEQUENCE_LOCKTIME_TYPE_FLAG (1 << 22)
+#define LOCKTIME_THRESHOLD          500000000
+
+#define MAX_STANDARD_P2WSH_STACK_ITEMS 100U
+#define MAX_STANDARD_P2WSH_SCRIPT_SIZE 3600U
+#define MAX_OPS_PER_SCRIPT             201U

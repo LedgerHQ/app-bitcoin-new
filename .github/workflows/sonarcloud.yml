@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - develop
+      - experimental
   pull_request:
     branches:
       - master
       - develop
+      - experimental
     types: [opened, synchronize, reopened]
 
 jobs:

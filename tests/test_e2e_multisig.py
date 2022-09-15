@@ -1,115 +1,40 @@
 import pytest
 
-from typing import Dict
+from typing import List, Union
+
 import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from bip32 import BIP32
-
 from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin.client_base import TransportClient
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin._script import is_p2sh, is_p2wsh, parse_multisig
+from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
 
-from test_utils import SpeculosGlobals
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
 from speculos.client import SpeculosClient
 from test_utils.speculos import automation
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
+from .conftest import AuthServiceProxy
 
 
-def extract_our_pubkeys(psbt: PSBT, master_fp: bytes) -> Dict[int, bytes]:
-    # It only works for standard wallets and simple multisig; won't generalize to miniscript
-    # based on code in bitcoin-core/HWI
-
-    psbt2 = PSBT()
-    psbt2.deserialize(psbt.serialize())
-    if (psbt2.version is None or psbt.version == 0):
-        psbt2.convert_to_v2()
-
-    pubkeys: Dict[int, bytes] = {}
-    for input_num, psbt_in in enumerate(psbt2.inputs):
-        utxo = None
-        scriptcode = b""
-        if psbt_in.witness_utxo:
-            utxo = psbt_in.witness_utxo
-        if psbt_in.non_witness_utxo:
-            assert psbt_in.prev_out is not None
-            utxo = psbt_in.non_witness_utxo.vout[psbt_in.prev_out]
-        if utxo is None:
-            continue
-        scriptcode = utxo.scriptPubKey
-
-        if is_p2sh(scriptcode):
-            if len(psbt_in.redeem_script) == 0:
-                continue
-            scriptcode = psbt_in.redeem_script
-
-        # Check if P2WSH
-        if is_p2wsh(scriptcode):
-            if len(psbt_in.witness_script) == 0:
-                continue
-            scriptcode = psbt_in.witness_script
-
-        multisig = parse_multisig(scriptcode)
-        if multisig is not None:
-            _, ms_pubkeys = multisig
-
-            our_keys = 0
-            for pub in ms_pubkeys:
-                if pub in psbt_in.hd_keypaths:
-                    pk_origin = psbt_in.hd_keypaths[pub]
-                    if pk_origin.fingerprint == master_fp:
-                        our_keys += 1
-                        pubkeys[input_num] = pub
-
-            if our_keys > 1:
-                raise ValueError("Cannot have more than 1 internal key in a supported wallet")
-        else:
-            for key, origin in psbt_in.hd_keypaths.items():
-                if origin.fingerprint == master_fp:
-                    pubkeys[input_num] = key
-
-            for key, (_, origin) in psbt_in.tap_bip32_paths.items():
-                if key == psbt_in.tap_internal_key and origin.fingerprint == master_fp:
-                    pubkeys[input_num] = key
-    return pubkeys
-
-
-def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, is_speculos: bool, comm: SpeculosClient):
-    if not is_speculos:
-        pytest.skip("Requires speculos")
-
-    wallet_name, core_xpub_orig = create_new_wallet()
-    wallet_rpc = get_wallet_rpc(wallet_name)
-
-    bip32 = BIP32.from_seed(speculos_globals.seed, network="test")
-    internal_xpub = bip32.get_xpub_from_path("m/48'/1'/0'/2'")
-    wallet = MultisigWallet(
-        name="Cold storage",
-        address_type=AddressType.WIT,
-        threshold=2,
-        keys_info=[
-            f"{core_xpub_orig}/**",
-            f"[{speculos_globals.master_key_fingerprint.hex()}/48'/1'/0'/2']{internal_xpub}/**",
-        ],
-    )
-
+def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     with automation(comm, "automations/register_wallet_accept.json"):
-        wallet_id, wallet_hmac = client.register_wallet(wallet)
+        wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
 
-    assert wallet_id == wallet.id
+    assert wallet_id == wallet_policy.id
 
     assert hmac.compare_digest(
         hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
-    address_hww = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
+    address_hww = client.get_wallet_address(wallet_policy, wallet_hmac, 0, 3, False)
 
     # ==> verify the address matches what bitcoin-core computes
-    receive_descriptor = wallet.get_descriptor(change=False)
+    receive_descriptor = wallet_policy.get_descriptor(change=False)
     receive_descriptor_info = rpc.getdescriptorinfo(receive_descriptor)
     # bitcoin-core adds the checksum, and requires it for other calls
     receive_descriptor_chk = receive_descriptor_info["descriptor"]
@@ -118,7 +43,7 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
     assert T(address_hww) == address_core
 
     # also get the change descriptor for later
-    change_descriptor = wallet.get_descriptor(change=True)
+    change_descriptor = wallet_policy.get_descriptor(change=True)
     change_descriptor_info = rpc.getdescriptorinfo(change_descriptor)
     change_descriptor_chk = change_descriptor_info["descriptor"]
 
@@ -154,9 +79,15 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
 
     out_address = rpc_test_wallet.getnewaddress()
 
-    result = multisig_rpc.walletcreatefundedpsbt(outputs={
-        out_address: Decimal("0.01")
-    })
+    result = multisig_rpc.walletcreatefundedpsbt(
+        outputs={
+            out_address: Decimal("0.01")
+        },
+        options={
+            # make sure that the fee is large enough; it looks like
+            # fee estimation doesn't work in core with miniscript, yet
+            "fee_rate": 10
+        })
 
     psbt_b64 = result["psbt"]
 
@@ -165,28 +96,105 @@ def test_e2e_multisig(rpc, rpc_test_wallet, client: Client, speculos_globals: Sp
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    pubkeys = extract_our_pubkeys(psbt, speculos_globals.master_key_fingerprint)
-
     with automation(comm, "automations/sign_with_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet, wallet_hmac)
+        hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac)
 
-    assert len(hww_sigs) == len(pubkeys)  # should be true as long as all inputs are internal
+    n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
+    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
 
-    for i, sig in hww_sigs.items():
-        pubkey = pubkeys[i]
+    for i, pubkey, sig in hww_sigs:
         psbt.inputs[i].partial_sigs[pubkey] = sig
 
     signed_psbt_hww_b64 = psbt.serialize()
 
     # ==> sign it with bitcoin-core
 
-    signed_psbt_core_b64 = wallet_rpc.walletprocesspsbt(psbt_b64)["psbt"]
+    for core_wallet_name in core_wallet_names:
+        signed_psbt_core_b64 = get_wallet_rpc(core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"]
 
     # ==> finalize the psbt, extract tx and broadcast
     combined_psbt = rpc.combinepsbt([signed_psbt_hww_b64, signed_psbt_core_b64])
     result = rpc.finalizepsbt(combined_psbt)
+
     rawtx = result["hex"]
     assert result["complete"] == True
 
     # make sure the transaction is valid by broadcasting it (would fail if rejected)
     rpc.sendrawtransaction(rawtx)
+
+
+def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    path = "48'/1'/0'/2'"
+    core_wallet_name, core_xpub_orig = create_new_wallet()
+
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    wallet_policy = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            f"{core_xpub_orig}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+        ],
+    )
+
+    run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # test an edge case of a multisig where the wallet controls more than one key
+    # 3-of-5 multisig where 2 keys are internal
+
+    path_1 = "48'/1'/0'/2'"
+    internal_xpub_1 = get_internal_xpub(speculos_globals.seed, path_1)
+    path_2 = "48'/1'/1'/2'"
+    internal_xpub_2 = get_internal_xpub(speculos_globals.seed, path_2)
+
+    core_wallet_name_1, core_xpub_orig_1 = create_new_wallet()
+    core_wallet_name_2, core_xpub_orig_2 = create_new_wallet()
+    core_wallet_name_3, core_xpub_orig_3 = create_new_wallet()
+
+    wallet_policy = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=3,
+        keys_info=[
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path_1}]{internal_xpub_1}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path_2}]{internal_xpub_2}",
+            f"{core_xpub_orig_1}",
+            f"{core_xpub_orig_2}",
+            f"{core_xpub_orig_3}",
+        ],
+    )
+
+    run_test(wallet_policy, [core_wallet_name_1, core_wallet_name_2, core_wallet_name_3],
+             rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], enable_slow_tests: bool):
+    # Largest supported multisig with sortedmulti.
+    # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
+
+    # slow test, disabled by default
+    if not enable_slow_tests:
+        pytest.skip()
+
+    core_wallet_names: List[str] = []
+    core_xpub_origs: List[str] = []
+    for _ in range(15):
+        name, xpub_orig = create_new_wallet()
+        core_wallet_names.append(name)
+        core_xpub_origs.append(xpub_orig)
+
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+
+    wallet_policy = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        sorted=True,
+        keys_info=core_xpub_origs + [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
+    )
+
+    run_test(wallet_policy, core_wallet_names, rpc, rpc_test_wallet, client, speculos_globals, comm)

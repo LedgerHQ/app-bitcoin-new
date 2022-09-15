@@ -12,6 +12,21 @@
 #include "../crypto.h"
 #endif
 
+size_t get_push_script_size(uint32_t n) {
+    if (n <= 16)
+        return 1;  // OP_0 and OP_1 .. OP_16
+    else if (n < 0x80)
+        return 2;  // 01 nn
+    else if (n < 0x8000)
+        return 3;  // 02 nnnn
+    else if (n < 0x800000)
+        return 4;  // 03 nnnnnn
+    else if (n < 0x80000000)
+        return 5;  // 04 nnnnnnnn
+    else
+        return 6;  // 05 nnnnnnnnnn
+}
+
 int get_script_type(const uint8_t script[], size_t script_len) {
     if (script_len == 25 && script[0] == OP_DUP && script[1] == OP_HASH160 && script[2] == 0x14 &&
         script[23] == OP_EQUALVERIFY && script[24] == OP_CHECKSIG) {
@@ -51,19 +66,14 @@ int get_script_type(const uint8_t script[], size_t script_len) {
 #ifndef SKIP_FOR_CMOCKA
 
 // TODO: add unit tests
-int get_script_address(const uint8_t script[],
-                       size_t script_len,
-                       const global_context_t *coin_config,
-                       char *out,
-                       size_t out_len) {
+int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len) {
     int script_type = get_script_type(script, script_len);
     int addr_len;
     switch (script_type) {
         case SCRIPT_TYPE_P2PKH:
         case SCRIPT_TYPE_P2SH: {
             int offset = (script_type == SCRIPT_TYPE_P2PKH) ? 3 : 2;
-            int ver = (script_type == SCRIPT_TYPE_P2PKH) ? coin_config->p2pkh_version
-                                                         : coin_config->p2sh_version;
+            int ver = (script_type == SCRIPT_TYPE_P2PKH) ? COIN_P2PKH_VERSION : COIN_P2SH_VERSION;
             addr_len = base58_encode_address(script + offset, ver, out, out_len - 1);
             if (addr_len < 0) {
                 return -1;
@@ -80,15 +90,12 @@ int get_script_address(const uint8_t script[],
             int version = (script[0] == 0 ? 0 : script[0] - 80);
 
             // make sure that the output buffer is long enough
-            if (out_len < 73 + strlen(coin_config->native_segwit_prefix)) {
+            if (out_len < 73 + strlen(COIN_NATIVE_SEGWIT_PREFIX)) {
                 return -1;
             }
 
-            int ret = segwit_addr_encode(out,
-                                         coin_config->native_segwit_prefix,
-                                         version,
-                                         script + 2,
-                                         prog_len);
+            int ret =
+                segwit_addr_encode(out, COIN_NATIVE_SEGWIT_PREFIX, version, script + 2, prog_len);
 
             if (ret != 1) {
                 return -1;  // should never happen

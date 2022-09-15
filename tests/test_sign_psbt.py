@@ -8,7 +8,7 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, PolicyMapWallet, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
@@ -75,7 +75,7 @@ def parse_signing_events(events: List[dict]) -> dict:
     ret = dict()
 
     cur_output_index = -1
-    
+
     ret["addresses"] = []
     ret["amounts"] = []
     ret["fees"] = ""
@@ -124,11 +124,11 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "pkh(@0)",
+        "pkh(@0/**)",
         [
-            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
         ],
     )
 
@@ -138,11 +138,13 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+        bytes.fromhex(
             "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -151,11 +153,11 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "sh(wpkh(@0))",
+        "sh(wpkh(@0/**))",
         [
-            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3/**"
+            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"
         ],
     )
 
@@ -165,24 +167,26 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
     result = client.sign_psbt(psbt, wallet, None)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
+        bytes.fromhex(
             "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
-    # PSBT for a legacy 1-input 2-output spend (1 change address)
+    # PSBT for a segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -193,24 +197,26 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     #   "pubkey" : "03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068",
     #   "signature" : "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
+        bytes.fromhex(
             "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
         )
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
-    # PSBT for a legacy 2-input 2-output spend (1 change address)
+    # PSBT for a segwit 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -224,14 +230,19 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
     #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+        bytes.fromhex(
             "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
-        ),
-        1: bytes.fromhex(
+        )
+    ), (
+        1,
+        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+        bytes.fromhex(
             "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
         ),
-    }
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_missing_nonwitnessutxo_accept.json")
@@ -245,11 +256,11 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
     for input in psbt.inputs:
         input.non_witness_utxo = None
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -263,14 +274,19 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
     #   "pubkey" : "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
     #   "signature" : "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+        bytes.fromhex(
             "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
-        ),
-        1: bytes.fromhex(
+        )
+    ), (
+        1,
+        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+        bytes.fromhex(
             "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
         ),
-    }
+    )]
 
 
 # def test_sign_psbt_legacy(client: Client):
@@ -310,24 +326,26 @@ def test_sign_psbt_multisig_wsh(client: Client):
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/**",
+            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
         ],
     )
 
     wallet_hmac = bytes.fromhex(
-        "d6434852fb3caa7edbd1165084968f1691444b3cfc10cf1e431acbbc7f48451f"
+        "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
     )
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac)
 
-    assert result == {
-        0: bytes.fromhex(
+    assert result == [(
+        0,
+        bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
+        bytes.fromhex(
             "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
         )
-    }
+    )]
 
 
 # def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
@@ -350,15 +368,16 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "tr(@0)",
+        "tr(@0/**)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
         ],
     )
 
     result = client.sign_psbt(psbt, wallet, None)
+    assert len(result) == 1
 
     # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
     # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
@@ -368,17 +387,18 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     sighash0 = bytes.fromhex("7A999E5AD6F53EA6448E7026061D3B4523F957999C430A5A492DFACE74AE31B6")
 
     # get the (tweaked) pubkey from the scriptPubKey
-    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+    pubkey0_psbt = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    assert len(result) == 1
+    idx0, pubkey0, sig0 = result[0]
+    assert idx0 == 0
+    assert pubkey0 == pubkey0_psbt
 
     # the sighash 0x01 is appended to the signature
-    assert len(result[0]) == 64+1
-    assert result[0][-1] == 0x01
+    assert len(sig0) == 64+1
+    assert sig0[-1] == 0x01
 
-    sig0 = result[0][:-1]
+    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
@@ -386,11 +406,11 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "tr(@0)",
+        "tr(@0/**)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
         ],
     )
 
@@ -404,14 +424,18 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
 
     # get the (tweaked) pubkey from the scriptPubKey
-    pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+    expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
     assert len(result) == 1
-    assert len(result[0]) == 64
 
-    sig0 = result[0]
+    idx0, pubkey0, sig0 = result[0]
+
+    assert idx0 == 0
+    assert pubkey0 == expected_pubkey0
+    assert len(sig0) == 64
 
     assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
@@ -420,11 +444,11 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -462,14 +486,14 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
     parsed_events = parse_signing_events(all_events)
 
     assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     shown_out_idx = 0
     for out_idx in range(n_outs):
         if out_idx != change_index:
             out_amt = psbt.tx.vout[out_idx].nValue
-            assert((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or 
-                    (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+            assert((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
+                   (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
             out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
             assert parsed_events["addresses"][shown_out_idx] == out_addr
@@ -483,11 +507,11 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -515,11 +539,11 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
     parsed_events = parse_signing_events(all_events)
 
     assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-          (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     out_amt = psbt.tx.vout[0].nValue
     assert((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
-          (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+           (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -533,11 +557,11 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     n_inputs = 512
     n_outputs = 256
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "tr(@0)",
+        "tr(@0/**)",
         [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
         ],
     )
 
@@ -557,11 +581,11 @@ def test_sign_psbt_fail_11_changes(client: Client):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -583,11 +607,11 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
     if not is_speculos:
         pytest.skip("Requires speculos")
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -611,11 +635,11 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
 
 
 def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -638,11 +662,11 @@ def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    wallet = PolicyMapWallet(
+    wallet = WalletPolicy(
         "",
-        "wpkh(@0)",
+        "wpkh(@0/**)",
         [
-            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
         ],
     )
 
@@ -660,25 +684,25 @@ def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
     psbt.deserialize(psbt_b64)
 
     wallets = [
-        PolicyMapWallet(
+        WalletPolicy(
             "",
-            "pkh(@0)",
+            "pkh(@0/**)",
             [
-                "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
+                "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
             ],
         ),
-        PolicyMapWallet(
+        WalletPolicy(
             "",
-            "tr(@0)",
+            "tr(@0/**)",
             [
-                "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
+                "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
             ],
         ),
-        PolicyMapWallet(
+        WalletPolicy(
             "",
-            "wpkh(@0)",
+            "wpkh(@0/**)",
             [
-                "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**"
+                "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
             ],
         )
     ]
@@ -688,3 +712,33 @@ def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
             hww_sigs = client.sign_psbt(psbt, wallet, None)
 
         assert len(hww_sigs) == 1
+
+
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
+    # An earlier (unreleased) version of the app had issues in recognizing the internal key in
+    # wallets with multiple internal keys. This caused the app not to recognize some inputs as
+    # internal and refuse signing.
+    # This test avoid regressions.
+
+    psbt_b64 = "cHNidP8BAH0CAAAAAc73gS9SovmC2TiOljy8430GM1piHwQ2qexyVay941KiAAAAAAD9////AoRMiQAAAAAAIgAgCNTAdTDWmzUxjznipRc1U4uQGLRoZrO78XwYXYUabZpAQg8AAAAAABYAFERtNGMisyaTdIH6qfcs0sgquVa9AAAAAAABAIkCAAAAARZzljeqA1KqIrHu0Dlk1eHOMjicZvTJNJyJr/EKGRpbAAAAAAD+////AoCWmAAAAAAAIgAg7J/0qnaRhypwlt/UpEpsEFWGdEW1xaoG8zEdfnMy+LjbWm0pAQAAACJRIDnrpLTPwAtLr+lUmuKj0BponWuHmsIjhT94mb7F0QNeaQAAAAEBK4CWmAAAAAAAIgAg7J/0qnaRhypwlt/UpEpsEFWGdEW1xaoG8zEdfnMy+LgBBY4hA1h5yhc6nBs/MA7Fh/tMxtVNYY4wWE5CXBtTuYgocI8drGQhArcwd+z8NOR+OK4rn4KGkQCCFM8COcy6P8m/T41alSKMrSED2O7HEKG8D9F+VNLOnTTQL43jAvbEPioS3GbGDIQceJVnIQMcumfE5xIqwJgWWRP5G5iLnJRWKeGzi7yANv+se/rxEmisIgYCtzB37Pw05H44riufgoaRAIIUzwI5zLo/yb9PjVqVIowY9azC/SwAAIABAACAAAAAgAIAAAADAAAAIgYDHLpnxOcSKsCYFlkT+RuYi5yUVinhs4u8gDb/rHv68RIMoPWInwAAAAADAAAAIgYDWHnKFzqcGz8wDsWH+0zG1U1hjjBYTkJcG1O5iChwjx0Y9azC/SwAAIABAACAAAAAgAAAAAADAAAAIgYD2O7HEKG8D9F+VNLOnTTQL43jAvbEPioS3GbGDIQceJUMt6EhtAAAAAADAAAAAAEBjiECUzcaIHTkAJE5L9bKuknM0NEVGMEJZh9J+AglLIn3FWSsZCECmjJ4GqB1Hs3Dr/H+FWE3rSzge5+iVTuf+FA3DBpG3SWtIQL+762PyBkOL51EV+NoTOccB+ABFJtDgCJ3I79tiEq7cGchAuWvSvOsaVtJcvo5AFkgH7RZXYD4+VU+4x4MqG2IiTPcaKwiAgJTNxogdOQAkTkv1sq6SczQ0RUYwQlmH0n4CCUsifcVZBj1rML9LAAAgAEAAIAAAACAAQAAAAEAAAAiAgKaMngaoHUezcOv8f4VYTetLOB7n6JVO5/4UDcMGkbdJRj1rML9LAAAgAEAAIAAAACAAwAAAAEAAAAiAgLlr0rzrGlbSXL6OQBZIB+0WV2A+PlVPuMeDKhtiIkz3Ayg9YifAQAAAAEAAAAiAgL+762PyBkOL51EV+NoTOccB+ABFJtDgCJ3I79tiEq7cAy3oSG0AQAAAAEAAAAAAA=="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    wallet = WalletPolicy(
+        "Me and Bob or me and Carl",
+        "wsh(c:andor(pk(@0/<0;1>/*),pk_k(@1/**),and_v(v:pk(@0/<2;3>/*),pk_k(@2/**))))",
+        [
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDDcwGjxKph1xkiAnzvpgdnTeaEhVnH9d766yqvd16JN7EmPW9qSwnbco7kZwPd7UbyEwRojYGUaHT1UULbdqAjGQzeCy3qdZEwZLRmpzwZV",
+            "tpubDCDraP1C24GGX6BHCewLBWbKQRNGACfz8JjyKXYoZjEJWeGV5Ng43FL31MryaiqeBjdC5dPUZD2zqnmMe6gqrYEstnu8pmJZYp3AQmhzQ6G",
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "e139a96195e18bc61e8cda72d11b3f75d3084a5c893990ca74a152206064792d"
+    )
+
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    print(result)

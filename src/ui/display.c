@@ -23,8 +23,8 @@
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
 
-// the processor to call after the user approval, for UI flows that require it
-static command_processor_t g_next_processor;
+static bool g_ux_flow_ended;
+static bool g_ux_flow_response;
 
 extern dispatcher_context_t G_dispatcher_context;
 
@@ -52,8 +52,12 @@ typedef struct {
 
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
-    char policy_map[MAX_POLICY_MAP_STR_LENGTH];
-    char address[MAX_ADDRESS_LENGTH_STR + 1];
+
+    // no flows show together both a policy map and an address, therefore we share memory
+    union {
+        char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
+        char address[MAX_ADDRESS_LENGTH_STR + 1];
+    };
 } ui_wallet_state_t;
 
 typedef struct {
@@ -84,23 +88,15 @@ typedef union {
     ui_validate_transaction_state_t validate_transaction;
 } ui_state_t;
 
-#ifdef TARGET_NANOS
-ui_state_t __attribute__((section(".new_globals"))) g_ui_state;
-#else
 ui_state_t g_ui_state;
-#endif
 
 void send_deny_sw(dispatcher_context_t *dc) {
     SEND_SW(dc, SW_DENY);
 }
 
-void continue_after_approval(bool approved) {
-    if (approved) {
-        G_dispatcher_context.next(g_next_processor);
-    } else {
-        G_dispatcher_context.next(send_deny_sw);
-    }
-    G_dispatcher_context.run();
+void set_ux_flow_response(bool approved) {
+    g_ux_flow_ended = true;
+    g_ux_flow_response = approved;
 }
 
 /*
@@ -127,7 +123,7 @@ UX_STEP_NOCB(ux_display_unusual_derivation_path_step,
 // Step with icon and text to caution the user to reject if unsure
 UX_STEP_CB(ux_display_reject_if_not_sure_step,
            pnn,
-           continue_after_approval(false),
+           set_ux_flow_response(false),
            {
                &C_icon_crossmark,
                "Reject if you're",
@@ -137,7 +133,7 @@ UX_STEP_CB(ux_display_reject_if_not_sure_step,
 // Step with approve button
 UX_STEP_CB(ux_display_approve_step,
            pb,
-           continue_after_approval(true),
+           set_ux_flow_response(true),
            {
                &C_icon_validate_14,
                "Approve",
@@ -146,7 +142,7 @@ UX_STEP_CB(ux_display_approve_step,
 // Step with continue button
 UX_STEP_CB(ux_display_continue_step,
            pb,
-           continue_after_approval(true),
+           set_ux_flow_response(true),
            {
                &C_icon_validate_14,
                "Continue",
@@ -155,7 +151,7 @@ UX_STEP_CB(ux_display_continue_step,
 // Step with reject button
 UX_STEP_CB(ux_display_reject_step,
            pb,
-           continue_after_approval(false),
+           set_ux_flow_response(false),
            {
                &C_icon_crossmark,
                "Reject",
@@ -193,38 +189,20 @@ UX_STEP_NOCB(ux_display_address_step,
                  .text = g_ui_state.path_and_address.address,
              });
 
-// Step with icon and text with name of a wallet being registered
-UX_STEP_NOCB(ux_display_wallet_header_name_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Register wallet",
-                 g_ui_state.wallet.wallet_name,
-             });
-
-// Step with description of a policy wallet
-UX_STEP_NOCB(ux_display_wallet_policy_map_type_step,
+// Step with description of a wallet policy
+UX_STEP_NOCB(ux_display_wallet_policy_map_step,
              bnnn_paging,
              {
-                 .title = "Policy map:",  // TODO: simplify for known multisig policies
-                 .text = g_ui_state.wallet.policy_map,
+                 .title = "Wallet policy:",
+                 .text = g_ui_state.wallet.descriptor_template,
              });
 
 // Step with index and xpub of a cosigner of a policy_map wallet
-UX_STEP_NOCB(ux_display_wallet_policy_map_cosigner_pubkey_step,
+UX_STEP_NOCB(ux_display_wallet_policy_cosigner_pubkey_step,
              bnnn_paging,
              {
                  .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
                  .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
-             });
-
-// Step with icon and text with name of a wallet being registered
-UX_STEP_NOCB(ux_display_receive_in_wallet_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Receive in:",
-                 g_ui_state.wallet.wallet_name,
              });
 
 // Step with title/text for address, used when showing a wallet receive address
@@ -233,15 +211,6 @@ UX_STEP_NOCB(ux_display_wallet_address_step,
              {
                  .title = "Address",
                  .text = g_ui_state.wallet.address,
-             });
-
-// Step with icon and text with name of a wallet to spend from
-UX_STEP_NOCB(ux_display_spend_from_wallet_step,
-             pnn,
-             {
-                 &C_icon_wallet,
-                 "Spend from:",
-                 g_ui_state.wallet.wallet_name,
              });
 
 // Step with warning icon and text explaining that there are external inputs
@@ -257,6 +226,9 @@ UX_STEP_NOCB(ux_display_warning_external_inputs_step,
 UX_STEP_NOCB(ux_unverified_segwit_input_flow_1_step, pb, {&C_icon_warning, "Unverified inputs"});
 UX_STEP_NOCB(ux_unverified_segwit_input_flow_2_step, nn, {"Update", "Ledger Live"});
 UX_STEP_NOCB(ux_unverified_segwit_input_flow_3_step, nn, {"or third party", "wallet software"});
+
+// Step with warning icon for nondefault sighash
+UX_STEP_NOCB(ux_nondefault_sighash_flow_1_step, pb, {&C_icon_warning, "Non-default sighash"});
 
 // Step with eye icon and "Review" and the output index
 UX_STEP_NOCB(ux_review_step,
@@ -292,8 +264,42 @@ UX_STEP_NOCB(ux_confirm_transaction_fees_step,
              });
 UX_STEP_CB(ux_accept_and_send_step,
            pbb,
-           continue_after_approval(true),
+           set_ux_flow_response(true),
            {&C_icon_validate_14, "Accept", "and send"});
+
+// Step with wallet icon and "Register wallet"
+UX_STEP_NOCB(ux_display_register_wallet_step,
+             pb,
+             {
+                 &C_icon_wallet,
+                 "Register wallet",
+             });
+
+// Step with wallet icon and "Receive in known wallet"
+UX_STEP_NOCB(ux_display_receive_in_registered_wallet_step,
+             pnn,
+             {
+                 &C_icon_wallet,
+                 "Receive in",
+                 "known wallet",
+             });
+
+// Step with wallet icon and "Spend from known wallet"
+UX_STEP_NOCB(ux_display_spend_from_registered_wallet_step,
+             pnn,
+             {
+                 &C_icon_wallet,
+                 "Spend from",
+                 "known wallet",
+             });
+
+// Step with "Wallet name:", followed by the wallet name
+UX_STEP_NOCB(ux_display_wallet_name_step,
+             bnnn_paging,
+             {
+                 .title = "Wallet name:",
+                 .text = g_ui_state.wallet.wallet_name,
+             });
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_sign_message_step,
@@ -320,7 +326,7 @@ UX_STEP_NOCB(ux_message_hash_step,
 
 UX_STEP_CB(ux_sign_message_accept_new,
            pbb,
-           continue_after_approval(true),
+           set_ux_flow_response(true),
            {&C_icon_validate_14, "Sign", "message"});
 
 // FLOW to display BIP32 path and a message hash to sign:
@@ -366,17 +372,6 @@ UX_FLOW(ux_display_pubkey_suspicious_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-// FLOW to display a receive address, for a standard path:
-// #1 screen: eye icon + "Confirm Address"
-// #2 screen: display address
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_address_flow,
-        &ux_display_confirm_address_step,
-        &ux_display_address_step,
-        &ux_display_approve_step,
-        &ux_display_reject_step);
-
 // FLOW to display a receive address, for a non-standard path:
 // #1 screen: warning icon + "The derivation path is unusual"
 // #2 screen: display BIP32 Path
@@ -409,13 +404,15 @@ UX_FLOW(ux_display_unusual_derivation_path_flow,
         &ux_display_reject_step);
 
 // FLOW to display the header of a policy map wallet:
-// #1 screen: eye icon + "Register wallet" and the wallet name
-// #2 screen: display policy map (paginated)
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_policy_map_header_flow,
-        &ux_display_wallet_header_name_step,
-        &ux_display_wallet_policy_map_type_step,
+// #1 screen: Wallet icon + "Register wallet"
+// #2 screen: "Wallet name:" and wallet name
+// #3 screen: display policy map (paginated)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_register_wallet_flow,
+        &ux_display_register_wallet_step,
+        &ux_display_wallet_name_step,
+        &ux_display_wallet_policy_map_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -424,17 +421,19 @@ UX_FLOW(ux_display_policy_map_header_flow,
 // #2 screen: approve button
 // #3 screen: reject button
 UX_FLOW(ux_display_policy_map_cosigner_pubkey_flow,
-        &ux_display_wallet_policy_map_cosigner_pubkey_step,
+        &ux_display_wallet_policy_cosigner_pubkey_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
 // FLOW to display the name and an address of a registered wallet:
-// #1 screen: wallet name
-// #2 screen: wallet address (paginated)
-// #3 screen: approve button
-// #4 screen: reject button
-UX_FLOW(ux_display_wallet_name_address_flow,
-        &ux_display_receive_in_wallet_step,
+// #1 screen: Wallet icon + "Receive in known wallet"
+// #2 screen: wallet name
+// #3 screen: wallet address (paginated)
+// #4 screen: approve button
+// #5 screen: reject button
+UX_FLOW(ux_display_receive_in_wallet_flow,
+        &ux_display_receive_in_registered_wallet_step,
+        &ux_display_wallet_name_step,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
@@ -449,11 +448,13 @@ UX_FLOW(ux_display_canonical_wallet_address_flow,
         &ux_display_reject_step);
 
 // FLOW to display a registered wallet and authorize spending:
-// #1 screen: wallet name
-// #2 screen: approve button
-// #3 screen: reject button
-UX_FLOW(ux_display_wallet_for_spending_flow,
-        &ux_display_spend_from_wallet_step,
+// #1 screen: "Spend from known wallet"
+// #2 screen: wallet name
+// #3 screen: approve button
+// #4 screen: reject button
+UX_FLOW(ux_display_spend_from_wallet_flow,
+        &ux_display_spend_from_registered_wallet_step,
+        &ux_display_wallet_name_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
@@ -476,6 +477,17 @@ UX_FLOW(ux_display_unverified_segwit_inputs_flow,
         &ux_unverified_segwit_input_flow_1_step,
         &ux_unverified_segwit_input_flow_2_step,
         &ux_unverified_segwit_input_flow_3_step,
+        &ux_display_continue_step,
+        &ux_display_reject_step);
+
+// FLOW to warn about segwitv1 inputs with non-default sighash
+// #1 screen: warning icon + "Non default sighash"
+// #2 screen: crossmark icon + "Reject if not sure" (user can reject here)
+// #3 screen: "continue" button
+// #4 screen: "reject" button
+UX_FLOW(ux_display_nondefault_sighash_flow,
+        &ux_nondefault_sighash_flow_1_step,
+        &ux_display_reject_if_not_sure_step,
         &ux_display_continue_step,
         &ux_display_reject_step);
 
@@ -503,88 +515,83 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_accept_and_send_step,
         &ux_display_reject_step);
 
-void ui_display_pubkey(dispatcher_context_t *context,
+// Process UI events until the current flow terminates; does not handle any APDU exchange
+// This method also sets the UI state as "dirty" so that the dispatcher refreshes resets the UI
+// at the end of the command handler.
+// Returns true/false depending if the user accepted in the corresponding UX flow.
+bool io_ui_process(dispatcher_context_t *context) {
+    g_ux_flow_ended = false;
+
+    context->set_ui_dirty();
+
+    // We are not waiting for the client's input, nor we are doing computations on the device
+    io_clear_processing_timeout();
+
+    io_seproxyhal_general_status();
+    do {
+        io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer), 0);
+        io_seproxyhal_handle_event();
+        io_seproxyhal_general_status();
+    } while (io_seproxyhal_spi_is_status_sent() && !g_ux_flow_ended);
+
+    // We're back at work, we want to show the "Processing..." screen when appropriate
+    io_start_processing_timeout();
+
+    return g_ux_flow_response;
+}
+
+bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *bip32_path_str,
                        bool is_path_suspicious,
-                       const char *pubkey,
-                       command_processor_t on_success) {
-    context->pause();
-
+                       const char *pubkey) {
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
     strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
-
-    g_next_processor = on_success;
 
     if (!is_path_suspicious) {
         ux_flow_init(0, ux_display_pubkey_flow, NULL);
     } else {
         ux_flow_init(0, ux_display_pubkey_suspicious_flow, NULL);
     }
+
+    return io_ui_process(context);
 }
 
-void ui_display_message_hash(dispatcher_context_t *context,
+bool ui_display_message_hash(dispatcher_context_t *context,
                              const char *bip32_path_str,
-                             const char *message_hash,
-                             command_processor_t on_success) {
-    context->pause();
-
+                             const char *message_hash) {
     ui_path_and_hash_state_t *state = (ui_path_and_hash_state_t *) &g_ui_state;
 
     strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
     strncpy(state->hash_hex, message_hash, sizeof(state->hash_hex));
 
-    g_next_processor = on_success;
-
     ux_flow_init(0, ux_sign_message_flow, NULL);
+
+    return io_ui_process(context);
 }
 
-void ui_display_address(dispatcher_context_t *context,
-                        const char *address,
-                        bool is_path_suspicious,
-                        const char *path_str,
-                        command_processor_t on_success) {
-    context->pause();
-
-    ui_path_and_address_state_t *state = (ui_path_and_address_state_t *) &g_ui_state;
-
-    strncpy(state->address, address, sizeof(state->address));
-
-    g_next_processor = on_success;
-
-    if (!is_path_suspicious) {
-        ux_flow_init(0, ux_display_address_flow, NULL);
-    } else {
-        strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-        ux_flow_init(0, ux_display_address_suspicious_flow, NULL);
-    }
-}
-
-void ui_display_wallet_header(dispatcher_context_t *context,
-                              const policy_map_wallet_header_t *wallet_header,
-                              command_processor_t on_success) {
-    context->pause();
-
+bool ui_display_register_wallet(dispatcher_context_t *context,
+                                const policy_map_wallet_header_t *wallet_header,
+                                const char *policy_descriptor) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_header->name, sizeof(wallet_header->name));
-    strncpy(state->policy_map, wallet_header->policy_map, sizeof(wallet_header->policy_map));
+    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
+    state->wallet_name[wallet_header->name_len] = 0;
+    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
+    state->descriptor_template[wallet_header->descriptor_template_len] = 0;
 
-    g_next_processor = on_success;
+    ux_flow_init(0, ux_display_register_wallet_flow, NULL);
 
-    ux_flow_init(0, ux_display_policy_map_header_flow, NULL);
+    return io_ui_process(context);
 }
 
-void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
+bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
                                            const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
-                                           bool is_internal,
-                                           command_processor_t on_success) {
+                                           bool is_internal) {
     (void) (n_keys);
-
-    context->pause();
 
     ui_cosigner_pubkey_and_index_state_t *state =
         (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
@@ -595,90 +602,68 @@ void ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
         snprintf(state->signer_index,
                  sizeof(state->signer_index),
                  "Key @%u <ours>",
-                 cosigner_index + 1);
+                 cosigner_index);
     } else {
         snprintf(state->signer_index,
                  sizeof(state->signer_index),
                  "Key @%u <theirs>",
-                 cosigner_index + 1);
+                 cosigner_index);
     }
 
-    g_next_processor = on_success;
-
     ux_flow_init(0, ux_display_policy_map_cosigner_pubkey_flow, NULL);
+
+    return io_ui_process(context);
 }
 
-void ui_display_wallet_address(dispatcher_context_t *context,
+bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
-                               const char *address,
-                               command_processor_t on_success) {
-    context->pause();
-
+                               const char *address) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->address, address, sizeof(state->address));
-    g_next_processor = on_success;
 
     if (wallet_name == NULL) {
         ux_flow_init(0, ux_display_canonical_wallet_address_flow, NULL);
     } else {
         strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
-        ux_flow_init(0, ux_display_wallet_name_address_flow, NULL);
+        ux_flow_init(0, ux_display_receive_in_wallet_flow, NULL);
     }
+
+    return io_ui_process(context);
 }
 
-void ui_display_unusual_path(dispatcher_context_t *context,
-                             const char *bip32_path_str,
-                             command_processor_t on_success) {
-    context->pause();
-
-    ui_path_state_t *state = (ui_path_state_t *) &g_ui_state;
-
-    g_next_processor = on_success;
-
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    ux_flow_init(0, ux_display_unusual_derivation_path_flow, NULL);
-}
-
-void ui_authorize_wallet_spend(dispatcher_context_t *context,
-                               const char *wallet_name,
-                               command_processor_t on_success) {
-    context->pause();
-
+bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
 
-    g_next_processor = on_success;
+    ux_flow_init(0, ux_display_spend_from_wallet_flow, NULL);
 
-    ux_flow_init(0, ux_display_wallet_for_spending_flow, NULL);
+    return io_ui_process(context);
 }
 
-void ui_warn_external_inputs(dispatcher_context_t *context, command_processor_t on_success) {
-    context->pause();
-
-    g_next_processor = on_success;
-
+bool ui_warn_external_inputs(dispatcher_context_t *context) {
     ux_flow_init(0, ux_display_warning_external_inputs_flow, NULL);
+
+    return io_ui_process(context);
 }
 
-void ui_warn_unverified_segwit_inputs(dispatcher_context_t *context,
-                                      command_processor_t on_success) {
-    context->pause();
-
-    g_next_processor = on_success;
-
+bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
     ux_flow_init(0, ux_display_unverified_segwit_inputs_flow, NULL);
+    return io_ui_process(context);
 }
 
-void ui_validate_output(dispatcher_context_t *context,
+bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
+    ux_flow_init(0, ux_display_nondefault_sighash_flow, NULL);
+
+    return io_ui_process(context);
+}
+
+bool ui_validate_output(dispatcher_context_t *context,
                         int index,
                         const char *address_or_description,
                         const char *coin_name,
-                        uint64_t amount,
-                        command_processor_t on_success) {
-    context->pause();
-
+                        uint64_t amount) {
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
     snprintf(state->index, sizeof(state->index), "output #%d", index);
@@ -687,22 +672,17 @@ void ui_validate_output(dispatcher_context_t *context,
             sizeof(state->address_or_description));
     format_sats_amount(coin_name, amount, state->amount);
 
-    g_next_processor = on_success;
-
     ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
+
+    return io_ui_process(context);
 }
 
-void ui_validate_transaction(dispatcher_context_t *context,
-                             const char *coin_name,
-                             uint64_t fee,
-                             command_processor_t on_success) {
-    context->pause();
-
+bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
-
-    g_next_processor = on_success;
 
     format_sats_amount(coin_name, fee, state->fee);
 
     ux_flow_init(0, ux_accept_transaction_flow, NULL);
+
+    return io_ui_process(context);
 }

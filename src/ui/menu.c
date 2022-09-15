@@ -22,12 +22,11 @@
 #include "menu.h"
 
 // We have a screen with the icon and "Bitcoin is ready" for Bitcoin,
-// "Bitcoin Testnet is ready" for Bitcoin Testnet, "Application is ready" for all the altcoins
+// "Bitcoin Testnet is ready" for Bitcoin Testnet.
 UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_bitcoin_logo, "Bitcoin", "is ready"});
 UX_STEP_NOCB(ux_menu_ready_step_bitcoin_testnet,
              pnn,
              {&C_bitcoin_logo, "Bitcoin Testnet", "is ready"});
-UX_STEP_NOCB(ux_menu_ready_step_altcoin, nn, {"Application", "is ready"});
 
 UX_STEP_NOCB(ux_menu_version_step, bn, {"Version", APPVERSION});
 UX_STEP_CB(ux_menu_about_step, pb, ui_menu_about(), {&C_icon_certificate, "About"});
@@ -57,18 +56,6 @@ UX_FLOW(ux_menu_main_flow_bitcoin_testnet,
         &ux_menu_exit_step,
         FLOW_LOOP);
 
-// FLOW for the main menu (for altcoins):
-// #1 screen: ready
-// #2 screen: version of the app
-// #3 screen: about submenu
-// #4 screen: quit
-UX_FLOW(ux_menu_main_flow_altcoin,
-        &ux_menu_ready_step_altcoin,
-        &ux_menu_version_step,
-        &ux_menu_about_step,
-        &ux_menu_exit_step,
-        FLOW_LOOP);
-
 #define BIP32_PUBKEY_VERSION_MAINNET 0x0488B21E
 #define BIP32_PUBKEY_VERSION_TESTNET 0x043587CF
 
@@ -77,12 +64,10 @@ void ui_menu_main() {
         ux_stack_push();
     }
 
-    if (G_coin_config->bip32_pubkey_version == BIP32_PUBKEY_VERSION_MAINNET) {  // mainnet
+    if (BIP32_PUBKEY_VERSION == BIP32_PUBKEY_VERSION_MAINNET) {  // mainnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin, NULL);
-    } else if (G_coin_config->bip32_pubkey_version == BIP32_PUBKEY_VERSION_TESTNET) {  // testnet
+    } else if (BIP32_PUBKEY_VERSION == BIP32_PUBKEY_VERSION_TESTNET) {  // testnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin_testnet, NULL);
-    } else {
-        ux_flow_init(0, ux_menu_main_flow_altcoin, NULL);  // some altcoin
     }
 }
 

@@ -29,9 +29,6 @@
 
 #include "dispatcher.h"
 
-extern dispatcher_context_t G_dispatcher_context;
-extern command_processor_t G_command_continuation;
-
 uint16_t G_output_len = 0;
 
 // Counter incremented at every tick

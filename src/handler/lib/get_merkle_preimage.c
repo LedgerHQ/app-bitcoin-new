@@ -7,13 +7,15 @@
 #include "../../crypto.h"
 #include "../client_commands.h"
 
+#include "debug-helpers/debug.h"
+
 // TODO: refactor common code with stream_preimage.c
 
 int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
                              const uint8_t hash[static 32],
                              uint8_t *out_ptr,
                              size_t out_ptr_len) {
-    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     PRINT_STACK_POINTER();
 

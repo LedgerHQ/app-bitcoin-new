@@ -9,7 +9,7 @@ int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                      void (*len_callback)(size_t, void *),
                                      void (*callback)(buffer_t *, void *),
                                      void *callback_state) {
-    LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t key_merkle_hash[32];
     merkle_compute_element_hash(key, key_len, key_merkle_hash);

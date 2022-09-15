@@ -8,12 +8,13 @@
 #include "../../common/buffer.h"
 
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
+                                          void *callback_state,
                                           const uint8_t root[static 32],
                                           int size,
                                           int index,
-                                          dispatcher_callback_descriptor_t keys_callback,
+                                          merkle_tree_elements_callback_t callback,
                                           merkleized_map_commitment_t *out_ptr) {
-    // LOG_PROCESSOR(dispatcher_context, __FILE__, __LINE__, __func__);
+    // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t raw_output[9 + 2 * 32];  // maximum size of serialized result (9 bytes for the varint,
                                      // and the 2 Merkle roots)
@@ -36,7 +37,9 @@ int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_conte
     }
 
     return call_check_merkle_tree_sorted_with_callback(dispatcher_context,
+                                                       callback_state,
                                                        out_ptr->keys_root,
                                                        out_ptr->size,
-                                                       keys_callback);
+                                                       callback,
+                                                       out_ptr);
 }
