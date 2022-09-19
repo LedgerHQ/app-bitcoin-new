@@ -76,7 +76,7 @@ class LegacyClient(Client):
 
         self.app = btchip(DongleAdaptor(comm_client))
 
-        if self.app.getAppName() not in ["Bitcoin", "Bitcoin Test", "app"]:
+        if self.app.getAppName() not in ["Bitcoin", "Bitcoin Legacy", "Bitcoin Test", "Bitcoin Test Legacy", "app"]:
             raise ValueError("Ledger is not in either the Bitcoin or Bitcoin Testnet app")
 
     def get_extended_pubkey(self, path: str, display: bool = False) -> str:
