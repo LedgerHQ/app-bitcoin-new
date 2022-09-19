@@ -49,6 +49,7 @@
 struct libargs_s {
     unsigned int id;
     unsigned int command;
+    void *unused;  // it used to be the coin_config; unused in the new app
     union {
         check_address_parameters_t *check_address;
         create_transaction_parameters_t *create_transaction;
