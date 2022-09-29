@@ -1,0 +1,15 @@
+[package]
+name = "ledger_hwi"
+version = "0.1.0"
+authors = ["edouard <m@edouard.paris>"]
+edition = "2018"
+
+[dependencies]
+ledger_bitcoin_client = { path = "../.." }
+async-trait = { version = "0.1"}
+bitcoin = { version = "0.29.1", default-features = false, features = ["no-std"] }
+ledger-apdu = "0.10"
+ledger-transport-hid = "0.10"
+hidapi = { version = "1.4.1", features = ["linux-static-hidraw"], default-features = false }
+tokio = { version = "1.21", features = ["macros", "net", "rt", "rt-multi-thread", "io-util", "sync"] }
+
