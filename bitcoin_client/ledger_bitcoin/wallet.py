@@ -76,7 +76,7 @@ class WalletPolicy(WalletPolicyBase):
             key = self.keys_info[i]
             desc = desc.replace(f"@{i}", key)
 
-        # in V1, /** is part of the key; in V1, it's part of the policy map. This handles either
+        # in V1, /** is part of the key; in V2, it's part of the policy map. This handles either
         desc = desc.replace("/**", f"/{1 if change else 0}/*")
 
         if self.version == WalletType.WALLET_POLICY_V2:
