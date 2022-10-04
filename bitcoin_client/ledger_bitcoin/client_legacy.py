@@ -117,7 +117,7 @@ class LegacyClient(Client):
         return xpub.to_string()
 
     def register_wallet(self, wallet: WalletPolicy) -> Tuple[bytes, bytes]:
-        raise NotImplementedError # legacy app does not have this functionality
+        raise NotImplementedError  # legacy app does not have this functionality
 
     def get_wallet_address(
         self,
@@ -129,7 +129,7 @@ class LegacyClient(Client):
     ) -> str:
         # TODO: check keypath
 
-        if wallet_hmac != None or wallet.n_keys != 1:
+        if wallet_hmac is not None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
         if not isinstance(wallet, WalletPolicy):
@@ -153,16 +153,16 @@ class LegacyClient(Client):
         bech32 = addr_type == AddressType.WIT
         output = self.app.getWalletPublicKey(f"{key_origin_path}/{change}/{address_index}", display, p2sh_p2wpkh or bech32, bech32)
         assert isinstance(output["address"], str)
-        return output['address'][12:-2] # HACK: A bug in getWalletPublicKey results in the address being returned as the string "bytearray(b'<address>')". This extracts the actual address to work around this.
+        return output['address'][12:-2]  # HACK: A bug in getWalletPublicKey results in the address being returned as the string "bytearray(b'<address>')". This extracts the actual address to work around this.
 
     def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
-        if wallet_hmac != None or wallet.n_keys != 1:
+        if wallet_hmac is not None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
         if not isinstance(wallet, WalletPolicy):
             raise ValueError("Invalid wallet policy type, it must be WalletPolicy")
 
-        if not wallet.descriptor_template in ["pkh(@0/**)", "pkh(@0/<0;1>/*)", "wpkh(@0/**)", "wpkh(@0/<0:1>/*)", "sh(wpkh(@0/**))", "sh(wpkh(@0/<0;1>/*))"]:
+        if wallet.descriptor_template not in ["pkh(@0/**)", "pkh(@0/<0;1>/*)", "wpkh(@0/**)", "wpkh(@0/<0;1>/*)", "sh(wpkh(@0/**))", "sh(wpkh(@0/<0;1>/*))"]:
             raise NotImplementedError("Unsupported policy")
 
         # the rest of the code is basically the HWI code, and it ignores wallet
@@ -303,7 +303,7 @@ class LegacyClient(Client):
             # Legacy signing if all inputs are legacy
             for i in range(len(legacy_inputs)):
                 for signature_attempt in all_signature_attempts[i]:
-                    assert(tx.inputs[i].non_witness_utxo is not None)
+                    assert (tx.inputs[i].non_witness_utxo is not None)
                     self.app.startUntrustedTransaction(first_input, i, legacy_inputs, script_codes[i], c_tx.nVersion)
                     self.app.finalizeInput(b"DUMMY", -1, -1, change_path, tx_bytes)
 
@@ -312,7 +312,7 @@ class LegacyClient(Client):
 
                     first_input = False
 
-        # Send map of input signatures
+        # Send list of input signatures
         return result
 
     def get_master_fingerprint(self) -> bytes:

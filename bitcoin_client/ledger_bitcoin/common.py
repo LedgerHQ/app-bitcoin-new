@@ -103,15 +103,6 @@ def read_varint(buf: BytesIO,
     return int.from_bytes(b, byteorder="little")
 
 
-def read(buf: BytesIO, size: int) -> bytes:
-    b: bytes = buf.read(size)
-
-    if len(b) < size:
-        raise ValueError(f"Cant read {size} bytes in buffer!")
-
-    return b
-
-
 def read_uint(buf: BytesIO,
               bit_len: int,
               byteorder: Literal['big', 'little'] = 'little') -> int:
