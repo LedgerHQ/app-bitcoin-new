@@ -35,8 +35,13 @@ impl MerkleTree {
         }
     }
 
+    /// Returns the leaf value at index i.
+    pub fn get_leaf(&self, i: usize) -> Option<&[u8; 32]> {
+        self.leaves.get(i)
+    }
+
     /// Get position of the leaf in the tree.
-    pub fn get_leaf_index(&self, val: &[u8; 32]) -> Option<usize> {
+    pub fn get_leaf_index(&self, val: &[u8]) -> Option<usize> {
         self.leaves.iter().position(|v| v == val)
     }
 

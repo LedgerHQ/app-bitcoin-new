@@ -40,6 +40,21 @@ pub enum ClientCommandCode {
     GetMoreElements = 0xA0,
 }
 
+impl TryFrom<u8> for ClientCommandCode {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0x10 => Ok(ClientCommandCode::Yield),
+            0x40 => Ok(ClientCommandCode::GetPreimage),
+            0x41 => Ok(ClientCommandCode::GetMerkleLeafProof),
+            0x42 => Ok(ClientCommandCode::GetMerkleLeafIndex),
+            0xA0 => Ok(ClientCommandCode::GetMoreElements),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum StatusWord {
