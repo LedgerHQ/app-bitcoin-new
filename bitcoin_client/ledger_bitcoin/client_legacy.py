@@ -297,7 +297,7 @@ class LegacyClient(Client):
 
                     # tx.inputs[i].partial_sigs[signature_attempt[1]] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
 
-                    result.append((i, b'', self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
+                    result.append((i, signature_attempt[1], self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
         elif has_legacy:
             first_input = True
             # Legacy signing if all inputs are legacy
@@ -308,7 +308,7 @@ class LegacyClient(Client):
                     self.app.finalizeInput(b"DUMMY", -1, -1, change_path, tx_bytes)
 
                     #tx.inputs[i].partial_sigs[signature_attempt[1]] = self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)
-                    result.append((i, b'', self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
+                    result.append((i, signature_attempt[1], self.app.untrustedHashSign(signature_attempt[0], "", c_tx.nLockTime, 0x01)))
 
                     first_input = False
 
