@@ -485,15 +485,15 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     parsed_events = parse_signing_events(all_events)
 
-    assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
+            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     shown_out_idx = 0
     for out_idx in range(n_outs):
         if out_idx != change_index:
             out_amt = psbt.tx.vout[out_idx].nValue
-            assert((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
-                   (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+            assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
+                    (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
             out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
             assert parsed_events["addresses"][shown_out_idx] == out_addr
@@ -538,12 +538,12 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     parsed_events = parse_signing_events(all_events)
 
-    assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
+            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     out_amt = psbt.tx.vout[0].nValue
-    assert((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
-           (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+    assert ((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
+            (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
