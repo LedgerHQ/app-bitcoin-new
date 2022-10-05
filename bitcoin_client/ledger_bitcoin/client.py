@@ -74,7 +74,7 @@ class NewClient(Client):
         client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
 
-        # necessary for V2
+        # necessary for version 1 of the protocol (introduced in version 2.1.0)
         client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         sw, response = self._make_request(
@@ -111,7 +111,7 @@ class NewClient(Client):
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
-        # necessary for V2
+        # necessary for version 1 of the protocol (introduced in version 2.1.0)
         client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         sw, response = self._make_request(
@@ -177,7 +177,7 @@ class NewClient(Client):
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
 
-        # necessary for V2
+        # necessary for version 1 of the protocol (introduced in version 2.1.0)
         client_intepreter.add_known_preimage(wallet.descriptor_template.encode())
 
         global_map: Mapping[bytes, bytes] = parse_stream_to_map(f)
