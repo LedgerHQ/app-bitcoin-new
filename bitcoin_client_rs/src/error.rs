@@ -7,7 +7,7 @@ pub enum BitcoinClientError<T: Debug> {
     Transport(T),
     Interpreter(InterpreterError),
     Device { command: u8, status: StatusWord },
-    Unexpected { command: u8, error: String },
+    UnexpectedResult { command: u8, data: Vec<u8> },
 }
 
 impl<T: Debug> From<InterpreterError> for BitcoinClientError<T> {

@@ -1,8 +1,13 @@
 /// APDU commands  for the Bitcoin application.
 ///
-use super::apdu::{self, APDUCommand};
 use bitcoin::util::bip32::{ChildNumber, DerivationPath};
 use core::default::Default;
+
+use super::{
+    apdu::{self, APDUCommand},
+    common::write_varint,
+    wallet::WalletPolicy,
+};
 
 /// Creates the APDU command required to get the extended pubkey with the given derivation path.
 pub fn get_extended_pubkey(path: &DerivationPath, display: bool) -> APDUCommand {
@@ -21,6 +26,19 @@ pub fn get_extended_pubkey(path: &DerivationPath, display: bool) -> APDUCommand 
     APDUCommand {
         cla: apdu::Cla::Bitcoin as u8,
         ins: apdu::BitcoinCommandCode::GetExtendedPubkey as u8,
+        data,
+        ..Default::default()
+    }
+}
+
+/// Creates the APDU command required to register the given wallet policy.
+pub fn register_wallet(policy: &WalletPolicy) -> APDUCommand {
+    let bytes = policy.serialize();
+    let mut data = write_varint(bytes.len());
+    data.extend(bytes);
+    APDUCommand {
+        cla: apdu::Cla::Bitcoin as u8,
+        ins: apdu::BitcoinCommandCode::RegisterWallet as u8,
         data,
         ..Default::default()
     }

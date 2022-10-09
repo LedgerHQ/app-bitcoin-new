@@ -7,6 +7,7 @@ use crate::{
     command,
     error::BitcoinClientError,
     interpreter::ClientCommandInterpreter,
+    wallet::WalletPolicy,
 };
 
 /// BitcoinClient calls and interprets commands with the Ledger Device.
@@ -59,12 +60,40 @@ impl<T: Transport> BitcoinClient<T> {
         let cmd = command::get_extended_pubkey(path, display);
         let mut int = ClientCommandInterpreter::new();
         self.make_request(&cmd, &mut int).and_then(|data| {
-            ExtendedPubKey::from_str(&String::from_utf8_lossy(&data)).map_err(|e| {
-                BitcoinClientError::Unexpected {
+            ExtendedPubKey::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
+                BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
-                    error: e.to_string(),
+                    data,
                 }
             })
+        })
+    }
+
+    /// Registers the given wallet policy, returns the wallet ID and HMAC.
+    pub fn register_wallet(
+        &self,
+        wallet: &WalletPolicy,
+    ) -> Result<([u8; 32], [u8; 32]), BitcoinClientError<T::Error>> {
+        let cmd = command::register_wallet(wallet);
+        let mut intpr = ClientCommandInterpreter::new();
+        intpr.add_known_preimage(wallet.serialize());
+        let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
+        intpr.add_known_list(&keys);
+        //necessary for version 1 of the protocol (introduced in version 2.1.0)
+        intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        self.make_request(&cmd, &mut intpr).and_then(|data| {
+            if data.len() < 64 {
+                Err(BitcoinClientError::UnexpectedResult {
+                    command: cmd.ins,
+                    data,
+                })
+            } else {
+                let mut id = [0x00; 32];
+                id.copy_from_slice(&data[0..32]);
+                let mut hash = [0x00; 32];
+                hash.copy_from_slice(&data[32..64]);
+                Ok((id, hash))
+            }
         })
     }
 }
