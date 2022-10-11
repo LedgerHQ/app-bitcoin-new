@@ -9,6 +9,15 @@ use super::{
     wallet::WalletPolicy,
 };
 
+/// Creates the APDU Command to retrieve the master fingerprint.
+pub fn get_master_fingerprint() -> APDUCommand {
+    APDUCommand {
+        cla: apdu::Cla::Bitcoin as u8,
+        ins: apdu::BitcoinCommandCode::GetMasterFingerprint as u8,
+        ..Default::default()
+    }
+}
+
 /// Creates the APDU command required to get the extended pubkey with the given derivation path.
 pub fn get_extended_pubkey(path: &DerivationPath, display: bool) -> APDUCommand {
     let child_numbers: &[ChildNumber] = path.as_ref();

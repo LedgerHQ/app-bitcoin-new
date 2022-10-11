@@ -1,4 +1,4 @@
-use bitcoin::util::bip32::{DerivationPath, ExtendedPubKey};
+use bitcoin::util::bip32::{DerivationPath, ExtendedPubKey, Fingerprint};
 use core::fmt::Debug;
 use core::str::FromStr;
 
@@ -48,6 +48,14 @@ impl<T: Transport> BitcoinClient<T> {
         } else {
             Ok(data)
         }
+    }
+
+    /// Retrieve the master fingerprint.
+    pub fn get_master_fingerprint(&self) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
+        let cmd = command::get_master_fingerprint();
+        let mut int = ClientCommandInterpreter::new();
+        self.make_request(&cmd, &mut int)
+            .map(|data| Fingerprint::from(data.as_slice()))
     }
 
     /// Retrieve the bip32 extended pubkey derived with the given path
