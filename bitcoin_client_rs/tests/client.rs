@@ -1,7 +1,10 @@
 mod utils;
 use std::str::FromStr;
 
-use bitcoin::{hashes::hex::ToHex, util::bip32::DerivationPath};
+use bitcoin::{
+    hashes::hex::{FromHex, ToHex},
+    util::bip32::DerivationPath,
+};
 use ledger_bitcoin_client::{async_client, client, wallet};
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
@@ -108,5 +111,81 @@ async fn test_register_wallet() {
             .unwrap();
 
         assert_eq!(hmac.to_hex(), hmac_result);
+    }
+}
+
+#[tokio::test]
+async fn test_get_wallet_address() {
+    for case in test_cases("./tests/data/get_wallet_address.json") {
+        let exchanges: Vec<String> = case
+            .get("exchanges")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let name: String = case
+            .get("name")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let policy: String = case
+            .get("policy")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let keys_str: Vec<String> = case
+            .get("keys")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let keys: Vec<wallet::WalletPubKey> = keys_str
+            .iter()
+            .map(|s| wallet::WalletPubKey::from_str(s).unwrap())
+            .collect();
+
+        let hmac: Option<String> = case
+            .get("hmac")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+        let hmac = hmac.map(|s| {
+            let mut h = [b'\0'; 32];
+            h.copy_from_slice(&Vec::from_hex(&s).unwrap());
+            h
+        });
+
+        let change: bool = case
+            .get("change")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let display: bool = case
+            .get("display")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let address_index: u32 = case
+            .get("address_index")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let address_result: String = case
+            .get("address")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let wallet = wallet::WalletPolicy::new(name, wallet::Version::V2, policy, keys);
+
+        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
+        let address = client::BitcoinClient::new(transport.clone())
+            .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+            .unwrap();
+
+        assert_eq!(address.to_string(), address_result);
+
+        let address = async_client::BitcoinClient::new(transport.clone())
+            .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+            .await
+            .unwrap();
+
+        assert_eq!(address.to_string(), address_result);
     }
 }

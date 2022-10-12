@@ -136,6 +136,12 @@ impl WalletPolicy {
 
         res
     }
+
+    pub fn id(&self) -> [u8; 32] {
+        let mut engine = sha256::Hash::engine();
+        engine.input(&self.serialize());
+        sha256::Hash::from_engine(engine).into_inner()
+    }
 }
 
 #[derive(Debug)]

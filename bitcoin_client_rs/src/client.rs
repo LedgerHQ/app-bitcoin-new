@@ -78,6 +78,7 @@ impl<T: Transport> BitcoinClient<T> {
     }
 
     /// Registers the given wallet policy, returns the wallet ID and HMAC.
+    #[allow(clippy::type_complexity)]
     pub fn register_wallet(
         &self,
         wallet: &WalletPolicy,
@@ -87,7 +88,7 @@ impl<T: Transport> BitcoinClient<T> {
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
         intpr.add_known_list(&keys);
-        //necessary for version 1 of the protocol (introduced in version 2.1.0)
+        // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
         self.make_request(&cmd, &mut intpr).and_then(|data| {
             if data.len() < 64 {
@@ -102,6 +103,33 @@ impl<T: Transport> BitcoinClient<T> {
                 hash.copy_from_slice(&data[32..64]);
                 Ok((id, hash))
             }
+        })
+    }
+
+    /// For a given wallet that was already registered on the device (or a standard wallet that does not need registration),
+    /// returns the address for a certain `change`/`address_index` combination.
+    pub fn get_wallet_address(
+        &self,
+        wallet: &WalletPolicy,
+        wallet_hmac: Option<&[u8; 32]>,
+        change: bool,
+        address_index: u32,
+        display: bool,
+    ) -> Result<bitcoin::Address, BitcoinClientError<T::Error>> {
+        let mut intpr = ClientCommandInterpreter::new();
+        intpr.add_known_preimage(wallet.serialize());
+        let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
+        intpr.add_known_list(&keys);
+        // necessary for version 1 of the protocol (introduced in version 2.1.0)
+        intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
+        let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
+        self.make_request(&cmd, &mut intpr).and_then(|data| {
+            bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
+                BitcoinClientError::UnexpectedResult {
+                    command: cmd.ins,
+                    data,
+                }
+            })
         })
     }
 }
