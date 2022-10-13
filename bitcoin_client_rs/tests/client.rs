@@ -2,8 +2,9 @@ mod utils;
 use std::str::FromStr;
 
 use bitcoin::{
+    consensus::encode::deserialize,
     hashes::hex::{FromHex, ToHex},
-    util::bip32::DerivationPath,
+    util::{bip32::DerivationPath, psbt::Psbt},
 };
 use ledger_bitcoin_client::{async_client, client, wallet};
 
@@ -187,5 +188,68 @@ async fn test_get_wallet_address() {
             .unwrap();
 
         assert_eq!(address.to_string(), address_result);
+    }
+}
+
+#[tokio::test]
+async fn test_sign_psbt() {
+    for case in test_cases("./tests/data/sign_psbt.json") {
+        let exchanges: Vec<String> = case
+            .get("exchanges")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let name: String = case
+            .get("name")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let policy: String = case
+            .get("policy")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let keys_str: Vec<String> = case
+            .get("keys")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let keys: Vec<wallet::WalletPubKey> = keys_str
+            .iter()
+            .map(|s| wallet::WalletPubKey::from_str(s).unwrap())
+            .collect();
+
+        let hmac: Option<String> = case
+            .get("hmac")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+        let hmac = hmac.map(|s| {
+            let mut h = [b'\0'; 32];
+            h.copy_from_slice(&Vec::from_hex(&s).unwrap());
+            h
+        });
+
+        let psbt_str: String = case
+            .get("psbt")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
+        let psbt: Psbt = deserialize(&base64::decode(&psbt_str).unwrap()).unwrap();
+
+        let wallet = wallet::WalletPolicy::new(name, wallet::Version::V2, policy, keys);
+
+        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
+        let _res = client::BitcoinClient::new(transport.clone())
+            .sign_psbt(&psbt, &wallet, hmac.as_ref())
+            .unwrap();
+
+        // assert_eq!(address.to_string(), address_result);
+
+        let _res = async_client::BitcoinClient::new(transport.clone())
+            .sign_psbt(&psbt, &wallet, hmac.as_ref())
+            .await
+            .unwrap();
+
+        // assert_eq!(address.to_string(), address_result);
     }
 }

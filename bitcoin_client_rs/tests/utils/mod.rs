@@ -18,13 +18,13 @@ impl RecordStore {
     pub fn new(exchanges: &Vec<String>) -> RecordStore {
         let mut store = RecordStore::default();
         let mut command: Vec<u8> = Vec::new();
-        for exchange in exchanges {
+        for (i, exchange) in exchanges.iter().enumerate() {
             let exchange = exchange.replace(" ", "");
             if let Some(cmd) = exchange.strip_prefix("=>") {
-                command = Vec::from_hex(cmd).expect("Wrong tests data");
+                command = Vec::from_hex(cmd).expect(&format!("Wrong tests data {}: {}", i, cmd));
             }
             if let Some(resp) = exchange.strip_prefix("<=") {
-                let resp = Vec::from_hex(resp).expect("Wrong tests data");
+                let resp = Vec::from_hex(resp).expect(&format!("Wrong tests data {}: {}", i, resp));
                 store.queue.insert(command.clone(), resp);
             }
         }

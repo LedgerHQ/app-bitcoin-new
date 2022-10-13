@@ -2,6 +2,7 @@ mod command;
 mod common;
 mod interpreter;
 mod merkle;
+mod psbt;
 
 pub mod apdu;
 pub mod client;

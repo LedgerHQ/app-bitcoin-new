@@ -4,6 +4,7 @@ use crate::{apdu::StatusWord, interpreter::InterpreterError};
 
 #[derive(Debug)]
 pub enum BitcoinClientError<T: Debug> {
+    InvalidPsbt,
     Transport(T),
     Interpreter(InterpreterError),
     Device { command: u8, status: StatusWord },

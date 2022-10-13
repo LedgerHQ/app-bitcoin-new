@@ -56,7 +56,7 @@ impl ClientCommandInterpreter {
     /// client command is sent with `sha256(b'\0' + el)`.
     /// Moreover, the commands GET_MERKLE_LEAF_INDEX and GET_MERKLE_LEAF_PROOF must correctly answer
     /// queries relative to the Merkle whose root is `mt_root`.
-    pub fn add_known_list(&mut self, elements: &[impl AsRef<[u8]>]) {
+    pub fn add_known_list(&mut self, elements: &[impl AsRef<[u8]>]) -> [u8; 32] {
         let mut leaves = Vec::with_capacity(elements.len());
         for element in elements {
             let mut preimage = vec![0x00];
@@ -67,7 +67,10 @@ impl ClientCommandInterpreter {
             self.known_preimages.push((hash, preimage));
             leaves.push(hash);
         }
-        self.trees.push(MerkleTree::new(leaves));
+        let tree = MerkleTree::new(leaves);
+        let root_hash = *tree.root_hash();
+        self.trees.push(tree);
+        root_hash
     }
 
     /// Adds the Merkle trees of keys, and the Merkle tree of values (ordered by key)
@@ -111,6 +114,11 @@ impl ClientCommandInterpreter {
             Ok(ClientCommandCode::GetMoreElements) => get_more_elements(&mut self.queue),
             Err(()) => Err(InterpreterError::UnknownCommand(command[0])),
         }
+    }
+
+    /// Consumes the interpreter and returns the yielded results.
+    pub fn yielded(self) -> Vec<Vec<u8>> {
+        self.yielded
     }
 }
 
@@ -265,6 +273,36 @@ fn get_more_elements(queue: &mut Vec<Vec<u8>>) -> Result<Vec<u8>, InterpreterErr
     response.extend_from_slice(&(element_length).to_be_bytes());
     response.extend(response_elements);
     Ok(response)
+}
+
+/// Returns a serialized Merkleized map commitment, encoded as the concatenation of:
+///     - the number of key/value pairs, as a Bitcoin-style varint;
+///     - the root of the Merkle tree of the keys
+///     - the root of the Merkle tree of the values.
+pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
+    let mut sorted: Vec<&(Vec<u8>, Vec<u8>)> = mapping.iter().collect();
+    sorted.sort_by(|(k1, _), (k2, _)| k1.as_slice().cmp(k2));
+
+    let mut keys_hashes: Vec<[u8; 32]> = Vec::with_capacity(sorted.len());
+    let mut values_hashes: Vec<[u8; 32]> = Vec::with_capacity(sorted.len());
+    for (key, value) in &sorted {
+        let mut preimage = vec![0x00];
+        preimage.extend_from_slice(key);
+        let mut engine = sha256::Hash::engine();
+        engine.input(&preimage);
+        keys_hashes.push(sha256::Hash::from_engine(engine).into_inner());
+
+        let mut preimage = vec![0x00];
+        preimage.extend_from_slice(value);
+        let mut engine = sha256::Hash::engine();
+        engine.input(&preimage);
+        values_hashes.push(sha256::Hash::from_engine(engine).into_inner());
+    }
+
+    let mut commitment = write_varint(sorted.len());
+    commitment.extend(MerkleTree::new(keys_hashes).root_hash());
+    commitment.extend(MerkleTree::new(values_hashes).root_hash());
+    commitment
 }
 
 #[derive(Debug)]
