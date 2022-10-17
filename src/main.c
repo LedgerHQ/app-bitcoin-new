@@ -141,11 +141,18 @@ void app_main() {
         }
         PRINTF("\n");
 
-        if (G_swap_state.called_from_swap &&
-            (cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT)) {
-            PRINTF("Only SIGN_PSBT and GET_MASTER_FINGERPRINT can be called during swap\n");
-            io_send_sw(SW_INS_NOT_SUPPORTED);
-            return;
+        if (G_swap_state.called_from_swap) {
+            if (cmd.cla != CLA_APP) {
+                io_send_sw(SW_CLA_NOT_SUPPORTED);
+            }
+            if (cmd.ins != GET_EXTENDED_PUBKEY && cmd.ins != GET_WALLET_ADDRESS &&
+                cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT) {
+                PRINTF(
+                    "Only GET_EXTENDED_PUBKEY, GET_WALLET_ADDRESS, SIGN_PSBT and "
+                    "GET_MASTER_FINGERPRINT can be called during swap\n");
+                io_send_sw(SW_INS_NOT_SUPPORTED);
+                return;
+            }
         }
 
         // Dispatch structured APDU command to handler

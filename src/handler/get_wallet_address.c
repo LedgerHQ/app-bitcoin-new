@@ -33,6 +33,8 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
+#include "../swap/swap_globals.h"
+
 #include "lib/policy.h"
 #include "lib/get_preimage.h"
 #include "lib/get_merkle_leaf_element.h"
@@ -223,6 +225,13 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
         }
 
         is_wallet_canonical = false;
+    }
+
+    // Swap feature: check that wallet is canonical
+    if (G_swap_state.called_from_swap && !is_wallet_canonical) {
+        PRINTF("Must be a canonical wallet for swap feature\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
     }
 
     {
