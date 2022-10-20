@@ -144,6 +144,7 @@ void app_main() {
         if (G_swap_state.called_from_swap) {
             if (cmd.cla != CLA_APP) {
                 io_send_sw(SW_CLA_NOT_SUPPORTED);
+                return;
             }
             if (cmd.ins != GET_EXTENDED_PUBKEY && cmd.ins != GET_WALLET_ADDRESS &&
                 cmd.ins != SIGN_PSBT && cmd.ins != GET_MASTER_FINGERPRINT) {
