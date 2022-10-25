@@ -11,7 +11,7 @@ from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
-from .psbt import PSBT
+from .psbt import PSBT, normalize_psbt
 from ._serialize import deser_string
 
 
@@ -126,33 +126,9 @@ class NewClient(Client):
 
         return response.decode()
 
-    def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
-        """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+        psbt = normalize_psbt(psbt)
 
-        Signature requires explicit approval from the user.
-
-        Parameters
-        ----------
-        psbt : PSBT
-            A PSBT of version 0 or 2, with all the necessary information to sign the inputs already filled in; what the
-            required fields changes depending on the type of input.
-            The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
-            signing. This is not required for Taproot inputs.
-
-        wallet : WalletPolicy
-            The registered wallet policy, or a standard wallet policy.
-
-        wallet_hmac: Optional[bytes]
-            For a registered wallet, the hmac obtained at wallet registration. `None` for a standard wallet policy.
-
-        Returns
-        -------
-        List[Tuple[int, bytes, bytes]]
-            A list of tuples returned by the hardware wallets, where each element is a tuple of:
-            - an integer, the index of the input being signed;
-            - a `bytes` array of length 33 (compressed ecdsa pubkey) or 32 (x-only BIP-0340 pubkey), the corresponding pubkey for this signature;
-            - a `bytes` array with the signature.
-        """
         if psbt.version != 2:
             if self._no_clone_psbt:
                 psbt.convert_to_v2()

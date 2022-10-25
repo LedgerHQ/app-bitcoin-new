@@ -19,6 +19,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    Union,
 )
 
 from .key import KeyOriginInfo
@@ -1079,3 +1080,20 @@ class PSBT(object):
         self._convert_version(0)
         self.tx = self.get_unsigned_tx()
         self.explicit_version = False
+
+
+def normalize_psbt(psbt: Union[PSBT, bytes, str]) -> PSBT:
+    """
+    Deserializes a psbt given as an argument from a string or a byte array, if necessary.
+
+    :param psbt: Either an instance of PSBT, or binary-encoded psbt as `bytes`, or a base64-encoded psbt as a `str`.
+    :returns: the deserialized PSBT object. If `psbt` was already a `PSBT`, it is returned directly (without cloning).
+    """
+    if isinstance(psbt, bytes):
+        psbt = base64.b64encode(psbt).decode()
+
+    if isinstance(psbt, str):
+        psbt_obj = PSBT()
+        psbt_obj.deserialize(psbt)
+        psbt = psbt_obj
+    return psbt
