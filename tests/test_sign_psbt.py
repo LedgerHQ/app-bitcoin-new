@@ -741,4 +741,4 @@ def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac)
 
-    print(result)
+    assert len(result) == 2
