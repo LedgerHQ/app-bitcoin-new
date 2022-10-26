@@ -10,92 +10,67 @@ from hashlib import sha256
 import pytest
 
 
+def run_register_test(client: Client, speculos_globals, wallet_policy: WalletPolicy) -> None:
+    wallet_policy_id, wallet_hmac = client.register_wallet(wallet_policy)
+
+    assert wallet_policy_id == wallet_policy.id
+
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key, wallet_policy_id, sha256).digest(),
+        wallet_hmac,
+    )
+
+
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_legacy(client: Client, speculos_globals):
-    wallet = MultisigWallet(
+    run_register_test(client, speculos_globals, MultisigWallet(
         name="Cold storage",
         address_type=AddressType.LEGACY,
         threshold=2,
         keys_info=[
-            f"[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
-            f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
+            "[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+            "[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
         ],
-    )
-
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
-
-    assert wallet_id == wallet.id
-
-    assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
-        wallet_hmac,
-    )
+    ))
 
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_sh_wit(client: Client, speculos_globals):
-    wallet = MultisigWallet(
+    run_register_test(client, speculos_globals, MultisigWallet(
         name="Cold storage",
         address_type=AddressType.SH_WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
-            f"[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
         ],
-    )
-
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
-
-    assert wallet_id == wallet.id
-
-    assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
-        wallet_hmac,
-    )
+    ))
 
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_accept_wit(client: Client, speculos_globals):
-    wallet = MultisigWallet(
+    run_register_test(client, speculos_globals, MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
         ],
-    )
-
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
-
-    assert wallet_id == wallet.id
-
-    assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
-        wallet_hmac,
-    )
+    ))
 
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_with_long_name(client: Client, speculos_globals):
-    wallet = MultisigWallet(
+    run_register_test(client, speculos_globals, MultisigWallet(
         name="Cold storage with a pretty long name that requires 64 characters",
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
         ],
-    )
-
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
-
-    assert wallet_id == wallet.id
-
-    assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
-        wallet_hmac,
-    )
+    ))
 
 
 @has_automation("automations/register_wallet_reject.json")
@@ -105,8 +80,8 @@ def test_register_wallet_reject_header(client: Client):
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
-            f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-            f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
         ],
     )
 
@@ -127,8 +102,8 @@ def test_register_wallet_invalid_names(client: Client):
             address_type=AddressType.WIT,
             threshold=2,
             keys_info=[
-                f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
-                f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+                "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
             ],
         )
 
@@ -145,7 +120,7 @@ def test_register_wallet_unsupported_policy(client: Client):
             name="Unsupported",
             descriptor_template="pk(@0/**)",  # bare pubkey, not supported
             keys_info=[
-                f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+                "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
             ]
         ))
 
@@ -244,3 +219,32 @@ def test_register_wallet_not_sane_policy(client: Client):
 
     # TODO: we can probably not trigger stack and ops limits with the current limits we have on the
     # miniscript policy size; otherwise it would be worth to add tests for them, too.
+
+
+@has_automation("automations/register_wallet_accept.json")
+def test_register_unusual_singlesig_accounts(client: Client, speculos_globals):
+    # Tests that it is possible to register policies for single-signature using unusual paths
+
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Unusual Legacy",
+        descriptor_template="pkh(@0/**)",
+        keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
+    ))
+
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Unusual Nested SegWit",
+        descriptor_template="sh(wpkh(@0/**))",
+        keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
+    ))
+
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Unusual Native SegWit",
+        descriptor_template="wpkh(@0/**)",
+        keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
+    ))
+
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Unusual Taproot",
+        descriptor_template="tr(@0/**)",
+        keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
+    ))
