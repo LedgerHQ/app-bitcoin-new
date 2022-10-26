@@ -40,7 +40,7 @@ pub trait Transport {
 
 In order to satisfy this Trait, it is possible to import the
 `ledger-transport-hid` crate from https://github.com/Zondax/ledger-rs.
-Please, read the `examples/ledger_hwi/src/main.rs` file to find an example.
+Please, read the `examples/ledger_hwi/src/transport.rs` file to find an example.
 
 ## The `async` feature
 
@@ -68,4 +68,7 @@ emulator can be found in the `examples` directory.
 
 Example of a command to retrieve the extended pubkey with the given
 derivation path and display it on the device screen:  
-`cargo run --package ledger_hwi -- get_extended_pubkey "m/44'/0'/0'/0/0" true`
+```
+cargo run --package ledger_hwi -- \
+get-extended-pubkey --derivation-path "m/44'/0'/0'/0/0" --display
+```
