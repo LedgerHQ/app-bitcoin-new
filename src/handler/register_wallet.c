@@ -99,6 +99,8 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 
     // check if policy is acceptable
     if (!is_policy_acceptable(&policy_map.parsed)) {
+        PRINTF("Policy is not acceptable\n");
+
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return;
     }
@@ -230,7 +232,8 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
 }
 
 static bool is_policy_acceptable(const policy_node_t *policy) {
-    return policy->type == TOKEN_SH || policy->type == TOKEN_WSH || policy->type == TOKEN_TR;
+    return policy->type == TOKEN_PKH || policy->type == TOKEN_WPKH || policy->type == TOKEN_SH ||
+           policy->type == TOKEN_WSH || policy->type == TOKEN_TR;
 }
 
 static bool is_policy_name_acceptable(const char *name, size_t name_len) {
