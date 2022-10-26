@@ -1,7 +1,9 @@
 from typing import List, Tuple, Optional, Union, Literal
 from io import BytesIO
 
-from ledgercomm import Transport
+from ledgercomm.interfaces.hid_device import HID
+
+from .transport import Transport
 
 from .common import Chain
 
@@ -24,8 +26,8 @@ except ImportError:
 
 
 class TransportClient:
-    def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", server: str = "127.0.0.1", port: int = 9999, debug: bool = False):
-        self.transport = Transport('hid', debug=debug) if interface == 'hid' else Transport(interface, server, port, debug)
+    def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", *, server: str = "127.0.0.1", port: int = 9999, path: Optional[str] = None, hid: Optional[HID] = None, debug: bool = False):
+        self.transport = Transport('hid', path=path, hid=hid, debug=debug) if interface == 'hid' else Transport(interface, server=server, port=port, debug=debug)
 
     def apdu_exchange(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
