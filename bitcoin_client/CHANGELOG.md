@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [0.1.0] - TODO
+## [0.1.1] - 26-10-2022
+
+### Changed
+
+- Improved interface of TransportClient for better interoperability with HID.
+- `sign_psbt` now accepts the psbt to be passed as `bytes` or `str`.
+
+## [0.1.0] - 18-10-2022
 
 ### Changed
 
