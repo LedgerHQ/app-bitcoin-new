@@ -55,7 +55,7 @@ pub struct TransportTcp {
 
 impl TransportTcp {
     pub async fn new() -> Result<Self, Box<dyn Error>> {
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40000);
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
         let stream = TcpStream::connect(addr).await?;
         Ok(Self {
             connection: Mutex::new(stream),
