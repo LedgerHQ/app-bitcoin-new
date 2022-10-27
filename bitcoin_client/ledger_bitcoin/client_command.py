@@ -246,8 +246,8 @@ class ClientCommandInterpreter:
         self.commands = {cmd.code: cmd for cmd in commands}
 
     def execute(self, hw_response: bytes) -> bytes:
-        """Interprets the client command requested by the hardware wallet, returning the appropriet
-        response and updating the client interpreter's internal state if appropriate.
+        """Interprets the client command requested by the hardware wallet, returning the appropriate
+        response and updating the client interpreter's internal state if needed.
 
         Parameters
         ----------

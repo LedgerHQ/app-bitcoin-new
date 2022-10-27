@@ -16,7 +16,7 @@ from typing import List, Tuple, Optional, Union
 
 from .common import AddressType, Chain, hash160
 from .key import ExtendedKey, parse_path
-from .psbt import PSBT
+from .psbt import PSBT, normalize_psbt
 from .wallet import WalletPolicy
 
 from ._script import is_p2sh, is_witness, is_p2wpkh, is_p2wsh
@@ -155,7 +155,7 @@ class LegacyClient(Client):
         assert isinstance(output["address"], str)
         return output['address'][12:-2]  # HACK: A bug in getWalletPublicKey results in the address being returned as the string "bytearray(b'<address>')". This extracts the actual address to work around this.
 
-    def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         if wallet_hmac is not None or wallet.n_keys != 1:
             raise NotImplementedError("Policy wallets are only supported from version 2.0.0. Please update your Ledger hardware wallet")
 
@@ -164,6 +164,8 @@ class LegacyClient(Client):
 
         if wallet.descriptor_template not in ["pkh(@0/**)", "pkh(@0/<0;1>/*)", "wpkh(@0/**)", "wpkh(@0/<0;1>/*)", "sh(wpkh(@0/**))", "sh(wpkh(@0/<0;1>/*))"]:
             raise NotImplementedError("Unsupported policy")
+
+        psbt = normalize_psbt(psbt)
 
         # the rest of the code is basically the HWI code, and it ignores wallet
 

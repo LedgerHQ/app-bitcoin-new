@@ -1,7 +1,9 @@
-from typing import List, Tuple, Mapping, Optional, Union, Literal
+from typing import List, Tuple, Optional, Union, Literal
 from io import BytesIO
 
-from ledgercomm import Transport
+from ledgercomm.interfaces.hid_device import HID
+
+from .transport import Transport
 
 from .common import Chain
 
@@ -24,8 +26,8 @@ except ImportError:
 
 
 class TransportClient:
-    def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", server: str = "127.0.0.1", port: int = 9999, debug: bool = False):
-        self.transport = Transport('hid', debug=debug) if interface == 'hid' else Transport(interface, server, port, debug)
+    def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", *, server: str = "127.0.0.1", port: int = 9999, path: Optional[str] = None, hid: Optional[HID] = None, debug: bool = False):
+        self.transport = Transport('hid', path=path, hid=hid, debug=debug) if interface == 'hid' else Transport(interface, server=server, port=port, debug=debug)
 
     def apdu_exchange(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
@@ -199,18 +201,19 @@ class Client:
 
         raise NotImplementedError
 
-    def sign_psbt(self, psbt: PSBT, wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
         Signature requires explicit approval from the user.
 
         Parameters
         ----------
-        psbt : PSBT
+        psbt : PSBT | bytes | str
             A PSBT of version 0 or 2, with all the necessary information to sign the inputs already filled in; what the
             required fields changes depending on the type of input.
             The non-witness UTXO must be present for both legacy and SegWit inputs, or the hardware wallet will reject
             signing (this will change for Taproot inputs).
+            The argument can be either a `PSBT` object, or `bytes`, or a base64-encoded `str`.
 
         wallet : WalletPolicy
             The registered wallet policy, or a standard wallet policy.

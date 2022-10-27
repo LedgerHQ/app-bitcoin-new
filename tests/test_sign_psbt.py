@@ -1,3 +1,4 @@
+import base64
 import pytest
 
 import threading
@@ -741,4 +742,37 @@ def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac)
 
-    print(result)
+    assert len(result) == 2
+
+
+@has_automation("automations/sign_with_default_wallet_accept.json")
+def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
+    # same as test_sign_psbt_singlesig_pkh_1to1, but the psbt is passed as bytes or base64 string
+
+    psbt_obj = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
+
+    wallet = WalletPolicy(
+        "",
+        "pkh(@0/**)",
+        [
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
+        ],
+    )
+
+    psbt_b64 = psbt_obj.serialize()
+    psbt_bytes = base64.b64decode(psbt_b64)
+
+    for psbt in [psbt_b64, psbt_bytes]:
+        # expected sigs:
+        # #0:
+        #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
+        #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+        result = client.sign_psbt(psbt, wallet, None)
+
+        assert result == [(
+            0,
+            bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+            bytes.fromhex(
+                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            )
+        )]

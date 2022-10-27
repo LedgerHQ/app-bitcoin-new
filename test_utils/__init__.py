@@ -86,7 +86,7 @@ class SpeculosGlobals:
 
 def get_internal_xpub(seed: str, path: str) -> str:
     bip32 = BIP32.from_seed(seed, network="test")
-    return bip32.get_xpub_from_path(f"m/{path}")
+    return bip32.get_xpub_from_path(f"m/{path}") if path else bip32.get_xpub_from_path("m")
 
 
 def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy) -> int:

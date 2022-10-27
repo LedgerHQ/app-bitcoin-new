@@ -7,6 +7,8 @@ from .common import Chain
 
 from .wallet import AddressType, WalletPolicy, MultisigWallet, WalletType
 
+__version__ = '0.1.1'
+
 __all__ = [
     "Client",
     "TransportClient",
