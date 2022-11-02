@@ -112,5 +112,9 @@ fn extract_keys_and_template(policy: &str) -> Result<(String, Vec<WalletPubKey>)
         pubkeys.push(pubkey);
         descriptor_template = descriptor_template.replace(capture.as_str(), &format!("@{}", index));
     }
-    Ok((descriptor_template, pubkeys))
+    if let Some((descriptor_template, _hash)) = descriptor_template.rsplit_once("#") {
+        Ok((descriptor_template.to_string(), pubkeys))
+    } else {
+        Ok((descriptor_template, pubkeys))
+    }
 }
