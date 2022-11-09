@@ -170,20 +170,29 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
     return io_ui_process(context);
 }
 
+bool ui_transaction_prompt(dispatcher_context_t *context, const int external_outputs_total_count) {
+    ui_display_transaction_prompt(external_outputs_total_count);
+    return io_ui_process(context);
+}
+
 bool ui_validate_output(dispatcher_context_t *context,
                         int index,
+                        int total_count,
                         const char *address_or_description,
                         const char *coin_name,
                         uint64_t amount) {
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
-    snprintf(state->index, sizeof(state->index), "output #%d", index);
     strncpy(state->address_or_description,
             address_or_description,
             sizeof(state->address_or_description));
     format_sats_amount(coin_name, amount, state->amount);
 
-    ui_display_output_address_amount_flow();
+    if (total_count == 1) {
+        ui_display_output_address_amount_no_index_flow(index);
+    } else {
+        ui_display_output_address_amount_flow(index);
+    }
 
     return io_ui_process(context);
 }

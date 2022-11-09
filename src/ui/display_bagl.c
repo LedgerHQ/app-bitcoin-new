@@ -31,9 +31,6 @@
 // Step with icon and text for pubkey
 UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public key"});
 
-// Step with icon and text for address
-UX_STEP_NOCB(ux_display_confirm_address_step, pn, {&C_icon_eye, "Confirm receive address"});
-
 // Step with icon and text for a suspicious address
 UX_STEP_NOCB(ux_display_unusual_derivation_path_step,
              pnn,
@@ -102,14 +99,6 @@ UX_STEP_NOCB(ux_display_pubkey_step,
              {
                  .title = "Public key",
                  .text = g_ui_state.path_and_pubkey.pubkey,
-             });
-
-// Step with title/text for address
-UX_STEP_NOCB(ux_display_address_step,
-             bnnn_paging,
-             {
-                 .title = "Address",
-                 .text = g_ui_state.path_and_address.address,
              });
 
 // Step with description of a wallet policy
@@ -295,37 +284,6 @@ UX_FLOW(ux_display_pubkey_suspicious_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-// FLOW to display a receive address, for a non-standard path:
-// #1 screen: warning icon + "The derivation path is unusual"
-// #2 screen: display BIP32 Path
-// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
-// #4 screen: eye icon + "Confirm Address"
-// #5 screen: display address
-// #6 screen: approve button
-// #7 screen: reject button
-UX_FLOW(ux_display_address_suspicious_flow,
-        &ux_display_unusual_derivation_path_step,
-        &ux_display_path_step,
-        &ux_display_reject_if_not_sure_step,
-        &ux_display_confirm_address_step,
-        &ux_display_address_step,
-        &ux_display_approve_step,
-        &ux_display_reject_step);
-
-// FLOW to warn the user if a change output has an unusual derivation path
-// (e.g. account index or address index too large):
-// #1 screen: warning icon + "The derivation path is unusual"
-// #2 screen: display BIP32 Path
-// #3 screen: crossmark icon + "Reject if not sure" (user can reject here)
-// #4 screen: approve button
-// #5 screen: reject button
-UX_FLOW(ux_display_unusual_derivation_path_flow,
-        &ux_display_unusual_derivation_path_step,
-        &ux_display_path_step,
-        &ux_display_reject_if_not_sure_step,
-        &ux_display_approve_step,
-        &ux_display_reject_step);
-
 // FLOW to display the header of a policy map wallet:
 // #1 screen: Wallet icon + "Register wallet"
 // #2 screen: "Wallet name:" and wallet name
@@ -482,8 +440,18 @@ void ui_display_nondefault_sighash_flow(void) {
     ux_flow_init(0, ux_display_nondefault_sighash_flow, NULL);
 }
 
-void ui_display_output_address_amount_flow(void) {
+void ui_display_output_address_amount_flow(int index) {
+    snprintf(g_ui_state.validate_output.index,
+             sizeof(g_ui_state.validate_output.index),
+             "output #%d",
+             index);
     ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
+}
+
+void ui_display_output_address_amount_no_index_flow(int index) {
+    // Currently we don't want any change in the UX so this function defaults to
+    // ui_display_output_address_amount_flow
+    ui_display_output_address_amount_flow(index);
 }
 
 void ui_accept_transaction_flow(void) {
