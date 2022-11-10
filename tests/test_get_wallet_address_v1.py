@@ -207,3 +207,40 @@ def test_get_wallet_address_multisig_wit_v1(client: Client):
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
+
+
+def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client):
+    # legacy address (P2PKH)
+    wallet = WalletPolicy(
+        name="",
+        descriptor_template="pkh(@0)",
+        keys_info=[
+            f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**",
+        ],
+        version=WalletType.WALLET_POLICY_V1
+    )
+    assert client.get_wallet_address(wallet, None, 0,  0, True) == "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
+    assert client.get_wallet_address(wallet, None, 1, 15, True) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
+
+
+def test_get_wallet_address_multisig_legacy_v1_ui(client: Client):
+    # test for a legacy p2sh multisig wallet
+
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.LEGACY,
+        threshold=2,
+        keys_info=[
+            f"[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW/**",
+            f"[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm/**",
+        ],
+        version=WalletType.WALLET_POLICY_V1
+    )
+    wallet_hmac = bytes.fromhex(
+        "1980a07cde99fbdec0d487671d3bb296507e47b3ddfa778600a9d73d501983bc"
+    )
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, True)
+    assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
+
+
