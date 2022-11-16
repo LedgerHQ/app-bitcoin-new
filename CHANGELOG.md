@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.0] - 16-11-2022
+
+### Added
+
+- Miniscript support on SegWit.
+- Improved support for wallet policies.
+- Support for sighash flags.
+
+### Changed
+
+- Wallet policies now allow external keys with no key origin information.
+- Wallet policies now allow multiple internal keys.
+
+### Removed
+
+- Support for legacy protocol (pre-2.0.0 version) and support for altcoins, now done via separate apps. Substantial binary size reduction as a consequence.
+
 ## [2.0.6] - 06-06-2022
 
 ### Added
