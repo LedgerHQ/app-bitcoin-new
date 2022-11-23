@@ -155,7 +155,7 @@ The sha256 hash of a serialized wallet policy is used as a *wallet policy id*.
 ## Wallet name
 
 The wallet name must be recognizable from the user when shown on-screen. Currently, the following limitations apply during wallet registration:
-- The wallet name must be between 1 and 16 characters long.
+- The wallet name must be at least 1 and at most 64 characters long.
 - Each character must be an ASCII character with code at least 32 = 0x20 (the 'space' character) and at most 125 = 0x7e (the '~' character).
 - The first and the last character must _not_ be spaces.
 
