@@ -1,13 +1,12 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use bitcoin::hashes::{sha256, Hash, HashEngine};
-
-use crate::{
-    apdu::ClientCommandCode,
-    common::{read_varint, write_varint},
-    merkle::MerkleTree,
+use bitcoin::{
+    consensus::encode::{self, VarInt},
+    hashes::{sha256, Hash, HashEngine},
 };
+
+use crate::{apdu::ClientCommandCode, merkle::MerkleTree};
 
 /// Interpreter for the client-side commands.
 /// This struct keeps has methods to keep track of:
@@ -138,7 +137,7 @@ fn get_preimage_command(
         .find(|(hash, _)| hash == &request[1..])
         .ok_or(InterpreterError::UnknownHash)?;
 
-    let preimage_len_out = write_varint(preimage.len());
+    let preimage_len_out = encode::serialize(&VarInt(preimage.len() as u64));
 
     // We can send at most 255 - len(preimage_len_out) - 1 bytes in a single message;
     //the rest will be stored for GET_MORE_ELEMENTS
@@ -174,30 +173,27 @@ fn get_merkle_leaf_proof(
     };
 
     let root = &request[0..32];
-    let (tree_size, data) = read_varint(&request[32..]).ok_or(
-        InterpreterError::UnsupportedRequest(ClientCommandCode::GetMerkleLeafProof as u8),
-    )?;
-    let (leaf_index, data) = read_varint(data).ok_or(InterpreterError::UnsupportedRequest(
-        ClientCommandCode::GetMerkleLeafProof as u8,
-    ))?;
-    // Request must be fully read
-    if !data.is_empty() {
-        return Err(InterpreterError::UnsupportedRequest(
-            ClientCommandCode::GetMerkleLeafProof as u8,
-        ));
-    }
+    let (tree_size, read): (VarInt, usize) =
+        encode::deserialize_partial(&request[32..]).map_err(|_| {
+            InterpreterError::UnsupportedRequest(ClientCommandCode::GetMerkleLeafProof as u8)
+        })?;
+
+    // deserialize consumes the entire vector.
+    let leaf_index: VarInt = encode::deserialize(&request[32 + read..]).map_err(|_| {
+        InterpreterError::UnsupportedRequest(ClientCommandCode::GetMerkleLeafProof as u8)
+    })?;
 
     let tree = trees
         .iter()
         .find(|tree| tree.root_hash() == root)
         .ok_or(InterpreterError::UnknownHash)?;
 
-    if leaf_index >= tree_size || tree_size != tree.size() {
+    if leaf_index >= tree_size || tree_size.0 != tree.size() as u64 {
         return Err(InterpreterError::InvalidIndexOrSize);
     }
 
     let proof = tree
-        .get_leaf_proof(leaf_index)
+        .get_leaf_proof(leaf_index.0 as usize)
         .ok_or(InterpreterError::InvalidIndexOrSize)?;
 
     let len_proof = proof.len();
@@ -215,7 +211,7 @@ fn get_merkle_leaf_proof(
         }
     }
 
-    let mut response = tree.get_leaf(leaf_index).unwrap().to_vec();
+    let mut response = tree.get_leaf(leaf_index.0 as usize).unwrap().to_vec();
     response.extend_from_slice(&(len_proof as u8).to_be_bytes());
     response.extend_from_slice(&(n_response_elements as u8).to_be_bytes());
     response.extend_from_slice(&first_part_proof);
@@ -244,7 +240,7 @@ fn get_merkle_leaf_index(
         .ok_or(InterpreterError::UnknownHash)?;
 
     let mut response = 1_u8.to_be_bytes().to_vec();
-    response.extend(write_varint(leaf_index));
+    response.extend(encode::serialize(&VarInt(leaf_index as u64)));
     Ok(response)
 }
 
@@ -299,7 +295,7 @@ pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> 
         values_hashes.push(sha256::Hash::from_engine(engine).into_inner());
     }
 
-    let mut commitment = write_varint(sorted.len());
+    let mut commitment = encode::serialize(&VarInt(sorted.len() as u64));
     commitment.extend(MerkleTree::new(keys_hashes).root_hash());
     commitment.extend(MerkleTree::new(values_hashes).root_hash());
     commitment

@@ -1,11 +1,13 @@
 /// APDU commands  for the Bitcoin application.
 ///
-use bitcoin::util::bip32::{ChildNumber, DerivationPath};
+use bitcoin::{
+    consensus::encode::{self, VarInt},
+    util::bip32::{ChildNumber, DerivationPath},
+};
 use core::default::Default;
 
 use super::{
     apdu::{self, APDUCommand},
-    common::write_varint,
     wallet::WalletPolicy,
 };
 
@@ -43,7 +45,7 @@ pub fn get_extended_pubkey(path: &DerivationPath, display: bool) -> APDUCommand 
 /// Creates the APDU command required to register the given wallet policy.
 pub fn register_wallet(policy: &WalletPolicy) -> APDUCommand {
     let bytes = policy.serialize();
-    let mut data = write_varint(bytes.len());
+    let mut data = encode::serialize(&VarInt(bytes.len() as u64));
     data.extend(bytes);
     APDUCommand {
         cla: apdu::Cla::Bitcoin as u8,
@@ -87,9 +89,9 @@ pub fn sign_psbt(
 ) -> APDUCommand {
     let mut data: Vec<u8> = Vec::new();
     data.extend_from_slice(global_mapping_commitment);
-    data.extend(write_varint(inputs_number));
+    data.extend(encode::serialize(&VarInt(inputs_number as u64)));
     data.extend_from_slice(input_commitments_root);
-    data.extend(write_varint(outputs_number));
+    data.extend(encode::serialize(&VarInt(outputs_number as u64)));
     data.extend_from_slice(output_commitments_root);
     data.extend_from_slice(&policy.id());
     data.extend_from_slice(hmac.unwrap_or(&[b'\0'; 32]));

@@ -3,11 +3,12 @@ use core::iter::IntoIterator;
 use core::str::FromStr;
 
 use bitcoin::{
+    consensus::encode::{self, VarInt},
     hashes::{sha256, Hash, HashEngine},
     util::bip32::{DerivationPath, Error, ExtendedPubKey, Fingerprint, KeySource},
 };
 
-use crate::{common::write_varint, merkle::MerkleTree};
+use crate::merkle::MerkleTree;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Version {
@@ -105,7 +106,9 @@ impl WalletPolicy {
         let mut res: Vec<u8> = (self.version as u8).to_be_bytes().to_vec();
         res.extend_from_slice(&(self.name.len() as u8).to_be_bytes());
         res.extend_from_slice(self.name.as_bytes());
-        res.extend_from_slice(&write_varint(self.descriptor_template.as_bytes().len()));
+        res.extend(encode::serialize(&VarInt(
+            self.descriptor_template.as_bytes().len() as u64,
+        )));
 
         if self.version == Version::V2 {
             let mut engine = sha256::Hash::engine();
@@ -116,7 +119,7 @@ impl WalletPolicy {
             res.extend_from_slice(self.descriptor_template.as_bytes());
         }
 
-        res.extend_from_slice(&write_varint(self.keys.len()));
+        res.extend(encode::serialize(&VarInt(self.keys.len() as u64)));
 
         res.extend_from_slice(
             MerkleTree::new(

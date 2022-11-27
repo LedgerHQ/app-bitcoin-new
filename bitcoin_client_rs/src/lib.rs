@@ -1,5 +1,4 @@
 mod command;
-mod common;
 mod interpreter;
 mod merkle;
 mod psbt;
