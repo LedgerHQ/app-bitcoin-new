@@ -8,8 +8,7 @@ If you wish to contribute to this library, please read
 
 ## Minimum Supported Rust Version
 
-`bitcoin_client_rs` should always compile using **Rust 1.43** and pass
-tests using **Rust 1.49**.
+`bitcoin_client_rs` should always compile using **Rust 1.60**.
 
 ## Getting started
 
