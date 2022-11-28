@@ -249,3 +249,21 @@ jobs:
           cd bitcoin_client_js
           yarn install
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
+
+
+  job_test_rust_client:
+    name: Tests for rust client library
+    needs: job_build
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Run tests
+        run: |
+          cd bitcoin_client_rs/
+          cargo test
