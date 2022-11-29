@@ -206,9 +206,9 @@ typedef struct policy_node_ext_info_s {
 // policy_nodes, representing a non-negative offset from the position of the structure itself.
 // This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
 // in other structures, as they no longer contain 32-bit pointers.
-typedef struct ptr_node_s {
+typedef struct ptr_rel_s {
     uint16_t offset;
-} ptr_node_t;
+} ptr_rel_t;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
@@ -240,19 +240,19 @@ typedef struct {
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t script;
+    ptr_rel_t script;
 } policy_node_with_script_t;
 
 // 6 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t scripts[2];
+    ptr_rel_t scripts[2];
 } policy_node_with_script2_t;
 
 // 8 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t scripts[3];
+    ptr_rel_t scripts[3];
 } policy_node_with_script3_t;
 
 // generic type with pointer for up to 3 (but constant) number of child scripts
@@ -282,7 +282,7 @@ typedef struct {
 // 8 bytes
 typedef struct policy_node_scriptlist_s {
     struct policy_node_scriptlist_s *next;
-    ptr_node_t script;
+    ptr_rel_t script;
 } policy_node_scriptlist_t;
 
 // 12 bytes, (+ 8 bytes for every script)
@@ -309,10 +309,10 @@ typedef struct policy_node_tree_s {
     bool is_leaf;  // if this is a leaf, then it contains a pointer to a SCRIPT;
                    // otherwise, it contains two pointers to TREE expressions.
     union {
-        ptr_node_t script;  // pointer to a policy_node_with_script_t
+        ptr_rel_t script;  // pointer to a policy_node_with_script_t
         struct {
-            ptr_node_t left_tree;   // pointer to a policy_node_tree_s
-            ptr_node_t right_tree;  // pointer to a policy_node_tree_s
+            ptr_rel_t left_tree;   // pointer to a policy_node_tree_s
+            ptr_rel_t right_tree;  // pointer to a policy_node_tree_s
         };
     };
 } policy_node_tree_t;
@@ -325,16 +325,21 @@ typedef struct {
 
 // The following helpers function simplifies dealing with relative pointers to scripts
 
-// Converts a relative pointer to the corresponding pointer to a policy node
-static inline const policy_node_t *node_ptr(const ptr_node_t *ptr) {
-    return (const policy_node_t *) ((const uint8_t *) ptr + ptr->offset);
+// Converts a relative pointer to the corresponding pointer to the corresponding absolute pointer
+static inline const void *resolve_ptr(const ptr_rel_t *ptr) {
+    return (const void *) ((const uint8_t *) ptr + ptr->offset);
+}
+
+// Syntactic sugar for resolve_ptr when the return value is a pointer to policy_node_t
+static inline const policy_node_t *resolve_node_ptr(const ptr_rel_t *ptr) {
+    return (const void *) ((const uint8_t *) ptr + ptr->offset);
 }
 
 // Initializes a relative pointer so that it points to node.
 // IMPORTANT: the assumption is that node is located in memory at an address larger than
 // relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
 // is potentially dangerous to use.
-static inline void init_relative_ptr(ptr_node_t *relative_ptr, void *node) {
+static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
     relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
 }
 

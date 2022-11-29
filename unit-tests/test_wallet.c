@@ -68,7 +68,7 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&root->script);
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) resolve_ptr(&root->script);
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
     check_key_placeholder(inner->key_placeholder, 0, 0, 1);
@@ -86,11 +86,11 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) node_ptr(&root->script);
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) resolve_ptr(&root->script);
 
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&mid->script);
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) resolve_ptr(&mid->script);
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
     check_key_placeholder(inner->key_placeholder, 0, 0, 1);
@@ -126,7 +126,7 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) node_ptr(&root->script);
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) resolve_ptr(&root->script);
     assert_int_equal(inner->base.type, TOKEN_MULTI);
 
     assert_int_equal(inner->k, 3);
@@ -149,10 +149,10 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) node_ptr(&root->script);
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) resolve_ptr(&root->script);
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) node_ptr(&mid->script);
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) resolve_ptr(&mid->script);
     assert_int_equal(inner->base.type, TOKEN_SORTEDMULTI);
 
     assert_int_equal(inner->k, 3);
@@ -187,7 +187,7 @@ static void test_parse_policy_tr(void **state) {
 
     assert_int_equal(root->tree->is_leaf, true);
 
-    policy_node_with_key_t *tapscript = (policy_node_with_key_t *) node_ptr(&root->tree->script);
+    policy_node_with_key_t *tapscript = (policy_node_with_key_t *) resolve_ptr(&root->tree->script);
 
     assert_int_equal(tapscript->base.type, TOKEN_PK);
     check_key_placeholder(tapscript->key_placeholder, 1, 0, 1);
@@ -204,18 +204,18 @@ static void test_parse_policy_tr(void **state) {
 
     assert_int_equal(taptree->is_leaf, false);
 
-    policy_node_tree_t *taptree_left = (policy_node_tree_t *) node_ptr(&taptree->left_tree);
+    policy_node_tree_t *taptree_left = (policy_node_tree_t *) resolve_ptr(&taptree->left_tree);
     assert_int_equal(taptree_left->is_leaf, true);
     policy_node_with_key_t *tapscript_left =
-        (policy_node_with_key_t *) node_ptr(&taptree_left->script);
+        (policy_node_with_key_t *) resolve_ptr(&taptree_left->script);
 
     assert_int_equal(tapscript_left->base.type, TOKEN_PK);
     check_key_placeholder(tapscript_left->key_placeholder, 1, 0, 1);
 
-    policy_node_tree_t *taptree_right = (policy_node_tree_t *) node_ptr(&taptree->right_tree);
+    policy_node_tree_t *taptree_right = (policy_node_tree_t *) resolve_ptr(&taptree->right_tree);
     assert_int_equal(taptree_right->is_leaf, true);
     policy_node_with_key_t *tapscript_right =
-        (policy_node_with_key_t *) node_ptr(&taptree_right->script);
+        (policy_node_with_key_t *) resolve_ptr(&taptree_right->script);
 
     assert_int_equal(tapscript_right->base.type, TOKEN_PK);
     check_key_placeholder(tapscript_right->key_placeholder, 2, 5, 7);
@@ -244,10 +244,10 @@ static void test_parse_policy_tr_multisig(void **state) {
 
     assert_int_equal(taptree->is_leaf, false);
 
-    policy_node_tree_t *taptree_left = (policy_node_tree_t *) node_ptr(&taptree->left_tree);
+    policy_node_tree_t *taptree_left = (policy_node_tree_t *) resolve_ptr(&taptree->left_tree);
     assert_int_equal(taptree_left->is_leaf, true);
     policy_node_multisig_t *tapscript_left =
-        (policy_node_multisig_t *) node_ptr(&taptree_left->script);
+        (policy_node_multisig_t *) resolve_ptr(&taptree_left->script);
 
     assert_int_equal(tapscript_left->base.type, TOKEN_MULTI_A);
     assert_int_equal(tapscript_left->k, 1);
@@ -255,10 +255,10 @@ static void test_parse_policy_tr_multisig(void **state) {
     check_key_placeholder(&tapscript_left->key_placeholders[0], 1, 0, 1);
     check_key_placeholder(&tapscript_left->key_placeholders[1], 2, 0, 1);
 
-    policy_node_tree_t *taptree_right = (policy_node_tree_t *) node_ptr(&taptree->right_tree);
+    policy_node_tree_t *taptree_right = (policy_node_tree_t *) resolve_ptr(&taptree->right_tree);
     assert_int_equal(taptree_right->is_leaf, true);
     policy_node_multisig_t *tapscript_right =
-        (policy_node_multisig_t *) node_ptr(&taptree_right->script);
+        (policy_node_multisig_t *) resolve_ptr(&taptree_right->script);
 
     assert_int_equal(tapscript_right->base.type, TOKEN_SORTEDMULTI_A);
     assert_int_equal(tapscript_right->k, 2);
@@ -363,7 +363,7 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
 
         policy_node_with_script_t *policy = (policy_node_with_script_t *) out;
         policy_node_ext_info_t ext_info;
-        res = compute_miniscript_policy_ext_info(node_ptr(&policy->script), &ext_info);
+        res = compute_miniscript_policy_ext_info(resolve_ptr(&policy->script), &ext_info);
 
         assert_true(res == 0);
 
