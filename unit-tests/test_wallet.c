@@ -18,6 +18,16 @@ unsigned int pic(unsigned int linked_address) {
 
 #include "common/wallet.h"
 
+static int parse_policy(const char *descriptor_template, uint8_t *out, size_t out_size) {
+    buffer_t descriptor_template_buf =
+        buffer_create((void *) descriptor_template, strlen(descriptor_template));
+
+    return parse_descriptor_template(&descriptor_template_buf,
+                                     out,
+                                     out_size,
+                                     WALLET_POLICY_VERSION_V2);
+}
+
 // in unit tests, size_t integers are currently 8 compiled as 8 bytes; therefore, in the app
 // about half of the memory would be needed
 #define MAX_WALLET_POLICY_MEMORY_SIZE 512
@@ -25,18 +35,10 @@ unsigned int pic(unsigned int linked_address) {
 static void test_parse_policy_map_singlesig_1(void **state) {
     (void) state;
 
-    uint8_t out[MAX_WALLET_POLICY_BYTES];
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res = parse_policy("pkh(@0/**)", out, sizeof(out));
 
-    char *descriptor_template = "pkh(@0/**)";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
@@ -51,16 +53,8 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res = parse_policy("sh(wpkh(@0/**))", out, sizeof(out));
 
-    char *descriptor_template = "sh(wpkh(@0/**))";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -79,16 +73,8 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res = parse_policy("sh(wsh(pkh(@0/**)))", out, sizeof(out));
 
-    char *descriptor_template = "sh(wsh(pkh(@0/**)))";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -111,16 +97,8 @@ static void test_parse_policy_map_multisig_1(void **state) {
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res = parse_policy("sortedmulti(2,@0/**,@1/**,@2/**)", out, sizeof(out));
 
-    char *descriptor_template = "sortedmulti(2,@0/**,@1/**,@2/**)";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_multisig_t *node_1 = (policy_node_multisig_t *) out;
 
@@ -143,16 +121,8 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res = parse_policy("wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))", out, sizeof(out));
 
-    char *descriptor_template = "wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -175,16 +145,9 @@ static void test_parse_policy_map_multisig_3(void **state) {
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
-    int res;
+    int res =
+        parse_policy("sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))", out, sizeof(out));
 
-    char *descriptor_template = "sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))";
-    buffer_t descriptor_template_buf =
-        buffer_create((void *) descriptor_template, strlen(descriptor_template));
-
-    res = parse_descriptor_template(&descriptor_template_buf,
-                                    out,
-                                    sizeof(out),
-                                    WALLET_POLICY_VERSION_V2);
     assert_int_equal(res, 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
@@ -205,53 +168,44 @@ static void test_parse_policy_map_multisig_3(void **state) {
     }
 }
 
-// convenience function to parse as one liners
-
-static int parse_policy(char *policy, size_t policy_len, uint8_t *out, size_t out_len) {
-    buffer_t in_buf = buffer_create((void *) policy, policy_len);
-    return parse_descriptor_template(&in_buf, out, out_len, WALLET_POLICY_VERSION_V2);
-}
-
-#define PARSE_POLICY(policy, out, out_len) parse_policy(policy, sizeof(policy) - 1, out, out_len)
-
 static void test_failures(void **state) {
     (void) state;
 
     uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
 
     // excess byte not allowed
-    assert_true(0 > PARSE_POLICY("pkh(@0/**) ", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh(@0/**) ", out, sizeof(out)));
 
     // missing closing parenthesis
-    assert_true(0 > PARSE_POLICY("pkh(@0/**", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh(@0/**", out, sizeof(out)));
 
     // unknown token
-    assert_true(0 > PARSE_POLICY("yolo(@0/**)", out, sizeof(out)));
-    assert_true(0 > PARSE_POLICY("Pkh(@0/**)", out, sizeof(out)));  // case-sensitive
+    assert_true(0 > parse_policy("yolo(@0/**)", out, sizeof(out)));
+    assert_true(0 > parse_policy("Pkh(@0/**)", out, sizeof(out)));  // case-sensitive
 
     // missing or invalid key identifier
-    assert_true(0 > PARSE_POLICY("pkh()", out, sizeof(out)));
-    assert_true(0 > PARSE_POLICY("pkh(@)", out, sizeof(out)));
-    assert_true(0 > PARSE_POLICY("pkh(0)", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh()", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh(@)", out, sizeof(out)));
+    assert_true(0 > parse_policy("pkh(0)", out, sizeof(out)));
 
     // sh not top-level
-    assert_true(0 > PARSE_POLICY("sh(sh(pkh(@0/**)))", out, sizeof(out)));
+    assert_true(0 > parse_policy("sh(sh(pkh(@0/**)))", out, sizeof(out)));
 
     // wsh can only be inside sh
-    assert_true(0 > PARSE_POLICY("wsh(wsh(pkh(@0/**)))", out, sizeof(out)));
+    assert_true(0 > parse_policy("wsh(wsh(pkh(@0/**)))", out, sizeof(out)));
 
     // wpkh can only be inside sh
-    assert_true(0 > PARSE_POLICY("wsh(wpkh(@0/**)))", out, sizeof(out)));
+    assert_true(0 > parse_policy("wsh(wpkh(@0/**)))", out, sizeof(out)));
 
     // multi with invalid threshold
-    assert_true(0 > PARSE_POLICY("multi(6,@0/**,@1/**,@2/**,@3/**,@4/**)",
+    assert_true(0 > parse_policy("multi(6,@0/**,@1/**,@2/**,@3/**,@4/**)",
                                  out,
                                  sizeof(out)));  // threshold larger than n
-    assert_true(0 > PARSE_POLICY("multi(0,@0/**,@1/**,@2/**,@3/**,@4/**)", out, sizeof(out)));
+    assert_true(0 > parse_policy("multi(0,@0/**,@1/**,@2/**,@3/**,@4/**)", out, sizeof(out)));
     // missing threshold or keys in multisig
-    assert_true(0 > PARSE_POLICY("multi(@0/**,@1/**,@2/**,@3/**,@4/**)", out, sizeof(out)));
-    assert_true(0 > PARSE_POLICY("multi(1)", out, sizeof(out)));
-    assert_true(0 > PARSE_POLICY("multi(1,)", out, sizeof(out)));
+    assert_true(0 > parse_policy("multi(@0/**,@1/**,@2/**,@3/**,@4/**)", out, sizeof(out)));
+    assert_true(0 > parse_policy("multi(1)", out, sizeof(out)));
+    assert_true(0 > parse_policy("multi(1,)", out, sizeof(out)));
 }
 
 enum TestMode {
