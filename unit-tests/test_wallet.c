@@ -32,6 +32,16 @@ static int parse_policy(const char *descriptor_template, uint8_t *out, size_t ou
 // about half of the memory would be needed
 #define MAX_WALLET_POLICY_MEMORY_SIZE 512
 
+// convenience function to compactly check common assertions on a key placeholder pointer
+static void check_key_placeholder(const policy_node_key_placeholder_t *ptr,
+                                  int key_index,
+                                  uint32_t num_first,
+                                  uint32_t num_second) {
+    assert_int_equal(ptr->key_index, key_index);
+    assert_int_equal(ptr->num_first, num_first);
+    assert_int_equal(ptr->num_second, num_second);
+}
+
 static void test_parse_policy_map_singlesig_1(void **state) {
     (void) state;
 
@@ -43,9 +53,7 @@ static void test_parse_policy_map_singlesig_1(void **state) {
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
     assert_int_equal(node_1->base.type, TOKEN_PKH);
-    assert_int_equal(node_1->key_placeholder->key_index, 0);
-    assert_int_equal(node_1->key_placeholder->num_first, 0);
-    assert_int_equal(node_1->key_placeholder->num_second, 1);
+    check_key_placeholder(node_1->key_placeholder, 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_2(void **state) {
@@ -63,9 +71,7 @@ static void test_parse_policy_map_singlesig_2(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&root->script);
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
-    assert_int_equal(inner->key_placeholder->key_index, 0);
-    assert_int_equal(inner->key_placeholder->num_first, 0);
-    assert_int_equal(inner->key_placeholder->num_second, 1);
+    check_key_placeholder(inner->key_placeholder, 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_3(void **state) {
@@ -87,9 +93,7 @@ static void test_parse_policy_map_singlesig_3(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) node_ptr(&mid->script);
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
-    assert_int_equal(inner->key_placeholder->key_index, 0);
-    assert_int_equal(inner->key_placeholder->num_first, 0);
-    assert_int_equal(inner->key_placeholder->num_second, 1);
+    check_key_placeholder(inner->key_placeholder, 0, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_1(void **state) {
@@ -105,15 +109,9 @@ static void test_parse_policy_map_multisig_1(void **state) {
     assert_int_equal(node_1->base.type, TOKEN_SORTEDMULTI);
     assert_int_equal(node_1->k, 2);
     assert_int_equal(node_1->n, 3);
-    assert_int_equal(node_1->key_placeholders[0].key_index, 0);
-    assert_int_equal(node_1->key_placeholders[0].num_first, 0);
-    assert_int_equal(node_1->key_placeholders[0].num_second, 1);
-    assert_int_equal(node_1->key_placeholders[1].key_index, 1);
-    assert_int_equal(node_1->key_placeholders[1].num_first, 0);
-    assert_int_equal(node_1->key_placeholders[1].num_second, 1);
-    assert_int_equal(node_1->key_placeholders[2].key_index, 2);
-    assert_int_equal(node_1->key_placeholders[2].num_first, 0);
-    assert_int_equal(node_1->key_placeholders[2].num_second, 1);
+    check_key_placeholder(&node_1->key_placeholders[0], 0, 0, 1);
+    check_key_placeholder(&node_1->key_placeholders[1], 1, 0, 1);
+    check_key_placeholder(&node_1->key_placeholders[2], 2, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_2(void **state) {
@@ -134,9 +132,7 @@ static void test_parse_policy_map_multisig_2(void **state) {
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        assert_int_equal(inner->key_placeholders[i].key_index, i);
-        assert_int_equal(inner->key_placeholders[i].num_first, 0);
-        assert_int_equal(inner->key_placeholders[i].num_second, 1);
+        check_key_placeholder(&inner->key_placeholders[i], i, 0, 1);
     }
 }
 
@@ -162,10 +158,114 @@ static void test_parse_policy_map_multisig_3(void **state) {
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        assert_int_equal(inner->key_placeholders[i].key_index, i);
-        assert_int_equal(inner->key_placeholders[i].num_first, 0);
-        assert_int_equal(inner->key_placeholders[i].num_second, 1);
+        check_key_placeholder(&inner->key_placeholders[i], i, 0, 1);
     }
+}
+
+static void test_parse_policy_tr(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    int res;
+
+    // Simple tr without a tree
+    res = parse_policy("tr(@0/**)", out, sizeof(out));
+
+    assert_int_equal(res, 0);
+    policy_node_tr_t *root = (policy_node_tr_t *) out;
+
+    assert_ptr_equal(root->tree, NULL);
+    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+
+    // Simple tr with a TREE that is a simple script
+    res = parse_policy("tr(@0/**,pk(@1/**))", out, sizeof(out));
+
+    assert_int_equal(res, 0);
+    root = (policy_node_tr_t *) out;
+
+    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+
+    assert_int_equal(root->tree->is_leaf, true);
+
+    policy_node_with_key_t *tapscript = (policy_node_with_key_t *) node_ptr(&root->tree->script);
+
+    assert_int_equal(tapscript->base.type, TOKEN_PK);
+    check_key_placeholder(tapscript->key_placeholder, 1, 0, 1);
+
+    // Simple tr with a TREE with two tapleaves
+    res = parse_policy("tr(@0/**,{pk(@1/**),pk(@2/<5;7>/*)})", out, sizeof(out));
+
+    assert_int_equal(res, 0);
+    root = (policy_node_tr_t *) out;
+
+    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+
+    policy_node_tree_t *taptree = root->tree;
+
+    assert_int_equal(taptree->is_leaf, false);
+
+    policy_node_tree_t *taptree_left = (policy_node_tree_t *) node_ptr(&taptree->left_tree);
+    assert_int_equal(taptree_left->is_leaf, true);
+    policy_node_with_key_t *tapscript_left =
+        (policy_node_with_key_t *) node_ptr(&taptree_left->script);
+
+    assert_int_equal(tapscript_left->base.type, TOKEN_PK);
+    check_key_placeholder(tapscript_left->key_placeholder, 1, 0, 1);
+
+    policy_node_tree_t *taptree_right = (policy_node_tree_t *) node_ptr(&taptree->right_tree);
+    assert_int_equal(taptree_right->is_leaf, true);
+    policy_node_with_key_t *tapscript_right =
+        (policy_node_with_key_t *) node_ptr(&taptree_right->script);
+
+    assert_int_equal(tapscript_right->base.type, TOKEN_PK);
+    check_key_placeholder(tapscript_right->key_placeholder, 2, 5, 7);
+}
+
+static void test_parse_policy_tr_multisig(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    int res;
+
+    // tr with a tree with two scripts: a multi_a and a sortedmulti_a:
+    res = parse_policy("tr(@0/**,{multi_a(1,@1/**,@2/**),sortedmulti_a(2,@3/**,@4/**,@5/**)})",
+                       out,
+                       sizeof(out));
+
+    assert_int_equal(res, 0);
+
+    policy_node_tr_t *root = (policy_node_tr_t *) out;
+
+    assert_int_equal(root->key_placeholder->key_index, 0);
+    assert_int_equal(root->key_placeholder->num_first, 0);
+    assert_int_equal(root->key_placeholder->num_second, 1);
+
+    policy_node_tree_t *taptree = root->tree;
+
+    assert_int_equal(taptree->is_leaf, false);
+
+    policy_node_tree_t *taptree_left = (policy_node_tree_t *) node_ptr(&taptree->left_tree);
+    assert_int_equal(taptree_left->is_leaf, true);
+    policy_node_multisig_t *tapscript_left =
+        (policy_node_multisig_t *) node_ptr(&taptree_left->script);
+
+    assert_int_equal(tapscript_left->base.type, TOKEN_MULTI_A);
+    assert_int_equal(tapscript_left->k, 1);
+    assert_int_equal(tapscript_left->n, 2);
+    check_key_placeholder(&tapscript_left->key_placeholders[0], 1, 0, 1);
+    check_key_placeholder(&tapscript_left->key_placeholders[1], 2, 0, 1);
+
+    policy_node_tree_t *taptree_right = (policy_node_tree_t *) node_ptr(&taptree->right_tree);
+    assert_int_equal(taptree_right->is_leaf, true);
+    policy_node_multisig_t *tapscript_right =
+        (policy_node_multisig_t *) node_ptr(&taptree_right->script);
+
+    assert_int_equal(tapscript_right->base.type, TOKEN_SORTEDMULTI_A);
+    assert_int_equal(tapscript_right->k, 2);
+    assert_int_equal(tapscript_right->n, 3);
+    check_key_placeholder(&tapscript_right->key_placeholders[0], 3, 0, 1);
+    check_key_placeholder(&tapscript_right->key_placeholders[1], 4, 0, 1);
+    check_key_placeholder(&tapscript_right->key_placeholders[2], 5, 0, 1);
 }
 
 static void test_failures(void **state) {
@@ -206,6 +306,24 @@ static void test_failures(void **state) {
     assert_true(0 > parse_policy("multi(@0/**,@1/**,@2/**,@3/**,@4/**)", out, sizeof(out)));
     assert_true(0 > parse_policy("multi(1)", out, sizeof(out)));
     assert_true(0 > parse_policy("multi(1,)", out, sizeof(out)));
+
+    // syntactically invalid tr descriptors
+    assert_true(0 > parse_policy("tr(,pk(@0))", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(pk(@0))", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(pk(@0),@1/**)", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,)", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,{})", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,@1/**)", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,{pk(@1)})", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,{pk(@1),})", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,{,pk(@1)})", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,{@1/**,pk(@2)})", out, sizeof(out)));
+
+    // invalid tokens within tr scripts
+    assert_true(0 > parse_policy("tr(@0/**,multi(2,@1,@2))", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,sortedmulti(2,@1,@2))", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,sh(pk(@0/**)))", out, sizeof(out)));
+    assert_true(0 > parse_policy("tr(@0/**,wsh(pk(@0/**)))", out, sizeof(out)));
 }
 
 enum TestMode {
@@ -391,6 +509,8 @@ int main() {
         cmocka_unit_test(test_parse_policy_map_multisig_1),
         cmocka_unit_test(test_parse_policy_map_multisig_2),
         cmocka_unit_test(test_parse_policy_map_multisig_3),
+        cmocka_unit_test(test_parse_policy_tr),
+        cmocka_unit_test(test_parse_policy_tr_multisig),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
     };
