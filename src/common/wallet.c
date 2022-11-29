@@ -33,7 +33,9 @@ static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_PKH, .name = "pkh"},
     {.type = TOKEN_WPKH, .name = "wpkh"},
     {.type = TOKEN_MULTI, .name = "multi"},
+    {.type = TOKEN_MULTI_A, .name = "multi_a"},
     {.type = TOKEN_SORTEDMULTI, .name = "sortedmulti"},
+    {.type = TOKEN_SORTEDMULTI_A, .name = "sortedmulti_a"},
     {.type = TOKEN_TR, .name = "tr"},
 
     // miniscript tokens (except wrappers)
@@ -93,7 +95,7 @@ const bool is_valid_miniscript_wrapper[] = {
  * Length of the longest token in the policy wallet descriptor language (not including the
  * terminating \0 byte).
  */
-#define MAX_TOKEN_LENGTH (sizeof("sortedmulti") - 1)
+#define MAX_TOKEN_LENGTH (sizeof("sortedmulti_a") - 1)
 
 int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *header) {
     if (!buffer_read_u8(buffer, &header->version)) {
@@ -472,6 +474,7 @@ static int parse_placeholder(buffer_t *in_buf, int version, policy_node_key_plac
 
 #define CONTEXT_WITHIN_SH  1  // parsing a direct child of SH
 #define CONTEXT_WITHIN_WSH 2  // parsing a direct child of WSH
+#define CONTEXT_WITHIN_TR  4  // parsing a child of TR (direct or not)
 
 // forward declaration
 static int parse_script(buffer_t *in_buf,
@@ -492,7 +495,7 @@ static int parse_child_scripts(buffer_t *in_buf,
 
     for (int child_index = 0; child_index < n_children; child_index++) {
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        init_node_ptr(&child_scripts[child_index], (policy_node_t *) buffer_get_cur(out_buf));
+        init_relative_ptr(&child_scripts[child_index], buffer_get_cur(out_buf));
 
         if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
             // failed while parsing internal script
@@ -506,6 +509,9 @@ static int parse_child_scripts(buffer_t *in_buf,
     }
     return 0;
 }
+
+// forward-declaration, since it's used in parse_script
+static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t depth);
 
 /**
  * Parses a SCRIPT expression from the in_buf buffer, allocating the nodes and variables in out_buf.
@@ -584,7 +590,7 @@ static int parse_script(buffer_t *in_buf,
                 }
 
                 if (inner_wrapper != NULL) {
-                    init_node_ptr(&inner_wrapper->script, (policy_node_t *) node);
+                    init_relative_ptr(&inner_wrapper->script, node);
                 }
                 inner_wrapper = node;
             }
@@ -596,6 +602,19 @@ static int parse_script(buffer_t *in_buf,
 
     // We read the token, we'll do different parsing based on what token we find
     PolicyNodeType token = parse_token(in_buf);
+
+    if (context_flags & CONTEXT_WITHIN_TR) {
+        // whitelist of allowed tokens within tr scripts
+        // more will be added with taproot miniscript support
+        switch (token) {
+            case TOKEN_PK:
+            case TOKEN_MULTI_A:
+            case TOKEN_SORTEDMULTI_A:
+                break;
+            default:
+                return WITH_ERROR(-1, "Token not allowed within tr");
+        }
+    }
 
     if (context_flags & CONTEXT_WITHIN_SH) {
         // whitelist of allowed tokens within sh; in particular, no miniscript
@@ -702,7 +721,7 @@ static int parse_script(buffer_t *in_buf,
             // the internal script is recursively parsed (if successful) in the current location
             // of the output buffer
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            init_node_ptr(&node->script, (policy_node_t *) buffer_get_cur(out_buf));
+            init_relative_ptr(&node->script, buffer_get_cur(out_buf));
 
             if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                 // failed while parsing internal script
@@ -1258,7 +1277,7 @@ static int parse_script(buffer_t *in_buf,
                 ++node->n;
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-                init_node_ptr(&cur->script, (policy_node_t *) buffer_get_cur(out_buf));
+                init_relative_ptr(&cur->script, buffer_get_cur(out_buf));
                 if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
                     // failed while parsing internal script
                     return -1;
@@ -1410,15 +1429,13 @@ static int parse_script(buffer_t *in_buf,
 
             break;
         }
-        case TOKEN_TR: {  // currently supporting x-only keys
+        case TOKEN_TR: {  // supporting only xpubs
             if (depth > 1) {
                 return WITH_ERROR(-1, "tr can only be top-level");
             }
 
-            policy_node_with_key_t *node =
-                (policy_node_with_key_t *) buffer_alloc(out_buf,
-                                                        sizeof(policy_node_with_key_t),
-                                                        true);
+            policy_node_tr_t *node =
+                (policy_node_tr_t *) buffer_alloc(out_buf, sizeof(policy_node_tr_t), true);
             if (node == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
@@ -1432,6 +1449,28 @@ static int parse_script(buffer_t *in_buf,
 
             if (0 > parse_placeholder(in_buf, version, node->key_placeholder)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
+            }
+
+            uint8_t c;
+            if (!buffer_peek(in_buf, &c)) {
+                return WITH_ERROR(-1, "buffer exhausted too early while parsing tr");
+            }
+            if (c == ',') {
+                // Parse a TREE node
+                buffer_seek_cur(in_buf, 1);  // skip ','
+
+                buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
+                node->tree = (policy_node_tree_t *) buffer_get_cur(out_buf);
+
+                if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
+                    return WITH_ERROR(-1, "Failed to parse TREE expression");
+                }
+            } else {
+                // no TREE, only tr(KP)
+                if (c != ')') {
+                    return WITH_ERROR(-1, "Failed to parse tr");
+                }
+                node->tree = NULL;
             }
 
             parsed_node = (policy_node_t *) node;
@@ -1473,7 +1512,9 @@ static int parse_script(buffer_t *in_buf,
             break;
         }
         case TOKEN_MULTI:
-        case TOKEN_SORTEDMULTI: {
+        case TOKEN_MULTI_A:
+        case TOKEN_SORTEDMULTI:
+        case TOKEN_SORTEDMULTI_A: {
             policy_node_multisig_t *node =
                 (policy_node_multisig_t *) buffer_alloc(out_buf,
                                                         sizeof(policy_node_multisig_t),
@@ -1488,7 +1529,7 @@ static int parse_script(buffer_t *in_buf,
                 if (context_flags & CONTEXT_WITHIN_SH) ++n_sh_wrappers;
                 if (context_flags & CONTEXT_WITHIN_WSH) ++n_sh_wrappers;
 
-                // sortedmulti cannot be used bare, and can only be directly under sh() or sh(wsh())
+                // sortedmulti can only be used bare, or directly under sh(), wsh()
                 if (depth != n_sh_wrappers) {
                     return WITH_ERROR(-1,
                                       "sortedmulti can only be bare, or directly under sh or wsh");
@@ -1576,7 +1617,7 @@ static int parse_script(buffer_t *in_buf,
     // if there was one or more wrappers, the script of the most internal node must point
     // to the parsed node
     if (inner_wrapper != NULL) {
-        init_node_ptr(&inner_wrapper->script, parsed_node);
+        init_relative_ptr(&inner_wrapper->script, parsed_node);
     }
 
     // Validate and compute the flags (miniscript type and modifiers) for all the wrapper, if any
@@ -1744,6 +1785,72 @@ static int parse_script(buffer_t *in_buf,
                 break;
             default:
                 return WITH_ERROR(-1, "unreachable code reached");
+        }
+    }
+
+    return 0;
+}
+
+// Parses a TREE expression inside tr()
+// TODO: we might want to change the meaning of "depth" to match the Merkle tree, here
+static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t depth) {
+    // out_buf must be aligned before calling this function
+
+    // TODO: should add a buffer_is_aligned() function in buffer.h
+    if ((unsigned int) (out_buf->ptr + out_buf->offset) % 4 != 0) {
+        return WITH_ERROR(-1, "out_buf not aligned");
+    }
+
+    policy_node_tree_t *tree_node =
+        (policy_node_tree_t *) buffer_alloc(out_buf, sizeof(policy_node_tree_t), true);
+
+    if (tree_node == NULL) {
+        return WITH_ERROR(-1, "Out of memory");
+    }
+
+    uint8_t c;
+
+    // the first character must be a '{'
+    if (!buffer_peek(in_buf, &c)) {
+        return WITH_ERROR(-1, "buffer ended too early");
+    }
+
+    if (c != '{') {
+        // parse a SCRIPT
+        tree_node->is_leaf = true;
+
+        buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
+        init_relative_ptr(&tree_node->script, buffer_get_cur(out_buf));
+        if (0 > parse_script(in_buf, out_buf, version, depth + 1, CONTEXT_WITHIN_TR)) {
+            return -1;
+        }
+    } else {
+        // parse a {TREE,TREE}
+        tree_node->is_leaf = false;
+        buffer_seek_cur(in_buf, 1);  // skip '{'
+
+        // parse first TREE expression
+        buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
+        init_relative_ptr(&tree_node->left_tree, buffer_get_cur(out_buf));
+        if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
+            return -1;
+        }
+
+        // the next character must be a comma
+        if (!consume_character(in_buf, ',')) {
+            return WITH_ERROR(-1, "Expected a comma");
+        }
+
+        // parse the second TREE expression
+        buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
+        init_relative_ptr(&tree_node->right_tree, buffer_get_cur(out_buf));
+        if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
+            return -1;
+        }
+
+        // the next character must be a comma
+        if (!consume_character(in_buf, '}')) {
+            return WITH_ERROR(-1, "Expected a '}'");
         }
     }
 

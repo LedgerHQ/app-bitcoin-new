@@ -760,7 +760,11 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     PRINT_STACK_POINTER();
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
-    policy_node_with_key_t *policy = (policy_node_with_key_t *) node->policy_node;
+    policy_node_tr_t *policy = (policy_node_tr_t *) node->policy_node;
+
+    if (policy->tree != NULL) {
+        return WITH_ERROR(-1, "Not implemented");
+    }
 
     uint8_t compressed_pubkey[33];
     uint8_t tweaked_key[32];
@@ -918,6 +922,11 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
             case TOKEN_MULTI:
             case TOKEN_SORTEDMULTI:
                 ret = execute_processor(&state, process_multi_sortedmulti_node, NULL);
+                break;
+            case TOKEN_MULTI_A:
+            case TOKEN_SORTEDMULTI_A:
+                // TODO: not implemented
+                ret = -1;
                 break;
             case TOKEN_A:
                 ret = execute_processor(&state, process_generic_node, commands_a);
@@ -1109,12 +1118,21 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_PK_H:
         case TOKEN_PK:
         case TOKEN_PKH:
-        case TOKEN_WPKH:
-        // tr has a key, plus a child script; for now, we only support key
-        case TOKEN_TR: {
+        case TOKEN_WPKH: {
             if (i == 0) {
                 memcpy(out_placeholder,
                        ((policy_node_with_key_t *) policy)->key_placeholder,
+                       sizeof(policy_node_key_placeholder_t));
+            }
+            return 1;
+        }
+        case TOKEN_TR: {
+            if (((policy_node_tr_t *) policy)->tree != NULL) {
+                return -1;  // TODO: not implemented
+            }
+            if (i == 0) {
+                memcpy(out_placeholder,
+                       ((policy_node_tr_t *) policy)->key_placeholder,
                        sizeof(policy_node_key_placeholder_t));
             }
             return 1;
@@ -1132,6 +1150,12 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             }
 
             return node->n;
+        }
+
+        case TOKEN_MULTI_A:
+        case TOKEN_SORTEDMULTI_A: {
+            // TODO: not implemented
+            return -1;
         }
 
         // nodes with a single child script (including miniscript wrappers)
