@@ -91,9 +91,12 @@ def test_register_wallet_reject_header(client: Client):
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_invalid_names(client: Client):
+    too_long_name = "This wallet name is much too long since it requires 65 characters"
+    assert len(too_long_name) == 65
+
     for invalid_name in [
         "",  # empty name not allowed
-        "Very long walletz",  # 17 characters is too long
+        too_long_name,  # 65 characters is too long
         " Test", "Test ",  # can't start with spaces
         "Tæst",  # characters out of allowed range
     ]:
@@ -107,8 +110,8 @@ def test_register_wallet_invalid_names(client: Client):
             ],
         )
 
-    with pytest.raises(IncorrectDataError):
-        client.register_wallet(wallet)
+        with pytest.raises(IncorrectDataError):
+            client.register_wallet(wallet)
 
 
 @has_automation("automations/register_wallet_accept.json")
