@@ -57,6 +57,7 @@ typedef struct {
     const uint8_t *keys_merkle_root;
     uint32_t n_keys;
     bool change;
+    bool is_taproot;
     size_t address_index;
 
     policy_parser_node_state_t nodes[MAX_POLICY_DEPTH];  // stack of nodes being processed
@@ -68,11 +69,11 @@ typedef struct {
     uint8_t hash[32];  // when a node processed in hash mode is popped, the hash is computed here
 } policy_parser_state_t;
 
-// comparator for pointers to compressed pubkeys
-static int cmp_compressed_pubkeys(const void *a, const void *b) {
+// comparator for pointers to arrays of equal length
+static int cmp_arrays(const void *a, const void *b, size_t length) {
     const uint8_t *key_a = (const uint8_t *) a;
     const uint8_t *key_b = (const uint8_t *) b;
-    for (int i = 0; i < 33; i++) {
+    for (size_t i = 0; i < length; i++) {
         int diff = key_a[i] - key_b[i];
         if (diff != 0) {
             return diff;
@@ -536,8 +537,14 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
                     return -1;
                 }
 
-                update_output_u8(state, 33);  // PUSH 33 bytes
-                update_output(state, compressed_pubkey, 33);
+                if (!state->is_taproot) {
+                    update_output_u8(state, 33);  // PUSH 33 bytes
+                    update_output(state, compressed_pubkey, 33);
+                } else {
+                    // x-only pubkey if within taproot
+                    update_output_u8(state, 32);  // PUSH 32 bytes
+                    update_output(state, compressed_pubkey + 1, 32);
+                }
                 break;
             }
             case CMD_CODE_PUSH_PKH: {
@@ -699,6 +706,10 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     const policy_node_multisig_t *policy = (const policy_node_multisig_t *) node->policy_node;
 
+    if (policy->n > 16) {
+        return WITH_ERROR(-1, "Implemented only for n <= 16");
+    }
+
     // k {pubkey_1} ... {pubkey_n} n OP_CHECKMULTISIG
 
     update_output_u8(state, 0x50 + policy->k);  // OP_k
@@ -737,7 +748,7 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
                         return -1;
                     }
 
-                    if (cmp_compressed_pubkeys(compressed_pubkey, cur_pubkey) > 0) {
+                    if (cmp_arrays(compressed_pubkey, cur_pubkey, 33) > 0) {
                         memcpy(compressed_pubkey, cur_pubkey, 33);
                         smallest_pubkey_index = j;
                     }
@@ -757,6 +768,112 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     return 1;
 }
 
+static int process_multi_a_sortedmulti_a_node(policy_parser_state_t *state, const void *arg) {
+    UNUSED(arg);
+
+    PRINT_STACK_POINTER();
+
+    policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
+    const policy_node_multisig_t *policy = (const policy_node_multisig_t *) node->policy_node;
+
+    if (policy->k > 16) {
+        return WITH_ERROR(-1, "Implemented only for k <= 16");
+    }
+
+    // <pk_1> OP_CHECKSIG <pk_2> OP_CHECKSIGADD ... <pk_n> OP_CHECKSIGADD <k> OP_NUMEQUAL
+
+    // bitvector of used keys (only relevant for sorting keys in SORTEDMULTI)
+    uint8_t used[BITVECTOR_REAL_SIZE(MAX_PUBKEYS_PER_MULTISIG)];
+    memset(used, 0, sizeof(memset));
+
+    for (int i = 0; i < policy->n; i++) {
+        uint8_t compressed_pubkey[33];
+
+        if (policy->base.type == TOKEN_MULTI_A) {
+            if (-1 == get_derived_pubkey(state, &policy->key_placeholders[i], compressed_pubkey)) {
+                return -1;
+            }
+        } else {
+            // Inefficient O(n^2) sorting; check process_multi_sortedmulti_node for the motivation.
+
+            int smallest_pubkey_index = -1;
+            memset(compressed_pubkey, 0xFF, sizeof(compressed_pubkey));  // init to largest value
+
+            for (int j = 0; j < policy->n; j++) {
+                if (!bitvector_get(used, j)) {
+                    uint8_t cur_pubkey[33];
+                    if (-1 == get_derived_pubkey(state, &policy->key_placeholders[j], cur_pubkey)) {
+                        return -1;
+                    }
+
+                    // x-only pubkeys must be compared ignoring the first byte
+                    if (cmp_arrays(compressed_pubkey + 1, cur_pubkey + 1, 32) > 0) {
+                        memcpy(compressed_pubkey, cur_pubkey, 33);
+                        smallest_pubkey_index = j;
+                    }
+                }
+            }
+            bitvector_set(used, smallest_pubkey_index, true);  // mark the key as used
+        }
+
+        // push <i-th pubkey> as x-only key (32 = 0x20 bytes)
+        update_output_u8(state, 0x20);
+        update_output(state, compressed_pubkey + 1, 32);
+
+        if (i == 0) {
+            update_output_u8(state, OP_CHECKSIG);
+        } else {
+            update_output_u8(state, OP_CHECKSIGADD);
+        }
+    }
+
+    update_output_u8(state, 0x50 + policy->k);  // <k>
+    update_output_op_v(state, OP_NUMEQUAL);     // OP_NUMEQUAL
+
+    return 1;
+}
+
+static int compute_tapleaf_hash(policy_parser_state_t *state,
+                                const policy_node_t *script_policy,
+                                uint8_t out[static 32]) {
+    uint8_t script[256];  // TODO: what's a good max size? Can we avoid having it at all?
+
+    buffer_t out_buf = buffer_create(script, sizeof(script));
+    int script_len = call_get_wallet_script(state->dispatcher_context,
+                                            script_policy,
+                                            state->wallet_version,
+                                            state->keys_merkle_root,
+                                            state->n_keys,
+                                            state->change,
+                                            state->address_index,
+                                            true,
+                                            &out_buf);
+
+    if (script_len < 0) {
+        return WITH_ERROR(-1, "Failed to compute tapleaf script");
+    }
+
+    crypto_tr_compute_tapleaf_hash(script, script_len, out);
+
+    return 0;
+}
+
+// See taproot_tree_helper in BIP-0341
+// This only computes h, assuming leaf_version = 0xc0.
+static int compute_taptree_hash(policy_parser_state_t *state,
+                                const policy_node_tree_t *tree,
+                                uint8_t out[static 32]) {
+    if (tree->is_leaf) {
+        return compute_tapleaf_hash(state, resolve_node_ptr(&tree->script), out);
+    } else {
+        uint8_t left_h[32], right_h[32];
+        if (0 > compute_taptree_hash(state, resolve_ptr(&tree->left_tree), left_h)) return -1;
+        if (0 > compute_taptree_hash(state, resolve_ptr(&tree->right_tree), right_h)) return -1;
+        crypto_tr_combine_taptree_hashes(left_h, right_h, out);
+        return 0;
+    }
+}
+
 static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     UNUSED(arg);
 
@@ -764,10 +881,6 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
 
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     policy_node_tr_t *policy = (policy_node_tr_t *) node->policy_node;
-
-    if (policy->tree != NULL) {
-        return WITH_ERROR(-1, "Not implemented");
-    }
 
     uint8_t compressed_pubkey[33];
     uint8_t tweaked_key[32];
@@ -779,8 +892,16 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     update_output_u8(state, OP_1);
     update_output_u8(state, 32);  // PUSH 32 bytes
 
+    uint8_t h[32];
     uint8_t parity;
-    crypto_tr_tweak_pubkey(compressed_pubkey + 1, &parity, tweaked_key);
+    int h_length = 0;
+
+    if (policy->tree != NULL) {
+        compute_taptree_hash(state, policy->tree, h);
+        h_length = 32;
+    }
+
+    crypto_tr_tweak_pubkey(compressed_pubkey + 1, h, h_length, &parity, tweaked_key);
 
     update_output(state, tweaked_key, 32);
 
@@ -795,6 +916,9 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
 // make sure that the compiler gives an error if any PolicyNodeType is missed
 #pragma GCC diagnostic error "-Wswitch-enum"
 
+// TODO: this function is messy because it doesn't distinguish between the evaluation of the "outer"
+// script, from the evaluation of a script inside a TREE expression of a tr() descriptor. It should
+// be refactored.
 int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            const policy_node_t *policy,
                            int wallet_version,
@@ -802,6 +926,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            uint32_t n_keys,
                            bool change,
                            size_t address_index,
+                           bool is_taproot,
                            buffer_t *out_buf) {
     policy_parser_state_t state = {.dispatcher_context = dispatcher_context,
                                    .wallet_version = wallet_version,
@@ -809,6 +934,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                                    .n_keys = n_keys,
                                    .change = change,
                                    .address_index = address_index,
+                                   .is_taproot = is_taproot,
                                    .node_stack_eos = 0};
 
     const policy_node_t *core_policy;
@@ -928,8 +1054,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                 break;
             case TOKEN_MULTI_A:
             case TOKEN_SORTEDMULTI_A:
-                // TODO: not implemented
-                ret = -1;
+                ret = execute_processor(&state, process_multi_a_sortedmulti_a_node, NULL);
                 break;
             case TOKEN_A:
                 ret = execute_processor(&state, process_generic_node, commands_a);
@@ -1095,6 +1220,30 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
 // make sure that the compiler gives an error if any PolicyNodeType is missed
 #pragma GCC diagnostic error "-Wswitch-enum"
 
+static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
+                                                unsigned int i,
+                                                policy_node_key_placeholder_t *out_placeholder) {
+    if (tree->is_leaf) {
+        return get_key_placeholder_by_index(resolve_node_ptr(&tree->script), i, out_placeholder);
+    } else {
+        int ret1 = get_key_placeholder_by_index_in_tree(
+            (policy_node_tree_t *) resolve_ptr(&tree->left_tree),
+            i,
+            out_placeholder);
+        if (ret1 < 0) return -1;
+
+        bool found = i < (unsigned int) ret1;
+
+        int ret2 = get_key_placeholder_by_index_in_tree(
+            (policy_node_tree_t *) resolve_ptr(&tree->right_tree),
+            found ? 0 : i - ret1,
+            found ? NULL : out_placeholder);
+        if (ret2 < 0) return -1;
+
+        return ret1 + ret2;
+    }
+}
+
 int get_key_placeholder_by_index(const policy_node_t *policy,
                                  unsigned int i,
                                  policy_node_key_placeholder_t *out_placeholder) {
@@ -1130,20 +1279,31 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             return 1;
         }
         case TOKEN_TR: {
-            if (((policy_node_tr_t *) policy)->tree != NULL) {
-                return -1;  // TODO: not implemented
-            }
             if (i == 0) {
                 memcpy(out_placeholder,
                        ((policy_node_tr_t *) policy)->key_placeholder,
                        sizeof(policy_node_key_placeholder_t));
             }
-            return 1;
+            if (((policy_node_tr_t *) policy)->tree != NULL) {
+                int ret_tree = get_key_placeholder_by_index_in_tree(
+                    ((policy_node_tr_t *) policy)->tree,
+                    i == 0 ? 0 : i - 1,
+                    i == 0 ? NULL : out_placeholder);  // if i == 0, we already found it; so we
+                                                       // recur with out_placeholder set to NULL
+                if (ret_tree < 0) {
+                    return -1;
+                }
+                return 1 + ret_tree;
+            } else {
+                return 1;
+            }
         }
 
         // terminal nodes with multiple keys
         case TOKEN_MULTI:
-        case TOKEN_SORTEDMULTI: {
+        case TOKEN_MULTI_A:
+        case TOKEN_SORTEDMULTI:
+        case TOKEN_SORTEDMULTI_A: {
             const policy_node_multisig_t *node = (const policy_node_multisig_t *) policy;
 
             if (i < (unsigned int) node->n) {
@@ -1153,12 +1313,6 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             }
 
             return node->n;
-        }
-
-        case TOKEN_MULTI_A:
-        case TOKEN_SORTEDMULTI_A: {
-            // TODO: not implemented
-            return -1;
         }
 
         // nodes with a single child script (including miniscript wrappers)

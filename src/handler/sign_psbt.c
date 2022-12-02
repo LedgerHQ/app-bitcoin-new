@@ -1898,7 +1898,9 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
-            crypto_tr_tweak_seckey(seckey);
+
+            // TODO: use the correct tweak for script path spend
+            crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
 
             // generate corresponding public key
             cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);

@@ -47,7 +47,9 @@ int read_and_parse_wallet_policy(
  *   0 for a receive address, 1 for a change address
  * @param[in] address_index
  *   The address index
- * @param[in] out_buf
+ * @param[in] is_taproot
+ *   true if within a taproot tree, false otherwise
+ * @param[out] out_buf
  *   A buffer to contain the script. If the available space in the buffer is not enough, the result
  * is truncated, but the correct length is still returned in case of success.
  *
@@ -61,6 +63,7 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            uint32_t n_keys,
                            bool change,
                            size_t address_index,
+                           bool is_taproot,
                            buffer_t *out_buf);
 
 /**

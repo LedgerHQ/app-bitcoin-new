@@ -257,6 +257,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
                                                 wallet_header.n_keys,
                                                 is_change,
                                                 address_index,
+                                                false,
                                                 &script_buf);
         if (script_len < 0) {
             PRINTF("Couldn't produce wallet script\n");

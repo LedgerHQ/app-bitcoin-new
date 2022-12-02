@@ -251,3 +251,28 @@ def test_register_unusual_singlesig_accounts(client: Client, speculos_globals):
         descriptor_template="tr(@0/**)",
         keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
     ))
+
+
+@has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_tr_script_pk(client: Client, speculos_globals):
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Taproot foreign internal key, and our script key",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ))
+
+
+@has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_tr_script_sortedmulti(client: Client, speculos_globals):
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Taproot single-key or multisig 2-of-2",
+        descriptor_template="tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ))
