@@ -243,13 +243,9 @@ async fn test_sign_psbt() {
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
 
-        // assert_eq!(address.to_string(), address_result);
-
         let _res = async_client::BitcoinClient::new(transport.clone())
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .await
             .unwrap();
-
-        // assert_eq!(address.to_string(), address_result);
     }
 }
