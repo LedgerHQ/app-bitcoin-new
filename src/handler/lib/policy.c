@@ -1222,7 +1222,7 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
 
 static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
                                                 unsigned int i,
-                                                const policy_node_tree_t **out_tapleaf_ptr,
+                                                const policy_node_t **out_tapleaf_ptr,
                                                 policy_node_key_placeholder_t *out_placeholder) {
     if (tree->is_leaf) {
         int ret =

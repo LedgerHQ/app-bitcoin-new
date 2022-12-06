@@ -367,9 +367,64 @@ static int get_amount_scriptpubkey_from_psbt(
                                                         NULL);
 }
 
+static int extract_bip32_derivation(dispatcher_context_t *dc,
+                                    int psbt_key_type,
+                                    const uint8_t values_root[static 32],
+                                    uint32_t merkle_tree_size,
+                                    int index,
+                                    uint32_t out[static 1 + MAX_BIP32_PATH_STEPS]) {
+    // TODO: we can improve this by parsing while streaming the response, using less memory while
+    // also removing the size limit.
+    // Here we are assuming the same pubkey does not appear in more than 7 leaves of the taptree,
+    // otherwise we will not be able to use it.
+    uint8_t response[1 + 32 * 7 + 4 * (1 + MAX_BIP32_PATH_STEPS)];
+
+    int len = call_get_merkle_leaf_element(dc,
+                                           values_root,
+                                           merkle_tree_size,
+                                           index,
+                                           response,
+                                           sizeof(response));
+    if (len < 0) {
+        return -1;
+    }
+
+    buffer_t response_buf = buffer_create(response, len);
+
+    // taproot fields have the list of hashes first, which we want to skip
+    bool is_tap = psbt_key_type == PSBT_IN_TAP_BIP32_DERIVATION ||
+                  psbt_key_type == PSBT_OUT_TAP_BIP32_DERIVATION;
+    if (is_tap) {
+        uint64_t hashes_len;
+        if (!buffer_read_varint(&response_buf, &hashes_len) || hashes_len > UINT16_MAX) {
+            return -1;
+        }
+        // make sure we can read 32 * hashes_len bytes, but we skip them
+        if (!buffer_can_read(&response_buf, 32 * (uint32_t) hashes_len)) {
+            return -1;
+        }
+        buffer_seek_cur(&response_buf, 32 * (uint32_t) hashes_len);
+    }
+
+    // read the fingerprint
+    if (!buffer_read_u32(&response_buf, &out[0], BE)) {
+        return -1;
+    }
+    int n_steps = 0;
+    while (n_steps < MAX_BIP32_PATH_STEPS && buffer_can_read(&response_buf, 4)) {
+        buffer_read_u32(&response_buf, &out[1 + n_steps], LE);
+        ++n_steps;
+    }
+    if (buffer_can_read(&response_buf, 1)) {
+        // either invalid path, or longer than MAX_BIP32_PATH_STEPS
+        return -1;
+    }
+    return n_steps;
+}
+
 // Convenience function to share common logic when processing all the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
-int read_change_and_index_from_psbt_bip32_derivation(
+static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     placeholder_info_t *placeholder_info,
     in_out_info_t *in_out,
@@ -399,51 +454,39 @@ int read_change_and_index_from_psbt_bip32_derivation(
         return -1;
     }
 
-    // get the corresponding value in the values Merkle tree (note: it doesn't work for
-    // taproot scripts)
-    uint8_t hasheslen_fpt_der[1 + 4 + 4 * MAX_BIP32_PATH_STEPS];
-    int len = call_get_merkle_leaf_element(dc,
+    // get the corresponding value in the values Merkle tree,
+    // then fetch the bip32 path from the field
+    uint32_t fpt_der[1 + MAX_BIP32_PATH_STEPS];
+
+    int der_len = extract_bip32_derivation(dc,
+                                           psbt_key_type,
                                            map_commitment->values_root,
-                                           (uint32_t) map_commitment->size,
+                                           map_commitment->size,
                                            index,
-                                           hasheslen_fpt_der,
-                                           sizeof(hasheslen_fpt_der));
-    int prefix_len = (psbt_key_type == psbt_key_type_taproot) ? 1 : 0;
-
-    // length sanity checks: at least 4 bytes for the fingerprint, and two derivation steps
-    if (len < prefix_len + 4 + 2 * 4 || (len - prefix_len) % 4 != 0) {
-        PRINTF("Invalid length of _BIP32_DERIVATION value: %d\n", len);
+                                           fpt_der);
+    if (der_len < 0) {
+        PRINTF("Failed to read BIP32_DERIVATION\n");
         return -1;
     }
 
-    // for PSBT_{IN,OUT}_TAP_BIP32_DERIVATION, there is a 1 byte 0x00 prefix
-    // anything with a different initial byte is a possible script path spend,
-    // which is not yet supported
-    if (psbt_key_type == psbt_key_type_taproot && hasheslen_fpt_der[0] != 0) {
-        PRINTF("PSBT_{IN,OUT}_TAP_BIP32_DERIVATION must have a 0-length list of hashes");
+    if (der_len < 2 || der_len > MAX_BIP32_PATH_STEPS) {
+        PRINTF("BIP32_DERIVATION path too long\n");
         return -1;
     }
-
-    int der_len = (len - prefix_len - 4) / 4;
 
     // if this derivation path matches the internal placeholder,
     // we use it to detect whether the current input is change or not,
     // and store its address index
-    uint32_t fpr = read_u32_be(hasheslen_fpt_der, prefix_len);
-
-    if (fpr == placeholder_info->fingerprint &&
+    if (fpt_der[0] == placeholder_info->fingerprint &&
         der_len == placeholder_info->key_derivation_length + 2) {
-        const uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
         for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-            uint32_t der_step = read_u32_le(derivation_path, 4 * i);
-
-            if (placeholder_info->key_derivation[i] != der_step) {
+            if (placeholder_info->key_derivation[i] != fpt_der[1 + i]) {
                 return 0;
             }
         }
 
-        uint32_t change = read_u32_le(derivation_path, 4 * (der_len - 2));
-        uint32_t addr_index = read_u32_le(derivation_path, 4 * (der_len - 1));
+        uint32_t change = fpt_der[1 + der_len - 2];
+        uint32_t addr_index = fpt_der[1 + der_len - 1];
 
         // check that we can indeed derive the same key from the current placeholder
         serialized_extended_pubkey_t pubkey;
@@ -2267,7 +2310,7 @@ sign_transaction(dispatcher_context_t *dc,
     while (true) {
         placeholder_info_t placeholder_info;
 
-        const policy_node_tree_t *tapleaf_ptr = NULL;
+        const policy_node_t *tapleaf_ptr = NULL;
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
                                                               placeholder_index,
                                                               &tapleaf_ptr,
