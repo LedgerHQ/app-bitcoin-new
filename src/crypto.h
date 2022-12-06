@@ -51,7 +51,8 @@ int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
                               uint8_t bip32_path_len);
 
 /**
- * Initialize public key given private key.
+ * Generates the child extended public key, from a parent extended public key and non-hardened
+ * index.
  *
  * @param[in]  parent
  *   Pointer to the extended serialized pubkey of the parent.

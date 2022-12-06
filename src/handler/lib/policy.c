@@ -1222,13 +1222,20 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
 
 static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
                                                 unsigned int i,
+                                                const policy_node_tree_t **out_tapleaf_ptr,
                                                 policy_node_key_placeholder_t *out_placeholder) {
     if (tree->is_leaf) {
-        return get_key_placeholder_by_index(resolve_node_ptr(&tree->script), i, out_placeholder);
+        int ret =
+            get_key_placeholder_by_index(resolve_node_ptr(&tree->script), i, NULL, out_placeholder);
+        if (ret >= 0 && out_tapleaf_ptr != NULL && i < (unsigned) ret) {
+            *out_tapleaf_ptr = resolve_ptr(&tree->script);
+        }
+        return ret;
     } else {
         int ret1 = get_key_placeholder_by_index_in_tree(
             (policy_node_tree_t *) resolve_ptr(&tree->left_tree),
             i,
+            out_tapleaf_ptr,
             out_placeholder);
         if (ret1 < 0) return -1;
 
@@ -1237,6 +1244,7 @@ static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
         int ret2 = get_key_placeholder_by_index_in_tree(
             (policy_node_tree_t *) resolve_ptr(&tree->right_tree),
             found ? 0 : i - ret1,
+            found ? NULL : out_tapleaf_ptr,
             found ? NULL : out_placeholder);
         if (ret2 < 0) return -1;
 
@@ -1246,6 +1254,7 @@ static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
 
 int get_key_placeholder_by_index(const policy_node_t *policy,
                                  unsigned int i,
+                                 const policy_node_t **out_tapleaf_ptr,
                                  policy_node_key_placeholder_t *out_placeholder) {
     // make sure that out_placeholder is a valid pointer, if the output is not needed
     policy_node_key_placeholder_t tmp;
@@ -1288,6 +1297,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
                 int ret_tree = get_key_placeholder_by_index_in_tree(
                     ((policy_node_tr_t *) policy)->tree,
                     i == 0 ? 0 : i - 1,
+                    i == 0 ? NULL : out_tapleaf_ptr,
                     i == 0 ? NULL : out_placeholder);  // if i == 0, we already found it; so we
                                                        // recur with out_placeholder set to NULL
                 if (ret_tree < 0) {
@@ -1331,6 +1341,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             return get_key_placeholder_by_index(
                 resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script),
                 i,
+                out_tapleaf_ptr,
                 out_placeholder);
         }
 
@@ -1345,12 +1356,14 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             const policy_node_with_script2_t *node = (const policy_node_with_script2_t *) policy;
             int ret1 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[0]),
                                                     i,
+                                                    out_tapleaf_ptr,
                                                     out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
             int ret2 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
+                                                    found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
             if (ret2 < 0) return -1;
 
@@ -1362,18 +1375,21 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             const policy_node_with_script3_t *node = (const policy_node_with_script3_t *) policy;
             int ret1 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[0]),
                                                     i,
+                                                    out_tapleaf_ptr,
                                                     out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
             int ret2 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
+                                                    found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
             if (ret2 < 0) return -1;
 
             found = i < (unsigned int) (ret1 + ret2);
             int ret3 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[2]),
                                                     found ? 0 : i - ret1 - ret2,
+                                                    found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
             if (ret3 < 0) return -1;
             return ret1 + ret2 + ret3;
@@ -1389,6 +1405,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
                 found = i < (unsigned int) ret;
                 int ret_partial = get_key_placeholder_by_index(resolve_node_ptr(&cur_child->script),
                                                                found ? 0 : i - ret,
+                                                               found ? NULL : out_tapleaf_ptr,
                                                                found ? NULL : out_placeholder);
                 if (ret_partial < 0) return -1;
 
@@ -1527,7 +1544,7 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
     }
 
     // check that all the key placeholders for the same xpub do indeed have different derivations
-    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL);
+    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL, NULL);
     if (n_placeholders < 0) {
         return WITH_ERROR(-1, "Unexpected error while counting placeholders");
     }
@@ -1539,12 +1556,12 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
     for (int i = 0; i < n_placeholders - 1;
          i++) {  // no point in running this for the last placeholder
         policy_node_key_placeholder_t kp_i;
-        if (0 > get_key_placeholder_by_index(policy, i, &kp_i)) {
+        if (0 > get_key_placeholder_by_index(policy, i, NULL, &kp_i)) {
             return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
         }
         for (int j = i + 1; j < n_placeholders; j++) {
             policy_node_key_placeholder_t kp_j;
-            if (0 > get_key_placeholder_by_index(policy, j, &kp_j)) {
+            if (0 > get_key_placeholder_by_index(policy, j, NULL, &kp_j)) {
                 return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
             }
 

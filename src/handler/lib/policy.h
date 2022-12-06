@@ -109,12 +109,16 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
  *   Pointer to the root node of the policy
  * @param[in] i
  *   Index of the wanted placeholder. Ignored if out_placeholder is NULL.
+ * @param[out] out_tapleaf_ptr
+ *   If not NULL, and if the i-th placeholder is in a tapleaf of the policy, receives the pointer to
+ * the tapleaf's script.
  * @param[out] out_placeholder
  *   If not NULL, it is a pointer that will receive the i-th placeholder of the policy.
  * @return the number of placeholders in the policy on success; -1 in case of error.
  */
 int get_key_placeholder_by_index(const policy_node_t *policy,
                                  unsigned int i,
+                                 const policy_node_t **out_tapleaf_ptr,
                                  policy_node_key_placeholder_t *out_placeholder);
 
 /**

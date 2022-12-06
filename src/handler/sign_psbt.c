@@ -799,6 +799,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
     while (true) {
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
                                                               placeholder_info->cur_index,
+                                                              NULL,
                                                               &placeholder_info->placeholder);
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
@@ -2266,8 +2267,10 @@ sign_transaction(dispatcher_context_t *dc,
     while (true) {
         placeholder_info_t placeholder_info;
 
+        const policy_node_tree_t *tapleaf_ptr = NULL;
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
                                                               placeholder_index,
+                                                              &tapleaf_ptr,
                                                               &placeholder_info.placeholder);
 
         if (n_key_placeholders < 0) {
@@ -2282,9 +2285,15 @@ sign_transaction(dispatcher_context_t *dc,
 
         if (fill_placeholder_info_if_internal(dc, st, &placeholder_info) == true) {
             for (unsigned int i = 0; i < st->n_inputs; i++)
-                if (bitvector_get(internal_inputs, i))
+                if (bitvector_get(internal_inputs, i)) {
+                    if (tapleaf_ptr != NULL) {
+                        // TODO: remove
+                        PRINTF("Should sign a tapscript, but I don't know how to, yet :'(\n");
+                    }
+                    // TODO: if the placeholder is in a tapscript, we need the tapleaf hash
                     if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, i))
                         return false;
+                }
         }
 
         ++placeholder_index;
