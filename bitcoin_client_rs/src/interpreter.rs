@@ -150,7 +150,9 @@ fn get_preimage_command(
     };
 
     if payload_size < preimage.len() {
-        queue.push(Vec::from(&preimage[payload_size..]));
+        for byte in &preimage[payload_size..] {
+            queue.push(vec![*byte]);
+        }
     }
 
     let mut response = preimage_len_out;
@@ -266,7 +268,7 @@ fn get_more_elements(queue: &mut Vec<Vec<u8>>) -> Result<Vec<u8>, InterpreterErr
     *queue = queue[n_added_elements..].to_vec();
 
     let mut response = (n_added_elements as u8).to_be_bytes().to_vec();
-    response.extend_from_slice(&(element_length).to_be_bytes());
+    response.extend((element_length as u8).to_be_bytes());
     response.extend(response_elements);
     Ok(response)
 }
