@@ -1,5 +1,5 @@
 use core::convert::TryFrom;
-use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use bitcoin::hashes::hex::{FromHex, ToHex};
@@ -11,7 +11,7 @@ use ledger_bitcoin_client::{
 
 #[derive(Default, Clone)]
 pub struct RecordStore {
-    pub queue: HashMap<Vec<u8>, Vec<u8>>,
+    pub queue: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 impl RecordStore {
@@ -25,7 +25,7 @@ impl RecordStore {
             }
             if let Some(resp) = exchange.strip_prefix("<=") {
                 let resp = Vec::from_hex(resp).expect(&format!("Wrong tests data {}: {}", i, resp));
-                store.queue.insert(command.clone(), resp);
+                store.queue.push((command.clone(), resp));
             }
         }
 
@@ -33,19 +33,27 @@ impl RecordStore {
     }
 }
 
-#[derive(Clone)]
 pub struct TransportReplayer {
     store: RecordStore,
+    current: AtomicUsize,
 }
 
 impl TransportReplayer {
     pub fn new(store: RecordStore) -> TransportReplayer {
-        TransportReplayer { store }
+        TransportReplayer {
+            store,
+            current: AtomicUsize::new(0),
+        }
     }
 
     fn replay(&self, command: &APDUCommand) -> Result<(StatusWord, Vec<u8>), MockError> {
         let payload = command.encode();
-        if let Some(res) = self.store.queue.get(&payload) {
+        let current = self.current.load(Ordering::Relaxed);
+        if let Some((req, res)) = self.store.queue.get(current) {
+            if payload != *req {
+                return Err(MockError::ExchangeNotFound(current, payload.to_hex()));
+            }
+            self.current.store(current + 1, Ordering::Relaxed);
             let res = res.as_slice();
             let mut buff = [b'\0'; 2];
             buff.copy_from_slice(&res[res.len() - 2..res.len()]);
@@ -56,7 +64,7 @@ impl TransportReplayer {
                 answer.to_vec(),
             ));
         }
-        Err(MockError::ExchangeNotFound(payload.to_hex()))
+        Err(MockError::ExchangeNotFound(current, payload.to_hex()))
     }
 }
 
@@ -77,5 +85,5 @@ impl async_client::Transport for TransportReplayer {
 
 #[derive(Debug)]
 pub enum MockError {
-    ExchangeNotFound(String),
+    ExchangeNotFound(usize, String),
 }

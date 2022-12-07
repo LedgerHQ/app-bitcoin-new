@@ -37,14 +37,14 @@ async fn test_get_extended_pubkey() {
             .map(|v| serde_json::from_value(v.clone()).unwrap())
             .unwrap();
 
-        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
-        let key = client::BitcoinClient::new(transport.clone())
+        let store = utils::RecordStore::new(&exchanges);
+        let key = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .get_extended_pubkey(&derivation_path, display)
             .unwrap();
 
         assert_eq!(key.to_string(), xpk_str);
 
-        let key = async_client::BitcoinClient::new(transport.clone())
+        let key = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .get_extended_pubkey(&derivation_path, display)
             .await
             .unwrap();
@@ -99,17 +99,18 @@ async fn test_register_wallet() {
 
         let wallet = wallet::WalletPolicy::new(name, version, policy, keys);
 
-        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
-        let (_id, hmac) = client::BitcoinClient::new(transport.clone())
+        let store = utils::RecordStore::new(&exchanges);
+        let (_id, hmac) = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .register_wallet(&wallet)
             .unwrap();
 
         assert_eq!(hmac.to_hex(), hmac_result);
 
-        let (_id, hmac) = async_client::BitcoinClient::new(transport.clone())
-            .register_wallet(&wallet)
-            .await
-            .unwrap();
+        let (_id, hmac) =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .register_wallet(&wallet)
+                .await
+                .unwrap();
 
         assert_eq!(hmac.to_hex(), hmac_result);
     }
@@ -175,17 +176,18 @@ async fn test_get_wallet_address() {
 
         let wallet = wallet::WalletPolicy::new(name, wallet::Version::V2, policy, keys);
 
-        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
-        let address = client::BitcoinClient::new(transport.clone())
+        let store = utils::RecordStore::new(&exchanges);
+        let address = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
             .unwrap();
 
         assert_eq!(address.to_string(), address_result);
 
-        let address = async_client::BitcoinClient::new(transport.clone())
-            .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
-            .await
-            .unwrap();
+        let address =
+            async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+                .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
+                .await
+                .unwrap();
 
         assert_eq!(address.to_string(), address_result);
     }
@@ -238,12 +240,12 @@ async fn test_sign_psbt() {
 
         let wallet = wallet::WalletPolicy::new(name, wallet::Version::V2, policy, keys);
 
-        let transport = utils::TransportReplayer::new(utils::RecordStore::new(&exchanges));
-        let _res = client::BitcoinClient::new(transport.clone())
+        let store = utils::RecordStore::new(&exchanges);
+        let _res = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
 
-        let _res = async_client::BitcoinClient::new(transport.clone())
+        let _res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .await
             .unwrap();
