@@ -2,7 +2,12 @@ use std::error::Error;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use bitcoin::{hashes::hex::ToHex, util::bip32};
+use bitcoin::{
+    consensus::encode::deserialize,
+    hashes::hex::{FromHex, ToHex},
+    util::{bip32, psbt::Psbt},
+};
+
 use hidapi::HidApi;
 use ledger_transport_hid::TransportNativeHID;
 use regex::Regex;
@@ -40,6 +45,16 @@ enum Commands {
         #[arg(long)]
         policy: String,
     },
+    Sign {
+        #[arg(long)]
+        psbt: String,
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        policy: String,
+        #[arg(long)]
+        hmac: String,
+    },
 }
 
 #[tokio::main]
@@ -73,6 +88,16 @@ async fn main() {
         Some(Commands::RegisterWallet { name, policy }) => {
             register_wallet(&client, &name, &policy).await.unwrap();
         }
+        Some(Commands::Sign {
+            psbt,
+            name,
+            policy,
+            hmac,
+        }) => {
+            sign(&client, &psbt, &name, &policy, Some(&hmac))
+                .await
+                .unwrap();
+        }
         _ => {}
     }
 }
@@ -83,7 +108,10 @@ async fn get_extended_pubkey<T: Transport>(
     display: bool,
 ) -> Result<(), Box<dyn Error>> {
     let path = bip32::DerivationPath::from_str(&derivation_path).map_err(|e| format!("{}", e))?;
-    let xpk = client.get_extended_pubkey(&path, display).await.unwrap();
+    let xpk = client
+        .get_extended_pubkey(&path, display)
+        .await
+        .map_err(|e| format!("{:#?}", e))?;
     println!("{}", xpk);
     Ok(())
 }
@@ -100,6 +128,35 @@ async fn register_wallet<T: Transport>(
         .await
         .map_err(|e| format!("{:#?}", e))?;
     println!("{}", hmac.to_hex());
+    Ok(())
+}
+
+async fn sign<T: Transport>(
+    client: &BitcoinClient<T>,
+    psbt: &str,
+    name: &str,
+    policy: &str,
+    hmac: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
+    let psbt: Psbt = deserialize(&base64::decode(&psbt)?).map_err(|e| format!("{:#?}", e))?;
+    let (descriptor_template, keys) = extract_keys_and_template(policy)?;
+    let wallet = WalletPolicy::new(name.to_string(), Version::V2, descriptor_template, keys);
+    let hmac = if let Some(s) = hmac {
+        let mut h = [b'\0'; 32];
+        h.copy_from_slice(&Vec::from_hex(&s).map_err(|e| format!("{:#?}", e))?);
+        Some(h)
+    } else {
+        None
+    };
+
+    let res = client
+        .sign_psbt(&psbt, &wallet, hmac.as_ref())
+        .await
+        .map_err(|e| format!("{:#?}", e))?;
+
+    for (index, key, sig) in res {
+        println!("index: {}, key: {}, sig: {}", index, key, sig);
+    }
     Ok(())
 }
 
