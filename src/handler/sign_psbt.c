@@ -2141,9 +2141,9 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                              unsigned int cur_input_index) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (!input->has_sighash_type) {
-        input->sighash_type = SIGHASH_ALL;
-    } else {
+    // if the psbt does not specify the sighash flag for this input, the default
+    // changes depending on the type of spend; therefore, we set it later.
+    if (input->has_sighash_type) {
         // Get sighash type
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input->in_out.map,
@@ -2172,6 +2172,11 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                              NULL)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
+        }
+
+        if (!input->has_sighash_type) {
+            // legacy input default to SIGHASH_ALL
+            input->sighash_type = SIGHASH_ALL;
         }
 
         uint8_t sighash[32];
@@ -2256,6 +2261,11 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
         uint8_t sighash[32];
         if (segwit_version == 0) {
+            if (!input->has_sighash_type) {
+                // segwitv0 inputs default to SIGHASH_ALL
+                input->sighash_type = SIGHASH_ALL;
+            }
+
             if (!compute_sighash_segwitv0(dc, st, hashes, input, cur_input_index, sighash))
                 return false;
 
@@ -2267,6 +2277,11 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                               sighash))
                 return false;
         } else if (segwit_version == 1) {
+            if (!input->has_sighash_type) {
+                // segwitv0 inputs default to SIGHASH_DEFAULT
+                input->sighash_type = SIGHASH_DEFAULT;
+            }
+
             if (!compute_sighash_segwitv1(dc,
                                           st,
                                           hashes,
