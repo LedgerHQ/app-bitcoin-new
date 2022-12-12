@@ -1,5 +1,4 @@
 import pytest
-import threading
 from pathlib import Path
 from bitcoin_client.ledger_bitcoin import Client, WalletPolicy
 from bitcoin_client.ledger_bitcoin.exception.errors import NotSupportedError
