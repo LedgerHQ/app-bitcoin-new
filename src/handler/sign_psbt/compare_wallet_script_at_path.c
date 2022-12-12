@@ -31,7 +31,8 @@ int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
                                                    change,
                                                    address_index,
                                                    false,
-                                                   &wallet_script_buf);
+                                                   &wallet_script_buf,
+                                                   NULL);
     if (wallet_script_len < 0) {
         PRINTF("Failed to get wallet script\n");
         return -1;  // shouldn't happen

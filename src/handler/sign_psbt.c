@@ -101,7 +101,7 @@ typedef struct {
     int key_derivation_length;
     uint32_t key_derivation[MAX_BIP32_PATH_STEPS];
     serialized_extended_pubkey_t pubkey;
-    bool is_tapscript;         // true if signing with a BIP342 tapleaf script
+    bool is_tapscript;         // true if signing with a BIP342 tapleaf script path spend
     uint8_t tapleaf_hash[32];  // only used for tapscripts
 } placeholder_info_t;
 
@@ -140,6 +140,7 @@ typedef struct {
         uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t wallet_policy_map;
     };
+    uint8_t taptree_hash[32];  // computed only if the policy map is a tr() with a TREE
 
     int wallet_header_version;
     uint8_t wallet_header_keys_info_merkle_root[32];
@@ -722,30 +723,37 @@ static bool __attribute__((noinline))
 fill_placeholder_info_if_internal(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,
                                   placeholder_info_t *placeholder_info) {
-    uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
-    int key_info_len = call_get_merkle_leaf_element(dc,
-                                                    st->wallet_header_keys_info_merkle_root,
-                                                    st->wallet_header_n_keys,
-                                                    placeholder_info->placeholder.key_index,
-                                                    key_info_str,
-                                                    sizeof(key_info_str));
-
-    if (key_info_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
-
-    // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
-
     policy_map_key_info_t key_info;
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header_version) == -1) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
+    {
+        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        st->wallet_header_keys_info_merkle_root,
+                                                        st->wallet_header_n_keys,
+                                                        placeholder_info->placeholder.key_index,
+                                                        key_info_str,
+                                                        sizeof(key_info_str));
+
+        if (key_info_len < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return false;
+        }
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header_version) ==
+            -1) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return false;
+        }
     }
 
     uint32_t fpr = read_u32_be(key_info.master_key_fingerprint, 0);
-    if (fpr == st->master_key_fingerprint) {
+    if (fpr != st->master_key_fingerprint) {
+        return false;
+    }
+
+    {
         // it could be a collision on the fingerprint; we verify that we can actually generate
         // the same pubkey
         char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
@@ -760,18 +768,19 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
             return false;
         }
 
-        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
-            placeholder_info->key_derivation_length = key_info.master_key_derivation_len;
-            for (int i = 0; i < key_info.master_key_derivation_len; i++) {
-                placeholder_info->key_derivation[i] = key_info.master_key_derivation[i];
-            }
-
-            placeholder_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
-
-            return true;
+        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+            return false;
         }
+
+        placeholder_info->key_derivation_length = key_info.master_key_derivation_len;
+        for (int i = 0; i < key_info.master_key_derivation_len; i++) {
+            placeholder_info->key_derivation[i] = key_info.master_key_derivation[i];
+        }
+
+        placeholder_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
     }
-    return false;
+
+    return true;
 }
 
 // finds the first placeholder that corresponds to an internal key
@@ -1894,14 +1903,25 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
     uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
 
+    if (st->wallet_policy_map.type != TOKEN_TR) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
     bool error = false;
     BEGIN_TRY {
         TRY {
             crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
 
-            // TODO: this is wrong if we're spending the key path but there is a script
             if (!placeholder_info->is_tapscript) {
-                crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+                policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+                if (policy->tree == NULL) {
+                    // tweak as specified in BIP-86 and BIP-386
+                    crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+                } else {
+                    // tweak with the taptree hash, per BIP-341
+                    crypto_tr_tweak_seckey(seckey, st->taptree_hash, 32, seckey);
+                }
             }
 
             // generate corresponding public key
@@ -2258,6 +2278,40 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 }
 
 static bool __attribute__((noinline))
+fill_taproot_placeholder_info(dispatcher_context_t *dc,
+                              sign_psbt_state_t *st,
+                              const input_info_t *input,
+                              const policy_node_t *tapleaf_ptr,
+                              placeholder_info_t *placeholder_info) {
+    // compute tapleaf hash
+    uint8_t script[80];  // TODO: will need a bigger buffer
+    buffer_t script_buf = buffer_create(script, sizeof(script));
+
+    uint32_t change = input->in_out.is_change ? placeholder_info->placeholder.num_second
+                                              : placeholder_info->placeholder.num_first;
+    uint32_t address_index = input->in_out.address_index;
+
+    int tapleaf_script_len = call_get_wallet_script(dc,
+                                                    tapleaf_ptr,
+                                                    st->wallet_header_version,
+                                                    st->wallet_header_keys_info_merkle_root,
+                                                    st->wallet_header_n_keys,
+                                                    change,
+                                                    address_index,
+                                                    true,
+                                                    &script_buf,
+                                                    st->taptree_hash);
+    if (tapleaf_script_len < 0) {
+        PRINTF("Failed to compute tapleaf script\n");
+        return false;
+    }
+
+    crypto_tr_compute_tapleaf_hash(script, tapleaf_script_len, placeholder_info->tapleaf_hash);
+
+    return true;
+}
+
+static bool __attribute__((noinline))
 sign_transaction(dispatcher_context_t *dc,
                  sign_psbt_state_t *st,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
@@ -2289,6 +2343,12 @@ sign_transaction(dispatcher_context_t *dc,
             break;
         }
 
+        if (tapleaf_ptr != NULL) {
+            // get_key_placeholder_by_index returns the pointer to the tapleaf only if the key being
+            // spent is indeed in a tapleaf
+            placeholder_info.is_tapscript = true;
+        }
+
         if (fill_placeholder_info_if_internal(dc, st, &placeholder_info) == true) {
             for (unsigned int i = 0; i < st->n_inputs; i++)
                 if (bitvector_get(internal_inputs, i)) {
@@ -2311,38 +2371,13 @@ sign_transaction(dispatcher_context_t *dc,
                         return false;
                     }
 
-                    if (tapleaf_ptr != NULL) {
-                        // compute tapleaf hash
-                        // TODO: refactor this in a new function
-                        uint8_t script[80];  // TODO: will need a bigger buffer
-                        buffer_t script_buf = buffer_create(script, sizeof(script));
+                    if (tapleaf_ptr != NULL && !fill_taproot_placeholder_info(dc,
+                                                                              st,
+                                                                              &input,
+                                                                              tapleaf_ptr,
+                                                                              &placeholder_info))
+                        return false;
 
-                        uint32_t change = input.in_out.is_change
-                                              ? placeholder_info.placeholder.num_second
-                                              : placeholder_info.placeholder.num_first;
-                        uint32_t address_index = input.in_out.address_index;
-
-                        int tapleaf_script_len =
-                            call_get_wallet_script(dc,
-                                                   tapleaf_ptr,
-                                                   st->wallet_header_version,
-                                                   st->wallet_header_keys_info_merkle_root,
-                                                   st->wallet_header_n_keys,
-                                                   change,
-                                                   address_index,
-                                                   true,
-                                                   &script_buf);
-                        if (tapleaf_script_len < 0) {
-                            PRINTF("Failed to compute tapleaf script\n");
-                            return false;
-                        }
-
-                        crypto_tr_compute_tapleaf_hash(script,
-                                                       tapleaf_script_len,
-                                                       placeholder_info.tapleaf_hash);
-
-                        placeholder_info.is_tapscript = true;
-                    }
                     if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i))
                         return false;
                 }

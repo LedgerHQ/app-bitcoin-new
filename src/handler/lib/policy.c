@@ -67,6 +67,8 @@ typedef struct {
     cx_sha256_t hash_context;  // shared among all the nodes; there are never two concurrent hash
                                // computations in process.
     uint8_t hash[32];  // when a node processed in hash mode is popped, the hash is computed here
+    uint8_t *taptree_hash;  // if this pointer is set and the parsed node is a tr() with a TREE,
+                            // this is filled when processing the tr() node
 } policy_parser_state_t;
 
 // comparator for pointers to arrays of equal length
@@ -847,7 +849,8 @@ static int compute_tapleaf_hash(policy_parser_state_t *state,
                                             state->change,
                                             state->address_index,
                                             true,
-                                            &out_buf);
+                                            &out_buf,
+                                            NULL);
 
     if (script_len < 0) {
         return WITH_ERROR(-1, "Failed to compute tapleaf script");
@@ -899,10 +902,13 @@ static int process_tr_node(policy_parser_state_t *state, const void *arg) {
     if (policy->tree != NULL) {
         compute_taptree_hash(state, policy->tree, h);
         h_length = 32;
+
+        if (state->taptree_hash != NULL) {
+            memcpy(state->taptree_hash, h, 32);
+        }
     }
 
     crypto_tr_tweak_pubkey(compressed_pubkey + 1, h, h_length, &parity, tweaked_key);
-
     update_output(state, tweaked_key, 32);
 
     return 1;
@@ -927,7 +933,8 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            bool change,
                            size_t address_index,
                            bool is_taproot,
-                           buffer_t *out_buf) {
+                           buffer_t *out_buf,
+                           uint8_t *out_taptree_hash) {
     policy_parser_state_t state = {.dispatcher_context = dispatcher_context,
                                    .wallet_version = wallet_version,
                                    .keys_merkle_root = keys_merkle_root,
@@ -935,7 +942,8 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                                    .change = change,
                                    .address_index = address_index,
                                    .is_taproot = is_taproot,
-                                   .node_stack_eos = 0};
+                                   .node_stack_eos = 0,
+                                   .taptree_hash = out_taptree_hash};
 
     const policy_node_t *core_policy;
 

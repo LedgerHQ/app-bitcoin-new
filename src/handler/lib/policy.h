@@ -52,6 +52,9 @@ int read_and_parse_wallet_policy(
  * @param[out] out_buf
  *   A buffer to contain the script. If the available space in the buffer is not enough, the result
  * is truncated, but the correct length is still returned in case of success.
+ * @param[out] out_taptree_hash
+ *   If not NULL and if the policy is a tr() with a TREE, a pointer to a 32-byte buffer that will
+ * receive the taptree hash.
  *
  * @return The length of the output on success; -1 in case of error.
  *
@@ -64,7 +67,8 @@ int call_get_wallet_script(dispatcher_context_t *dispatcher_context,
                            bool change,
                            size_t address_index,
                            bool is_taproot,
-                           buffer_t *out_buf);
+                           buffer_t *out_buf,
+                           uint8_t *out_taptree_hash);
 
 /**
  * Returns the address type constant corresponding to a standard policy type.

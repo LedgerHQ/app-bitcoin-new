@@ -258,7 +258,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
                                                 is_change,
                                                 address_index,
                                                 false,
-                                                &script_buf);
+                                                &script_buf,
+                                                NULL);
         if (script_len < 0) {
             PRINTF("Couldn't produce wallet script\n");
             SEND_SW(dc, SW_BAD_STATE);  // unexpected
