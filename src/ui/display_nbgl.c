@@ -4,6 +4,8 @@
 
 #include "nbgl_use_case.h"
 #include "./display.h"
+#include "./menu.h"
+#include "io.h"
 
 typedef struct {
     char *confirm;           // text displayed in last transaction page
@@ -23,6 +25,7 @@ enum {
     BACK_TOKEN,
 };
 
+extern bool G_was_processing_screen_shown;
 static TransactionContext_t transactionContext;
 
 // ux_flow_response

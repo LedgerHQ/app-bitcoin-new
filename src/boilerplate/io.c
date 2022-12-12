@@ -120,13 +120,15 @@ uint8_t io_event(uint8_t channel) {
                 G_ticks - G_processing_timeout_start_tick >= PROCESSING_TIMEOUT_TICKS) {
                 io_clear_processing_timeout();
 
-                G_was_processing_screen_shown = true;
+                if (!G_was_processing_screen_shown) {
+                    G_was_processing_screen_shown = true;
 #ifdef HAVE_BAGL
-                ux_flow_init(0, ux_processing_flow, NULL);
+                    ux_flow_init(0, ux_processing_flow, NULL);
 #endif  // HAVE_BAGL
 #ifdef HAVE_NBGL
-                nbgl_useCaseSpinner("Processing");
+                    nbgl_useCaseSpinner("Processing");
 #endif  // HAVE_NBGL
+                }
             }
 
             if (G_is_timeout_active.interruption &&
