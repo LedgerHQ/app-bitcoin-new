@@ -405,37 +405,43 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
 def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
+    # Test two times:
+    # - the first PSBT has SIGHASH_DEFAULT;
+    # - the second PSBT does not specify the sighash type.
+    # The behavior for taproot transactions should be the same, producing 64-byte signatures
 
-    wallet = WalletPolicy(
-        "",
-        "tr(@0/**)",
-        [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
-        ],
-    )
+    for psbt_file_name in ["tr-1to2-sighash-default", "tr-1to2-sighash-omitted"]:
+        psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/{psbt_file_name}.psbt")
 
-    result = client.sign_psbt(psbt, wallet, None)
+        wallet = WalletPolicy(
+            "",
+            "tr(@0/**)",
+            [
+                "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+            ],
+        )
 
-    # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
-    # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
-    # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
+        result = client.sign_psbt(psbt, wallet, None)
 
-    # sighash verified with bitcoin-core
-    sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
+        # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
+        # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
+        # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
 
-    # get the (tweaked) pubkey from the scriptPubKey
-    expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+        # sighash verified with bitcoin-core
+        sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
 
-    assert len(result) == 1
+        # get the (tweaked) pubkey from the scriptPubKey
+        expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    idx0, pubkey0, sig0 = result[0]
+        assert len(result) == 1
 
-    assert idx0 == 0
-    assert pubkey0 == expected_pubkey0
-    assert len(sig0) == 64
+        idx0, pubkey0, sig0 = result[0]
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+        assert idx0 == 0
+        assert pubkey0 == expected_pubkey0
+        assert len(sig0) == 64
+
+        assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
 
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
@@ -776,3 +782,41 @@ def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
                 "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
             )
         )]
+
+
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
+    # Transaction signed with SIGHASH_ALL, therefore producing a 65-byte signature
+
+    wallet = WalletPolicy(
+        name="Taproot foreign internal key, and our script key",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7"
+    )
+
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAFICAAAAAR/BzFdxy4OGDMVtlLz+2ThgjBf2NmJDW0HpxE/8/TFCAQAAAAD9////ATkFAAAAAAAAFgAUqo7zdMr638p2kC3bXPYcYLv9nYUAAAAAAAEBK0wGAAAAAAAAIlEg/AoQ0wjH5BtLvDZC+P2KwomFOxznVaDG0NSV8D2fLaQBAwQBAAAAIhXBUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUjIGsW6MH5efpMwPBbajAK//+UFFm28g3nfeVbAWDvjkysrMAhFlAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1HQB2IjpuMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIRZrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrD0BCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKT1rML9MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAARcgUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUBGCAJLtoDNhfiEO5/fQ43ikBK6hxItWqhAwIr7Pd0bkcApAAA")
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert len(result) == 1
+
+    # sighash verified with bitcoin-core (real transaction)
+    sighash0 = bytes.fromhex("39CEACF28A980B46749DD416EABE6E380C0C3742D19AA3E2ABB64F0840251E5B")
+
+    assert len(result) == 1
+
+    idx0, pubkey0, sig0 = result[0]
+
+    assert idx0 == 0
+    assert pubkey0 == bytes.fromhex("6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac")
+    assert len(sig0) == 65
+    assert sig0[-1] == 1  # SIGHASH_ALL
+
+    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0[:64])
