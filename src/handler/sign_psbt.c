@@ -915,6 +915,8 @@ preprocess_inputs(dispatcher_context_t *dc,
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
     placeholder_info_t placeholder_info;
+    memset(&placeholder_info, 0, sizeof(placeholder_info));
+
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
     // process each input
@@ -1204,6 +1206,8 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     placeholder_info_t placeholder_info;
+    memset(&placeholder_info, 0, sizeof(placeholder_info));
+
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
@@ -2321,6 +2325,7 @@ sign_transaction(dispatcher_context_t *dc,
     // Iterate over all the placeholders that correspond to keys owned by us
     while (true) {
         placeholder_info_t placeholder_info;
+        memset(&placeholder_info, 0, sizeof(placeholder_info));
 
         const policy_node_t *tapleaf_ptr = NULL;
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
@@ -2422,6 +2427,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
+    memset(internal_inputs, 0, sizeof(internal_inputs));
 
     /** Inputs verification flow
      *
