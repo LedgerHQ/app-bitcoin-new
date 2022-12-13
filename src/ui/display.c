@@ -206,3 +206,58 @@ bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_nam
 
     return io_ui_process(context);
 }
+
+#ifdef HAVE_BAGL
+bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
+    (void) context;
+    (void) success;
+    return true;
+}
+
+bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success) {
+    (void) context;
+    (void) success;
+    return true;
+}
+
+bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
+    (void) context;
+    (void) success;
+    return true;
+}
+
+bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
+    (void) context;
+    (void) success;
+    return true;
+}
+
+#endif  // HAVE_BAGL
+
+#ifdef HAVE_NBGL
+bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
+    (void) context;
+    ui_display_post_processing_confirm_wallet_registation(success);
+
+    return true;
+}
+
+bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success) {
+    ui_display_post_processing_confirm_wallet_spend(success);
+
+    return (success ? io_ui_process(context) : true);
+}
+
+bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
+    ui_display_post_processing_confirm_transaction(success);
+
+    return (success ? io_ui_process(context) : true);
+}
+
+bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
+    (void) context;
+    ui_display_post_processing_confirm_message(success);
+
+    return true;
+}
+#endif  // HAVE_NBGL

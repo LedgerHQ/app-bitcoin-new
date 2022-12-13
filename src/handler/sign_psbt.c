@@ -716,11 +716,15 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
     if (!st->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
+        ui_post_processing_confirm_wallet_spend(dc, false);
         return false;
     }
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
+    if (!st->is_wallet_canonical) {
+        ui_post_processing_confirm_wallet_spend(dc, true);
+    }
     return true;
 }
 
@@ -1380,6 +1384,7 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // Show final user validation UI
         if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
             SEND_SW(dc, SW_DENY);
+            ui_post_processing_confirm_transaction(dc, false);
             return false;
         };
     }
@@ -2434,6 +2439,7 @@ sign_transaction(dispatcher_context_t *dc,
 
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            ui_post_processing_confirm_transaction(dc, false);
             return false;
         }
 
@@ -2467,6 +2473,7 @@ sign_transaction(dispatcher_context_t *dc,
                         &input.in_out.map);
                     if (res < 0) {
                         SEND_SW(dc, SW_INCORRECT_DATA);
+                        ui_post_processing_confirm_transaction(dc, false);
                         return false;
                     }
 
@@ -2477,14 +2484,17 @@ sign_transaction(dispatcher_context_t *dc,
                                                                               &placeholder_info))
                         return false;
 
-                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i))
+                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
+                        ui_post_processing_confirm_transaction(dc, false);
                         return false;
+                    }
                 }
         }
 
         ++placeholder_index;
     }
 
+    ui_post_processing_confirm_transaction(dc, true);
     return true;
 }
 

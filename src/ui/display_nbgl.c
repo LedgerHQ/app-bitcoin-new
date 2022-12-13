@@ -478,4 +478,37 @@ void ui_display_nondefault_sighash_flow(void) {
                        ux_flow_response);
 }
 
+// Statuses
+void ui_display_post_processing_confirm_message(bool success) {
+    if (success) {
+        nbgl_useCaseStatus("MESSAGE\nSIGNED", true, ux_flow_response_true);
+    } else {
+        nbgl_useCaseStatus("Message rejected", false, ux_flow_response_false);
+    }
+}
+
+void ui_display_post_processing_confirm_wallet_registation(bool success) {
+    if (success) {
+        nbgl_useCaseStatus("WALLET\nREGISTERED", true, ux_flow_response_true);
+    } else {
+        nbgl_useCaseStatus("Wallet rejected", false, ux_flow_response_false);
+    }
+}
+
+void ui_display_post_processing_confirm_transaction(bool success) {
+    if (success) {
+        nbgl_useCaseStatus("TRANSACTION\nSIGNED", true, ux_flow_response_true);
+    } else {
+        nbgl_useCaseStatus("Transaction rejected", false, ux_flow_response_false);
+    }
+}
+
+void ui_display_post_processing_confirm_wallet_spend(bool success) {
+    if (success) {
+        nbgl_useCaseStatus("WALLET NAME\nCONFIRMED", true, ux_flow_response_true);
+    } else {
+        nbgl_useCaseStatus("Wallet name rejected", false, ux_flow_response_false);
+    }
+}
+
 #endif  // HAVE_NBGL
