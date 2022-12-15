@@ -360,7 +360,7 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
  * Initializes the "tagged" SHA256 hash with the given tag, as defined by BIP-0340.
  *
  * @param[out]  hash_context
- *   Pointer to 32-bit array of BIP-32 derivation steps.
+ *   Pointer to a sha256 hash context.
  * @param[in]  tag
  *   Pointer to an array containing the tag of the tagged hash.
  * @param[in]  tag_len
@@ -369,19 +369,12 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
 void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len);
 
 /**
- * Computes the tagged hash with tagged hash of a tapleaf, given the script.
- * The leaf's version is assumed to be 0xC0.
+ * Initializes the "tagged" SHA256 hash with tag "TapLeaf", used for tapscript leaves.
  *
- * @param[in]  script
- *   The script of the tapleaf.
- * @param[in]  script_len
- *   The length of `script`.
- * @param[out]  out
- *   The tagged tapleaf hash for the tapbranch.
+ * @param[out]  hash_context
+ *   Pointer to a sha256 hash context.
  */
-void crypto_tr_compute_tapleaf_hash(const uint8_t *script,
-                                    size_t script_len,
-                                    uint8_t out[static 32]);
+void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context);
 
 /**
  * Computes the tagged hash with tagged hash of a tapbranch, given the hashes for the children.

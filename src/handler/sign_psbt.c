@@ -2283,30 +2283,48 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
                               const input_info_t *input,
                               const policy_node_t *tapleaf_ptr,
                               placeholder_info_t *placeholder_info) {
-    // compute tapleaf hash
-    uint8_t script[80];  // TODO: will need a bigger buffer
-    buffer_t script_buf = buffer_create(script, sizeof(script));
-
     uint32_t change = input->in_out.is_change ? placeholder_info->placeholder.num_second
                                               : placeholder_info->placeholder.num_first;
     uint32_t address_index = input->in_out.address_index;
 
-    int tapleaf_script_len = call_get_wallet_script(dc,
-                                                    tapleaf_ptr,
-                                                    st->wallet_header_version,
-                                                    st->wallet_header_keys_info_merkle_root,
-                                                    st->wallet_header_n_keys,
-                                                    change,
-                                                    address_index,
-                                                    true,
-                                                    &script_buf,
-                                                    st->taptree_hash);
-    if (tapleaf_script_len < 0) {
+    cx_sha256_t hash_context;
+    crypto_tr_tapleaf_hash_init(&hash_context);
+
+    // we compute the tapscript once just to compute its length
+    // this avoids having to store it
+    int tapscript_len = get_wallet_internal_script_hash(
+        dc,
+        tapleaf_ptr,
+        &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
+                                    .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                    .n_keys = st->wallet_header_n_keys,
+                                    .change = change,
+                                    .address_index = address_index},
+        WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
+        NULL);
+    if (tapscript_len < 0) {
         PRINTF("Failed to compute tapleaf script\n");
         return false;
     }
 
-    crypto_tr_compute_tapleaf_hash(script, tapleaf_script_len, placeholder_info->tapleaf_hash);
+    crypto_hash_update_u8(&hash_context.header, 0xC0);
+    crypto_hash_update_varint(&hash_context.header, tapscript_len);
+
+    // we compute it again to get add the actual script code to the hash computation
+    if (0 >
+        get_wallet_internal_script_hash(
+            dc,
+            tapleaf_ptr,
+            &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
+                                        .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                        .n_keys = st->wallet_header_n_keys,
+                                        .change = change,
+                                        .address_index = address_index},
+            WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
+            &hash_context.header)) {
+        return false;  // should never happen!
+    }
+    crypto_hash_digest(&hash_context.header, placeholder_info->tapleaf_hash, 32);
 
     return true;
 }

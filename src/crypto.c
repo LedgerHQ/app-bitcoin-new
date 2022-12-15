@@ -495,6 +495,10 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
     crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
 }
 
+void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
+    crypto_tr_tagged_hash_init(hash_context, BIP0341_tapleaf_tag, sizeof(BIP0341_tapleaf_tag));
+}
+
 static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
     // save memory by reusing output buffer for intermediate results
     uint8_t *y = out + 1 + 32;
@@ -546,21 +550,6 @@ static void __attribute__((noinline)) crypto_tr_tagged_hash(const uint8_t *tag,
 
     crypto_hash_update(&hash_context.header, data, data_len);
     if (data2_len > 0) crypto_hash_update(&hash_context.header, data2, data2_len);
-    crypto_hash_digest(&hash_context.header, out, 32);
-}
-
-void crypto_tr_compute_tapleaf_hash(const uint8_t *script,
-                                    size_t script_len,
-                                    uint8_t out[static 32]) {
-    cx_sha256_t hash_context;
-    cx_sha256_init(&hash_context);
-
-    crypto_tr_tagged_hash_init(&hash_context, BIP0341_tapleaf_tag, sizeof(BIP0341_tapleaf_tag));
-
-    crypto_hash_update_u8(&hash_context.header, 0xC0);
-    crypto_hash_update_varint(&hash_context.header, script_len);
-    crypto_hash_update(&hash_context.header, script, script_len);
-
     crypto_hash_digest(&hash_context.header, out, 32);
 }
 
