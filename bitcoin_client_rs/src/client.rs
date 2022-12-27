@@ -3,6 +3,7 @@ use core::str::FromStr;
 
 use bitcoin::{
     consensus::encode::{deserialize_partial, VarInt},
+    secp256k1::ecdsa::Signature,
     util::{
         bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
         ecdsa::EcdsaSig,
@@ -295,6 +296,30 @@ impl<T: Transport> BitcoinClient<T> {
         }
 
         Ok(signatures)
+    }
+
+    /// Sign a message with the key derived with the given derivation path.
+    /// Result is the header byte (31-34: P2PKH compressed) and the ecdsa signature.
+    pub fn sign_message(
+        &self,
+        message: &[u8],
+        path: &DerivationPath,
+    ) -> Result<(u8, Signature), BitcoinClientError<T::Error>> {
+        let chunks: Vec<&[u8]> = message.chunks(64).collect();
+        let mut intpr = ClientCommandInterpreter::new();
+        let message_commitment_root = intpr.add_known_list(&chunks);
+        let cmd = command::sign_message(message.len(), &message_commitment_root, path);
+        self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
+            Ok((
+                data[0],
+                Signature::from_compact(&data[1..]).map_err(|_| {
+                    BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data: data.to_vec(),
+                    }
+                })?,
+            ))
+        })
     }
 }
 

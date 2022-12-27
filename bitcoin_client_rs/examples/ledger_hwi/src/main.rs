@@ -56,6 +56,12 @@ enum Commands {
         #[arg(long)]
         hmac: String,
     },
+    SignMessage {
+        #[arg(long)]
+        message: String,
+        #[arg(long)]
+        derivation_path: String,
+    },
 }
 
 #[tokio::main]
@@ -105,6 +111,14 @@ async fn main() {
             hmac,
         }) => {
             sign(&client, &psbt, &name, &policy, Some(&hmac))
+                .await
+                .unwrap();
+        }
+        Some(Commands::SignMessage {
+            message,
+            derivation_path,
+        }) => {
+            sign_message(&client, &message, &derivation_path)
                 .await
                 .unwrap();
         }
@@ -184,4 +198,20 @@ fn extract_keys_and_template(policy: &str) -> Result<(String, Vec<WalletPubKey>)
     } else {
         Ok((descriptor_template, pubkeys))
     }
+}
+
+async fn sign_message<T: Transport>(
+    client: &BitcoinClient<T>,
+    message: &str,
+    derivation_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    let path = bip32::DerivationPath::from_str(&derivation_path).map_err(|e| format!("{}", e))?;
+    let (header, ecdsa_sig) = client
+        .sign_message(message.as_bytes(), &path)
+        .await
+        .map_err(|e| format!("{:#?}", e))?;
+    let mut sig = vec![header];
+    sig.extend(&ecdsa_sig.serialize_compact());
+    println!("{}", base64::encode(sig));
+    Ok(())
 }
