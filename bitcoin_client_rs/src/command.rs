@@ -11,6 +11,15 @@ use super::{
     wallet::WalletPolicy,
 };
 
+/// Creates the APDU Command to retrieve the app's name, version and state flags.
+pub fn get_version() -> APDUCommand {
+    APDUCommand {
+        ins: apdu::BitcoinCommandCode::GetVersion as u8,
+        p2: 0x00,
+        ..Default::default()
+    }
+}
+
 /// Creates the APDU Command to retrieve the master fingerprint.
 pub fn get_master_fingerprint() -> APDUCommand {
     APDUCommand {

@@ -62,6 +62,41 @@ impl<T: Transport> BitcoinClient<T> {
         }
     }
 
+    /// Returns the currently running app's name, version and state flags
+    pub fn get_version(&self) -> Result<(String, String, Vec<u8>), BitcoinClientError<T::Error>> {
+        let cmd = command::get_version();
+        let data = self.make_request(&cmd, None)?;
+        if data.is_empty() || data[0] != 0x01 {
+            return Err(BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            });
+        }
+
+        let (name, i): (String, usize) =
+            deserialize_partial(&data[1..]).map_err(|_| BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            })?;
+
+        let (version, j): (String, usize) = deserialize_partial(&data[i + 1..]).map_err(|_| {
+            BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            }
+        })?;
+
+        let (flags, _): (Vec<u8>, usize) =
+            deserialize_partial(&data[i + j + 1..]).map_err(|_| {
+                BitcoinClientError::UnexpectedResult {
+                    command: cmd.ins,
+                    data: data.clone(),
+                }
+            })?;
+
+        Ok((name, version, flags))
+    }
+
     /// Retrieve the master fingerprint.
     pub fn get_master_fingerprint(&self) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
         let cmd = command::get_master_fingerprint();

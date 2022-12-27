@@ -14,6 +14,34 @@ fn test_cases(path: &str) -> Vec<serde_json::Value> {
 }
 
 #[tokio::test]
+async fn test_get_version() {
+    let exchanges: Vec<String> = vec![
+        "=> b001000000".into(),
+        "<= 010c426974636f696e205465737405322e312e3001009000".into(),
+    ];
+
+    let store = utils::RecordStore::new(&exchanges);
+    let (name, version, flags) =
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_version()
+            .unwrap();
+
+    assert_eq!(name, "Bitcoin Test".to_string());
+    assert_eq!(version, "2.1.0".to_string());
+    assert_eq!(flags, vec![0x00]);
+
+    let (name, version, flags) =
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_version()
+            .await
+            .unwrap();
+
+    assert_eq!(name, "Bitcoin Test".to_string());
+    assert_eq!(version, "2.1.0".to_string());
+    assert_eq!(flags, vec![0x00]);
+}
+
+#[tokio::test]
 async fn test_get_extended_pubkey() {
     for case in test_cases("./tests/data/get_extended_pubkey.json") {
         let exchanges: Vec<String> = case

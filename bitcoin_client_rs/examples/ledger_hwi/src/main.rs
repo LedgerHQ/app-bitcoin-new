@@ -32,6 +32,7 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    GetAppVersion,
     GetFingerprint,
     GetExtendedPubkey {
         #[arg(long)]
@@ -73,6 +74,15 @@ async fn main() {
     let client = BitcoinClient::new(TransportWrapper::new(transport));
 
     match args.command {
+        Some(Commands::GetAppVersion) => {
+            let (name, version, flags) = client.get_version().await.unwrap();
+            println!(
+                "name: {}\nversion: {}\nflags: {}",
+                name,
+                version,
+                flags.to_hex()
+            );
+        }
         Some(Commands::GetFingerprint) => {
             let fg = client.get_master_fingerprint().await.unwrap();
             println!("{}", fg);
