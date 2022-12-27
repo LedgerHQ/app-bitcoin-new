@@ -36,7 +36,7 @@ impl<T: Transport> BitcoinClient<T> {
     async fn make_request(
         &self,
         req: &APDUCommand,
-        interpreter: &mut ClientCommandInterpreter,
+        interpreter: Option<&mut ClientCommandInterpreter>,
     ) -> Result<Vec<u8>, BitcoinClientError<T::Error>> {
         let (mut sw, mut data) = self
             .transport
@@ -44,15 +44,17 @@ impl<T: Transport> BitcoinClient<T> {
             .await
             .map_err(BitcoinClientError::Transport)?;
 
-        while sw == StatusWord::InterruptedExecution {
-            let response = interpreter.execute(data)?;
-            let res = self
-                .transport
-                .exchange(&command::continue_interrupted(response))
-                .await
-                .map_err(BitcoinClientError::Transport)?;
-            sw = res.0;
-            data = res.1;
+        if let Some(interpreter) = interpreter {
+            while sw == StatusWord::InterruptedExecution {
+                let response = interpreter.execute(data)?;
+                let res = self
+                    .transport
+                    .exchange(&command::continue_interrupted(response))
+                    .await
+                    .map_err(BitcoinClientError::Transport)?;
+                sw = res.0;
+                data = res.1;
+            }
         }
 
         if sw != StatusWord::OK {
@@ -70,8 +72,7 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
     ) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
         let cmd = command::get_master_fingerprint();
-        let mut int = ClientCommandInterpreter::new();
-        self.make_request(&cmd, &mut int)
+        self.make_request(&cmd, None)
             .await
             .map(|data| Fingerprint::from(data.as_slice()))
     }
@@ -84,8 +85,7 @@ impl<T: Transport> BitcoinClient<T> {
         display: bool,
     ) -> Result<ExtendedPubKey, BitcoinClientError<T::Error>> {
         let cmd = command::get_extended_pubkey(path, display);
-        let mut int = ClientCommandInterpreter::new();
-        self.make_request(&cmd, &mut int).await.and_then(|data| {
+        self.make_request(&cmd, None).await.and_then(|data| {
             ExtendedPubKey::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
                 BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
@@ -107,20 +107,22 @@ impl<T: Transport> BitcoinClient<T> {
         intpr.add_known_list(&keys);
         //necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
-        self.make_request(&cmd, &mut intpr).await.and_then(|data| {
-            if data.len() < 64 {
-                Err(BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data,
-                })
-            } else {
-                let mut id = [0x00; 32];
-                id.copy_from_slice(&data[0..32]);
-                let mut hash = [0x00; 32];
-                hash.copy_from_slice(&data[32..64]);
-                Ok((id, hash))
-            }
-        })
+        self.make_request(&cmd, Some(&mut intpr))
+            .await
+            .and_then(|data| {
+                if data.len() < 64 {
+                    Err(BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data,
+                    })
+                } else {
+                    let mut id = [0x00; 32];
+                    id.copy_from_slice(&data[0..32]);
+                    let mut hash = [0x00; 32];
+                    hash.copy_from_slice(&data[32..64]);
+                    Ok((id, hash))
+                }
+            })
     }
 
     /// For a given wallet that was already registered on the device (or a standard wallet that does not need registration),
@@ -140,14 +142,16 @@ impl<T: Transport> BitcoinClient<T> {
         // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
-        self.make_request(&cmd, &mut intpr).await.and_then(|data| {
-            bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data,
-                }
+        self.make_request(&cmd, Some(&mut intpr))
+            .await
+            .and_then(|data| {
+                bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
+                    BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data,
+                    }
+                })
             })
-        })
     }
 
     /// Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
@@ -215,7 +219,7 @@ impl<T: Transport> BitcoinClient<T> {
             wallet_hmac,
         );
 
-        self.make_request(&cmd, &mut intpr).await?;
+        self.make_request(&cmd, Some(&mut intpr)).await?;
 
         let results = intpr.yielded();
         if results.iter().any(|res| res.len() <= 1) {
