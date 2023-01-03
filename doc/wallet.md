@@ -3,20 +3,16 @@
 A _wallet policy_ is a structured representation of an account secured by a policy expressed with output script descriptors. It is composed by two parts:
 a wallet descriptor template and the vector of key placeholder expressions.
 
-A _wallet descriptor template_ follows language very similar to output descriptor, except that each `KEY` expression with a key placeholder `KP` expression, that refers to to one of the keys in the keys information vector, plus the additional derivation steps to use for that key.
+A _wallet descriptor template_ follows language very similar to output descriptor, with a few differences; the biggest one is that each `KEY` expression with a key placeholder `KP` expression, that refers to to one of the keys in the _keys information vector_, plus the additional derivation steps to use for that key. Contextually, the keys information vector contains all the relevant _xpubs_, and possibly their key origin information.
 
-
-Each key information is an expression similar to the `KEY` expressions of output descriptors, except that
-- only serialized extended public keys ("xpubs") are supported at this time;
-- key origin information is compulsory for internal keys.
+Each entry in the key information vector contains an _xpub_ (other types of keys supported in output script descriptors are not allowed), possible preceeded by the key origin information. The key origin information is compulsory for internal keys.
 
 This section formally defines wallet policies, and how they relate to
 output script descriptors.
 
 ## Formal definition
 
-A wallet policy is composed by a wallet descriptor template, together with
-a vector of key information items.
+A _wallet policy_ is composed by a _wallet descriptor template_, together with a vector of _key information items_.
 
 ### Wallet descriptor template ====
 
@@ -33,6 +29,7 @@ compressed pubkey.
 - `sortedmulti(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script with keys
 sorted lexicographically in the resulting script.
 - `tr(KP)`: P2TR output with the specified key as internal key.
+- any valid [miniscript](https://bitcoin.sipa.be/miniscript) template (only inside top-level `wsh`).
 
 `KP` expressions (key placeholders) consist of
 - a single character `@`
@@ -41,7 +38,7 @@ for `@0`).
 - possibly followed by either:
   - the string  `/**`, or
   - a string of the form `/<NUM;NUM>/*`, for two distinct decimal numbers
-`NUM` representing unhardened derivations
+`NUM` representing unhardened derivations.
 
 The `/**` in the placeholder template represents commonly used paths for
 receive/change addresses, and is equivalent to `<0;1>`.
@@ -87,14 +84,14 @@ derivation steps is used when the corresponding key information is not an
 xpub.
 
 The key information vector *should* be ordered so that placeholder `@i`
-never appear for the first time before an occurrence of `@j`  for some `j <
-i`; for example, the first placeholder is always `@0`, the next one is
+never appear for the first time before an occurrence of `@j`  for some `j < i`; for example, the first placeholder is always `@0`, the next one is
 `@1`, etc.
 
 ### Implementation-specific restrictions
 
 - Placeholder _must_ be followed by `/**` or `/<0;1>`.
 - Key expressions only support xpubs at this time (no hex-encoded pubkeys).
+- Very large policies might not be supported because of the device's memory limitations.
 
 ## Descriptor derivation
 
@@ -169,7 +166,8 @@ The following policy types are currently supported:
 
 - `sh(multi(...))` and `sh(sortedmulti(...))` (legacy multisignature wallets);
 - `sh(wsh(multi(...)))` and `sh(wsh(sortedmulti(...)))` (wrapped-segwit multisignature wallets);
-- `wsh(multi(...))` and `wsh(sortedmulti(...))` (native segwit multisignature wallets).
+- `wsh(multi(...))` and `wsh(sortedmulti(...))` (native segwit multisignature wallets);
+- `wsh(SCRIPT)` (where `SCRIPT` is an arbitrary [miniscript](https://bitcoin.sipa.be/miniscript) template).
 
 # Default wallets
 A few policies that correspond to standardized single-key wallets can be used without requiring any registration; in the serialization, the wallet name must be a zero-length string. Those are the following policies:
@@ -179,4 +177,4 @@ A few policies that correspond to standardized single-key wallets can be used wi
 - ``sh(wpkh(@0))`` - nested segwit addresses as per [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)
 - ``tr(@0)`` - single Key P2TR as per [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
 
-Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adheres to the corresponding BIP.
+Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adhere to the corresponding BIP. Moreover, the BIP-44 `account` level must be at most `100`, and the `address index` at most `50000`. Larger values can still be used by registering the policy.  
