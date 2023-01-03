@@ -35,6 +35,7 @@ jobs:
         run: |
           apt-get update -y
           apt-get upgrade -y
+          DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata
           apt-get install -y
           curl -sL https://deb.nodesource.com/setup_16.x | bash -
           apt-get install -y gcovr nodejs unzip
