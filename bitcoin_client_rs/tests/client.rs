@@ -14,6 +14,75 @@ fn test_cases(path: &str) -> Vec<serde_json::Value> {
 }
 
 #[tokio::test]
+async fn test_get_version() {
+    let exchanges: Vec<String> = vec![
+        "=> b001000000".into(),
+        "<= 010c426974636f696e205465737405322e312e3001009000".into(),
+    ];
+
+    let store = utils::RecordStore::new(&exchanges);
+    let (name, version, flags) =
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_version()
+            .unwrap();
+
+    assert_eq!(name, "Bitcoin Test".to_string());
+    assert_eq!(version, "2.1.0".to_string());
+    assert_eq!(flags, vec![0x00]);
+
+    let (name, version, flags) =
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .get_version()
+            .await
+            .unwrap();
+
+    assert_eq!(name, "Bitcoin Test".to_string());
+    assert_eq!(version, "2.1.0".to_string());
+    assert_eq!(flags, vec![0x00]);
+}
+
+#[tokio::test]
+async fn test_sign_message() {
+    let exchanges: Vec<String> = vec![
+        "=> e110000132048000002c800000018000000000000000058a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827".into(),
+        "<= 418a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db8270100e000".into(),
+        "=> f8010001228a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db8270000".into(),
+        "<= 40008a2a5c9b768827de5a9552c38a044c66959c68f6d2f21b5260af54d2f87db827e000".into(),
+        "=> f80100010806060068656c6c6f".into(),
+        "<= 20bdeef462c0ce01b905db5206a51ed05a36671d1494ac12b18c764dbb955f45542c5819611050096d16ed03a5b01fc9806c163619777986235ed75fc91ee933e69000".into(),
+    ];
+
+    let path = DerivationPath::from_str("m/44'/1'/0'/0").unwrap();
+    let store = utils::RecordStore::new(&exchanges);
+    let (header, ecdsa_sig) =
+        client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .sign_message("hello".as_bytes(), &path)
+            .unwrap();
+
+    assert_eq!(header, 0x20);
+    let mut sig = vec![header];
+    sig.extend(ecdsa_sig.serialize_compact());
+    assert_eq!(
+        "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
+        base64::encode(sig)
+    );
+
+    let (header, ecdsa_sig) =
+        async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+            .sign_message("hello".as_bytes(), &path)
+            .await
+            .unwrap();
+
+    assert_eq!(header, 0x20);
+    let mut sig = vec![header];
+    sig.extend(ecdsa_sig.serialize_compact());
+    assert_eq!(
+        "IL3u9GLAzgG5BdtSBqUe0Fo2Zx0UlKwSsYx2TbuVX0VULFgZYRBQCW0W7QOlsB/JgGwWNhl3eYYjXtdfyR7pM+Y=",
+        base64::encode(sig)
+    );
+}
+
+#[tokio::test]
 async fn test_get_extended_pubkey() {
     for case in test_cases("./tests/data/get_extended_pubkey.json") {
         let exchanges: Vec<String> = case

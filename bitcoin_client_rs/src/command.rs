@@ -11,6 +11,15 @@ use super::{
     wallet::WalletPolicy,
 };
 
+/// Creates the APDU Command to retrieve the app's name, version and state flags.
+pub fn get_version() -> APDUCommand {
+    APDUCommand {
+        ins: apdu::BitcoinCommandCode::GetVersion as u8,
+        p2: 0x00,
+        ..Default::default()
+    }
+}
+
 /// Creates the APDU Command to retrieve the master fingerprint.
 pub fn get_master_fingerprint() -> APDUCommand {
     APDUCommand {
@@ -98,6 +107,31 @@ pub fn sign_psbt(
     APDUCommand {
         cla: apdu::Cla::Bitcoin as u8,
         ins: apdu::BitcoinCommandCode::SignPSBT as u8,
+        data,
+        ..Default::default()
+    }
+}
+
+/// Creates the APDU Command to sign a message.
+pub fn sign_message(
+    message_length: usize,
+    message_commitment_root: &[u8; 32],
+    path: &DerivationPath,
+) -> APDUCommand {
+    let child_numbers: &[ChildNumber] = path.as_ref();
+    let mut data: Vec<u8> =
+        child_numbers
+            .iter()
+            .fold(vec![child_numbers.len() as u8], |mut acc, &x| {
+                acc.extend_from_slice(&u32::from(x).to_be_bytes());
+                acc
+            });
+    data.extend(encode::serialize(&VarInt(message_length as u64)));
+    data.extend_from_slice(message_commitment_root);
+
+    APDUCommand {
+        cla: apdu::Cla::Bitcoin as u8,
+        ins: apdu::BitcoinCommandCode::SignMessage as u8,
         data,
         ..Default::default()
     }

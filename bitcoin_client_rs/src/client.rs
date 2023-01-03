@@ -3,6 +3,7 @@ use core::str::FromStr;
 
 use bitcoin::{
     consensus::encode::{deserialize_partial, VarInt},
+    secp256k1::ecdsa::Signature,
     util::{
         bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
         ecdsa::EcdsaSig,
@@ -33,21 +34,23 @@ impl<T: Transport> BitcoinClient<T> {
     fn make_request(
         &self,
         req: &APDUCommand,
-        interpreter: &mut ClientCommandInterpreter,
+        interpreter: Option<&mut ClientCommandInterpreter>,
     ) -> Result<Vec<u8>, BitcoinClientError<T::Error>> {
         let (mut sw, mut data) = self
             .transport
             .exchange(req)
             .map_err(BitcoinClientError::Transport)?;
 
-        while sw == StatusWord::InterruptedExecution {
-            let response = interpreter.execute(data)?;
-            let res = self
-                .transport
-                .exchange(&command::continue_interrupted(response))
-                .map_err(BitcoinClientError::Transport)?;
-            sw = res.0;
-            data = res.1;
+        if let Some(interpreter) = interpreter {
+            while sw == StatusWord::InterruptedExecution {
+                let response = interpreter.execute(data)?;
+                let res = self
+                    .transport
+                    .exchange(&command::continue_interrupted(response))
+                    .map_err(BitcoinClientError::Transport)?;
+                sw = res.0;
+                data = res.1;
+            }
         }
 
         if sw != StatusWord::OK {
@@ -60,11 +63,45 @@ impl<T: Transport> BitcoinClient<T> {
         }
     }
 
+    /// Returns the currently running app's name, version and state flags
+    pub fn get_version(&self) -> Result<(String, String, Vec<u8>), BitcoinClientError<T::Error>> {
+        let cmd = command::get_version();
+        let data = self.make_request(&cmd, None)?;
+        if data.is_empty() || data[0] != 0x01 {
+            return Err(BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            });
+        }
+
+        let (name, i): (String, usize) =
+            deserialize_partial(&data[1..]).map_err(|_| BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            })?;
+
+        let (version, j): (String, usize) = deserialize_partial(&data[i + 1..]).map_err(|_| {
+            BitcoinClientError::UnexpectedResult {
+                command: cmd.ins,
+                data: data.clone(),
+            }
+        })?;
+
+        let (flags, _): (Vec<u8>, usize) =
+            deserialize_partial(&data[i + j + 1..]).map_err(|_| {
+                BitcoinClientError::UnexpectedResult {
+                    command: cmd.ins,
+                    data: data.clone(),
+                }
+            })?;
+
+        Ok((name, version, flags))
+    }
+
     /// Retrieve the master fingerprint.
     pub fn get_master_fingerprint(&self) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
         let cmd = command::get_master_fingerprint();
-        let mut int = ClientCommandInterpreter::new();
-        self.make_request(&cmd, &mut int)
+        self.make_request(&cmd, None)
             .map(|data| Fingerprint::from(data.as_slice()))
     }
 
@@ -76,8 +113,7 @@ impl<T: Transport> BitcoinClient<T> {
         display: bool,
     ) -> Result<ExtendedPubKey, BitcoinClientError<T::Error>> {
         let cmd = command::get_extended_pubkey(path, display);
-        let mut int = ClientCommandInterpreter::new();
-        self.make_request(&cmd, &mut int).and_then(|data| {
+        self.make_request(&cmd, None).and_then(|data| {
             ExtendedPubKey::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
                 BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
@@ -100,7 +136,7 @@ impl<T: Transport> BitcoinClient<T> {
         intpr.add_known_list(&keys);
         // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
-        self.make_request(&cmd, &mut intpr).and_then(|data| {
+        self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
             if data.len() < 64 {
                 Err(BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
@@ -133,7 +169,7 @@ impl<T: Transport> BitcoinClient<T> {
         // necessary for version 1 of the protocol (introduced in version 2.1.0)
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
-        self.make_request(&cmd, &mut intpr).and_then(|data| {
+        self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
             bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
                 BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
@@ -208,7 +244,7 @@ impl<T: Transport> BitcoinClient<T> {
             wallet_hmac,
         );
 
-        self.make_request(&cmd, &mut intpr)?;
+        self.make_request(&cmd, Some(&mut intpr))?;
 
         let results = intpr.yielded();
         if results.iter().any(|res| res.len() <= 1) {
@@ -260,6 +296,30 @@ impl<T: Transport> BitcoinClient<T> {
         }
 
         Ok(signatures)
+    }
+
+    /// Sign a message with the key derived with the given derivation path.
+    /// Result is the header byte (31-34: P2PKH compressed) and the ecdsa signature.
+    pub fn sign_message(
+        &self,
+        message: &[u8],
+        path: &DerivationPath,
+    ) -> Result<(u8, Signature), BitcoinClientError<T::Error>> {
+        let chunks: Vec<&[u8]> = message.chunks(64).collect();
+        let mut intpr = ClientCommandInterpreter::new();
+        let message_commitment_root = intpr.add_known_list(&chunks);
+        let cmd = command::sign_message(message.len(), &message_commitment_root, path);
+        self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
+            Ok((
+                data[0],
+                Signature::from_compact(&data[1..]).map_err(|_| {
+                    BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data: data.to_vec(),
+                    }
+                })?,
+            ))
+        })
     }
 }
 
