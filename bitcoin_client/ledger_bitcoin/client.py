@@ -230,7 +230,7 @@ class NewClient(Client):
         sw, response = self._make_request(self.builder.sign_message(message_bytes, bip32_path), client_intepreter)
 
         if sw != 0x9000:
-            raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_EXTENDED_PUBKEY)
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_MESSAGE)
 
         return base64.b64encode(response).decode('utf-8')
 
