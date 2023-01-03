@@ -16,7 +16,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-legacy:latest
     env:
       SONAR_SCANNER_VERSION: 4.4.0.2170
       SONAR_SERVER_URL: "https://sonarcloud.io"
@@ -35,9 +35,10 @@ jobs:
         run: |
           apt-get update -y
           apt-get upgrade -y
+          DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata
           apt-get install -y
           curl -sL https://deb.nodesource.com/setup_16.x | bash -
-          apt-get install -y gcovr nodejs unzip
+          apt-get install -y gcovr nodejs unzip libcmocka-dev lcov
           mkdir -p $HOME/.sonar
           curl -sSLo $HOME/.sonar/sonar-scanner.zip ${{ env.SONAR_SCANNER_DOWNLOAD_URL }} 
           unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
