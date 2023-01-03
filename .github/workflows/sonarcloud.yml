@@ -38,7 +38,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata
           apt-get install -y
           curl -sL https://deb.nodesource.com/setup_16.x | bash -
-          apt-get install -y gcovr nodejs unzip
+          apt-get install -y gcovr nodejs unzip libcmocka-dev lcov
           mkdir -p $HOME/.sonar
           curl -sSLo $HOME/.sonar/sonar-scanner.zip ${{ env.SONAR_SCANNER_DOWNLOAD_URL }} 
           unzip -o $HOME/.sonar/sonar-scanner.zip -d $HOME/.sonar/
