@@ -160,8 +160,6 @@ The hardware wallet will reject registration for wallet names not respecting the
 
 ## Supported policies
 
-As a precaution, at this time only a limited set of commonly used policies can be registered. More will be added in the future, to support new use cases.
-
 The following policy types are currently supported:
 
 - `sh(multi(...))` and `sh(sortedmulti(...))` (legacy multisignature wallets);
