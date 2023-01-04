@@ -47,6 +47,7 @@
 #include "handlers.h"
 
 #include "sign_psbt/compare_wallet_script_at_path.h"
+#include "sign_psbt/extract_bip32_derivation.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
@@ -367,61 +368,6 @@ static int get_amount_scriptpubkey_from_psbt(
                                                         scriptPubKey,
                                                         scriptPubKey_len,
                                                         NULL);
-}
-
-static int extract_bip32_derivation(dispatcher_context_t *dc,
-                                    int psbt_key_type,
-                                    const uint8_t values_root[static 32],
-                                    uint32_t merkle_tree_size,
-                                    int index,
-                                    uint32_t out[static 1 + MAX_BIP32_PATH_STEPS]) {
-    // TODO: we can improve this by parsing while streaming the response, using less memory while
-    // also removing the size limit.
-    // Here we are assuming the same pubkey does not appear in more than 7 leaves of the taptree,
-    // otherwise we will not be able to use it.
-    uint8_t response[1 + 32 * 7 + 4 * (1 + MAX_BIP32_PATH_STEPS)];
-
-    int len = call_get_merkle_leaf_element(dc,
-                                           values_root,
-                                           merkle_tree_size,
-                                           index,
-                                           response,
-                                           sizeof(response));
-    if (len < 0) {
-        return -1;
-    }
-
-    buffer_t response_buf = buffer_create(response, len);
-
-    // taproot fields have the list of hashes first, which we want to skip
-    bool is_tap = psbt_key_type == PSBT_IN_TAP_BIP32_DERIVATION ||
-                  psbt_key_type == PSBT_OUT_TAP_BIP32_DERIVATION;
-    if (is_tap) {
-        uint64_t hashes_len;
-        if (!buffer_read_varint(&response_buf, &hashes_len) || hashes_len > UINT16_MAX) {
-            return -1;
-        }
-        // make sure we can read 32 * hashes_len bytes, but we skip them
-        if (!buffer_can_read(&response_buf, 32 * (uint32_t) hashes_len)) {
-            return -1;
-        }
-        buffer_seek_cur(&response_buf, 32 * (uint32_t) hashes_len);
-    }
-
-    // read the fingerprint
-    if (!buffer_read_u32(&response_buf, &out[0], BE)) {
-        return -1;
-    }
-    int n_steps = 0;
-    while (n_steps < MAX_BIP32_PATH_STEPS && buffer_can_read(&response_buf, 4)) {
-        buffer_read_u32(&response_buf, &out[1 + n_steps], LE);
-        ++n_steps;
-    }
-    if (buffer_can_read(&response_buf, 1)) {
-        // either invalid path, or longer than MAX_BIP32_PATH_STEPS
-        return -1;
-    }
-    return n_steps;
 }
 
 // Convenience function to share common logic when processing all the
