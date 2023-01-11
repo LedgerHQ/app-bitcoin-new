@@ -1030,7 +1030,9 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         out[0] = OP_1;
         out[1] = 32;  // PUSH 32 bytes
 
-        uint8_t h[32];
+        // uint8_t h[32];
+        uint8_t *h = out + 2;  // hack: re-use the output array to save memory
+
         int h_length = 0;
         if (tr_policy->tree != NULL) {
             compute_taptree_hash(dispatcher_context, wdi, tr_policy->tree, h);

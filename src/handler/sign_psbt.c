@@ -1149,6 +1149,60 @@ static void output_keys_callback(dispatcher_context_t *dc,
     }
 }
 
+static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
+                                                     sign_psbt_state_t *st,
+                                                     int cur_output_index,
+                                                     const output_info_t *output) {
+    // show this output's address
+    char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
+    int address_len = get_script_address(output->in_out.scriptPubKey,
+                                         output->in_out.scriptPubKey_len,
+                                         output_address,
+                                         sizeof(output_address));
+    if (address_len < 0) {
+        // script does not have an address; check if OP_RETURN
+        if (is_opreturn(output->in_out.scriptPubKey, output->in_out.scriptPubKey_len)) {
+            int res = format_opscript_script(output->in_out.scriptPubKey,
+                                             output->in_out.scriptPubKey_len,
+                                             output_address);
+            if (res == -1) {
+                PRINTF("Invalid or unsupported OP_RETURN for output %d\n", cur_output_index);
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return false;
+            }
+        } else {
+            PRINTF("Unknown or unsupported script type for output %d\n", cur_output_index);
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return false;
+        }
+    }
+
+    if (G_swap_state.called_from_swap) {
+        // Swap feature: do not show the address to the user, but double check it matches
+        // the request from app-exchange; it must be the only external output (checked
+        // elsewhere).
+        int swap_addr_len = strlen(G_swap_state.destination_address);
+        if (swap_addr_len != address_len ||
+            0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
+            // address did not match
+            PRINTF("Mismatching address for swap\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+    } else {
+        // Show address to the user
+        if (!ui_validate_output(dc,
+                                st->external_outputs_count,
+                                output_address,
+                                COIN_COINID_SHORT,
+                                output->value)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool __attribute__((noinline))
 process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     /** OUTPUTS VERIFICATION FLOW
@@ -1234,54 +1288,8 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // external output, user needs to validate
             ++st->external_outputs_count;
 
-            // show this output's address
-            char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-            int address_len = get_script_address(output.in_out.scriptPubKey,
-                                                 output.in_out.scriptPubKey_len,
-                                                 output_address,
-                                                 sizeof(output_address));
-            if (address_len < 0) {
-                // script does not have an address; check if OP_RETURN
-                if (is_opreturn(output.in_out.scriptPubKey, output.in_out.scriptPubKey_len)) {
-                    int res = format_opscript_script(output.in_out.scriptPubKey,
-                                                     output.in_out.scriptPubKey_len,
-                                                     output_address);
-                    if (res == -1) {
-                        PRINTF("Invalid or unsupported OP_RETURN for output %d\n",
-                               cur_output_index);
-                        SEND_SW(dc, SW_NOT_SUPPORTED);
-                        return false;
-                    }
-                } else {
-                    PRINTF("Unknown or unsupported script type for output %d\n", cur_output_index);
-                    SEND_SW(dc, SW_NOT_SUPPORTED);
-                    return false;
-                }
-            }
+            if (!display_output(dc, st, cur_output_index, &output)) return false;
 
-            if (G_swap_state.called_from_swap) {
-                // Swap feature: do not show the address to the user, but double check it matches
-                // the request from app-exchange; it must be the only external output (checked
-                // elsewhere).
-                int swap_addr_len = strlen(G_swap_state.destination_address);
-                if (swap_addr_len != address_len ||
-                    0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
-                    // address did not match
-                    PRINTF("Mismatching address for swap\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-            } else {
-                // Show address to the user
-                if (!ui_validate_output(dc,
-                                        st->external_outputs_count,
-                                        output_address,
-                                        COIN_COINID_SHORT,
-                                        output.value)) {
-                    SEND_SW(dc, SW_DENY);
-                    return false;
-                }
-            }
         } else {
             // valid change address, nothing to show to the user
 
