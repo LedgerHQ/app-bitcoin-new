@@ -140,7 +140,6 @@ typedef struct {
         uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
         policy_node_t wallet_policy_map;
     };
-    uint8_t taptree_hash[32];  // computed only if the policy map is a tr() with a TREE
 
     int wallet_header_version;
     uint8_t wallet_header_keys_info_merkle_root[32];
@@ -1798,6 +1797,7 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
                                                       unsigned int cur_input_index,
                                                       uint8_t *pubkey,
                                                       uint8_t pubkey_len,
+                                                      uint8_t *tapleaf_hash,
                                                       uint8_t *sig,
                                                       size_t sig_len) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -1810,10 +1810,17 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     int input_index_varint_len = varint_write(buf, 0, cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
 
+    // for tapscript signatures, we concatenate the (x-only) pubkey with the tapleaf hash
+    uint8_t augm_pubkey_len = pubkey_len + (tapleaf_hash != NULL ? 32 : 0);
+
     // the pubkey is not output in version 0 of the protocol
     if (st->p2 >= 1) {
-        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(&augm_pubkey_len, 1);
         dc->add_to_response(pubkey, pubkey_len);
+
+        if (tapleaf_hash != NULL) {
+            dc->add_to_response(tapleaf_hash, 32);
+        }
     }
 
     dc->add_to_response(sig, sig_len);
@@ -1867,7 +1874,7 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
     uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     sig[sig_len++] = sighash_byte;
 
-    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, sig, sig_len)) return false;
+    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, NULL, sig, sig_len)) return false;
 
     return true;
 }
@@ -1900,6 +1907,8 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
     size_t sig_len = 0;
 
+    uint8_t *tapleaf_hash = NULL;
+
     cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
     uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
 
@@ -1911,35 +1920,57 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     bool error = false;
     BEGIN_TRY {
         TRY {
-            crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
+            do {  // block executed once, only to allow safely breaking out on error
+                crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
 
-            if (!placeholder_info->is_tapscript) {
                 policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
-                if (policy->tree == NULL) {
-                    // tweak as specified in BIP-86 and BIP-386
-                    crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+
+                if (!placeholder_info->is_tapscript) {
+                    if (policy->tree == NULL) {
+                        // tweak as specified in BIP-86 and BIP-386
+                        crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+                    } else {
+                        uint8_t h[32];
+                        if (0 > compute_taptree_hash(
+                                    dc,
+                                    &(wallet_derivation_info_t){
+                                        .address_index = input->in_out.address_index,
+                                        .change = input->in_out.is_change ? 1 : 0,
+                                        .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                        .n_keys = st->wallet_header_n_keys,
+                                        .wallet_version = st->wallet_header_version},
+                                    policy->tree,
+                                    h)) {
+                            error = true;
+                            break;
+                        }
+
+                        // tweak with the taptree hash, per BIP-341
+                        crypto_tr_tweak_seckey(seckey, h, 32, seckey);
+                    }
                 } else {
-                    // tweak with the taptree hash, per BIP-341
-                    crypto_tr_tweak_seckey(seckey, st->taptree_hash, 32, seckey);
+                    // tapscript, we need to yield the tapleaf hash together with the pubkey
+                    tapleaf_hash = placeholder_info->tapleaf_hash;
                 }
-            }
 
-            // generate corresponding public key
-            cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
-            if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
-                error = true;
-            }
+                // generate corresponding public key
+                cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
+                if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
+                    error = true;
+                    break;
+                }
 
-            unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
-                                                          CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
-                                                          CX_SHA256,
-                                                          sighash,
-                                                          32,
-                                                          sig,
-                                                          &sig_len);
-            if (err != CX_OK) {
-                error = true;
-            }
+                unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
+                                                              CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
+                                                              CX_SHA256,
+                                                              sighash,
+                                                              32,
+                                                              sig,
+                                                              &sig_len);
+                if (err != CX_OK) {
+                    error = true;
+                }
+            } while (false);
         }
         CATCH_ALL {
             error = true;
@@ -1969,7 +2000,14 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
         sig[sig_len++] = sighash_byte;
     }
 
-    if (!yield_signature(dc, st, cur_input_index, pubkey_tweaked_compr + 1, 32, sig, sig_len))
+    if (!yield_signature(dc,
+                         st,
+                         cur_input_index,
+                         pubkey_tweaked_compr + 1,
+                         32,
+                         tapleaf_hash,
+                         sig,
+                         sig_len))
         return false;
 
     return true;

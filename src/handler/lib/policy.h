@@ -50,6 +50,27 @@ typedef struct {
 } wallet_derivation_info_t;
 
 /**
+ * Computes the hash of a taptree, to be used as tweak for the internal key per BIP-0341;
+ * The returned hash is the second value in the tuple returned by taproot_tree_helper in
+ * BIP-0341, assuming leaf_version 0xC0.
+ *
+ * @param[in] dispatcher_context
+ *   Pointer to the dispatcher context
+ * @param[in] wdi
+ *   Pointer to a wallet_derivation_info_t structure containing multiple other parameters
+ * @param[in] tree
+ *   Pointer to the root of the taptree
+ * @param[out] out
+ *   A buffer of 32 bytes to receive the output
+ *
+ * @return 0 on success, a negative number on failure.
+ */
+int compute_taptree_hash(dispatcher_context_t *dispatcher_context,
+                         const wallet_derivation_info_t *wdi,
+                         const policy_node_tree_t *tree,
+                         uint8_t out[static 32]);
+
+/**
  * Computes the script corresponding to a wallet policy, for a certain change and address index.
  *
  * @param[in] dispatcher_context

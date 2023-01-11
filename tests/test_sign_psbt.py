@@ -812,10 +812,15 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
 
     assert len(result) == 1
 
-    idx0, pubkey0, sig0 = result[0]
+    idx0, pubkeyaugm0, sig0 = result[0]
+
+    pubkey0 = pubkeyaugm0[0:32]
+    tapleaf_hash0 = pubkeyaugm0[32:]
 
     assert idx0 == 0
     assert pubkey0 == bytes.fromhex("6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac")
+    assert tapleaf_hash0 == bytes.fromhex("092eda033617e210ee7f7d0e378a404aea1c48b56aa103022becf7746e4700a4")
+
     assert len(sig0) == 65
     assert sig0[-1] == 1  # SIGHASH_ALL
 

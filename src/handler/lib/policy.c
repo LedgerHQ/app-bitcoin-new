@@ -890,11 +890,10 @@ static int compute_tapleaf_hash(dispatcher_context_t *dispatcher_context,
 }
 
 // See taproot_tree_helper in BIP-0341
-// This only computes h, assuming leaf_version = 0xc0.
-static int compute_taptree_hash(dispatcher_context_t *dc,
-                                const wallet_derivation_info_t *wdi,
-                                const policy_node_tree_t *tree,
-                                uint8_t out[static 32]) {
+int compute_taptree_hash(dispatcher_context_t *dc,
+                         const wallet_derivation_info_t *wdi,
+                         const policy_node_tree_t *tree,
+                         uint8_t out[static 32]) {
     if (tree->is_leaf) {
         return compute_tapleaf_hash(dc, wdi, resolve_node_ptr(&tree->script), out);
     } else {
