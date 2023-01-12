@@ -24,6 +24,8 @@ $ yarn build
 
 The following example showcases all the main methods of the `Client`'s interface.
 
+More examples can be found in the [test suite](src/__tests__/appClient.test.ts).
+
 Testing the `signPsbt` method requires a valid PSBTv2, and provide the corresponding wallet policy; it is skipped by default in the following example.
 
 ```javascript
@@ -44,8 +46,8 @@ async function main(transport) {
     // ==> Get and display on screen the first taproot address
     const firstTaprootAccountPubkey = await app.getExtendedPubkey("m/86'/1'/0'");
     const firstTaprootAccountPolicy = new DefaultWalletPolicy(
-        "tr(@0)",
-        `[${fpr}/86'/1'/0']${firstTaprootAccountPubkey}/**`
+        "tr(@0/**)",
+        `[${fpr}/86'/1'/0']${firstTaprootAccountPubkey}`
     );
 
     const firstTaprootAccountAddress = await app.getWalletAddress(
@@ -61,12 +63,12 @@ async function main(transport) {
     // ==> Register a multisig wallet named "Cold storage"
 
     const ourPubkey = await app.getExtendedPubkey("m/48'/1'/0'/2'");
-    const ourKeyInfo = `[${fpr}/48'/1'/0'/2']${ourPubkey}/**`;
-    const otherKeyInfo = "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**";
+    const ourKeyInfo = `[${fpr}/48'/1'/0'/2']${ourPubkey}`;
+    const otherKeyInfo = "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF";
 
     const multisigPolicy = new WalletPolicy(
         "Cold storage",
-        "wsh(sortedmulti(2,@0,@1))", // a 2-of-2 multisig policy template
+        "wsh(sortedmulti(2,@0/**,@1/**))", // a 2-of-2 multisig policy template
         [
             otherKeyInfo, // some other bitcoiner
             ourKeyInfo,   // that's us
