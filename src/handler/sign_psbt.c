@@ -2219,8 +2219,6 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
             }
 
-            st->inputs_total_value += amount;
-
             if (input->has_redeemScript) {
                 // Get redeemScript
                 uint8_t redeemScript[64];
