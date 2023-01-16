@@ -82,8 +82,14 @@ typedef struct {
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
-    // the script used when signing, either from the witness utxo or the redeem script
-    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    // we no longer need the script when we compute the taptree hash right before a taproot key-path
+    // spending; therefore, we reuse the same memory
+    union {
+        // the script used when signing, either from the witness utxo or the redeem script
+        uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+        uint8_t taptree_hash[32];
+    };
+
     size_t script_len;
 
     uint32_t sighash_type;
@@ -1941,27 +1947,10 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                         // tweak as specified in BIP-86 and BIP-386
                         crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
                     } else {
-                        // uint8_t h[32];
-                        // HACK to reuse stack: sig will be overwritten later;
-                        // not dangerous as not involving any secret.
-                        uint8_t *h = sig;
-
-                        if (0 > compute_taptree_hash(
-                                    dc,
-                                    &(wallet_derivation_info_t){
-                                        .address_index = input->in_out.address_index,
-                                        .change = input->in_out.is_change ? 1 : 0,
-                                        .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
-                                        .n_keys = st->wallet_header_n_keys,
-                                        .wallet_version = st->wallet_header_version},
-                                    policy->tree,
-                                    h)) {
-                            error = true;
-                            break;
-                        }
-
                         // tweak with the taptree hash, per BIP-341
-                        crypto_tr_tweak_seckey(seckey, h, 32, seckey);
+                        // The taptree hash is computed in sign_transaction_input in order to
+                        // reduce stack usage.
+                        crypto_tr_tweak_seckey(seckey, input->taptree_hash, 32, seckey);
                     }
                 } else {
                     // tapscript, we need to yield the tapleaf hash together with the pubkey
@@ -2309,6 +2298,25 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                           placeholder_info,
                                           sighash))
                 return false;
+
+            policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+            if (!placeholder_info->is_tapscript && policy->tree != NULL) {
+                // keypath spend, we compute the taptree hash so that we find it ready
+                // later in sign_sighash_schnorr_and_yield (which has less available stack).
+                if (0 > compute_taptree_hash(
+                            dc,
+                            &(wallet_derivation_info_t){
+                                .address_index = input->in_out.address_index,
+                                .change = input->in_out.is_change ? 1 : 0,
+                                .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                .n_keys = st->wallet_header_n_keys,
+                                .wallet_version = st->wallet_header_version},
+                            policy->tree,
+                            input->taptree_hash)) {
+                    PRINTF("Error while computing taptree hash\n");
+                    return false;
+                }
+            }
 
             if (!sign_sighash_schnorr_and_yield(dc,
                                                 st,
