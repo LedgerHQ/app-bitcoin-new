@@ -855,10 +855,10 @@ static int process_multi_a_sortedmulti_a_node(policy_parser_state_t *state, cons
     return 1;
 }
 
-static int compute_tapleaf_hash(dispatcher_context_t *dispatcher_context,
-                                const wallet_derivation_info_t *wdi,
-                                const policy_node_t *script_policy,
-                                uint8_t out[static 32]) {
+static int __attribute__((noinline)) compute_tapleaf_hash(dispatcher_context_t *dispatcher_context,
+                                                          const wallet_derivation_info_t *wdi,
+                                                          const policy_node_t *script_policy,
+                                                          uint8_t out[static 32]) {
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
@@ -889,20 +889,28 @@ static int compute_tapleaf_hash(dispatcher_context_t *dispatcher_context,
     return 0;
 }
 
+// Separated from compute_taptree_hash to optimize its stack usage
+static int __attribute__((noinline))
+compute_and_combine_taptree_child_hashes(dispatcher_context_t *dc,
+                                         const wallet_derivation_info_t *wdi,
+                                         const policy_node_tree_t *tree,
+                                         uint8_t out[static 32]) {
+    uint8_t left_h[32], right_h[32];
+    if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->left_tree), left_h)) return -1;
+    if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->right_tree), right_h)) return -1;
+    crypto_tr_combine_taptree_hashes(left_h, right_h, out);
+    return 0;
+}
+
 // See taproot_tree_helper in BIP-0341
-int compute_taptree_hash(dispatcher_context_t *dc,
-                         const wallet_derivation_info_t *wdi,
-                         const policy_node_tree_t *tree,
-                         uint8_t out[static 32]) {
-    if (tree->is_leaf) {
+int __attribute__((noinline)) compute_taptree_hash(dispatcher_context_t *dc,
+                                                   const wallet_derivation_info_t *wdi,
+                                                   const policy_node_tree_t *tree,
+                                                   uint8_t out[static 32]) {
+    if (tree->is_leaf)
         return compute_tapleaf_hash(dc, wdi, resolve_node_ptr(&tree->script), out);
-    } else {
-        uint8_t left_h[32], right_h[32];
-        if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->left_tree), left_h)) return -1;
-        if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->right_tree), right_h)) return -1;
-        crypto_tr_combine_taptree_hashes(left_h, right_h, out);
-        return 0;
-    }
+    else
+        return compute_and_combine_taptree_child_hashes(dc, wdi, tree, out);
 }
 
 #pragma GCC diagnostic push
