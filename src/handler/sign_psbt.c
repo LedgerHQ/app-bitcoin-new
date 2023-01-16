@@ -1899,8 +1899,6 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     cx_ecfp_private_key_t private_key = {0};
     uint8_t *seckey = private_key.d;  // convenience alias (entirely within the private_key struct)
 
-    uint8_t chain_code[32] = {0};
-
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
     for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
         sign_path[i] = placeholder_info->key_derivation[i];
@@ -1929,7 +1927,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     BEGIN_TRY {
         TRY {
             do {  // block executed once, only to allow safely breaking out on error
-                crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
+                crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len);
 
                 policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
 

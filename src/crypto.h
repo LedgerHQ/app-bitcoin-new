@@ -37,7 +37,7 @@ typedef struct {
  * @param[out] private_key
  *   Pointer to private key.
  * @param[out] chain_code
- *   Pointer to 32 bytes array for chain code.
+ *   Pointer to 32 bytes array for chain code, or NULL if the chain_code is not required.
  * @param[in]  bip32_path
  *   Pointer to buffer with BIP32 path.
  * @param[in]  bip32_path_len
@@ -46,7 +46,7 @@ typedef struct {
  * @return 0 if success, -1 otherwise.
  */
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t chain_code[static 32],
+                              uint8_t *chain_code,
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len);
 

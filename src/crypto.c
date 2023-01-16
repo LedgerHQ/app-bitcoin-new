@@ -90,7 +90,7 @@ static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
 }
 
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t chain_code[static 32],
+                              uint8_t *chain_code,
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len) {
     uint8_t raw_private_key[32] = {0};
@@ -434,14 +434,13 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                            uint32_t *info) {
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
-    uint8_t chain_code[32] = {0};
     uint32_t info_internal = 0;
 
     int sig_len = 0;
     bool error = false;
     BEGIN_TRY {
         TRY {
-            crypto_derive_private_key(&private_key, chain_code, bip32_path, bip32_path_len);
+            crypto_derive_private_key(&private_key, NULL, bip32_path, bip32_path_len);
             sig_len = cx_ecdsa_sign(&private_key,
                                     CX_RND_RFC6979,
                                     CX_SHA256,
