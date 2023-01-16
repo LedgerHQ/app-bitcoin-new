@@ -1153,6 +1153,8 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
                                                      sign_psbt_state_t *st,
                                                      int cur_output_index,
                                                      const output_info_t *output) {
+    (void) cur_output_index;
+
     // show this output's address
     char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     int address_len = get_script_address(output->in_out.scriptPubKey,
@@ -1896,37 +1898,40 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t *seckey = private_key.d;  // convenience alias (entirely within the private_key struct)
-
-    uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-        sign_path[i] = placeholder_info->key_derivation[i];
-    }
-    sign_path[placeholder_info->key_derivation_length] =
-        input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                : placeholder_info->placeholder.num_first;
-    sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
-
-    int sign_path_len = placeholder_info->key_derivation_length + 2;
-
-    uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
-    size_t sig_len = 0;
-
-    uint8_t *tapleaf_hash = NULL;
-
-    cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
-    uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
-
     if (st->wallet_policy_map.type != TOKEN_TR) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
 
+    uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
+    size_t sig_len = 0;
+
+    cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
+
+    uint8_t *tapleaf_hash = NULL;
+
     bool error = false;
+    cx_ecfp_private_key_t private_key = {0};
     BEGIN_TRY {
         TRY {
             do {  // block executed once, only to allow safely breaking out on error
+
+                uint8_t *seckey =
+                    private_key.d;  // convenience alias (entirely within the private_key struct)
+
+                uint32_t sign_path[MAX_BIP32_PATH_STEPS];
+
+                for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
+                    sign_path[i] = placeholder_info->key_derivation[i];
+                }
+                sign_path[placeholder_info->key_derivation_length] =
+                    input->in_out.is_change ? placeholder_info->placeholder.num_second
+                                            : placeholder_info->placeholder.num_first;
+                sign_path[placeholder_info->key_derivation_length + 1] =
+                    input->in_out.address_index;
+
+                int sign_path_len = placeholder_info->key_derivation_length + 2;
+
                 crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len);
 
                 policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
@@ -1965,10 +1970,6 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
                 // generate corresponding public key
                 cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
-                if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
-                    error = true;
-                    break;
-                }
 
                 unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
                                                               CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
@@ -2013,7 +2014,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
     if (!yield_signature(dc,
                          st,
                          cur_input_index,
-                         pubkey_tweaked_compr + 1,
+                         pubkey_tweaked.W + 1,  // x-only pubkey, hence take only the x-coordinate
                          32,
                          tapleaf_hash,
                          sig,
