@@ -1938,7 +1938,11 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                         // tweak as specified in BIP-86 and BIP-386
                         crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
                     } else {
-                        uint8_t h[32];
+                        // uint8_t h[32];
+                        // HACK to reuse stack: sig will be overwritten later;
+                        // not dangerous as not involving any secret.
+                        uint8_t *h = sig;
+
                         if (0 > compute_taptree_hash(
                                     dc,
                                     &(wallet_derivation_info_t){
