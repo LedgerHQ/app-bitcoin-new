@@ -2225,7 +2225,9 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             if (input->has_redeemScript) {
                 // Get redeemScript
-                uint8_t redeemScript[64];
+                // The redeemScript cannot be longer than standard scriptPubKeys for
+                // wrapped segwit transactions that we support
+                uint8_t redeemScript[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
                 int redeemScript_length =
                     call_get_merkleized_map_value(dc,
