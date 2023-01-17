@@ -1918,68 +1918,70 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
     bool error = false;
     cx_ecfp_private_key_t private_key = {0};
-    BEGIN_TRY {
-        TRY {
-            do {  // block executed once, only to allow safely breaking out on error
 
-                uint8_t *seckey =
-                    private_key.d;  // convenience alias (entirely within the private_key struct)
+    // IMPORTANT: Since we do not use any syscall that might throw an exception, it is safe to avoid
+    // using the TRY/CATCH block to ensure zeroing sensitive data.
 
-                uint32_t sign_path[MAX_BIP32_PATH_STEPS];
+    do {  // block executed once, only to allow safely breaking out on error
 
-                for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-                    sign_path[i] = placeholder_info->key_derivation[i];
-                }
-                sign_path[placeholder_info->key_derivation_length] =
-                    input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                            : placeholder_info->placeholder.num_first;
-                sign_path[placeholder_info->key_derivation_length + 1] =
-                    input->in_out.address_index;
+        uint8_t *seckey =
+            private_key.d;  // convenience alias (entirely within the private_key struct)
 
-                int sign_path_len = placeholder_info->key_derivation_length + 2;
+        uint32_t sign_path[MAX_BIP32_PATH_STEPS];
 
-                crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len);
-
-                policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
-
-                if (!placeholder_info->is_tapscript) {
-                    if (policy->tree == NULL) {
-                        // tweak as specified in BIP-86 and BIP-386
-                        crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
-                    } else {
-                        // tweak with the taptree hash, per BIP-341
-                        // The taptree hash is computed in sign_transaction_input in order to
-                        // reduce stack usage.
-                        crypto_tr_tweak_seckey(seckey, input->taptree_hash, 32, seckey);
-                    }
-                } else {
-                    // tapscript, we need to yield the tapleaf hash together with the pubkey
-                    tapleaf_hash = placeholder_info->tapleaf_hash;
-                }
-
-                // generate corresponding public key
-                cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
-
-                unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
-                                                              CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
-                                                              CX_SHA256,
-                                                              sighash,
-                                                              32,
-                                                              sig,
-                                                              &sig_len);
-                if (err != CX_OK) {
-                    error = true;
-                }
-            } while (false);
+        for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
+            sign_path[i] = placeholder_info->key_derivation[i];
         }
-        CATCH_ALL {
+        sign_path[placeholder_info->key_derivation_length] =
+            input->in_out.is_change ? placeholder_info->placeholder.num_second
+                                    : placeholder_info->placeholder.num_first;
+        sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
+
+        int sign_path_len = placeholder_info->key_derivation_length + 2;
+
+        if (0 > crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len)) {
+            error = true;
+            break;
+        }
+
+        policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+
+        if (!placeholder_info->is_tapscript) {
+            if (policy->tree == NULL) {
+                // tweak as specified in BIP-86 and BIP-386
+                crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+            } else {
+                // tweak with the taptree hash, per BIP-341
+                // The taptree hash is computed in sign_transaction_input in order to
+                // reduce stack usage.
+                crypto_tr_tweak_seckey(seckey, input->taptree_hash, 32, seckey);
+            }
+        } else {
+            // tapscript, we need to yield the tapleaf hash together with the pubkey
+            tapleaf_hash = placeholder_info->tapleaf_hash;
+        }
+
+        // generate corresponding public key
+        unsigned int err =
+            cx_ecfp_generate_pair_no_throw(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
+        if (err != CX_OK) {
+            error = true;
+            break;
+        }
+
+        err = cx_ecschnorr_sign_no_throw(&private_key,
+                                         CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
+                                         CX_SHA256,
+                                         sighash,
+                                         32,
+                                         sig,
+                                         &sig_len);
+        if (err != CX_OK) {
             error = true;
         }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
+    } while (false);
+
+    explicit_bzero(&private_key, sizeof(private_key));
 
     if (error) {
         // unexpected error when signing
