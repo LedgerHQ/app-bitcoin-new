@@ -113,7 +113,6 @@ typedef struct {
 
 // Cache for partial hashes during segwit signing (avoid quadratic hashing for segwit transactions)
 typedef struct {
-    bool segwit_hashes_computed;
     uint8_t sha_prevouts[32];
     uint8_t sha_amounts[32];
     uint8_t sha_scriptpubkeys[32];
@@ -2139,7 +2138,6 @@ compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_ha
         crypto_hash_digest(&sha_scriptpubkeys_context.header, hashes->sha_scriptpubkeys, 32);
     }
 
-    hashes->segwit_hashes_computed = true;
     return true;
 }
 
@@ -2261,12 +2259,6 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 SEND_SW(dc, SW_NOT_SUPPORTED);
                 return false;
             }
-        }
-
-        // compute all the tx-wide hashes
-
-        if (!hashes->segwit_hashes_computed) {
-            if (!compute_segwit_hashes(dc, st, hashes)) return false;
         }
 
         uint8_t sighash[32];
@@ -2397,7 +2389,11 @@ sign_transaction(dispatcher_context_t *dc,
     int placeholder_index = 0;
 
     segwit_hashes_t hashes;
-    hashes.segwit_hashes_computed = false;
+
+    // compute all the tx-wide hashes
+    // while this is redundant for legacy transactions, we do it here in order to
+    // avoid doing it in places that have more stack limitations
+    if (!compute_segwit_hashes(dc, st, &hashes)) return false;
 
     // Iterate over all the placeholders that correspond to keys owned by us
     while (true) {
