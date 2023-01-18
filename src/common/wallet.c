@@ -1798,8 +1798,7 @@ static int parse_script(buffer_t *in_buf,
 static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t depth) {
     // out_buf must be aligned before calling this function
 
-    // TODO: should add a buffer_is_aligned() function in buffer.h
-    if ((unsigned int) (out_buf->ptr + out_buf->offset) % 4 != 0) {
+    if (!buffer_is_cur_aligned(out_buf)) {
         return WITH_ERROR(-1, "out_buf not aligned");
     }
 
