@@ -93,6 +93,8 @@ def get_xpub_fingerprint(s: str) -> bytes:
     """
     data = decode(s)
     fingerprint = data[5:9]
+    if(not fingerprint.islower()):
+        raise BadArgumentError(f"the characters of {fingerprint} are not all lowercase")
     return fingerprint
 
 def get_xpub_fingerprint_hex(xpub: str) -> str:
