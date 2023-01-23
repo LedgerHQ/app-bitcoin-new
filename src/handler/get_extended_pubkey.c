@@ -54,6 +54,11 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
         case 86:
             hardened_der_len = 3;
             break;
+        case 45:
+            // BIP-45 prescribes simply length 1, but we instead support existing deployed
+            // use cases with path "m/45'/coin_type'/account'
+            hardened_der_len = 3;
+            break;
         case 48:
             hardened_der_len = 4;
             break;
@@ -61,9 +66,9 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
             return false;
     }
 
-    // bip32_path_len should be either hardened_der_len, or just two more
-    // for change and address_index
-    if (bip32_path_len != hardened_der_len && bip32_path_len != hardened_der_len + 2) {
+    // bip32_path_len should be at least the hardened_der_len
+    // (but it could have additional unhardened derivation steps)
+    if (bip32_path_len < hardened_der_len) {
         return false;
     }
 
@@ -96,19 +101,6 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     // Account shouldn't be too large
     if (account > MAX_BIP44_ACCOUNT_RECOMMENDED) {
         return false;
-    }
-
-    if (bip32_path_len > hardened_der_len) {
-        uint32_t change = bip32_path[bip32_path_len - 2];
-        uint32_t address_index = bip32_path[bip32_path_len - 1];
-
-        if (change != 0 && change != 1) {
-            return false;
-        }
-
-        if (address_index > MAX_BIP44_ADDRESS_INDEX_RECOMMENDED) {
-            return false;
-        }
     }
 
     // For BIP48, there is also the script type, with only standardized values 1' and 2'
