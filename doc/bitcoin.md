@@ -226,9 +226,15 @@ No output data; the signature are returned using the YIELD client command.
 
 #### Description
 
-Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, encoded as `<input_index> <pubkey_len> <pubkey> <signature>`, where the `input_index` is a Bitcoin style varint.
+Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, in the format described below. If multiple key placeholders of the wallet policy are internal, the process is repeated for each of them.
 
-If `P2` is `0` (version `0` of the protocol), `pubkey_len` and `pubkey` are omitted in the YIELD messages.
+The results yielded via the YIELD command respect the following format: `<input_index> <pubkey_augm_len> <pubkey_augm> <signature>`, where:
+- `input_index` is a Bitcoin style varint, the index input of the input being signed (starting from 0);
+- `pubkey_augm_len` is an unsigned byte equal to the length of `pubkey_augm`;
+- `pubkey_augm` is the `pubkey` used for signing for legacy, segwit or taproot script path spends (a compressed pubkey if non-taproot, a 32-byte x-only pubkey if taproot); for taproot script path spends, it is the concatenation of the `x-only` pubkey and the 32-byte *tapleaf hash* as defined in [BIP-0341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki);
+- `signature` is the returned signature, possibly concatenated with the sighash byte (as it would be pushed on the stack).
+
+If `P2` is `0` (version `0` of the protocol), `pubkey_augm_len` and `pubkey_augm` are omitted in the YIELD messages.
 
 For a registered wallet, the hmac must be correct.
 

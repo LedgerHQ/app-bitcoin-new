@@ -226,8 +226,9 @@ class Client:
         List[Tuple[int, bytes, bytes]]
             A list of tuples returned by the hardware wallets, where each element is a tuple of:
             - an integer, the index of the input being signed;
-            - a `bytes` array of length 33 (compressed ecdsa pubkey) or 32 (x-only BIP-0340 pubkey), the corresponding pubkey for this signature;
-            - a `bytes` array with the signature.
+            - a `bytes` array of length 33 (compressed ecdsa pubkey) or 32 (x-only BIP-0340 pubkey), the corresponding
+              pubkey for this signature; for taproot script path spends, it is concatenated with the tapleaf hash.
+            - a `bytes` array with the signature (concatenated with the sighash byte if appropriate).
         """
 
         raise NotImplementedError
