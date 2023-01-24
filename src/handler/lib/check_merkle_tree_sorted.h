@@ -4,8 +4,9 @@
 #include "../../common/merkle.h"
 
 // this flow aborts if any element is larger than this size
-// In PSBT, keys are currently up to 1+78 (for a serialized extended public key).
-#define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE 80
+// This is enough for a PSBT with the control block of a taptree of depth 5 tapbranches
+// TODO: we might remove this limitation altogether with a more careful implementation.
+#define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE 162
 
 typedef void (*merkle_tree_elements_callback_t)(struct dispatcher_context_s *,
                                                 void *,

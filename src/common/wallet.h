@@ -12,7 +12,7 @@
 #include "cx.h"
 #endif
 
-// The maximum number of keys supported for CHECKMULSITIG{VERIFY}
+// The maximum number of keys supported for CHECKMULTISIG{VERIFY}
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
 #define MAX_PUBKEYS_PER_MULTISIG 16
 
@@ -71,6 +71,9 @@
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH \
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
 
+// maximum depth of a taproot tree that we support
+#define MAX_TAPTREE_POLICY_DEPTH 4
+
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
     uint8_t master_key_fingerprint[4];
@@ -86,7 +89,6 @@ typedef struct {
     uint16_t descriptor_template_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
     union {
-        // TODO: rename to "descriptor_template"?
         char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1];  // used in V1
         uint8_t descriptor_template_sha256[32];                       // used in V2
     };

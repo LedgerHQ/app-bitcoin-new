@@ -1794,9 +1794,13 @@ static int parse_script(buffer_t *in_buf,
 }
 
 // Parses a TREE expression inside tr()
-// TODO: we might want to change the meaning of "depth" to match the Merkle tree, here
+// `depth` here refers to the depth inside the policy, therefore it starts at 1 for the taptree
 static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t depth) {
     // out_buf must be aligned before calling this function
+
+    if (depth > MAX_TAPTREE_POLICY_DEPTH) {
+        return WITH_ERROR(-1, "Taptree policy depth limit exceeded");
+    }
 
     if (!buffer_is_cur_aligned(out_buf)) {
         return WITH_ERROR(-1, "out_buf not aligned");

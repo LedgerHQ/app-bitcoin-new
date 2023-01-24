@@ -243,3 +243,23 @@ def test_e2e_tapscript_sortedmulti_a_2of2(rpc, rpc_test_wallet, client: Client, 
 
     run_test_e2e(wallet_policy, [core_wallet_name2],
                  rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_tapscript_depth4(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # A taproot tree with maximum supported depth, where the internal key is in the deepest script
+
+    keys_info = []
+    for _ in range(4):
+        _, core_xpub_orig = create_new_wallet()
+        keys_info.append(core_xpub_orig)
+
+    path = "499'/1'/0'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    keys_info.append(f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}")
+
+    wallet_policy = WalletPolicy(
+        name="Tapscriptception",
+        descriptor_template="tr(@0/**,{pk(@1/**),{pk(@2/**),{pk(@3/**),pk(@4/**)}}})",
+        keys_info=keys_info)
+
+    run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
