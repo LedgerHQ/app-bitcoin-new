@@ -86,6 +86,9 @@ class LegacyClient(Client):
         path = path.replace('h', '\'')
         path = path.replace('H', '\'')
 
+        if 'h' in path:
+            raise ValueError("'h' is not a valid hardened symbol in BIP32 path, only ' is supported")
+
         # This call returns raw uncompressed pubkey, chaincode
         pubkey = self.app.getWalletPublicKey(path, display)
         int_path = parse_path(path)
@@ -104,6 +107,9 @@ class LegacyClient(Client):
         else:
             child = 0
             fpr = b"\x00\x00\x00\x00"
+
+        if(not fpr.islower()):
+            raise ValueError("xpub fingerprint should all be lowercase")
 
         xpub = ExtendedKey(
             version=ExtendedKey.MAINNET_PUBLIC if self.chain == Chain.MAIN else ExtendedKey.TESTNET_PUBLIC,
