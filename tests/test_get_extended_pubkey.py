@@ -16,6 +16,11 @@ def test_get_extended_pubkey_standard_nodisplay(client: Client):
         "m/49'/1'/1'/1/3": "tpubDGnetmJDCL18TyaaoyRAYbkSE9wbHktSdTS4mfsR6inC8c2r6TjdBt3wkqEQhHYPtXpa46xpxDaCXU2PRNUGVvDzAHPG6hHRavYbwAGfnFr",
         "m/84'/1'/2'/0/10": "tpubDG9YpSUwScWJBBSrhnAT47NcT4NZGLcY18cpkaiWHnkUCi19EtCh8Heeox268NaFF6o56nVeSXuTyK6jpzTvV1h68Kr3edA8AZp27MiLUNt",
         "m/86'/1'/4'/1/12": "tpubDHTZ815MvTaRmo6Qg1rnU6TEU4ZkWyA56jA1UgpmMcBGomnSsyo34EZLoctzZY9MTJ6j7bhccceUeXZZLxZj5vgkVMYfcZ7DNPsyRdFpS3f",
+        # support up to 8 steps
+        "m/86'/1'/4'/1/2/3/4/5": "tpubDNcjumrTe1BBYEc1FmMaJZQw47mbvb4LfX4YwqC6GQ18PfMfuH3BEYREfdHm2gWXkSJ3JiXHF11iKnbJxzxp5qkgo8BBy2L48FRvrLhpTuh",
+        # the following two paths test compatibility with Unchained Capital's multisig setup
+        "m/45'/1'/0'": "tpubDCy2BKyxJFzACNgThkunvdnkHNotREK9LQDw8L9J1gx26SyzfoeJynJgWekzkramggmahVAgeHPxfpnvFtJ7hcYADrsVUnsPSei2tY9fBLL",
+        "m/45'/1'/0'/1": "tpubDFGDxRGdGFKekUtPuta4p9Kw2a2PSeyyhSTa7KNENJfBuJ78EEsL1LxwAA8ddSxZFWBT9gYRuLDoa2rwdix56WRsq77vAJ2iqeyPw6UBeyt",
     }
 
     for path, pubkey in testcases.items():
@@ -38,9 +43,6 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
         "m/48'/1'/0'/0'",  # script_type is 1' or 2' for BIP-0048
         "m/48'/1'/0'/3'",  # script_type is 1' or 2' for BIP-0048
         "m/999'/1'/0'",  # no standard with this purpose
-        "m/44'/1'/10'/0",  # missing address_index
-        "m/44'/1'/10'/2/3",  # change bigger than 1
-        "m/44'/1'/10'/0/3/5",  # no derivation steps expected after address_index
     ]
 
     for path in testcases:

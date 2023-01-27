@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.1] - 23-01-2023
+
+### Changed
+
+- Allow silent xpub exports at the `m/45'/coin_type'/account'` derivation paths.
+- Allow silent xpub exports for any unhardened child of an allowed path.
+- Allow up to 8 derivation steps for BIP-32 paths (instead of 6).
+
 ## [2.1.0] - 16-11-2022
 
 ### Added
