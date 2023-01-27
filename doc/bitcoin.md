@@ -85,7 +85,7 @@ Returns an extended public key at the given derivation path, serialized as per B
 | Length | Name              | Description |
 |--------|-------------------|-------------|
 | `1`    | `display`         | `0` or `1`  |
-| `1`    | `n`               | Number of derivation steps (maximum 6) |
+| `1`    | `n`               | Number of derivation steps (maximum 8) |
 | `4`    | `bip32_path[0]`   | First derivation step (big endian) |
 | `4`    | `bip32_path[1]`   | Second derivation step (big endian) |
 |        | ...               |             |
@@ -291,7 +291,7 @@ The device shows on its secure screen the BIP-32 path used for signing, and the 
 
 | Length  | Name              | Description |
 |---------|-------------------|-------------|
-| `1`     | `n`               | Number of derivation steps (maximum 6) |
+| `1`     | `n`               | Number of derivation steps (maximum 8) |
 | `4`     | `bip32_path[0]`   | First derivation step (big endian) |
 | `4`     | `bip32_path[1]`   | Second derivation step (big endian) |
 |         | ...               |             |
