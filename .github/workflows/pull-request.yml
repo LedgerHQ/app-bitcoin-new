@@ -1,0 +1,22 @@
+name: Pull request to main
+
+on:
+  pull_request:
+    types:
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
+    branches:
+      - 'main'
+
+jobs: 
+  pull-request:
+    if: ${{ !startsWith(github.head_ref, 'release/') }}
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/typescript-pull-request.v1.yml@feature/{LM-9718}-allow-set-workdir-in-release
+    with:
+      NODE_VERSION: 14
+      HAS_UNIT_TEST: false
+      WORKING_DIR: bitcoin_client_js
+    secrets: inherit
+    

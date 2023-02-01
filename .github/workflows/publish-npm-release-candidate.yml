@@ -1,0 +1,20 @@
+name: NPM Publish for release candidates
+run-name: "Publishing ${{ github.ref_name }}-rc to NPM"
+
+on:
+  push:
+    branches:
+      - 'release/v**'
+    paths-ignore:
+      - '.github/**'
+
+jobs:
+  publish:
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/typescript-publish-package.v1.yml@feature/{LM-9718}-allow-set-workdir-in-release
+    with:
+      NODE_VERSION: 14.x
+      HAS_UNIT_TEST: false
+      IS_RELEASE_CANDIDATE: true
+      USE_PAT: true
+      WORKING_DIR: bitcoin_client_js
+    secrets: inherit

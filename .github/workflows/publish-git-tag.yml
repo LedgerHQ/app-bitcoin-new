@@ -1,0 +1,18 @@
+name: Git tags
+run-name: "Publishing git tag for pull request #${{ github.event.number }}"
+
+on:
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+
+jobs: 
+  create-tag:
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/gh-publish-release-sdk.v1.yml@feature/{LM-9718}-allow-set-workdir-in-release
+    with:
+      WORKING_DIR: bitcoin_client_js
+    secrets: inherit

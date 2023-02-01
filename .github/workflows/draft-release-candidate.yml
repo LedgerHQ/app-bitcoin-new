@@ -1,0 +1,17 @@
+name: Create release branch
+run-name: "Drafting release branch and PR for ${{ github.event.inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version you want to release (vX.Y.Z)'
+        default: 'v0.0.1'
+        required: true
+
+jobs:
+  draft-new-release:
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/gh-draft-new-release-sdk.v1.yml@feature/{LM-9718}-allow-set-workdir-in-release
+    with:
+      WORKING_DIR: bitcoin_client_js
+    secrets: inherit

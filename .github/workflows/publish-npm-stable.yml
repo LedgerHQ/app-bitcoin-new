@@ -1,0 +1,24 @@
+name: NPM Publish for stable releases
+run-name: Publishing ${{ github.event.release.tag_name }} to NPM
+
+on:
+  release:
+    types: [published]
+
+jobs: 
+  publish:
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/typescript-publish-package.v1.yml@feature/{LM-9718}-allow-set-workdir-in-release
+    with:
+      NODE_VERSION: 14.x
+      HAS_UNIT_TEST: false
+      USE_PAT: true
+      WORKING_DIR: bitcoin_client_js
+    secrets: inherit
+
+  clean-up:
+    name: Clean up
+    needs: publish
+    uses: Lattice-Trade/membrane-github-template-actions/.github/workflows/npm-cleanup-packages.v1.yml@main
+    with:
+      USE_PAT: true
+    secrets: inherit
