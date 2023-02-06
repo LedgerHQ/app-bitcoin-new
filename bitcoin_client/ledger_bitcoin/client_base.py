@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Tuple, Optional, Union, Literal
 from io import BytesIO
 
@@ -47,6 +48,7 @@ class TransportClient:
     def stop(self) -> None:
         self.transport.close()
 
+
 def print_apdu(apdu_dict: dict) -> None:
     serialized_apdu = b''.join([
         apdu_dict["cla"].to_bytes(1, byteorder='big'),
@@ -58,8 +60,23 @@ def print_apdu(apdu_dict: dict) -> None:
     ])
     print(f"=> {serialized_apdu.hex()}")
 
+
 def print_response(sw: int, data: bytes) -> None:
     print(f"<= {data.hex()}{sw.to_bytes(2, byteorder='big').hex()}")
+
+
+@dataclass(frozen=True)
+class PartialSignature:
+    """Represents a partial signature returned by sign_psbt.
+
+    It always contains a pubkey and a signature.
+    The pubkey
+
+    The tapleaf_hash is also filled if signing a for a tapscript.
+    """
+    pubkey: bytes
+    signature: bytes
+    tapleaf_hash: Optional[bytes] = None
 
 
 class Client:
@@ -201,7 +218,7 @@ class Client:
 
         raise NotImplementedError
 
-    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, bytes, bytes]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
         Signature requires explicit approval from the user.
@@ -223,12 +240,10 @@ class Client:
 
         Returns
         -------
-        List[Tuple[int, bytes, bytes]]
+        List[Tuple[int, PartialSignature]]
             A list of tuples returned by the hardware wallets, where each element is a tuple of:
             - an integer, the index of the input being signed;
-            - a `bytes` array of length 33 (compressed ecdsa pubkey) or 32 (x-only BIP-0340 pubkey), the corresponding
-              pubkey for this signature; for taproot script path spends, it is concatenated with the tapleaf hash.
-            - a `bytes` array with the signature (concatenated with the sighash byte if appropriate).
+            - an instance of `PartialSignature`.
         """
 
         raise NotImplementedError

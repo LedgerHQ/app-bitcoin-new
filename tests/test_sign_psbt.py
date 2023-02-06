@@ -9,7 +9,7 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType, PartialSignature
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
@@ -141,9 +141,11 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
-        bytes.fromhex(
-            "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+        PartialSignature(
+            pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+            signature=bytes.fromhex(
+                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            )
         )
     )]
 
@@ -170,9 +172,11 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
-        bytes.fromhex(
-            "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+        PartialSignature(
+            pubkey=bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
+            signature=bytes.fromhex(
+                "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+            )
         )
     )]
 
@@ -200,9 +204,11 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
-        bytes.fromhex(
-            "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
+            signature=bytes.fromhex(
+                "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+            )
         )
     )]
 
@@ -233,16 +239,20 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
-        bytes.fromhex(
-            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+            signature=bytes.fromhex(
+                "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+            )
         )
     ), (
         1,
-        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
-        bytes.fromhex(
-            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-        ),
+        PartialSignature(
+            pubkey=bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+            signature=bytes.fromhex(
+                "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+            ),
+        )
     )]
 
 
@@ -277,16 +287,20 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
-        bytes.fromhex(
-            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+            signature=bytes.fromhex(
+                "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+            )
         )
     ), (
         1,
-        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
-        bytes.fromhex(
-            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-        ),
+        PartialSignature(
+            pubkey=bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+            signature=bytes.fromhex(
+                "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+            )
+        )
     )]
 
 
@@ -342,9 +356,11 @@ def test_sign_psbt_multisig_wsh(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
-        bytes.fromhex(
-            "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
+        PartialSignature(
+            pubkey=bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
+            signature=bytes.fromhex(
+                "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
+            )
         )
     )]
 
@@ -390,15 +406,16 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0_psbt = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    idx0, pubkey0, sig0 = result[0]
+    idx0, partial_sig0 = result[0]
     assert idx0 == 0
-    assert pubkey0 == pubkey0_psbt
+    assert partial_sig0.pubkey == pubkey0_psbt
+    assert partial_sig0.tapleaf_hash is None
 
     # the sighash 0x01 is appended to the signature
-    assert len(sig0) == 64+1
-    assert sig0[-1] == 0x01
+    assert len(partial_sig0.signature) == 64+1
+    assert partial_sig0.signature[-1] == 0x01
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, partial_sig0.signature[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -435,13 +452,14 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
 
         assert len(result) == 1
 
-        idx0, pubkey0, sig0 = result[0]
+        idx0, partial_sig0 = result[0]
 
         assert idx0 == 0
-        assert pubkey0 == expected_pubkey0
-        assert len(sig0) == 64
+        assert partial_sig0.pubkey == expected_pubkey0
+        assert len(partial_sig0.signature) == 64
+        assert partial_sig0.tapleaf_hash is None
 
-        assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+        assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature)
 
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
@@ -777,9 +795,11 @@ def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
 
         assert result == [(
             0,
-            bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
-            bytes.fromhex(
-                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            PartialSignature(
+                pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+                signature=bytes.fromhex(
+                    "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+                )
             )
         )]
 
@@ -812,16 +832,14 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
 
     assert len(result) == 1
 
-    idx0, pubkeyaugm0, sig0 = result[0]
-
-    pubkey0 = pubkeyaugm0[0:32]
-    tapleaf_hash0 = pubkeyaugm0[32:]
+    idx0, partial_sig0 = result[0]
 
     assert idx0 == 0
-    assert pubkey0 == bytes.fromhex("6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac")
-    assert tapleaf_hash0 == bytes.fromhex("092eda033617e210ee7f7d0e378a404aea1c48b56aa103022becf7746e4700a4")
+    assert partial_sig0.pubkey == bytes.fromhex("6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac")
+    assert partial_sig0.tapleaf_hash == bytes.fromhex(
+        "092eda033617e210ee7f7d0e378a404aea1c48b56aa103022becf7746e4700a4")
 
-    assert len(sig0) == 65
-    assert sig0[-1] == 1  # SIGHASH_ALL
+    assert len(partial_sig0.signature) == 65
+    assert partial_sig0.signature[-1] == 1  # SIGHASH_ALL
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0[:64])
+    assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature[:64])
