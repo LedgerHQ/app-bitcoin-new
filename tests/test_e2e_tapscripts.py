@@ -263,3 +263,34 @@ def test_e2e_tapscript_depth4(rpc, rpc_test_wallet, client: Client, speculos_glo
         keys_info=keys_info)
 
     run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_tapscript_large(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model):
+    # A quite large tapscript with 8 tapleaves and 22 keys in total.
+
+    # Takes more memory than Nano S can handle
+    if (model == "nanos"):
+        pytest.skip("Not supported on Nano S due to memory limitations")
+
+    keys_info = []
+
+    core_wallet_name = None
+    for i in range(21):
+        core_wallet_name_i, core_xpub_orig = create_new_wallet()
+        if i == 9:
+            # sign with bitcoin-core using the ninth external key (it will be key @10 in the policy)
+            core_wallet_name = core_wallet_name_i
+        keys_info.append(core_xpub_orig)
+
+    path = "499'/1'/0'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+
+    # the internal key is key @9, in a 2-of-4 multisig
+    keys_info.insert(9, f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}")
+
+    wallet_policy = WalletPolicy(
+        name="Tapzilla",
+        descriptor_template="tr(@0/**,{{{sortedmulti_a(1,@1/**,@2/**,@3/**,@4/**,@5/**),multi_a(2,@6/**,@7/**,@8/**)},{multi_a(2,@9/**,@10/**,@11/**,@12/**),pk(@13/**)}},{{multi_a(2,@14/**,@15/**),multi_a(3,@16/**,@17/**,@18/**)},{multi_a(2,@19/**,@20/**),pk(@21/**)}}})",
+        keys_info=keys_info)
+
+    run_test_e2e(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)

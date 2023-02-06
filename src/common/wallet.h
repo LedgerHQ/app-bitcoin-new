@@ -41,7 +41,7 @@
 #else
 // on larger devices, we can afford to reserve a lot more memory
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES           512
+#define MAX_WALLET_POLICY_BYTES           768
 #endif
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
