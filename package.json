@@ -1,7 +1,7 @@
 {
   "name": "ledger",
   "scripts": {
-    "postinstall": "cd bitcoin_client_js && npm install  --legacy-peer-deps && tsc -p tsconfig.json"
+    "postinstall": "cd bitcoin_client_js && npm install --legacy-peer-deps && npm run build"
   },
   "main": "bitcoin_client_js/build/main/index.js",
   "typings": "bitcoin_client_js/build/main/index.d.ts"
