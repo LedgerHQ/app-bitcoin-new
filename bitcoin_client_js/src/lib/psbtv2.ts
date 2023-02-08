@@ -22,6 +22,7 @@ export enum psbtIn {
   PARTIAL_SIG = 0x02,
   SIGHASH_TYPE = 0x03,
   REDEEM_SCRIPT = 0x04,
+  WITNESS_SCRIPT  = 0x05,
   BIP32_DERIVATION = 0x06,
   FINAL_SCRIPTSIG = 0x07,
   FINAL_SCRIPTWITNESS = 0x08,
@@ -148,6 +149,12 @@ export class PsbtV2 {
   }
   getInputRedeemScript(inputIndex: number): Buffer | undefined {
     return this.getInputOptional(inputIndex, psbtIn.REDEEM_SCRIPT, b());
+  }
+  setInputWitnessScript(inputIndex: number, witnessScript: Buffer) {
+    this.setInput(inputIndex, psbtIn.WITNESS_SCRIPT, b(), redeemScript);
+  }
+  getInputWitnessScript(inputIndex: number): Buffer | undefined {
+    return this.getInputOptional(inputIndex, psbtIn.WITNESS_SCRIPT, b());
   }
   setInputBip32Derivation(
     inputIndex: number,
