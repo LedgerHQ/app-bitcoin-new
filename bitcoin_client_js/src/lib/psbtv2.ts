@@ -151,7 +151,7 @@ export class PsbtV2 {
     return this.getInputOptional(inputIndex, psbtIn.REDEEM_SCRIPT, b());
   }
   setInputWitnessScript(inputIndex: number, witnessScript: Buffer) {
-    this.setInput(inputIndex, psbtIn.WITNESS_SCRIPT, b(), redeemScript);
+    this.setInput(inputIndex, psbtIn.WITNESS_SCRIPT, b(), witnessScript);
   }
   getInputWitnessScript(inputIndex: number): Buffer | undefined {
     return this.getInputOptional(inputIndex, psbtIn.WITNESS_SCRIPT, b());
