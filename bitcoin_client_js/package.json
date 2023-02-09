@@ -31,8 +31,7 @@
   "dependencies": {
     "@ledgerhq/hw-transport": "^6.20.0",
     "bip32-path": "^0.4.2",
-    "bitcoinjs-lib": "^6.0.1",
-    "tiny-secp256k1": "^2.1.2"
+    "bitcoinjs-lib": "^6.0.1"
   },
   "devDependencies": {
     "@ledgerhq/hw-transport-node-speculos-http": "^6.24.1",
