@@ -22,7 +22,7 @@ export enum psbtIn {
   PARTIAL_SIG = 0x02,
   SIGHASH_TYPE = 0x03,
   REDEEM_SCRIPT = 0x04,
-  WITNESS_SCRIPT  = 0x05,
+  WITNESS_SCRIPT = 0x05,
   BIP32_DERIVATION = 0x06,
   FINAL_SCRIPTSIG = 0x07,
   FINAL_SCRIPTWITNESS = 0x08,
@@ -114,21 +114,24 @@ export class PsbtV2 {
   }
   setInputWitnessUtxo(
     inputIndex: number,
-    amount: Buffer,
+    amount: number,
     scriptPubKey: Buffer
   ) {
     const buf = new BufferWriter();
-    buf.writeSlice(amount);
+    buf.writeSlice(uint64LE(amount));
     buf.writeVarSlice(scriptPubKey);
     this.setInput(inputIndex, psbtIn.WITNESS_UTXO, b(), buf.buffer());
   }
   getInputWitnessUtxo(
     inputIndex: number
-  ): { readonly amount: Buffer; readonly scriptPubKey: Buffer } | undefined {
+  ): { readonly amount: number; readonly scriptPubKey: Buffer } | undefined {
     const utxo = this.getInputOptional(inputIndex, psbtIn.WITNESS_UTXO, b());
     if (!utxo) return undefined;
     const buf = new BufferReader(utxo);
-    return { amount: buf.readSlice(8), scriptPubKey: buf.readVarSlice() };
+    return {
+      amount: unsafeFrom64bitLE(buf.readSlice(8)),
+      scriptPubKey: buf.readVarSlice()
+    };
   }
   setInputPartialSig(inputIndex: number, pubkey: Buffer, signature: Buffer) {
     this.setInput(inputIndex, psbtIn.PARTIAL_SIG, pubkey, signature);
