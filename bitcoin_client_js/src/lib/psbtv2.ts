@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
+import bjs from 'bitcoinjs-lib';
+
 import {
   BufferReader,
   BufferWriter,
@@ -373,6 +375,87 @@ export class PsbtV2 {
       this.outputMaps[i] = new Map();
       while (this.readKeyPair(this.outputMaps[i], buf));
     }
+  }
+  /**
+   * Imports a BitcoinJS (bitcoinjs-lib) Psbt object.
+   * https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/ts_src/psbt.ts
+   *
+   * Prepares the fields required for signing a Psbt on a Ledger
+   * device. It should be used exclusively before calling 
+   * `appClient.signPsbt()` and not as a general Psbt conversion method.
+   *
+   * Note: This method supports all the policies that the Ledger is able to
+   * sign, with the exception of taproot: tr(@0).
+   */
+  fromBitcoinJS(psbtBJS: bjs.Psbt) {
+    function isTaprootInput(input): boolean {
+      let isP2TR;
+      try {
+        bjs.payments.p2tr({ output: input.witnessUtxo.script });
+        isP2TR = true;
+      } catch (err) {
+        isP2TR = false;
+      }
+      return (
+        input &&
+        !!(
+          input.tapInternalKey ||
+          input.tapMerkleRoot ||
+          (input.tapLeafScript && input.tapLeafScript.length) ||
+          (input.tapBip32Derivation && input.tapBip32Derivation.length) ||
+          isP2TR
+        )
+      );
+    }
+    this.setGlobalPsbtVersion(2);
+    this.setGlobalTxVersion(psbtBJS.version);
+    this.setGlobalInputCount(psbtBJS.data.inputs.length);
+    this.setGlobalOutputCount(psbtBJS.txOutputs.length);
+    if (psbtBJS.locktime !== undefined)
+      this.setGlobalFallbackLocktime(psbtBJS.locktime);
+    psbtBJS.data.inputs.forEach((input, index) => {
+      if (isTaprootInput(input))
+        throw new Error(`Taproot inputs not supported`);
+      this.setInputPreviousTxId(index, psbtBJS.txInputs[index].hash);
+      if (psbtBJS.txInputs[index].sequence !== undefined)
+        this.setInputSequence(index, psbtBJS.txInputs[index].sequence);
+      this.setInputOutputIndex(index, psbtBJS.txInputs[index].index);
+      if (input.sighashType !== undefined)
+        this.setInputSighashType(index, input.sighashType);
+      if (input.nonWitnessUtxo)
+        this.setInputNonWitnessUtxo(index, input.nonWitnessUtxo);
+      if (input.witnessUtxo) {
+        this.setInputWitnessUtxo(
+          index,
+          input.witnessUtxo.value,
+          input.witnessUtxo.script
+        );
+      }
+      if (input.witnessScript)
+        this.setInputWitnessScript(index, input.witnessScript);
+      if (input.redeemScript)
+        this.setInputRedeemScript(index, input.redeemScript);
+      psbtBJS.data.inputs[index].bip32Derivation.forEach(derivation => {
+        if (derivation.path.substring(0, 2) !== 'm/')
+          throw new Error(`Invalid input bip32 derivation`);
+        const pathArray = derivation.path
+          .replace('m/', '')
+          .split('/')
+          .map(level =>
+            level.match("'") ? parseInt(level) + 0x80000000 : Number(level)
+          );
+        this.setInputBip32Derivation(
+          index,
+          derivation.pubkey,
+          derivation.masterFingerprint,
+          pathArray
+        );
+      });
+    });
+    psbtBJS.txOutputs.forEach((output, index) => {
+      this.setOutputAmount(index, output.value);
+      this.setOutputScript(index, output.script);
+    });
   }
   private readKeyPair(map: Map<string, Buffer>, buf: BufferReader): boolean {
     const keyLen = sanitizeBigintToNumber(buf.readVarInt());
