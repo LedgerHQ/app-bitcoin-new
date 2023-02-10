@@ -387,7 +387,7 @@ export class PsbtV2 {
    * Note: This method supports all the policies that the Ledger is able to
    * sign, with the exception of taproot: tr(@0).
    */
-  fromBitcoinJS(psbtBJS: bjs.Psbt) {
+  fromBitcoinJS(psbtBJS: bjs.Psbt) : PsbtV2 {
     function isTaprootInput(input): boolean {
       let isP2TR;
       try {
@@ -456,6 +456,7 @@ export class PsbtV2 {
       this.setOutputAmount(index, output.value);
       this.setOutputScript(index, output.script);
     });
+    return this;
   }
   private readKeyPair(map: Map<string, Buffer>, buf: BufferReader): boolean {
     const keyLen = sanitizeBigintToNumber(buf.readVarInt());
