@@ -35,7 +35,7 @@ Note that the 1-byte prefix `0x00` is prepended when computing the leaf hashes, 
 
 The Merkle proof (called *Merkle audit path* in the language for RFC 6962) for a leaf node is the minimal set of additional nodes that is necessary to compute the Merkle Tree Hash. See section 2.1.3. of RFC 6962 for some examples.
 
-For any non-root node of the tree (either internal or leaf), let the *brother* be the unique other note sharing the same parent, that is the unique other node whose hash is combined together to compute an internal node.
+For any non-root node of the tree (either internal or leaf), let the *brother* be the unique other node sharing the same parent, that is the unique other node whose hash is combined together to compute an internal node.
 
 In the typical tree-like representation of the Merkle tree, the Merkle proof for a leaf is the list of the brothers of all the internal nodes
 
