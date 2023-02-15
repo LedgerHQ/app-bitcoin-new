@@ -53,7 +53,6 @@ def pytest_addoption(parser):
     parser.addoption("--headless", action="store_true")
     parser.addoption("--enableslowtests", action="store_true")
     parser.addoption("--model", action="store", default="nanos")
-    parser.addoption("--sdk", action="store", default="2.1")
 
 
 @pytest.fixture(scope="module")
@@ -100,18 +99,13 @@ def model(pytestconfig):
     return pytestconfig.getoption("model")
 
 
-@pytest.fixture
-def sdk(pytestconfig):
-    return pytestconfig.getoption("sdk")
-
-
 @pytest.fixture(scope='session', autouse=True)
 def root_directory(request):
     return Path(str(request.config.rootdir))
 
 
 @pytest.fixture
-def comm(settings, root_directory, hid, headless, model, sdk, app_version: str) -> Union[TransportClient, SpeculosClient]:
+def comm(settings, root_directory, hid, headless, model, app_version: str) -> Union[TransportClient, SpeculosClient]:
     if hid:
         client = TransportClient("hid")
     else:
@@ -135,7 +129,7 @@ def comm(settings, root_directory, hid, headless, model, sdk, app_version: str) 
 
         client = SpeculosClient(
             app_binary,
-            ['--model', model, '--sdk', sdk, '--seed', f'{settings["mnemonic"]}']
+            ['--model', model, '--seed', f'{settings["mnemonic"]}']
             + ["--display", "qt" if not headless else "headless"]
             + lib_params
         )
