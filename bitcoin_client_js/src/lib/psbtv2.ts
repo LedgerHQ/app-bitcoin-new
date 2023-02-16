@@ -436,13 +436,13 @@ export class PsbtV2 {
       if (input.redeemScript)
         this.setInputRedeemScript(index, input.redeemScript);
       psbtBJS.data.inputs[index].bip32Derivation.forEach(derivation => {
-        if (derivation.path.substring(0, 2) !== 'm/')
+        if (!/^m\//i.test(derivation.path))
           throw new Error(`Invalid input bip32 derivation`);
         const pathArray = derivation.path
-          .replace('m/', '')
+          .replace(/m\//i, '')
           .split('/')
           .map(level =>
-            level.match("'") ? parseInt(level) + 0x80000000 : Number(level)
+            level.match(/['h]/i) ? parseInt(level) + 0x80000000 : Number(level)
           );
         this.setInputBip32Derivation(
           index,
