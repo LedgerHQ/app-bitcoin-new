@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
+import bjs from 'bitcoinjs-lib';
+
 import {
   BufferReader,
   BufferWriter,
@@ -22,7 +24,7 @@ export enum psbtIn {
   PARTIAL_SIG = 0x02,
   SIGHASH_TYPE = 0x03,
   REDEEM_SCRIPT = 0x04,
-  WITNESS_SCRIPT  = 0x05,
+  WITNESS_SCRIPT = 0x05,
   BIP32_DERIVATION = 0x06,
   FINAL_SCRIPTSIG = 0x07,
   FINAL_SCRIPTWITNESS = 0x08,
@@ -114,21 +116,24 @@ export class PsbtV2 {
   }
   setInputWitnessUtxo(
     inputIndex: number,
-    amount: Buffer,
+    amount: number,
     scriptPubKey: Buffer
   ) {
     const buf = new BufferWriter();
-    buf.writeSlice(amount);
+    buf.writeSlice(uint64LE(amount));
     buf.writeVarSlice(scriptPubKey);
     this.setInput(inputIndex, psbtIn.WITNESS_UTXO, b(), buf.buffer());
   }
   getInputWitnessUtxo(
     inputIndex: number
-  ): { readonly amount: Buffer; readonly scriptPubKey: Buffer } | undefined {
+  ): { readonly amount: number; readonly scriptPubKey: Buffer } | undefined {
     const utxo = this.getInputOptional(inputIndex, psbtIn.WITNESS_UTXO, b());
     if (!utxo) return undefined;
     const buf = new BufferReader(utxo);
-    return { amount: buf.readSlice(8), scriptPubKey: buf.readVarSlice() };
+    return {
+      amount: unsafeFrom64bitLE(buf.readSlice(8)),
+      scriptPubKey: buf.readVarSlice()
+    };
   }
   setInputPartialSig(inputIndex: number, pubkey: Buffer, signature: Buffer) {
     this.setInput(inputIndex, psbtIn.PARTIAL_SIG, pubkey, signature);
@@ -370,6 +375,88 @@ export class PsbtV2 {
       this.outputMaps[i] = new Map();
       while (this.readKeyPair(this.outputMaps[i], buf));
     }
+  }
+  /**
+   * Imports a BitcoinJS (bitcoinjs-lib) Psbt object.
+   * https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/ts_src/psbt.ts
+   *
+   * Prepares the fields required for signing a Psbt on a Ledger
+   * device. It should be used exclusively before calling 
+   * `appClient.signPsbt()` and not as a general Psbt conversion method.
+   *
+   * Note: This method supports all the policies that the Ledger is able to
+   * sign, with the exception of taproot: tr(@0).
+   */
+  fromBitcoinJS(psbtBJS: bjs.Psbt) : PsbtV2 {
+    function isTaprootInput(input): boolean {
+      let isP2TR;
+      try {
+        bjs.payments.p2tr({ output: input.witnessUtxo.script });
+        isP2TR = true;
+      } catch (err) {
+        isP2TR = false;
+      }
+      return (
+        input &&
+        !!(
+          input.tapInternalKey ||
+          input.tapMerkleRoot ||
+          (input.tapLeafScript && input.tapLeafScript.length) ||
+          (input.tapBip32Derivation && input.tapBip32Derivation.length) ||
+          isP2TR
+        )
+      );
+    }
+    this.setGlobalPsbtVersion(2);
+    this.setGlobalTxVersion(psbtBJS.version);
+    this.setGlobalInputCount(psbtBJS.data.inputs.length);
+    this.setGlobalOutputCount(psbtBJS.txOutputs.length);
+    if (psbtBJS.locktime !== undefined)
+      this.setGlobalFallbackLocktime(psbtBJS.locktime);
+    psbtBJS.data.inputs.forEach((input, index) => {
+      if (isTaprootInput(input))
+        throw new Error(`Taproot inputs not supported`);
+      this.setInputPreviousTxId(index, psbtBJS.txInputs[index].hash);
+      if (psbtBJS.txInputs[index].sequence !== undefined)
+        this.setInputSequence(index, psbtBJS.txInputs[index].sequence);
+      this.setInputOutputIndex(index, psbtBJS.txInputs[index].index);
+      if (input.sighashType !== undefined)
+        this.setInputSighashType(index, input.sighashType);
+      if (input.nonWitnessUtxo)
+        this.setInputNonWitnessUtxo(index, input.nonWitnessUtxo);
+      if (input.witnessUtxo) {
+        this.setInputWitnessUtxo(
+          index,
+          input.witnessUtxo.value,
+          input.witnessUtxo.script
+        );
+      }
+      if (input.witnessScript)
+        this.setInputWitnessScript(index, input.witnessScript);
+      if (input.redeemScript)
+        this.setInputRedeemScript(index, input.redeemScript);
+      psbtBJS.data.inputs[index].bip32Derivation.forEach(derivation => {
+        if (!/^m\//i.test(derivation.path))
+          throw new Error(`Invalid input bip32 derivation`);
+        const pathArray = derivation.path
+          .replace(/m\//i, '')
+          .split('/')
+          .map(level =>
+            level.match(/['h]/i) ? parseInt(level) + 0x80000000 : Number(level)
+          );
+        this.setInputBip32Derivation(
+          index,
+          derivation.pubkey,
+          derivation.masterFingerprint,
+          pathArray
+        );
+      });
+    });
+    psbtBJS.txOutputs.forEach((output, index) => {
+      this.setOutputAmount(index, output.value);
+      this.setOutputScript(index, output.script);
+    });
+    return this;
   }
   private readKeyPair(map: Map<string, Buffer>, buf: BufferReader): boolean {
     const keyLen = sanitizeBigintToNumber(buf.readVarInt());
