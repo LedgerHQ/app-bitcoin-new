@@ -12,7 +12,7 @@
 #include "cx.h"
 #endif
 
-// The maximum number of keys supported for CHECKMULSITIG{VERIFY}
+// The maximum number of keys supported for CHECKMULTISIG{VERIFY}
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
 #define MAX_PUBKEYS_PER_MULTISIG 16
 
@@ -41,7 +41,7 @@
 #else
 // on larger devices, we can afford to reserve a lot more memory
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES           512
+#define MAX_WALLET_POLICY_BYTES           768
 #endif
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
@@ -71,6 +71,9 @@
 #define MAX_WALLET_POLICY_SERIALIZED_LENGTH \
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
 
+// maximum depth of a taproot tree that we support
+#define MAX_TAPTREE_POLICY_DEPTH 4
+
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
     uint8_t master_key_fingerprint[4];
@@ -86,7 +89,6 @@ typedef struct {
     uint16_t descriptor_template_len;
     char name[MAX_WALLET_NAME_LENGTH + 1];
     union {
-        // TODO: rename to "descriptor_template"?
         char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1];  // used in V1
         uint8_t descriptor_template_sha256[32];                       // used in V2
     };
@@ -102,7 +104,9 @@ typedef enum {
     TOKEN_WPKH,
     // TOKEN_COMBO     // disabled, does not mix well with the script policy language
     TOKEN_MULTI,
+    TOKEN_MULTI_A,
     TOKEN_SORTEDMULTI,
+    TOKEN_SORTEDMULTI_A,
     TOKEN_TR,
     // TOKEN_ADDR,     // unsupported
     // TOKEN_RAW,      // unsupported
@@ -204,9 +208,9 @@ typedef struct policy_node_ext_info_s {
 // policy_nodes, representing a non-negative offset from the position of the structure itself.
 // This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
 // in other structures, as they no longer contain 32-bit pointers.
-typedef struct ptr_node_s {
+typedef struct ptr_rel_s {
     uint16_t offset;
-} ptr_node_t;
+} ptr_rel_t;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
@@ -235,28 +239,28 @@ typedef struct {
     struct policy_node_s base;
 } policy_node_constant_t;
 
-// 4 bytes (instead of 8)
+// 4 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t script;
+    ptr_rel_t script;
 } policy_node_with_script_t;
 
-// 6 bytes (instead of 12)
+// 6 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t scripts[2];
+    ptr_rel_t scripts[2];
 } policy_node_with_script2_t;
 
-// 8 bytes (instead of 16)
+// 8 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_node_t scripts[3];
+    ptr_rel_t scripts[3];
 } policy_node_with_script3_t;
 
 // generic type with pointer for up to 3 (but constant) number of child scripts
 typedef policy_node_with_script3_t policy_node_with_scripts_t;
 
-// 4 bytes (instead of 8)
+// 4 bytes
 typedef struct {
     struct policy_node_s base;
     policy_node_key_placeholder_t *key_placeholder;
@@ -280,7 +284,7 @@ typedef struct {
 // 8 bytes
 typedef struct policy_node_scriptlist_s {
     struct policy_node_scriptlist_s *next;
-    ptr_node_t script;
+    ptr_rel_t script;
 } policy_node_scriptlist_t;
 
 // 12 bytes, (+ 8 bytes for every script)
@@ -302,18 +306,42 @@ typedef struct {
     uint8_t h[32];
 } policy_node_with_hash_256_t;
 
+// a TREE is either a script, or a {TREE,TREE}
+typedef struct policy_node_tree_s {
+    bool is_leaf;  // if this is a leaf, then it contains a pointer to a SCRIPT;
+                   // otherwise, it contains two pointers to TREE expressions.
+    union {
+        ptr_rel_t script;  // pointer to a policy_node_with_script_t
+        struct {
+            ptr_rel_t left_tree;   // pointer to a policy_node_tree_s
+            ptr_rel_t right_tree;  // pointer to a policy_node_tree_s
+        };
+    };
+} policy_node_tree_t;
+
+typedef struct {
+    struct policy_node_s base;
+    policy_node_key_placeholder_t *key_placeholder;
+    policy_node_tree_t *tree;  // NULL if tr(KP)
+} policy_node_tr_t;
+
 // The following helpers function simplifies dealing with relative pointers to scripts
 
-// Converts a relative pointer to the corresponding pointer to a policy node
-static inline const policy_node_t *node_ptr(const ptr_node_t *ptr) {
-    return (const policy_node_t *) ((const uint8_t *) ptr + ptr->offset);
+// Converts a relative pointer to the corresponding pointer to the corresponding absolute pointer
+static inline const void *resolve_ptr(const ptr_rel_t *ptr) {
+    return (const void *) ((const uint8_t *) ptr + ptr->offset);
+}
+
+// Syntactic sugar for resolve_ptr when the return value is a pointer to policy_node_t
+static inline const policy_node_t *resolve_node_ptr(const ptr_rel_t *ptr) {
+    return (const void *) ((const uint8_t *) ptr + ptr->offset);
 }
 
 // Initializes a relative pointer so that it points to node.
 // IMPORTANT: the assumption is that node is located in memory at an address larger than
 // relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
 // is potentially dangerous to use.
-static inline void init_node_ptr(ptr_node_t *relative_ptr, policy_node_t *node) {
+static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
     relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
 }
 

@@ -428,6 +428,37 @@ static void test_buffer_alloc(void **state) {
     assert_int_equal(buf.offset, 3+3);
 }
 
+static void test_buffer_is_cur_aligned(void **state) {
+    (void) state;
+
+    uint8_t data[32] __attribute__ ((aligned (4)));
+
+    buffer_t buf = buffer_create(data + 2, sizeof(data) - 2);
+
+    assert_false(buffer_is_cur_aligned(&buf)); //2
+
+    buffer_seek_cur(&buf, 1);
+    assert_false(buffer_is_cur_aligned(&buf)); //3
+
+    buffer_seek_cur(&buf, 1);
+    assert_true(buffer_is_cur_aligned(&buf)); //4
+
+    buffer_seek_cur(&buf, 1);
+    assert_false(buffer_is_cur_aligned(&buf)); //5
+
+    buffer_seek_cur(&buf, 1);
+    assert_false(buffer_is_cur_aligned(&buf)); //6
+
+    buffer_seek_cur(&buf, 1);
+    assert_false(buffer_is_cur_aligned(&buf)); //7
+
+    buffer_seek_cur(&buf, 1);
+    assert_true(buffer_is_cur_aligned(&buf)); //8
+
+    buffer_seek_cur(&buf, 1);
+    assert_false(buffer_is_cur_aligned(&buf)); //9
+}
+
 // tests the buffer_snapshot/buffer_restore functions
 static void test_buffer_snapshot_restore(void **state) {
     (void) state;
@@ -461,6 +492,7 @@ int main() {
                                        cmocka_unit_test(test_buffer_write),
                                        cmocka_unit_test(test_buffer_create),
                                        cmocka_unit_test(test_buffer_alloc),
+                                       cmocka_unit_test(test_buffer_is_cur_aligned),
                                        cmocka_unit_test(test_buffer_snapshot_restore)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);

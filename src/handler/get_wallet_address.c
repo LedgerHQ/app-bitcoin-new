@@ -181,6 +181,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
                                                    pubkey_derived,
                                                    NULL);
         if (serialized_pubkey_len == -1) {
+            PRINTF("Failed to derive pubkey\n");
             SEND_SW(dc, SW_BAD_STATE);
             return;
         }
@@ -248,16 +249,16 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
 
     {
         uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
-        buffer_t script_buf = buffer_create(script, sizeof(script));
 
-        int script_len = call_get_wallet_script(dc,
-                                                &wallet_policy_map.parsed,
-                                                wallet_header.version,
-                                                wallet_header.keys_info_merkle_root,
-                                                wallet_header.n_keys,
-                                                is_change,
-                                                address_index,
-                                                &script_buf);
+        int script_len = get_wallet_script(
+            dc,
+            &wallet_policy_map.parsed,
+            &(wallet_derivation_info_t){.wallet_version = wallet_header.version,
+                                        .keys_merkle_root = wallet_header.keys_info_merkle_root,
+                                        .n_keys = wallet_header.n_keys,
+                                        .change = is_change,
+                                        .address_index = address_index},
+            script);
         if (script_len < 0) {
             PRINTF("Couldn't produce wallet script\n");
             SEND_SW(dc, SW_BAD_STATE);  // unexpected
@@ -270,6 +271,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
         address_len = get_script_address(script, script_len, address, sizeof(address));
 
         if (address_len < 0) {
+            PRINTF("Could not produce address\n");
             SEND_SW(dc, SW_BAD_STATE);  // unexpected
             return;
         }

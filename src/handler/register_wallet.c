@@ -203,10 +203,12 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t p2) {
         // Unclear if there is any use case for registering policies with no internal keys.
         // We disallow that, might reconsider in future versions if needed.
         PRINTF("Wallet policy with no internal keys\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     } else if (n_internal_keys != 1 && wallet_header.version == WALLET_POLICY_VERSION_V1) {
         // for legacy policies, we keep the restriction to exactly 1 internal key
         PRINTF("V1 policies must have exactly 1 internal key\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
 

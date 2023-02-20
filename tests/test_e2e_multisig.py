@@ -108,16 +108,17 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     signed_psbt_hww_b64 = psbt.serialize()
 
     # ==> sign it with bitcoin-core
+    partial_psbts = [signed_psbt_hww_b64]
 
     for core_wallet_name in core_wallet_names:
-        signed_psbt_core_b64 = get_wallet_rpc(core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"]
+        partial_psbts.append(get_wallet_rpc(core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"])
 
     # ==> finalize the psbt, extract tx and broadcast
-    combined_psbt = rpc.combinepsbt([signed_psbt_hww_b64, signed_psbt_core_b64])
+    combined_psbt = rpc.combinepsbt(partial_psbts)
     result = rpc.finalizepsbt(combined_psbt)
 
-    rawtx = result["hex"]
     assert result["complete"] == True
+    rawtx = result["hex"]
 
     # make sure the transaction is valid by broadcasting it (would fail if rejected)
     rpc.sendrawtransaction(rawtx)
@@ -150,8 +151,8 @@ def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wal
     path_2 = "48'/1'/1'/2'"
     internal_xpub_2 = get_internal_xpub(speculos_globals.seed, path_2)
 
-    core_wallet_name_1, core_xpub_orig_1 = create_new_wallet()
-    core_wallet_name_2, core_xpub_orig_2 = create_new_wallet()
+    _, core_xpub_orig_1 = create_new_wallet()
+    _, core_xpub_orig_2 = create_new_wallet()
     core_wallet_name_3, core_xpub_orig_3 = create_new_wallet()
 
     wallet_policy = MultisigWallet(
@@ -167,7 +168,7 @@ def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wal
         ],
     )
 
-    run_test(wallet_policy, [core_wallet_name_1, core_wallet_name_2, core_wallet_name_3],
+    run_test(wallet_policy, [core_wallet_name_3],
              rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 

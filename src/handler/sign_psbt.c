@@ -47,6 +47,7 @@
 #include "handlers.h"
 
 #include "sign_psbt/compare_wallet_script_at_path.h"
+#include "sign_psbt/extract_bip32_derivation.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
@@ -81,8 +82,14 @@ typedef struct {
 
     uint64_t prevout_amount;  // the value of the prevout of the current input
 
-    // the script used when signing, either from the witness utxo or the redeem script
-    uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+    // we no longer need the script when we compute the taptree hash right before a taproot key-path
+    // spending; therefore, we reuse the same memory
+    union {
+        // the script used when signing, either from the witness utxo or the redeem script
+        uint8_t script[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
+        uint8_t taptree_hash[32];
+    };
+
     size_t script_len;
 
     uint32_t sighash_type;
@@ -97,14 +104,15 @@ typedef struct {
     policy_node_key_placeholder_t placeholder;
     int cur_index;
     uint32_t fingerprint;
-    int key_derivation_length;
+    uint8_t key_derivation_length;
     uint32_t key_derivation[MAX_BIP32_PATH_STEPS];
     serialized_extended_pubkey_t pubkey;
+    bool is_tapscript;         // true if signing with a BIP342 tapleaf script path spend
+    uint8_t tapleaf_hash[32];  // only used for tapscripts
 } placeholder_info_t;
 
 // Cache for partial hashes during segwit signing (avoid quadratic hashing for segwit transactions)
 typedef struct {
-    bool segwit_hashes_computed;
     uint8_t sha_prevouts[32];
     uint8_t sha_amounts[32];
     uint8_t sha_scriptpubkeys[32];
@@ -369,26 +377,20 @@ static int get_amount_scriptpubkey_from_psbt(
 
 // Convenience function to share common logic when processing all the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
-int read_change_and_index_from_psbt_bip32_derivation(
+static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     placeholder_info_t *placeholder_info,
     in_out_info_t *in_out,
     int psbt_key_type,
     buffer_t *data,
-    bool is_output,
     const merkleized_map_commitment_t *map_commitment,
     int index) {
-    int psbt_key_type_taproot;  // segwitv1 (taproot) keys are 32-byte x-only keys
-    if (is_output) {
-        psbt_key_type_taproot = PSBT_OUT_TAP_BIP32_DERIVATION;
-    } else {
-        psbt_key_type_taproot = PSBT_IN_TAP_BIP32_DERIVATION;
-    }
-
-    // x-only pubkeys for taproot, normal compressed pubkeys otherwise
-    size_t key_len = (psbt_key_type == psbt_key_type_taproot ? 32 : 33);
-
     uint8_t bip32_derivation_pubkey[33];
+
+    bool is_tap = psbt_key_type == PSBT_IN_TAP_BIP32_DERIVATION ||
+                  psbt_key_type == PSBT_OUT_TAP_BIP32_DERIVATION;
+    int key_len = is_tap ? 32 : 33;
+
     if (!buffer_read_bytes(data,
                            bip32_derivation_pubkey,
                            key_len)  // read compressed pubkey or x-only pubkey
@@ -399,58 +401,46 @@ int read_change_and_index_from_psbt_bip32_derivation(
         return -1;
     }
 
-    // get the corresponding value in the values Merkle tree (note: it doesn't work for
-    // taproot scripts)
-    uint8_t hasheslen_fpt_der[1 + 4 + 4 * MAX_BIP32_PATH_STEPS];
-    int len = call_get_merkle_leaf_element(dc,
+    // get the corresponding value in the values Merkle tree,
+    // then fetch the bip32 path from the field
+    uint32_t fpt_der[1 + MAX_BIP32_PATH_STEPS];
+
+    int der_len = extract_bip32_derivation(dc,
+                                           psbt_key_type,
                                            map_commitment->values_root,
-                                           (uint32_t) map_commitment->size,
+                                           map_commitment->size,
                                            index,
-                                           hasheslen_fpt_der,
-                                           sizeof(hasheslen_fpt_der));
-    int prefix_len = (psbt_key_type == psbt_key_type_taproot) ? 1 : 0;
-
-    // length sanity checks: at least 4 bytes for the fingerprint, and two derivation steps
-    if (len < prefix_len + 4 + 2 * 4 || (len - prefix_len) % 4 != 0) {
-        PRINTF("Invalid length of _BIP32_DERIVATION value: %d\n", len);
+                                           fpt_der);
+    if (der_len < 0) {
+        PRINTF("Failed to read BIP32_DERIVATION\n");
         return -1;
     }
 
-    // for PSBT_{IN,OUT}_TAP_BIP32_DERIVATION, there is a 1 byte 0x00 prefix
-    // anything with a different initial byte is a possible script path spend,
-    // which is not yet supported
-    if (psbt_key_type == psbt_key_type_taproot && hasheslen_fpt_der[0] != 0) {
-        PRINTF("PSBT_{IN,OUT}_TAP_BIP32_DERIVATION must have a 0-length list of hashes");
+    if (der_len < 2 || der_len > MAX_BIP32_PATH_STEPS) {
+        PRINTF("BIP32_DERIVATION path too long\n");
         return -1;
     }
-
-    int der_len = (len - prefix_len - 4) / 4;
 
     // if this derivation path matches the internal placeholder,
     // we use it to detect whether the current input is change or not,
     // and store its address index
-    uint32_t fpr = read_u32_be(hasheslen_fpt_der, prefix_len);
-
-    if (fpr == placeholder_info->fingerprint &&
+    if (fpt_der[0] == placeholder_info->fingerprint &&
         der_len == placeholder_info->key_derivation_length + 2) {
-        const uint8_t *derivation_path = hasheslen_fpt_der + prefix_len + 4;
         for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-            uint32_t der_step = read_u32_le(derivation_path, 4 * i);
-
-            if (placeholder_info->key_derivation[i] != der_step) {
+            if (placeholder_info->key_derivation[i] != fpt_der[1 + i]) {
                 return 0;
             }
         }
 
-        uint32_t change = read_u32_le(derivation_path, 4 * (der_len - 2));
-        uint32_t addr_index = read_u32_le(derivation_path, 4 * (der_len - 1));
+        uint32_t change = fpt_der[1 + der_len - 2];
+        uint32_t addr_index = fpt_der[1 + der_len - 1];
 
         // check that we can indeed derive the same key from the current placeholder
         serialized_extended_pubkey_t pubkey;
         if (0 > bip32_CKDpub(&placeholder_info->pubkey, change, &pubkey)) return -1;
         if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey)) return -1;
 
-        int pk_offset = (key_len == 33 ? 0 : 1);  // skip the first byte if x-only pubkey
+        int pk_offset = is_tap ? 1 : 0;
         if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0) {
             return 0;
         }
@@ -737,30 +727,37 @@ static bool __attribute__((noinline))
 fill_placeholder_info_if_internal(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,
                                   placeholder_info_t *placeholder_info) {
-    uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
-    int key_info_len = call_get_merkle_leaf_element(dc,
-                                                    st->wallet_header_keys_info_merkle_root,
-                                                    st->wallet_header_n_keys,
-                                                    placeholder_info->placeholder.key_index,
-                                                    key_info_str,
-                                                    sizeof(key_info_str));
-
-    if (key_info_len < 0) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
-
-    // Make a sub-buffer for the pubkey info
-    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
-
     policy_map_key_info_t key_info;
-    if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header_version) == -1) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
+    {
+        uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        st->wallet_header_keys_info_merkle_root,
+                                                        st->wallet_header_n_keys,
+                                                        placeholder_info->placeholder.key_index,
+                                                        key_info_str,
+                                                        sizeof(key_info_str));
+
+        if (key_info_len < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return false;
+        }
+
+        // Make a sub-buffer for the pubkey info
+        buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header_version) ==
+            -1) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return false;
+        }
     }
 
     uint32_t fpr = read_u32_be(key_info.master_key_fingerprint, 0);
-    if (fpr == st->master_key_fingerprint) {
+    if (fpr != st->master_key_fingerprint) {
+        return false;
+    }
+
+    {
         // it could be a collision on the fingerprint; we verify that we can actually generate
         // the same pubkey
         char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
@@ -775,18 +772,19 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
             return false;
         }
 
-        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
-            placeholder_info->key_derivation_length = key_info.master_key_derivation_len;
-            for (int i = 0; i < key_info.master_key_derivation_len; i++) {
-                placeholder_info->key_derivation[i] = key_info.master_key_derivation[i];
-            }
-
-            placeholder_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
-
-            return true;
+        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+            return false;
         }
+
+        placeholder_info->key_derivation_length = key_info.master_key_derivation_len;
+        for (int i = 0; i < key_info.master_key_derivation_len; i++) {
+            placeholder_info->key_derivation[i] = key_info.master_key_derivation[i];
+        }
+
+        placeholder_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
     }
-    return false;
+
+    return true;
 }
 
 // finds the first placeholder that corresponds to an internal key
@@ -799,6 +797,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
     while (true) {
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
                                                               placeholder_info->cur_index,
+                                                              NULL,
                                                               &placeholder_info->placeholder);
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
@@ -858,7 +857,6 @@ static void input_keys_callback(dispatcher_context_t *dc,
                                                                  &callback_data->input->in_out,
                                                                  key_type,
                                                                  data,
-                                                                 false,
                                                                  map_commitment,
                                                                  i)) {
                 callback_data->input->in_out.unexpected_pubkey_error = true;
@@ -876,6 +874,8 @@ preprocess_inputs(dispatcher_context_t *dc,
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
     placeholder_info_t placeholder_info;
+    memset(&placeholder_info, 0, sizeof(placeholder_info));
+
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
     // process each input
@@ -1146,13 +1146,68 @@ static void output_keys_callback(dispatcher_context_t *dc,
                                                                  &callback_data->output->in_out,
                                                                  key_type,
                                                                  data,
-                                                                 true,
                                                                  map_commitment,
                                                                  i)) {
                 callback_data->output->in_out.unexpected_pubkey_error = true;
             }
         }
     }
+}
+
+static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
+                                                     sign_psbt_state_t *st,
+                                                     int cur_output_index,
+                                                     const output_info_t *output) {
+    (void) cur_output_index;
+
+    // show this output's address
+    char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
+    int address_len = get_script_address(output->in_out.scriptPubKey,
+                                         output->in_out.scriptPubKey_len,
+                                         output_address,
+                                         sizeof(output_address));
+    if (address_len < 0) {
+        // script does not have an address; check if OP_RETURN
+        if (is_opreturn(output->in_out.scriptPubKey, output->in_out.scriptPubKey_len)) {
+            int res = format_opscript_script(output->in_out.scriptPubKey,
+                                             output->in_out.scriptPubKey_len,
+                                             output_address);
+            if (res == -1) {
+                PRINTF("Invalid or unsupported OP_RETURN for output %d\n", cur_output_index);
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return false;
+            }
+        } else {
+            PRINTF("Unknown or unsupported script type for output %d\n", cur_output_index);
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return false;
+        }
+    }
+
+    if (G_swap_state.called_from_swap) {
+        // Swap feature: do not show the address to the user, but double check it matches
+        // the request from app-exchange; it must be the only external output (checked
+        // elsewhere).
+        int swap_addr_len = strlen(G_swap_state.destination_address);
+        if (swap_addr_len != address_len ||
+            0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
+            // address did not match
+            PRINTF("Mismatching address for swap\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+    } else {
+        // Show address to the user
+        if (!ui_validate_output(dc,
+                                st->external_outputs_count,
+                                output_address,
+                                COIN_COINID_SHORT,
+                                output->value)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+    }
+    return true;
 }
 
 static bool __attribute__((noinline))
@@ -1166,6 +1221,8 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     placeholder_info_t placeholder_info;
+    memset(&placeholder_info, 0, sizeof(placeholder_info));
+
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
@@ -1238,54 +1295,8 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // external output, user needs to validate
             ++st->external_outputs_count;
 
-            // show this output's address
-            char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-            int address_len = get_script_address(output.in_out.scriptPubKey,
-                                                 output.in_out.scriptPubKey_len,
-                                                 output_address,
-                                                 sizeof(output_address));
-            if (address_len < 0) {
-                // script does not have an address; check if OP_RETURN
-                if (is_opreturn(output.in_out.scriptPubKey, output.in_out.scriptPubKey_len)) {
-                    int res = format_opscript_script(output.in_out.scriptPubKey,
-                                                     output.in_out.scriptPubKey_len,
-                                                     output_address);
-                    if (res == -1) {
-                        PRINTF("Invalid or unsupported OP_RETURN for output %d\n",
-                               cur_output_index);
-                        SEND_SW(dc, SW_NOT_SUPPORTED);
-                        return false;
-                    }
-                } else {
-                    PRINTF("Unknown or unsupported script type for output %d\n", cur_output_index);
-                    SEND_SW(dc, SW_NOT_SUPPORTED);
-                    return false;
-                }
-            }
+            if (!display_output(dc, st, cur_output_index, &output)) return false;
 
-            if (G_swap_state.called_from_swap) {
-                // Swap feature: do not show the address to the user, but double check it matches
-                // the request from app-exchange; it must be the only external output (checked
-                // elsewhere).
-                int swap_addr_len = strlen(G_swap_state.destination_address);
-                if (swap_addr_len != address_len ||
-                    0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
-                    // address did not match
-                    PRINTF("Mismatching address for swap\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-            } else {
-                // Show address to the user
-                if (!ui_validate_output(dc,
-                                        st->external_outputs_count,
-                                        output_address,
-                                        COIN_COINID_SHORT,
-                                        output.value)) {
-                    SEND_SW(dc, SW_DENY);
-                    return false;
-                }
-            }
         } else {
             // valid change address, nothing to show to the user
 
@@ -1665,6 +1676,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
                                                                segwit_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
+                                                               placeholder_info_t *placeholder_info,
                                                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -1698,8 +1710,12 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
         crypto_hash_update(&sighash_context.header, hashes->sha_outputs, 32);
     }
 
-    // annex and ext_flags not supported, so spend_type = 0
-    crypto_hash_update_u8(&sighash_context.header, 0x00);
+    // ext_flag
+    uint8_t ext_flag = placeholder_info->is_tapscript ? 1 : 0;
+    // annex is not supported
+    const uint8_t annex_present = 0;
+    uint8_t spend_type = ext_flag * 2 + annex_present;
+    crypto_hash_update_u8(&sighash_context.header, spend_type);
 
     if ((sighash_byte & 0x80) == SIGHASH_ANYONECANPAY) {
         // outpoint (hash)
@@ -1779,6 +1795,13 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
         crypto_hash_update(&sighash_context.header, tmp, 32);
     }
 
+    if (placeholder_info->is_tapscript) {
+        // If spending a tapscript, append the Common Signature Message Extension per BIP-0342
+        crypto_hash_update(&sighash_context.header, placeholder_info->tapleaf_hash, 32);
+        crypto_hash_update_u8(&sighash_context.header, 0x00);         // key_version
+        crypto_hash_update_u32(&sighash_context.header, 0xffffffff);  // no OP_CODESEPARATOR
+    }
+
     crypto_hash_digest(&sighash_context.header, sighash, 32);
 
     return true;
@@ -1789,6 +1812,7 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
                                                       unsigned int cur_input_index,
                                                       uint8_t *pubkey,
                                                       uint8_t pubkey_len,
+                                                      uint8_t *tapleaf_hash,
                                                       uint8_t *sig,
                                                       size_t sig_len) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -1801,10 +1825,17 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     int input_index_varint_len = varint_write(buf, 0, cur_input_index);
     dc->add_to_response(&buf, input_index_varint_len);
 
+    // for tapscript signatures, we concatenate the (x-only) pubkey with the tapleaf hash
+    uint8_t augm_pubkey_len = pubkey_len + (tapleaf_hash != NULL ? 32 : 0);
+
     // the pubkey is not output in version 0 of the protocol
     if (st->p2 >= 1) {
-        dc->add_to_response(&pubkey_len, 1);
+        dc->add_to_response(&augm_pubkey_len, 1);
         dc->add_to_response(pubkey, pubkey_len);
+
+        if (tapleaf_hash != NULL) {
+            dc->add_to_response(tapleaf_hash, 32);
+        }
     }
 
     dc->add_to_response(sig, sig_len);
@@ -1858,7 +1889,7 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
     uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     sig[sig_len++] = sighash_byte;
 
-    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, sig, sig_len)) return false;
+    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, NULL, sig, sig_len)) return false;
 
     return true;
 }
@@ -1872,59 +1903,84 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    cx_ecfp_private_key_t private_key = {0};
-    uint8_t *seckey = private_key.d;  // convenience alias (entirely within the private_key struct)
-
-    uint8_t chain_code[32] = {0};
-
-    uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-        sign_path[i] = placeholder_info->key_derivation[i];
+    if (st->wallet_policy_map.type != TOKEN_TR) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
     }
-    sign_path[placeholder_info->key_derivation_length] =
-        input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                : placeholder_info->placeholder.num_first;
-    sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
-
-    int sign_path_len = placeholder_info->key_derivation_length + 2;
 
     uint8_t sig[64 + 1];  // extra byte for the appended sighash-type, possibly
     size_t sig_len = 0;
 
     cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
-    uint8_t pubkey_tweaked_compr[33];     // same pubkey in compressed form
+
+    uint8_t *tapleaf_hash = NULL;
 
     bool error = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_private_key(&private_key, chain_code, sign_path, sign_path_len);
-            crypto_tr_tweak_seckey(seckey);
+    cx_ecfp_private_key_t private_key = {0};
 
-            // generate corresponding public key
-            cx_ecfp_generate_pair(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
-            if (crypto_get_compressed_pubkey(pubkey_tweaked.W, pubkey_tweaked_compr) < 0) {
-                error = true;
-            }
+    // IMPORTANT: Since we do not use any syscall that might throw an exception, it is safe to avoid
+    // using the TRY/CATCH block to ensure zeroing sensitive data.
 
-            unsigned int err = cx_ecschnorr_sign_no_throw(&private_key,
-                                                          CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
-                                                          CX_SHA256,
-                                                          sighash,
-                                                          32,
-                                                          sig,
-                                                          &sig_len);
-            if (err != CX_OK) {
-                error = true;
-            }
+    do {  // block executed once, only to allow safely breaking out on error
+
+        uint8_t *seckey =
+            private_key.d;  // convenience alias (entirely within the private_key struct)
+
+        uint32_t sign_path[MAX_BIP32_PATH_STEPS];
+
+        for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
+            sign_path[i] = placeholder_info->key_derivation[i];
         }
-        CATCH_ALL {
+        sign_path[placeholder_info->key_derivation_length] =
+            input->in_out.is_change ? placeholder_info->placeholder.num_second
+                                    : placeholder_info->placeholder.num_first;
+        sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
+
+        int sign_path_len = placeholder_info->key_derivation_length + 2;
+
+        if (0 > crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len)) {
+            error = true;
+            break;
+        }
+
+        policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+
+        if (!placeholder_info->is_tapscript) {
+            if (policy->tree == NULL) {
+                // tweak as specified in BIP-86 and BIP-386
+                crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
+            } else {
+                // tweak with the taptree hash, per BIP-341
+                // The taptree hash is computed in sign_transaction_input in order to
+                // reduce stack usage.
+                crypto_tr_tweak_seckey(seckey, input->taptree_hash, 32, seckey);
+            }
+        } else {
+            // tapscript, we need to yield the tapleaf hash together with the pubkey
+            tapleaf_hash = placeholder_info->tapleaf_hash;
+        }
+
+        // generate corresponding public key
+        unsigned int err =
+            cx_ecfp_generate_pair_no_throw(CX_CURVE_256K1, &pubkey_tweaked, &private_key, 1);
+        if (err != CX_OK) {
+            error = true;
+            break;
+        }
+
+        err = cx_ecschnorr_sign_no_throw(&private_key,
+                                         CX_ECSCHNORR_BIP0340 | CX_RND_TRNG,
+                                         CX_SHA256,
+                                         sighash,
+                                         32,
+                                         sig,
+                                         &sig_len);
+        if (err != CX_OK) {
             error = true;
         }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
-    }
-    END_TRY;
+    } while (false);
+
+    explicit_bzero(&private_key, sizeof(private_key));
 
     if (error) {
         // unexpected error when signing
@@ -1945,7 +2001,14 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
         sig[sig_len++] = sighash_byte;
     }
 
-    if (!yield_signature(dc, st, cur_input_index, pubkey_tweaked_compr + 1, 32, sig, sig_len))
+    if (!yield_signature(dc,
+                         st,
+                         cur_input_index,
+                         pubkey_tweaked.W + 1,  // x-only pubkey, hence take only the x-coordinate
+                         32,
+                         tapleaf_hash,
+                         sig,
+                         sig_len))
         return false;
 
     return true;
@@ -2075,7 +2138,6 @@ compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_ha
         crypto_hash_digest(&sha_scriptpubkeys_context.header, hashes->sha_scriptpubkeys, 32);
     }
 
-    hashes->segwit_hashes_computed = true;
     return true;
 }
 
@@ -2083,36 +2145,19 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                              sign_psbt_state_t *st,
                                                              segwit_hashes_t *hashes,
                                                              placeholder_info_t *placeholder_info,
+                                                             input_info_t *input,
                                                              unsigned int cur_input_index) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    input_info_t input;
-    memset(&input, 0, sizeof(input));
-
-    input_keys_callback_data_t callback_data = {.input = &input,
-                                                .placeholder_info = placeholder_info};
-    int res =
-        call_get_merkleized_map_with_callback(dc,
-                                              (void *) &callback_data,
-                                              st->inputs_root,
-                                              st->n_inputs,
-                                              cur_input_index,
-                                              (merkle_tree_elements_callback_t) input_keys_callback,
-                                              &input.in_out.map);
-    if (res < 0) {
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
-    }
-
-    if (!input.has_sighash_type) {
-        input.sighash_type = SIGHASH_ALL;
-    } else {
+    // if the psbt does not specify the sighash flag for this input, the default
+    // changes depending on the type of spend; therefore, we set it later.
+    if (input->has_sighash_type) {
         // Get sighash type
         if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &input.in_out.map,
+                                                      &input->in_out.map,
                                                       (uint8_t[]){PSBT_IN_SIGHASH_TYPE},
                                                       1,
-                                                      &input.sighash_type)) {
+                                                      &input->sighash_type)) {
             PRINTF("Malformed PSBT_IN_SIGHASH_TYPE for input %d\n", cur_input_index);
 
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -2121,29 +2166,34 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
     }
 
     // Sign as segwit input iff it has a witness utxo
-    if (!input.has_witnessUtxo) {
+    if (!input->has_witnessUtxo) {
         // sign legacy P2PKH or P2SH
 
         // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
 
         uint64_t tmp;  // unused
         if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
-                                                             &input.in_out.map,
+                                                             &input->in_out.map,
                                                              &tmp,
-                                                             input.in_out.scriptPubKey,
-                                                             &input.in_out.scriptPubKey_len,
+                                                             input->in_out.scriptPubKey,
+                                                             &input->in_out.scriptPubKey_len,
                                                              NULL)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
+        if (!input->has_sighash_type) {
+            // legacy input default to SIGHASH_ALL
+            input->sighash_type = SIGHASH_ALL;
+        }
+
         uint8_t sighash[32];
-        if (!compute_sighash_legacy(dc, st, &input, cur_input_index, sighash)) return false;
+        if (!compute_sighash_legacy(dc, st, input, cur_input_index, sighash)) return false;
 
         if (!sign_sighash_ecdsa_and_yield(dc,
                                           st,
                                           placeholder_info,
-                                          &input,
+                                          input,
                                           cur_input_index,
                                           sighash))
             return false;
@@ -2153,23 +2203,23 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         {
             uint64_t amount;
             if (0 > get_amount_scriptpubkey_from_psbt_witness(dc,
-                                                              &input.in_out.map,
+                                                              &input->in_out.map,
                                                               &amount,
-                                                              input.in_out.scriptPubKey,
-                                                              &input.in_out.scriptPubKey_len)) {
+                                                              input->in_out.scriptPubKey,
+                                                              &input->in_out.scriptPubKey_len)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
-            st->inputs_total_value += amount;
-
-            if (input.has_redeemScript) {
+            if (input->has_redeemScript) {
                 // Get redeemScript
-                uint8_t redeemScript[64];
+                // The redeemScript cannot be longer than standard scriptPubKeys for
+                // wrapped segwit transactions that we support
+                uint8_t redeemScript[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
                 int redeemScript_length =
                     call_get_merkleized_map_value(dc,
-                                                  &input.in_out.map,
+                                                  &input->in_out.map,
                                                   (uint8_t[]){PSBT_IN_REDEEM_SCRIPT},
                                                   1,
                                                   redeemScript,
@@ -2186,22 +2236,22 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 crypto_hash160(redeemScript, redeemScript_length, p2sh_redeemscript + 2);
                 p2sh_redeemscript[22] = 0x87;
 
-                if (input.in_out.scriptPubKey_len != 23 ||
-                    memcmp(input.in_out.scriptPubKey, p2sh_redeemscript, 23) != 0) {
+                if (input->in_out.scriptPubKey_len != 23 ||
+                    memcmp(input->in_out.scriptPubKey, p2sh_redeemscript, 23) != 0) {
                     PRINTF("witnessUtxo's scriptPubKey does not match redeemScript\n");
                     SEND_SW(dc, SW_INCORRECT_DATA);
                     return false;
                 }
 
-                input.script_len = redeemScript_length;
-                memcpy(input.script, redeemScript, redeemScript_length);
+                input->script_len = redeemScript_length;
+                memcpy(input->script, redeemScript, redeemScript_length);
                 segwit_version = get_segwit_version(redeemScript, redeemScript_length);
             } else {
-                input.script_len = input.in_out.scriptPubKey_len;
-                memcpy(input.script, input.in_out.scriptPubKey, input.in_out.scriptPubKey_len);
+                input->script_len = input->in_out.scriptPubKey_len;
+                memcpy(input->script, input->in_out.scriptPubKey, input->in_out.scriptPubKey_len);
 
                 segwit_version =
-                    get_segwit_version(input.in_out.scriptPubKey, input.in_out.scriptPubKey_len);
+                    get_segwit_version(input->in_out.scriptPubKey, input->in_out.scriptPubKey_len);
             }
 
             if (segwit_version > 1) {
@@ -2211,32 +2261,61 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             }
         }
 
-        // compute all the tx-wide hashes
-
-        if (!hashes->segwit_hashes_computed) {
-            if (!compute_segwit_hashes(dc, st, hashes)) return false;
-        }
-
         uint8_t sighash[32];
         if (segwit_version == 0) {
-            if (!compute_sighash_segwitv0(dc, st, hashes, &input, cur_input_index, sighash))
+            if (!input->has_sighash_type) {
+                // segwitv0 inputs default to SIGHASH_ALL
+                input->sighash_type = SIGHASH_ALL;
+            }
+
+            if (!compute_sighash_segwitv0(dc, st, hashes, input, cur_input_index, sighash))
                 return false;
 
             if (!sign_sighash_ecdsa_and_yield(dc,
                                               st,
                                               placeholder_info,
-                                              &input,
+                                              input,
                                               cur_input_index,
                                               sighash))
                 return false;
         } else if (segwit_version == 1) {
-            if (!compute_sighash_segwitv1(dc, st, hashes, &input, cur_input_index, sighash))
+            if (!input->has_sighash_type) {
+                // segwitv0 inputs default to SIGHASH_DEFAULT
+                input->sighash_type = SIGHASH_DEFAULT;
+            }
+
+            if (!compute_sighash_segwitv1(dc,
+                                          st,
+                                          hashes,
+                                          input,
+                                          cur_input_index,
+                                          placeholder_info,
+                                          sighash))
                 return false;
+
+            policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+            if (!placeholder_info->is_tapscript && policy->tree != NULL) {
+                // keypath spend, we compute the taptree hash so that we find it ready
+                // later in sign_sighash_schnorr_and_yield (which has less available stack).
+                if (0 > compute_taptree_hash(
+                            dc,
+                            &(wallet_derivation_info_t){
+                                .address_index = input->in_out.address_index,
+                                .change = input->in_out.is_change ? 1 : 0,
+                                .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                .n_keys = st->wallet_header_n_keys,
+                                .wallet_version = st->wallet_header_version},
+                            policy->tree,
+                            input->taptree_hash)) {
+                    PRINTF("Error while computing taptree hash\n");
+                    return false;
+                }
+            }
 
             if (!sign_sighash_schnorr_and_yield(dc,
                                                 st,
                                                 placeholder_info,
-                                                &input,
+                                                input,
                                                 cur_input_index,
                                                 sighash))
                 return false;
@@ -2250,6 +2329,58 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 }
 
 static bool __attribute__((noinline))
+fill_taproot_placeholder_info(dispatcher_context_t *dc,
+                              sign_psbt_state_t *st,
+                              const input_info_t *input,
+                              const policy_node_t *tapleaf_ptr,
+                              placeholder_info_t *placeholder_info) {
+    uint32_t change = input->in_out.is_change ? placeholder_info->placeholder.num_second
+                                              : placeholder_info->placeholder.num_first;
+    uint32_t address_index = input->in_out.address_index;
+
+    cx_sha256_t hash_context;
+    crypto_tr_tapleaf_hash_init(&hash_context);
+
+    // we compute the tapscript once just to compute its length
+    // this avoids having to store it
+    int tapscript_len = get_wallet_internal_script_hash(
+        dc,
+        tapleaf_ptr,
+        &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
+                                    .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                    .n_keys = st->wallet_header_n_keys,
+                                    .change = change,
+                                    .address_index = address_index},
+        WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
+        NULL);
+    if (tapscript_len < 0) {
+        PRINTF("Failed to compute tapleaf script\n");
+        return false;
+    }
+
+    crypto_hash_update_u8(&hash_context.header, 0xC0);
+    crypto_hash_update_varint(&hash_context.header, tapscript_len);
+
+    // we compute it again to get add the actual script code to the hash computation
+    if (0 >
+        get_wallet_internal_script_hash(
+            dc,
+            tapleaf_ptr,
+            &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
+                                        .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
+                                        .n_keys = st->wallet_header_n_keys,
+                                        .change = change,
+                                        .address_index = address_index},
+            WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
+            &hash_context.header)) {
+        return false;  // should never happen!
+    }
+    crypto_hash_digest(&hash_context.header, placeholder_info->tapleaf_hash, 32);
+
+    return true;
+}
+
+static bool __attribute__((noinline))
 sign_transaction(dispatcher_context_t *dc,
                  sign_psbt_state_t *st,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
@@ -2258,14 +2389,21 @@ sign_transaction(dispatcher_context_t *dc,
     int placeholder_index = 0;
 
     segwit_hashes_t hashes;
-    hashes.segwit_hashes_computed = false;
+
+    // compute all the tx-wide hashes
+    // while this is redundant for legacy transactions, we do it here in order to
+    // avoid doing it in places that have more stack limitations
+    if (!compute_segwit_hashes(dc, st, &hashes)) return false;
 
     // Iterate over all the placeholders that correspond to keys owned by us
     while (true) {
         placeholder_info_t placeholder_info;
+        memset(&placeholder_info, 0, sizeof(placeholder_info));
 
+        const policy_node_t *tapleaf_ptr = NULL;
         int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
                                                               placeholder_index,
+                                                              &tapleaf_ptr,
                                                               &placeholder_info.placeholder);
 
         if (n_key_placeholders < 0) {
@@ -2278,11 +2416,44 @@ sign_transaction(dispatcher_context_t *dc,
             break;
         }
 
+        if (tapleaf_ptr != NULL) {
+            // get_key_placeholder_by_index returns the pointer to the tapleaf only if the key being
+            // spent is indeed in a tapleaf
+            placeholder_info.is_tapscript = true;
+        }
+
         if (fill_placeholder_info_if_internal(dc, st, &placeholder_info) == true) {
             for (unsigned int i = 0; i < st->n_inputs; i++)
-                if (bitvector_get(internal_inputs, i))
-                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, i))
+                if (bitvector_get(internal_inputs, i)) {
+                    input_info_t input;
+                    memset(&input, 0, sizeof(input));
+
+                    input_keys_callback_data_t callback_data = {
+                        .input = &input,
+                        .placeholder_info = &placeholder_info};
+                    int res = call_get_merkleized_map_with_callback(
+                        dc,
+                        (void *) &callback_data,
+                        st->inputs_root,
+                        st->n_inputs,
+                        i,
+                        (merkle_tree_elements_callback_t) input_keys_callback,
+                        &input.in_out.map);
+                    if (res < 0) {
+                        SEND_SW(dc, SW_INCORRECT_DATA);
                         return false;
+                    }
+
+                    if (tapleaf_ptr != NULL && !fill_taproot_placeholder_info(dc,
+                                                                              st,
+                                                                              &input,
+                                                                              tapleaf_ptr,
+                                                                              &placeholder_info))
+                        return false;
+
+                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i))
+                        return false;
+                }
         }
 
         ++placeholder_index;
@@ -2310,6 +2481,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
 
     // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
+    memset(internal_inputs, 0, sizeof(internal_inputs));
 
     /** Inputs verification flow
      *

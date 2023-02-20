@@ -194,3 +194,40 @@ def test_get_wallet_address_multisig_wit(client: Client):
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
+
+
+def test_get_wallet_address_tr_script_pk(client: Client):
+    wallet = WalletPolicy(
+        name="Taproot foreign internal key, and our script key",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7"
+    )
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
+    assert res == "tb1pls9pp5cgcljpkjauxep03lv2c2yc2wcuua26p3ks6j2lq0vl9kjqf5rgm2"
+
+
+def test_get_wallet_address_tr_script_sortedmulti(client: Client):
+    wallet = WalletPolicy(
+        name="Taproot single-key or multisig 2-of-2",
+        descriptor_template="tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "a3f31e9d7b70d1d967413488bae136a8b6c7afd1de0524deb6cf74f5c509b9ab"
+    )
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
+    assert res == "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7"

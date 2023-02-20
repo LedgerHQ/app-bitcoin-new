@@ -37,7 +37,7 @@ typedef struct {
  * @param[out] private_key
  *   Pointer to private key.
  * @param[out] chain_code
- *   Pointer to 32 bytes array for chain code.
+ *   Pointer to 32 bytes array for chain code, or NULL if the chain_code is not required.
  * @param[in]  bip32_path
  *   Pointer to buffer with BIP32 path.
  * @param[in]  bip32_path_len
@@ -46,12 +46,13 @@ typedef struct {
  * @return 0 if success, -1 otherwise.
  */
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t chain_code[static 32],
+                              uint8_t *chain_code,
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len);
 
 /**
- * Initialize public key given private key.
+ * Generates the child extended public key, from a parent extended public key and non-hardened
+ * index.
  *
  * @param[in]  parent
  *   Pointer to the extended serialized pubkey of the parent.
@@ -349,7 +350,7 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
  * @return the length of the signature on success, or -1 in case of error.
  */
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
-                                           size_t bip32_path_len,
+                                           uint8_t bip32_path_len,
                                            const uint8_t hash[static 32],
                                            uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
@@ -359,7 +360,7 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
  * Initializes the "tagged" SHA256 hash with the given tag, as defined by BIP-0340.
  *
  * @param[out]  hash_context
- *   Pointer to 32-bit array of BIP-32 derivation steps.
+ *   Pointer to a sha256 hash context.
  * @param[in]  tag
  *   Pointer to an array containing the tag of the tagged hash.
  * @param[in]  tag_len
@@ -368,25 +369,67 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
 void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len);
 
 /**
- * Builds a tweaked public key from a BIP340 public key array.
+ * Initializes the "tagged" SHA256 hash with tag "TapLeaf", used for tapscript leaves.
+ *
+ * @param[out]  hash_context
+ *   Pointer to a sha256 hash context.
+ */
+void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context);
+
+/**
+ * Computes the tagged hash with tagged hash of a tapbranch, given the hashes for the children.
+ *
+ * @param[in]  left_h
+ *   The hash of the left tapbranch/tapleaf.
+ * @param[in]  right_h
+ *   The hash of the right tapbranch/tapleaf.
+ * @param[out]  out
+ *   The combined hash for the tapbranch.
+ */
+void crypto_tr_combine_taptree_hashes(const uint8_t left_h[static 32],
+                                      const uint8_t right_h[static 32],
+                                      uint8_t out[static 32]);
+
+/**
+ * Computes the tweaked public key from a BIP340 public key array.
  * Implementation of taproot_tweak_pubkey of BIP341 with `h` set to the empty byte string.
  *
  * @param[in]  pubkey
  *   Pointer to the 32-byte to be used as public key.
+ * @param[in]  h
+ *   Pointer to the tweaking data.
+ * @param[in]  h_len
+ *   Length of `h`.
  * @param[out]  y_parity
  *   Pointer to a variable that will be set to 0/1 according to the parity of th y-coordinate of the
  * final tweaked pubkey.
  * @param[out]  out
  *  Pointer to the a 32-byte array that will contain the x coordinate of the tweaked key.
+ *
+ * @return 0 on success, or -1 in case of error.
  */
-int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]);
+int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
+                           const uint8_t *h,
+                           size_t h_len,
+                           uint8_t *y_parity,
+                           uint8_t out[static 32]);
 
 /**
- * Builds a tweaked public key from a BIP340 public key array.
+ * Computes the tweaked secret key from a BIP340 secret key.
  * Implementation of taproot_tweak_seckey of BIP341 with `h` set to the empty byte string.
  *
- * @param[in|out] seckey
- *   Pointer to the 32-byte containing the secret key; it will contain the output tweaked secret
- * key.
+ * @param[in] seckey
+ *   Pointer to the 32-byte containing the secret key.
+ * @param[out]  h
+ *   Pointer to the tweaking data.
+ * @param[out]  h_len
+ *   Length of `h`.
+ * @param[out]  out
+ *  Pointer to the a 32-byte array that will contain the tweaked secret key.
+ *
+ * @return 0 on success, or -1 in case of error.
  */
-int crypto_tr_tweak_seckey(uint8_t seckey[static 32]);
+int crypto_tr_tweak_seckey(const uint8_t seckey[static 32],
+                           const uint8_t *h,
+                           size_t h_len,
+                           uint8_t out[static 32]);
