@@ -62,8 +62,11 @@ def test_register_wallet_accept_wit(client: Client, speculos_globals):
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_with_long_name(client: Client, speculos_globals):
+    name = "Cold storage with a pretty long name that requires 64 characters"
+    assert len(name) == 64
+
     run_register_test(client, speculos_globals, MultisigWallet(
-        name="Cold storage with a pretty long name that requires 64 characters",
+        name=name,
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[

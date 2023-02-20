@@ -1853,7 +1853,7 @@ static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t d
             return -1;
         }
 
-        // the next character must be a comma
+        // the next character must be a '}'
         if (!consume_character(in_buf, '}')) {
             return WITH_ERROR(-1, "Expected a '}'");
         }

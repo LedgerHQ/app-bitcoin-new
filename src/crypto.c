@@ -533,7 +533,7 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
 }
 
 // Computes a tagged hash according to BIP-340.
-// If data_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
+// If data2_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
 // Somewhat weird signature, but this helps to optimize stack usage.
 static void __attribute__((noinline)) crypto_tr_tagged_hash(const uint8_t *tag,
                                                             uint16_t tag_len,

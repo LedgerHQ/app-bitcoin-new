@@ -1713,7 +1713,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
     // ext_flag
     uint8_t ext_flag = placeholder_info->is_tapscript ? 1 : 0;
     // annex is not supported
-    uint8_t annex_present = 0;
+    const uint8_t annex_present = 0;
     uint8_t spend_type = ext_flag * 2 + annex_present;
     crypto_hash_update_u8(&sighash_context.header, spend_type);
 
