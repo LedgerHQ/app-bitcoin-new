@@ -104,7 +104,7 @@ typedef struct {
     policy_node_key_placeholder_t placeholder;
     int cur_index;
     uint32_t fingerprint;
-    int key_derivation_length;
+    uint8_t key_derivation_length;
     uint32_t key_derivation[MAX_BIP32_PATH_STEPS];
     serialized_extended_pubkey_t pubkey;
     bool is_tapscript;         // true if signing with a BIP342 tapleaf script path spend

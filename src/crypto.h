@@ -350,7 +350,7 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
  * @return the length of the signature on success, or -1 in case of error.
  */
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
-                                           size_t bip32_path_len,
+                                           uint8_t bip32_path_len,
                                            const uint8_t hash[static 32],
                                            uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
