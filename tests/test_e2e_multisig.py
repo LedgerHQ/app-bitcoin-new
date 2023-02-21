@@ -102,8 +102,8 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
 
-    for i, pubkey, sig in hww_sigs:
-        psbt.inputs[i].partial_sigs[pubkey] = sig
+    for i, part_sig in hww_sigs:
+        psbt.inputs[i].partial_sigs[part_sig.pubkey] = part_sig.signature
 
     signed_psbt_hww_b64 = psbt.serialize()
 

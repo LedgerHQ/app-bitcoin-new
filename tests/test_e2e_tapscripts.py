@@ -101,18 +101,13 @@ def run_test_e2e(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc:
         hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac)
 
     # only correct for taproot policies
-    for i, pubkey_augm, sig in hww_sigs:
-        if len(pubkey_augm) > 33:
+    for i, part_sig in hww_sigs:
+        if part_sig.tapleaf_hash is not None:
             # signature for a script spend
-            assert len(pubkey_augm) == 32 + 32
-            pubkey = pubkey_augm[0:32]
-            leaf_hash = pubkey_augm[32:64]
-            psbt.inputs[i].tap_script_sigs[(pubkey, leaf_hash)] = sig
+            psbt.inputs[i].tap_script_sigs[(part_sig.pubkey, part_sig.tapleaf_hash)] = part_sig.signature
         else:
             # key path spend
-            assert len(pubkey_augm) == 32
-
-            psbt.inputs[i].tap_key_sig = sig
+            psbt.inputs[i].tap_key_sig = part_sig.signature
 
     signed_psbt_hww_b64 = psbt.serialize()
 

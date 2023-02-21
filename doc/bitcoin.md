@@ -226,7 +226,7 @@ No output data; the signature are returned using the YIELD client command.
 
 #### Description
 
-Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what output matches the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, in the format described below. If multiple key placeholders of the wallet policy are internal, the process is repeated for each of them.
+Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what outputs match the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, in the format described below. If multiple key placeholders of the wallet policy are internal, the process is repeated for each of them.
 
 The results yielded via the YIELD command respect the following format: `<input_index> <pubkey_augm_len> <pubkey_augm> <signature>`, where:
 - `input_index` is a Bitcoin style varint, the index input of the input being signed (starting from 0);
