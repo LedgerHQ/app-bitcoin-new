@@ -1,9 +1,16 @@
 {
   "name": "@bitcoinerlab/ledger",
-  "version": "0.1.3",
+  "description": "This package is an internal package for use by other packages within the @bitcoinerlab organization. It provides an alias for the Ledger Bitcoin 2.0 typescript client. All credit for the underlying technology and functionality should be attributed to Ledger, the company behind the product.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitcoinerlab/ledger.git"
+  },
+  "version": "0.1.6",
   "scripts": {
     "sync_package_dependencies": "jq --argjson deps \"$(cat bitcoin_client_js/package.json | jq '.dependencies')\" '.dependencies += $deps' package.json > package.json.new && mv package.json.new package.json",
-    "prepublishOnly": "npm run sync_package_dependencies && cd bitcoin_client_js && npm install --legacy-peer-deps && npm run build"
+    "tmp_README": "mv README.md /tmp && echo This package is an internal package for use by other packages within the @bitcoinerlab organization. It provides an alias for the Ledger Bitcoin 2.0 typescript client. All credit for the underlying technology and functionality should be attributed to Ledger, the company behind the product. > README.md",
+    "prepublishOnly": "npm run tmp_README && npm run sync_package_dependencies && cd bitcoin_client_js && npm install --legacy-peer-deps && npm run build",
+    "postpublish": "rm README.md && mv /tmp/README.md ."
   },
   "main": "bitcoin_client_js/build/main/index.js",
   "types": "bitcoin_client_js/build/main/index.d.ts",
