@@ -1,8 +1,18 @@
 {
-  "name": "ledger",
+  "name": "@bitcoinerlab/ledger",
+  "version": "0.1.3",
   "scripts": {
-    "postinstall": "cd bitcoin_client_js && npm install --legacy-peer-deps && npm run build"
+    "sync_package_dependencies": "jq --argjson deps \"$(cat bitcoin_client_js/package.json | jq '.dependencies')\" '.dependencies += $deps' package.json > package.json.new && mv package.json.new package.json",
+    "prepublishOnly": "npm run sync_package_dependencies && cd bitcoin_client_js && npm install --legacy-peer-deps && npm run build"
   },
   "main": "bitcoin_client_js/build/main/index.js",
-  "typings": "bitcoin_client_js/build/main/index.d.ts"
+  "types": "bitcoin_client_js/build/main/index.d.ts",
+  "files": [
+    "bitcoin_client_js/build"
+  ],
+  "dependencies": {
+    "@ledgerhq/hw-transport": "^6.20.0",
+    "bip32-path": "^0.4.2",
+    "bitcoinjs-lib": "^6.0.1"
+  }
 }
