@@ -20,6 +20,10 @@
 
 #include "os.h"
 #include "ux.h"
+#ifdef HAVE_NBGL
+#include "nbgl_touch.h"
+#include "nbgl_use_case.h"
+#endif  // HAVE_NBGL
 
 #include "io.h"
 #include "globals.h"
@@ -100,7 +104,15 @@ uint8_t io_event(uint8_t channel) {
 #ifdef HAVE_BAGL
             UX_DISPLAYED_EVENT({});
 #endif  // HAVE_BAGL
+#ifdef HAVE_NBGL
+            UX_DEFAULT_EVENT();
+#endif  // HAVE_NBGL
             break;
+#ifdef HAVE_NBGL
+        case SEPROXYHAL_TAG_FINGER_EVENT:
+            UX_FINGER_EVENT(G_io_seproxyhal_spi_buffer);
+            break;
+#endif  // HAVE_NBGL
         case SEPROXYHAL_TAG_TICKER_EVENT:
             ++G_ticks;
 
@@ -112,6 +124,9 @@ uint8_t io_event(uint8_t channel) {
 #ifdef HAVE_BAGL
                 ux_flow_init(0, ux_processing_flow, NULL);
 #endif  // HAVE_BAGL
+#ifdef HAVE_NBGL
+                nbgl_useCaseSpinner("Processing");
+#endif  // HAVE_NBGL
             }
 
             if (G_is_timeout_active.interruption &&
