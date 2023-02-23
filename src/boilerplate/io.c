@@ -47,12 +47,14 @@ bool G_was_processing_screen_shown;
 uint16_t G_interruption_timeout_start_tick;
 uint16_t G_processing_timeout_start_tick;
 
+#ifdef HAVE_BAGL
 UX_STEP_NOCB(ux_processing_flow_1_step, pn, {&C_icon_processing, "Processing..."});
 UX_FLOW(ux_processing_flow, &ux_processing_flow_1_step);
 
 void io_seproxyhal_display(const bagl_element_t *element) {
     io_seproxyhal_display_default((bagl_element_t *) element);
 }
+#endif  // HAVE_BAGL
 
 void io_start_interruption_timeout() {
     G_interruption_timeout_start_tick = G_ticks;
@@ -83,7 +85,9 @@ uint8_t io_event(uint8_t channel) {
 
     switch (G_io_seproxyhal_spi_buffer[0]) {
         case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
+#ifdef HAVE_BAGL
             UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
+#endif  // HAVE_BAGL
             break;
         case SEPROXYHAL_TAG_STATUS_EVENT:
             if (G_io_apdu_media == IO_APDU_MEDIA_USB_HID &&  //
@@ -93,7 +97,9 @@ uint8_t io_event(uint8_t channel) {
             }
             /* fallthrough */
         case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
+#ifdef HAVE_BAGL
             UX_DISPLAYED_EVENT({});
+#endif  // HAVE_BAGL
             break;
         case SEPROXYHAL_TAG_TICKER_EVENT:
             ++G_ticks;
@@ -103,7 +109,9 @@ uint8_t io_event(uint8_t channel) {
                 io_clear_processing_timeout();
 
                 G_was_processing_screen_shown = true;
+#ifdef HAVE_BAGL
                 ux_flow_init(0, ux_processing_flow, NULL);
+#endif  // HAVE_BAGL
             }
 
             if (G_is_timeout_active.interruption &&

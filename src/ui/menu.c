@@ -21,6 +21,7 @@
 #include "../globals.h"
 #include "menu.h"
 
+#ifdef HAVE_BAGL
 // We have a screen with the icon and "Bitcoin is ready" for Bitcoin,
 // "Bitcoin Testnet is ready" for Bitcoin Testnet.
 UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_bitcoin_logo, "Bitcoin", "is ready"});
@@ -56,10 +57,12 @@ UX_FLOW(ux_menu_main_flow_bitcoin_testnet,
         &ux_menu_exit_step,
         FLOW_LOOP);
 
+#endif  // HAVE_BAGL
 #define BIP32_PUBKEY_VERSION_MAINNET 0x0488B21E
 #define BIP32_PUBKEY_VERSION_TESTNET 0x043587CF
 
 void ui_menu_main() {
+#ifdef HAVE_BAGL
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
@@ -69,8 +72,10 @@ void ui_menu_main() {
     } else if (BIP32_PUBKEY_VERSION == BIP32_PUBKEY_VERSION_TESTNET) {  // testnet
         ux_flow_init(0, ux_menu_main_flow_bitcoin_testnet, NULL);
     }
+#endif  // HAVE_BAGL
 }
 
+#ifdef HAVE_BAGL
 UX_STEP_NOCB(ux_menu_info_step, bn, {"Bitcoin App", "(c) 2022 Ledger"});
 UX_STEP_CB(ux_menu_back_step, pb, ui_menu_main(), {&C_icon_back, "Back"});
 
@@ -78,7 +83,10 @@ UX_STEP_CB(ux_menu_back_step, pb, ui_menu_main(), {&C_icon_back, "Back"});
 // #1 screen: app info
 // #2 screen: back button to main menu
 UX_FLOW(ux_menu_about_flow, &ux_menu_info_step, &ux_menu_back_step, FLOW_LOOP);
+#endif  // HAVE_BAGL
 
 void ui_menu_about() {
+#ifdef HAVE_BAGL
     ux_flow_init(0, ux_menu_about_flow, NULL);
+#endif  // HAVE_BAGL
 }
