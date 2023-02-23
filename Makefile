@@ -77,9 +77,9 @@ endif
 APP_LOAD_PARAMS += $(APP_LOAD_FLAGS)
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME=icons/nanos_app_$(COIN).gif
+ICONNAME=icons/nanos_app_bitcoin.gif
 else
-ICONNAME=icons/nanox_app_$(COIN).gif
+ICONNAME=icons/nanox_app_bitcoin.gif
 endif
 
 all: default
