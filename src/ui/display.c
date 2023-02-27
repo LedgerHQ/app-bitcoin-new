@@ -31,13 +31,15 @@ void set_ux_flow_response(bool approved) {
 }
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
-// This method also sets the UI state as "dirty" so that the dispatcher refreshes resets the UI
-// at the end of the command handler.
+// This method also sets the UI state as "dirty" according to the input parameter
+// so that the dispatcher refreshes resets the UI at the end of the command handler.
 // Returns true/false depending if the user accepted in the corresponding UX flow.
-bool io_ui_process(dispatcher_context_t *context) {
+static bool io_ui_process(dispatcher_context_t *context, bool set_dirty) {
     g_ux_flow_ended = false;
 
-    context->set_ui_dirty();
+    if (set_dirty) {
+        context->set_ui_dirty();
+    }
 
     // We are not waiting for the client's input, nor we are doing computations on the device
     io_clear_processing_timeout();
@@ -70,7 +72,7 @@ bool ui_display_pubkey(dispatcher_context_t *context,
         ui_display_pubkey_suspicious_flow();
     }
 
-    return io_ui_process(context);
+    return io_ui_process(context, false);
 }
 
 bool ui_display_message_hash(dispatcher_context_t *context,
@@ -83,7 +85,7 @@ bool ui_display_message_hash(dispatcher_context_t *context,
 
     ui_sign_message_flow();
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_display_register_wallet(dispatcher_context_t *context,
@@ -98,7 +100,7 @@ bool ui_display_register_wallet(dispatcher_context_t *context,
 
     ui_display_register_wallet_flow();
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
@@ -126,7 +128,7 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
     }
     ui_display_policy_map_cosigner_pubkey_flow();
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
@@ -143,7 +145,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
         ui_display_receive_in_wallet_flow();
     }
 
-    return io_ui_process(context);
+    return io_ui_process(context, false);
 }
 
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
@@ -152,27 +154,27 @@ bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
     ui_display_spend_from_wallet_flow();
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
     ui_display_warning_external_inputs_flow();
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
     ui_display_unverified_segwit_inputs_flows();
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
     ui_display_nondefault_sighash_flow();
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_transaction_prompt(dispatcher_context_t *context, const int external_outputs_total_count) {
     ui_display_transaction_prompt(external_outputs_total_count);
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_validate_output(dispatcher_context_t *context,
@@ -194,7 +196,7 @@ bool ui_validate_output(dispatcher_context_t *context,
         ui_display_output_address_amount_flow(index);
     }
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
@@ -204,7 +206,7 @@ bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_nam
 
     ui_accept_transaction_flow();
 
-    return io_ui_process(context);
+    return io_ui_process(context, true);
 }
 
 #ifdef HAVE_BAGL
@@ -245,13 +247,13 @@ bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *contex
 bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success) {
     ui_display_post_processing_confirm_wallet_spend(success);
 
-    return (success ? io_ui_process(context) : true);
+    return io_ui_process(context, success);
 }
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
     ui_display_post_processing_confirm_transaction(success);
 
-    return (success ? io_ui_process(context) : true);
+    return io_ui_process(context, success);
 }
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
