@@ -127,6 +127,7 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context);
 
 bool ui_validate_output(dispatcher_context_t *context,
                         int index,
+                        int total_count,
                         const char *address_or_description,
                         const char *coin_name,
                         uint64_t amount);
