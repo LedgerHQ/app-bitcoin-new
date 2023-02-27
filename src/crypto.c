@@ -190,22 +190,6 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     return 0;
 }
 
-#ifndef _NR_cx_hash_ripemd160
-/** Missing in some SDKs, we implement it using the cxram section if needed. */
-static size_t cx_hash_ripemd160(const uint8_t *in, size_t in_len, uint8_t *out, size_t out_len) {
-    PRINT_STACK_POINTER();
-
-    if (out_len < CX_RIPEMD160_SIZE) {
-        return 0;
-    }
-    cx_ripemd160_init_no_throw((cx_ripemd160_t *) &G_cx);
-    cx_ripemd160_update((cx_ripemd160_t *) &G_cx, in, in_len);
-    cx_ripemd160_final((cx_ripemd160_t *) &G_cx, out);
-    explicit_bzero((cx_ripemd160_t *) &G_cx, sizeof(cx_sha256_t));
-    return CX_RIPEMD160_SIZE;
-}
-#endif  // _NR_cx_hash_ripemd160
-
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     cx_hash_ripemd160(in, inlen, out, 20);
 }
