@@ -9,6 +9,25 @@
       ]
     },
     {
+      "regexp": "Tap to continue",
+      "actions": [
+        ["finger", 55, 550, true],
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "Approve",
+      "actions": [
+        [ "finger", 55, 550, true]
+      ]
+    },
+    {
+      "regexp": "Processing",
+      "actions": [
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
       "regexp": "[S]?ign",
       "conditions": [
         [ "seen", false ]

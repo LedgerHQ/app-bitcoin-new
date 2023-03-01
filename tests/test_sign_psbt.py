@@ -54,18 +54,38 @@ def should_go_right(event: dict):
     return False
 
 
+def ux_thread_sign_psbt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
+    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
+
+    first_approve = True
+ 
+    while True:
+        event = speculos_client.get_next_event()
+        all_events.append(event)
+ 
+        if "Tap to continue" in event["text"]:
+            speculos_client.finger_touch(55, 550)
+ 
+        elif first_approve and "Hold to sign" in event["text"]:
+            first_approve = False
+            speculos_client.finger_touch(55, 550, 3)
+ 
+        elif "SIGNED" in event["text"]:
+            break
+ 
+ 
+
 def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     # press right until the last screen (will press the "right" button more times than needed)
-
     while True:
         event = speculos_client.get_next_event()
         all_events.append(event)
-
+  
         if should_go_right(event):
             speculos_client.press_and_release("right")
-        elif event["text"] == "Approve":
+        elif "Approve" in event["text"]:
             speculos_client.press_and_release("both")
         elif event["text"] == "Accept":
             speculos_client.press_and_release("both")
@@ -95,18 +115,30 @@ def parse_signing_events(events: List[dict]) -> dict:
             ret["amounts"].append("")
             next_step = ""
 
+        elif ev["text"].startswith("Tap"):
+            ret["addresses"].append("")
+            ret["amounts"].append("")
+            next_step = ""
+            continue
+
         elif ev["text"].startswith(keywords):
             next_step = ev["text"]
             continue
 
         if next_step.startswith("Address"):
-            ret["addresses"][-1] += ev["text"]
+            if len(ret["addresses"]) == 0:
+                ret["addresses"].append("")
+
+            ret["addresses"][-1] += ev["text"].strip().replace("O", "0" ) # OCR misreads O for 0
 
         elif next_step.startswith("Fees"):
-            ret["fees"] += ev["text"]
+            ret["fees"] += ev["text"].strip()
 
         elif next_step.startswith("Amount"):
-            ret["amounts"][-1] += ev["text"]
+            if len(ret["amounts"]) == 0:
+                ret["amounts"].append("")
+
+            ret["amounts"][-1] += ev["text"].strip()
 
     return ret
 
@@ -462,7 +494,7 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
         assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool, model):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -501,7 +533,11 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
+    else:
+        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+
     x.start()
     result = client.sign_psbt(psbt, wallet, None)
     x.join()
@@ -520,13 +556,13 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
                     (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
-            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
+            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"]).replace('O', '0' ) # OCR misreads O for 0
             assert parsed_events["addresses"][shown_out_idx] == out_addr
 
             shown_out_idx += 1
 
 
-def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool, model):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -554,7 +590,10 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
+    else:
+        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
     x.start()
     result = client.sign_psbt(psbt, wallet, None)
     x.join()
@@ -602,9 +641,20 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     assert len(result) == n_inputs
 
 
-def test_sign_psbt_fail_11_changes(client: Client):
+def ux_thread_acept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
+    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
+
+    while True:
+        event = speculos_client.get_next_event()
+        all_events.append(event)
+        if "Tap to continue" in event["text"]:
+            speculos_client.finger_touch(55, 550)
+            break
+ 
+
+def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
-    # before any user interaction
+    # before any user interaction on nanos.
 
     wallet = WalletPolicy(
         "",
@@ -621,6 +671,12 @@ def test_sign_psbt_fail_11_changes(client: Client):
         [True] * 11,
     )
 
+    all_events: List[dict] = []
+
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_acept_prompt_stax, args=[comm, all_events])
+
+        x.start()
     with pytest.raises(NotSupportedError):
         client.sign_psbt(psbt, wallet, None)
 

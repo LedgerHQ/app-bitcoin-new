@@ -3,11 +3,13 @@
 
 from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy, WalletType
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
+from speculos.client import SpeculosClient
 
+import threading
 
 import pytest
 
-# TODO: add tests with UI
+# TODO: add more tests with UI
 
 
 def test_get_wallet_address_singlesig_legacy_v1(client: Client):
@@ -209,8 +211,35 @@ def test_get_wallet_address_multisig_wit_v1(client: Client):
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
 
 
-def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client):
+def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos: bool, model):
     # legacy address (P2PKH)
+    def ux_thread():
+        event = comm.wait_for_text_event("Address")
+
+        # press right until the last screen (will press the "right" button more times than needed)
+        while "Reject" != event["text"]:
+            comm.press_and_release("right")
+
+            event = comm.get_next_event()
+
+        # go back to the Accept screen, then accept
+        comm.press_and_release("left")
+        comm.press_and_release("both")
+  
+    def ux_thread_stax():
+      while True:
+          event = comm.get_next_event()
+          if "Tap to continue" in event["text"] or "Show as QR" in event["text"]:
+              comm.finger_touch(55, 550)
+          elif "VERIFIED" in event["text"]:
+              break
+
+ 
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_stax)
+    else:
+        x = threading.Thread(target=ux_thread)
+
     wallet = WalletPolicy(
         name="",
         descriptor_template="pkh(@0)",
@@ -219,11 +248,20 @@ def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client):
         ],
         version=WalletType.WALLET_POLICY_V1
     )
+    x.start()
     assert client.get_wallet_address(wallet, None, 0,  0, True) == "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
+    x.join()
+
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_stax)
+    else:
+        x = threading.Thread(target=ux_thread)
+    x.start()
     assert client.get_wallet_address(wallet, None, 1, 15, True) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
+    x.join()
 
 
-def test_get_wallet_address_multisig_legacy_v1_ui(client: Client):
+def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos: bool, model):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
@@ -240,7 +278,35 @@ def test_get_wallet_address_multisig_legacy_v1_ui(client: Client):
         "1980a07cde99fbdec0d487671d3bb296507e47b3ddfa778600a9d73d501983bc"
     )
 
+    def ux_thread():
+        event = comm.wait_for_text_event("Receive")
+
+        # press right until the last screen (will press the "right" button more times than needed)
+        while "Reject" != event["text"]:
+            comm.press_and_release("right")
+
+            event = comm.get_next_event()
+
+        # go back to the Accept screen, then accept
+        comm.press_and_release("left")
+        comm.press_and_release("both")
+  
+    def ux_thread_stax():
+      while True:
+          event = comm.get_next_event()
+          if "Tap to continue" in event["text"] or "Confirm" in event["text"]:
+              comm.finger_touch(55, 550)
+          elif "CONFIRMED" in event["text"]:
+              break
+ 
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_stax)
+    else:
+        x = threading.Thread(target=ux_thread)
+
+    x.start()
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, True)
+    x.join()
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
 
