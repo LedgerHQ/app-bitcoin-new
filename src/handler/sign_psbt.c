@@ -2339,6 +2339,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                             policy->tree,
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
+                    SEND_SW(dc, SW_BAD_STATE);
                     return false;
                 }
             }
@@ -2485,6 +2486,7 @@ sign_transaction(dispatcher_context_t *dc,
                         return false;
 
                     if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
+                        SEND_SW(dc, SW_BAD_STATE);  // should never happen
                         ui_post_processing_confirm_transaction(dc, false);
                         return false;
                     }
