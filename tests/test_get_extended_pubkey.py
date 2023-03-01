@@ -7,7 +7,8 @@ from bitcoin_client.ledger_bitcoin.exception import DenyError, NotSupportedError
 from speculos.client import SpeculosClient
 
 
-def test_get_extended_pubkey_standard_display(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_extended_pubkey_standard_display(client: Client, comm: SpeculosClient, is_speculos:
+        bool, model: str):
     testcases = {
         "m/44'/1'/0'": "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
         "m/44'/1'/10'": "tpubDCwYjpDhUdPGp21gSpVay2QPJVh6WNySWMXPhbcu1DsxH31dF7mY18oibbu5RxCLBc1Szerjscuc3D5HyvfYqfRvc9mesewnFqGmPjney4d",
@@ -105,7 +106,8 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: Client):
             )
 
 
-def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, is_speculos: bool,
+        model: str):
     # Test the successful UX flow for a non-standard path (here, root path)
     # (Slow test, not feasible to repeat it for many paths)
 
@@ -152,7 +154,8 @@ def test_get_extended_pubkey_non_standard(client: Client, comm: SpeculosClient, 
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
 
 
-def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: SpeculosClient,
+        is_speculos: bool, model: str):
     # Test rejecting after the "Reject if you're not sure" warning
     # (Slow test, not feasible to repeat it for many paths)
 
@@ -196,7 +199,8 @@ def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: Spe
     x.join()
 
 
-def test_get_extended_pubkey_non_standard_reject(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_extended_pubkey_non_standard_reject(client: Client, comm: SpeculosClient, is_speculos:
+        bool, model: str):
     # Test rejecting at the end
     # (Slow test, not feasible to repeat it for many paths)
 

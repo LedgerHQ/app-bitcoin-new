@@ -494,7 +494,8 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
         assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool,
+        model: str):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -562,7 +563,8 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             shown_out_idx += 1
 
 
-def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool,
+        model: str):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -652,7 +654,7 @@ def ux_thread_acept_prompt_stax(speculos_client: SpeculosClient, all_events: Lis
             break
  
 
-def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model):
+def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: str):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction on nanos.
 

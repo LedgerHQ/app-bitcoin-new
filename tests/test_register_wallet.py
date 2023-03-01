@@ -132,7 +132,7 @@ def test_register_wallet_unsupported_policy(client: Client):
 
 
 @has_automation("automations/register_wallet_accept.json")
-def test_register_miniscript_long_policy(client: Client, speculos_globals, model):
+def test_register_miniscript_long_policy(client: Client, speculos_globals, model: str):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices,
     # except on Nano S that has 196 bytes as a technical limitation.
     wallet = WalletPolicy(

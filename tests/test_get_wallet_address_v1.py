@@ -211,7 +211,8 @@ def test_get_wallet_address_multisig_wit_v1(client: Client):
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
 
 
-def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: SpeculosClient,
+        is_speculos: bool, model: str):
     # legacy address (P2PKH)
     def ux_thread():
         event = comm.wait_for_text_event("Address")
@@ -261,7 +262,8 @@ def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: Speculo
     x.join()
 
 
-def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos: bool, model):
+def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos:
+        bool, model: str):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
