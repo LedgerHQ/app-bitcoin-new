@@ -82,6 +82,12 @@ else
 ICONNAME=icons/nanox_app_$(COIN).gif
 endif
 
+# RIPEMD160 addition.
+DEFINES += HAVE_RIPEMD160
+SOURCE_PATH += $(BOLOS_SDK)/lib_cxng/src/cx_ripemd160.c
+SOURCE_PATH += $(BOLOS_SDK)/lib_cxng/src/cx_hmac.c
+# RIPEMD160 - End
+
 all: default
 
 # TODO: double check if all those flags are still relevant/needed (was copied from legacy app-bitcoin)
