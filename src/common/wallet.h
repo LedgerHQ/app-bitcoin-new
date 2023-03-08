@@ -383,7 +383,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * When parsing descriptors containing miniscript, this fails if the miniscript is not correct,
  * as defined by the miniscript type system.
  * This does NOT check non-malleability of the miniscript.
- * * @param in_buf the buffer containing the policy map to parse
+ * @param in_buf the buffer containing the policy map to parse
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
  * @param version either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
@@ -391,6 +391,17 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * output buffer is too small.
  */
 int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int version);
+
+/**
+ * Given a valid policy that the bitcoin app is able to sign, returns the segwit version.
+ * The result is undefined for a node that is not a valid root of a wallet policy that the bitcoin
+ * app is able to sign.
+ *
+ * @param policy the root node of the wallet policy
+ * @return -1 if it's a legacy policy, 0 if it is a policy for SegwitV0 (possibly nested), 1 for
+ * SegwitV1 (taproot).
+ */
+int get_policy_segwit_version(const policy_node_t *policy);
 
 /**
  * Computes additional properties of the given miniscript, to detect malleability and other security

@@ -238,20 +238,6 @@ static int hash_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st, cx_hash
     return 0;
 }
 
-static int get_segwit_version(const uint8_t scriptPubKey[], int scriptPubKey_len) {
-    if (scriptPubKey_len <= 1) {
-        return -1;
-    }
-
-    if (scriptPubKey[0] == 0x00) {
-        return 0;
-    } else if (scriptPubKey[0] >= 0x51 && scriptPubKey[0] <= 0x60) {
-        return scriptPubKey[0] - 0x50;
-    }
-
-    return -1;
-}
-
 /*
  Convenience function to get the amount and scriptpubkey from the non-witness-utxo of a certain
  input in a PSBTv2.
@@ -1000,8 +986,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         bitvector_set(internal_inputs, cur_input_index, 1);
         st->internal_inputs_total_value += input.prevout_amount;
 
-        int segwit_version =
-            get_segwit_version(input.in_out.scriptPubKey, input.in_out.scriptPubKey_len);
+        int segwit_version = get_policy_segwit_version(&st->wallet_policy_map);
 
         // For legacy inputs, the non-witness utxo must be present
         if (segwit_version == -1 && !input.has_nonWitnessUtxo) {
@@ -2229,8 +2214,6 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                           sighash))
             return false;
     } else {
-        int segwit_version;
-
         {
             uint64_t amount;
             if (0 > get_amount_scriptpubkey_from_psbt_witness(dc,
@@ -2276,22 +2259,13 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
                 input->script_len = redeemScript_length;
                 memcpy(input->script, redeemScript, redeemScript_length);
-                segwit_version = get_segwit_version(redeemScript, redeemScript_length);
             } else {
                 input->script_len = input->in_out.scriptPubKey_len;
                 memcpy(input->script, input->in_out.scriptPubKey, input->in_out.scriptPubKey_len);
-
-                segwit_version =
-                    get_segwit_version(input->in_out.scriptPubKey, input->in_out.scriptPubKey_len);
-            }
-
-            if (segwit_version > 1) {
-                PRINTF("Segwit version not supported: %d\n", segwit_version);
-                SEND_SW(dc, SW_NOT_SUPPORTED);
-                return false;
             }
         }
 
+        int segwit_version = get_policy_segwit_version(&st->wallet_policy_map);
         uint8_t sighash[32];
         if (segwit_version == 0) {
             if (!input->has_sighash_type) {

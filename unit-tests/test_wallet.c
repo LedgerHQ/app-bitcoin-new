@@ -268,6 +268,36 @@ static void test_parse_policy_tr_multisig(void **state) {
     check_key_placeholder(&tapscript_right->key_placeholders[2], 5, 0, 1);
 }
 
+static void test_get_policy_segwit_version(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    policy_node_t *policy = out;
+
+    // legacy policies (returning -1)
+    parse_policy("pkh(@0/**)", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == -1);
+
+    parse_policy("sh(multi(2,@0/**,@1/**))", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == -1);
+
+    // segwit v0 policies
+    parse_policy("wpkh(@0/**)", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 0);
+    parse_policy("wsh(multi(2,@0/**,@1/**))", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 0);
+    parse_policy("sh(wpkh(@0/**))", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 0);
+    parse_policy("sh(wsh(multi(2,@0/**,@1/**)))", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 0);
+
+    // segwit v1 policies
+    parse_policy("tr(@0/**)", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 1);
+    parse_policy("tr(@0/**,{pk(@1/**,multi(1,@2/**,@3/**)})", out, sizeof(out));
+    assert(get_policy_segwit_version(policy) == 1);
+}
+
 static void test_failures(void **state) {
     (void) state;
 
@@ -511,6 +541,7 @@ int main() {
         cmocka_unit_test(test_parse_policy_map_multisig_3),
         cmocka_unit_test(test_parse_policy_tr),
         cmocka_unit_test(test_parse_policy_tr_multisig),
+        cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
     };
