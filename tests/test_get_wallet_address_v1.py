@@ -212,7 +212,7 @@ def test_get_wallet_address_multisig_wit_v1(client: Client):
 
 
 def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: SpeculosClient,
-        is_speculos: bool, model: str):
+                                                   is_speculos: bool, model: str):
     # legacy address (P2PKH)
     def ux_thread():
         event = comm.wait_for_text_event("Address")
@@ -226,16 +226,15 @@ def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: Speculo
         # go back to the Accept screen, then accept
         comm.press_and_release("left")
         comm.press_and_release("both")
-  
-    def ux_thread_stax():
-      while True:
-          event = comm.get_next_event()
-          if "Tap to continue" in event["text"] or "Show as QR" in event["text"]:
-              comm.finger_touch(55, 550)
-          elif "VERIFIED" in event["text"]:
-              break
 
- 
+    def ux_thread_stax():
+        while True:
+            event = comm.get_next_event()
+            if "Tap to continue" in event["text"] or "Show as QR" in event["text"]:
+                comm.finger_touch(55, 550)
+            elif "VERIFIED" in event["text"]:
+                break
+
     if model == "stax":
         x = threading.Thread(target=ux_thread_stax)
     else:
@@ -263,7 +262,7 @@ def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: Speculo
 
 
 def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos:
-        bool, model: str):
+                                                  bool, model: str):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
@@ -292,15 +291,15 @@ def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: Speculos
         # go back to the Accept screen, then accept
         comm.press_and_release("left")
         comm.press_and_release("both")
-  
+
     def ux_thread_stax():
-      while True:
-          event = comm.get_next_event()
-          if "Tap to continue" in event["text"] or "Confirm" in event["text"]:
-              comm.finger_touch(55, 550)
-          elif "CONFIRMED" in event["text"]:
-              break
- 
+        while True:
+            event = comm.get_next_event()
+            if "Tap to continue" in event["text"] or "Confirm" in event["text"]:
+                comm.finger_touch(55, 550)
+            elif "CONFIRMED" in event["text"]:
+                break
+
     if model == "stax":
         x = threading.Thread(target=ux_thread_stax)
     else:
@@ -310,5 +309,3 @@ def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: Speculos
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, True)
     x.join()
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
-
-

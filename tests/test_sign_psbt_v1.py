@@ -133,7 +133,7 @@ def parse_signing_events(events: List[dict]) -> dict:
             if len(ret["addresses"]) == 0:
                 ret["addresses"].append("")
 
-            ret["addresses"][-1] += ev["text"].strip().replace("O", "0" ) # OCR misreads O for 0
+            ret["addresses"][-1] += ev["text"].strip().replace("O", "0")  # OCR misreads O for 0
 
         elif next_step.startswith("Fees"):
             ret["fees"] += ev["text"]
@@ -367,7 +367,7 @@ def test_sign_psbt_taproot_1to2_v1(client: Client):
 
 
 def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, is_speculos: bool,
-        model: str):
+                                          model: str):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -406,7 +406,7 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
     fees_amount = sum_in - sum_out
 
     all_events: List[dict] = []
-    
+
     if model == "stax":
         x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
     else:
@@ -420,15 +420,15 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
 
     parsed_events = parse_signing_events(all_events)
 
-    assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
+            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     shown_out_idx = 0
     for out_idx in range(n_outs):
         if out_idx != change_index:
             out_amt = psbt.tx.vout[out_idx].nValue
-            assert((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
-                   (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+            assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
+                    (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
             out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
             assert parsed_events["addresses"][shown_out_idx] == out_addr
@@ -437,7 +437,7 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
 
 
 def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClient, is_speculos:
-        bool, model: str):
+                                             bool, model: str):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -479,12 +479,12 @@ def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClien
 
     parsed_events = parse_signing_events(all_events)
 
-    assert((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-           (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
+            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
 
     out_amt = psbt.tx.vout[0].nValue
-    assert((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
-           (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+    assert ((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
+            (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -531,7 +531,7 @@ def ux_thread_accept_prompt_stax(speculos_client: SpeculosClient, all_events: Li
 
 
 def test_sign_psbt_fail_11_changes_v1(client: Client, comm: SpeculosClient, is_speculos: bool,
-        model: str):
+                                      model: str):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction
 
@@ -550,7 +550,6 @@ def test_sign_psbt_fail_11_changes_v1(client: Client, comm: SpeculosClient, is_s
         [100_000_000] * 11,
         [True] * 11,
     )
-
 
     all_events: List[dict] = []
 

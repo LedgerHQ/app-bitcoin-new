@@ -58,22 +58,21 @@ def ux_thread_sign_psbt_stax(speculos_client: SpeculosClient, all_events: List[d
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     first_approve = True
- 
+
     while True:
         event = speculos_client.get_next_event()
         all_events.append(event)
- 
+
         if "Tap to continue" in event["text"]:
             speculos_client.finger_touch(55, 550)
- 
+
         elif first_approve and "Hold to sign" in event["text"]:
             first_approve = False
             speculos_client.finger_touch(55, 550, 3)
- 
+
         elif "SIGNED" in event["text"]:
             break
- 
- 
+
 
 def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
@@ -82,7 +81,7 @@ def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict])
     while True:
         event = speculos_client.get_next_event()
         all_events.append(event)
-  
+
         if should_go_right(event):
             speculos_client.press_and_release("right")
         elif "Approve" in event["text"]:
@@ -129,7 +128,7 @@ def parse_signing_events(events: List[dict]) -> dict:
             if len(ret["addresses"]) == 0:
                 ret["addresses"].append("")
 
-            ret["addresses"][-1] += ev["text"].strip().replace("O", "0" ) # OCR misreads O for 0
+            ret["addresses"][-1] += ev["text"].strip().replace("O", "0")  # OCR misreads O for 0
 
         elif next_step.startswith("Fees"):
             ret["fees"] += ev["text"].strip()
@@ -495,7 +494,7 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
 
 
 def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool,
-        model: str):
+                                       model: str):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -557,14 +556,15 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
                     (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
-            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"]).replace('O', '0' ) # OCR misreads O for 0
+            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(
+                network=NETWORKS["test"]).replace('O', '0')  # OCR misreads O for 0
             assert parsed_events["addresses"][shown_out_idx] == out_addr
 
             shown_out_idx += 1
 
 
 def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool,
-        model: str):
+                                          model: str):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -652,7 +652,7 @@ def ux_thread_acept_prompt_stax(speculos_client: SpeculosClient, all_events: Lis
         if "Tap to continue" in event["text"]:
             speculos_client.finger_touch(55, 550)
             break
- 
+
 
 def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: str):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
