@@ -11,7 +11,7 @@ import { createVarint, parseVarint } from './varint';
 const CLA_BTC = 0xe1;
 const CLA_FRAMEWORK = 0xf8;
 
-const CURRENT_PROTOCOL_VERSION = 1; // from supported from version 2.1.0 of the app
+const CURRENT_PROTOCOL_VERSION = 1; // supported from version 2.1.0 of the app
 
 enum BitcoinIns {
   GET_PUBKEY = 0x00,
