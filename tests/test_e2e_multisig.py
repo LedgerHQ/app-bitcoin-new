@@ -82,12 +82,8 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     result = multisig_rpc.walletcreatefundedpsbt(
         outputs={
             out_address: Decimal("0.01")
-        },
-        options={
-            # make sure that the fee is large enough; it looks like
-            # fee estimation doesn't work in core with miniscript, yet
-            "fee_rate": 10
-        })
+        }
+    )
 
     psbt_b64 = result["psbt"]
 
