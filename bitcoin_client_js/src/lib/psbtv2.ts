@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import bjs from 'bitcoinjs-lib';
+import * as bjs from 'bitcoinjs-lib';
 
 import {
   BufferReader,
@@ -11,6 +11,8 @@ import {
 import { sanitizeBigintToNumber } from './varint';
 
 export enum psbtGlobal {
+  UNSIGNED_TX = 0x00,
+  XPUB = 0x01,
   TX_VERSION = 0x02,
   FALLBACK_LOCKTIME = 0x03,
   INPUT_COUNT = 0x04,
@@ -36,6 +38,7 @@ export enum psbtIn {
 }
 export enum psbtOut {
   REDEEM_SCRIPT = 0x00,
+  WITNESS_SCRIPT = 0x01,
   BIP_32_DERIVATION = 0x02,
   AMOUNT = 0x03,
   SCRIPT = 0x04,
@@ -367,14 +370,74 @@ export class PsbtV2 {
       throw new Error('Invalid magic bytes');
     }
     while (this.readKeyPair(this.globalMap, buf));
-    for (let i = 0; i < this.getGlobalInputCount(); i++) {
+
+    let psbtVersion: number;
+    try {
+      psbtVersion = this.getGlobalPsbtVersion();
+    } catch {
+      psbtVersion = 0;
+    }
+
+    if (psbtVersion !== 0 && psbtVersion !== 2) throw new Error("Only PSBTs of version 0 or 2 are supported");
+
+    let nInputs: number;
+    let nOutputs: number;
+    if (psbtVersion == 0) {
+      // if PSBTv0, we parse the PSBT_GLOBAL_UNSIGNED_TX field
+      const txRaw = this.getGlobal(psbtGlobal.UNSIGNED_TX);
+      const tx = bjs.Transaction.fromBuffer(txRaw);
+      nInputs = tx.ins.length;
+      nOutputs = tx.outs.length
+    } else {
+      // if PSBTv2, we already have the counts
+      nInputs = this.getGlobalInputCount();
+      nOutputs = this.getGlobalOutputCount();
+    }
+
+    for (let i = 0; i < nInputs; i++) {
       this.inputMaps[i] = new Map();
       while (this.readKeyPair(this.inputMaps[i], buf));
     }
-    for (let i = 0; i < this.getGlobalOutputCount(); i++) {
+    for (let i = 0; i < nOutputs; i++) {
       this.outputMaps[i] = new Map();
       while (this.readKeyPair(this.outputMaps[i], buf));
     }
+
+    this.normalizeToV2();
+  }
+  normalizeToV2() {
+    // if the psbt is a PsbtV0, convert it to PsbtV2 instead.
+    // throw an error for any version other than 0 or 2,
+    const psbtVersion = this.getGlobalOptional(psbtGlobal.VERSION)?.readInt32LE(0);
+    if (psbtVersion === 2) return;
+    else if (psbtVersion !== undefined) {
+      throw new Error('Invalid or unsupported value for PSBT_GLOBAL_VERSION');
+    }
+
+    // Convert PsbtV0 to PsbtV2 by parsing the PSBT_GLOBAL_UNSIGNED_TX field
+    // and filling in the corresponding fields.
+    const txRaw = this.getGlobal(psbtGlobal.UNSIGNED_TX);
+    const tx = bjs.Transaction.fromBuffer(txRaw);
+
+    this.setGlobalPsbtVersion(2);
+    this.setGlobalTxVersion(tx.version);
+    this.setGlobalFallbackLocktime(tx.locktime);
+    this.setGlobalInputCount(tx.ins.length);
+    this.setGlobalOutputCount(tx.outs.length);
+
+    for (let i = 0; i < tx.ins.length; i++) {
+      this.setInputPreviousTxId(i, tx.ins[i].hash);
+      this.setInputOutputIndex(i, tx.ins[i].index);
+      this.setInputSequence(i, tx.ins[i].sequence);
+    }
+
+    for (let i = 0; i < tx.outs.length; i++) {
+      this.setOutputAmount(i, tx.outs[i].value);
+      this.setOutputScript(i, tx.outs[i].script);
+    }
+
+    // PSBT_GLOBAL_UNSIGNED_TX must be removed in a valid PSBTv2
+    this.globalMap.delete(psbtGlobal.UNSIGNED_TX.toString(16).padStart(2, '0'));
   }
   /**
    * Imports a BitcoinJS (bitcoinjs-lib) Psbt object.
@@ -467,6 +530,7 @@ export class PsbtV2 {
     const keyData = buf.readSlice(keyLen - 1);
     const value = buf.readVarSlice();
     set(map, keyType, keyData, value);
+
     return true;
   }
   private getKeyDatas(
@@ -654,8 +718,8 @@ function createKey(buf: Buffer): Key {
   return new Key(buf.readUInt8(0), buf.slice(1));
 }
 function serializeMap(buf: BufferWriter, map: ReadonlyMap<string, Buffer>) {
-  for (const key of map.keys()) {
-    const value = map.get(key)!;
+  // serialize in lexicographical order of keys
+  for (let [key, value] of [...map].sort(([k1], [k2]) => k1.localeCompare(k2))) {
     const keyPair = new KeyPair(createKey(Buffer.from(key, 'hex')), value);
     keyPair.serialize(buf);
   }
