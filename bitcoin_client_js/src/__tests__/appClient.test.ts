@@ -359,6 +359,49 @@ describe("test AppClient", () => {
     expect(result[0][1].signature.length).toEqual(65); // 64 because it's SIGHASH_ALL and not SIGHASH_DEFAULT
   });
 
+  it("can sign a psbt passed as a base64 string", async () => {
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_with_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const walletPolicy = new WalletPolicy(
+      "Taproot foreign internal key, and our script key",
+      "tr(@0/**,pk(@1/**))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const hmac = Buffer.from("dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7", "hex");
+    const psbtBase64 = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA="
+    const result = await app.signPsbt(psbtBase64, walletPolicy, hmac);
+
+    expect(result.length).toEqual(1);
+  });
+
+  it("can sign a psbt passed as binary buffer string", async () => {
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_with_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const walletPolicy = new WalletPolicy(
+      "Taproot foreign internal key, and our script key",
+      "tr(@0/**,pk(@1/**))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const hmac = Buffer.from("dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7", "hex");
+    const psbtBuf = Buffer.from(
+      "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA=",
+      "base64"
+    );
+    const result = await app.signPsbt(psbtBuf, walletPolicy, hmac);
+
+    expect(result.length).toEqual(1);
+  });
+
   it("can sign a message", async () => {
     const msg = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible.";
     const path = "m/84'/1'/0'/0/8";

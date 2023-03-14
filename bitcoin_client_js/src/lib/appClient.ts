@@ -224,7 +224,7 @@ export class AppClient {
    * Signs a psbt using a (standard or registered) `WalletPolicy`. This is an interactive command, as user validation
    * is necessary using the device's secure screen.
    * On success, a map of input indexes and signatures is returned.
-   * @param psbt an instance of `PsbtV2`
+   * @param psbt a base64-encoded string, or a psbt in a binary Buffer. Using the `PsbtV2` type is deprecated.
    * @param walletPolicy the `WalletPolicy` to use for signing
    * @param walletHMAC the 32-byte hmac obtained during wallet policy registration, or `null` for a standard policy
    * @param progressCallback optionally, a callback that will be called every time a signature is produced during
@@ -234,11 +234,21 @@ export class AppClient {
    *    - an instance of PartialSignature
    */
   async signPsbt(
-    psbt: PsbtV2,
+    psbt: PsbtV2 | string | Buffer,
     walletPolicy: WalletPolicy,
     walletHMAC: Buffer | null,
     progressCallback?: () => void
   ): Promise<[number, PartialSignature][]> {
+    if (typeof psbt === 'string') {
+      psbt = Buffer.from(psbt, "base64");
+    }
+
+    if (Buffer.isBuffer(psbt)) {
+      const psbtObj = new PsbtV2()
+      psbtObj.deserialize(psbt);
+      psbt = psbtObj;
+    }
+
     const merkelizedPsbt = new MerkelizedPsbt(psbt);
 
     if (walletHMAC != null && walletHMAC.length != 32) {
