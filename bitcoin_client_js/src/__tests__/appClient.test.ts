@@ -319,7 +319,7 @@ describe("test AppClient", () => {
   });
 
   it("can sign a psbt for a taproot script path", async () => {
-    // psbt from test_sign_psbt_singlesig_wpkh_2to2 in the main test suite, converted to PSBTv2
+    // psbt from test_sign_psbt_tr_script_pk_sighash_all in the main test suite, converted to PSBTv2
     const psbtBuf = Buffer.from(
       "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA=",
       "base64"
@@ -356,7 +356,7 @@ describe("test AppClient", () => {
 
     // We could test the validity of the signature, but this is already done in the corresponding python test.
     // Here we're only interested in testing that the JS library returns the correct values.
-    expect(result[0][1].signature.length).toEqual(65); // 64 because it's SIGHASH_ALL and not SIGHASH_DEFAULT
+    expect(result[0][1].signature.length).toEqual(65); // 65 because it's SIGHASH_ALL and not SIGHASH_DEFAULT
   });
 
   it("can sign a psbt passed as a base64 string", async () => {

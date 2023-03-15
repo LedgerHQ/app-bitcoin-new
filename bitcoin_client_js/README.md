@@ -89,7 +89,7 @@ async function main(transport) {
     // ==> Sign a psbt
 
     // TODO: set a wallet policy and a valid psbt file in order to test psbt signing
-    const psbt = null; // a base64-encoded psbt, or a binary psbt in a Buffer 
+    const psbt = null; // a base64-encoded psbt, or a binary psbt in a Buffer
     const signingPolicy = null; // an instance of WalletPolicy
     const signingPolicyHmac = null; // if not a default wallet policy, this must also be set
     if (!psbt || !signingPolicy) {
