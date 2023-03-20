@@ -216,8 +216,8 @@ def test_e2e_tapscript_one_of_three_scriptpath(rpc, rpc_test_wallet, client: Cli
                  rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
-def test_e2e_tapscript_sortedmulti_a_2of2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
-    # tr(foreign_key_1,sortedmulti_a(2,my_key,foreign_key_2))
+def test_e2e_tapscript_multi_a_2of2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # tr(foreign_key_1,multi_a(2,my_key,foreign_key_2))
 
     path = "499'/1'/0'"
     _, core_xpub_orig_1 = create_new_wallet()

@@ -296,25 +296,110 @@ describe("test AppClient", () => {
     expect(result.length).toEqual(2);
 
     expect(result[0][0]).toEqual(0);
-    expect(result[0][1]).toEqual(Buffer.from(
+    expect(result[0][1].pubkey).toEqual(Buffer.from(
       "03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3",
       "hex"
     ));
-    expect(result[0][2]).toEqual(Buffer.from(
+    expect(result[0][1].signature).toEqual(Buffer.from(
       "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01",
       "hex"
     ));
 
 
     expect(result[1][0]).toEqual(1);
-    expect(result[1][1]).toEqual(Buffer.from(
+    expect(result[1][1].pubkey).toEqual(Buffer.from(
       "0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0",
       "hex"
     ));
-    expect(result[1][2]).toEqual(Buffer.from(
+    expect(result[1][1].signature).toEqual(Buffer.from(
       "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001",
       "hex"
     ));
+    expect(result[1][1].tapleafHash).toBeUndefined();
+  });
+
+  it("can sign a psbt for a taproot script path", async () => {
+    // psbt from test_sign_psbt_tr_script_pk_sighash_all in the main test suite, converted to PSBTv2
+    const psbtBuf = Buffer.from(
+      "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA=",
+      "base64"
+    );
+
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_with_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const walletPolicy = new WalletPolicy(
+      "Taproot foreign internal key, and our script key",
+      "tr(@0/**,pk(@1/**))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const psbt = new PsbtV2();
+    psbt.deserialize(psbtBuf);
+    const hmac = Buffer.from("dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7", "hex");
+    const result = await app.signPsbt(psbt, walletPolicy, hmac);
+
+    expect(result.length).toEqual(1);
+
+    expect(result[0][0]).toEqual(0);
+    expect(result[0][1].pubkey).toEqual(Buffer.from(
+      "6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac",
+      "hex"
+    ));
+    expect(result[0][1].tapleafHash).toEqual(Buffer.from(
+      "092eda033617e210ee7f7d0e378a404aea1c48b56aa103022becf7746e4700a4",
+      "hex"
+    ));
+
+    // We could test the validity of the signature, but this is already done in the corresponding python test.
+    // Here we're only interested in testing that the JS library returns the correct values.
+    expect(result[0][1].signature.length).toEqual(65); // 65 because it's SIGHASH_ALL and not SIGHASH_DEFAULT
+  });
+
+  it("can sign a psbt passed as a base64 string", async () => {
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_with_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const walletPolicy = new WalletPolicy(
+      "Taproot foreign internal key, and our script key",
+      "tr(@0/**,pk(@1/**))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const hmac = Buffer.from("dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7", "hex");
+    const psbtBase64 = "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA="
+    const result = await app.signPsbt(psbtBase64, walletPolicy, hmac);
+
+    expect(result.length).toEqual(1);
+  });
+
+  it("can sign a psbt passed as binary buffer string", async () => {
+    const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/sign_with_wallet_accept.json').toString());
+    await setSpeculosAutomation(transport, automation);
+
+    const walletPolicy = new WalletPolicy(
+      "Taproot foreign internal key, and our script key",
+      "tr(@0/**,pk(@1/**))",
+      [
+        "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+        "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+      ]
+    );
+
+    const hmac = Buffer.from("dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7", "hex");
+    const psbtBuf = Buffer.from(
+      "cHNidP8BAgQCAAAAAQMEAAAAAAEEAQEBBQEBAfsEAgAAAAABAStMBgAAAAAAACJRIPwKENMIx+QbS7w2Qvj9isKJhTsc51WgxtDUlfA9ny2kAQMEAQAAACIVwVAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1IyBrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrKzAIRZQFxCL7OqN7cUwC7IjhrOrMDZ6wmL5zl5YMm64Pjoi9R0AdiI6bjAAAIABAACAAAAAgAIAAIAAAAAAAAAAACEWaxbowfl5+kzA8FtqMAr//5QUWbbyDed95VsBYO+OTKw9AQku2gM2F+IQ7n99DjeKQErqHEi1aqEDAivs93RuRwCk9azC/TAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAEXIFAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1ARggCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKQBDiAfwcxXccuDhgzFbZS8/tk4YIwX9jZiQ1tB6cRP/P0xQgEPBAEAAAABEAT9////AAEDCDkFAAAAAAAAAQQWABSqjvN0yvrfynaQLdtc9hxgu/2dhQA=",
+      "base64"
+    );
+    const result = await app.signPsbt(psbtBuf, walletPolicy, hmac);
+
+    expect(result.length).toEqual(1);
   });
 
   it("can sign a message", async () => {
