@@ -26,10 +26,10 @@ The following example showcases all the main methods of the `Client`'s interface
 
 More examples can be found in the [test suite](src/__tests__/appClient.test.ts).
 
-Testing the `signPsbt` method requires a valid PSBTv2, and provide the corresponding wallet policy; it is skipped by default in the following example.
+Testing the `signPsbt` method requires a valid PSBT, and provide the corresponding wallet policy; it is skipped by default in the following example.
 
 ```javascript
-import { AppClient, DefaultWalletPolicy, WalletPolicy, PsbtV2 } from 'ledger-bitcoin';
+import { AppClient, DefaultWalletPolicy, WalletPolicy } from 'ledger-bitcoin';
 import Transport from '@ledgerhq/hw-transport-node-hid';
 
 // This examples assumes the Bitcoin Testnet app is running.
