@@ -1,3 +1,4 @@
+// TODO: update all this
 #ifdef HAVE_NBGL
 
 #include <stdint.h>

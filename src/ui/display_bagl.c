@@ -28,6 +28,24 @@
    any flow.
 */
 
+static void update_title(const char *title, size_t title_len) {
+    memset(g_ui_state.title_and_text.title, 0, sizeof(g_ui_state.title_and_text.title));
+    if (title_len > sizeof(g_ui_state.title_and_text.title) - 1) {
+        PRINTF("Step title too long\n");
+        title_len = sizeof(g_ui_state.title_and_text.title) - 1;
+    }
+    memcpy(g_ui_state.title_and_text.title, title, title_len);
+}
+
+static void update_text(const char *text, size_t text_len) {
+    memset(g_ui_state.title_and_text.text, 0, sizeof(g_ui_state.title_and_text.text));
+    if (text_len > sizeof(g_ui_state.title_and_text.text) - 1) {
+        PRINTF("Step text too long\n");
+        text_len = sizeof(g_ui_state.title_and_text.text) - 1;
+    }
+    memcpy(g_ui_state.title_and_text.text, text, text_len);
+}
+
 // Step with icon and text for pubkey
 UX_STEP_NOCB(ux_display_confirm_pubkey_step, pn, {&C_icon_eye, "Confirm public key"});
 
@@ -86,20 +104,30 @@ UX_STEP_CB(ux_display_reject_step,
 // PATH/PUBKEY or PATH/ADDRESS
 
 // Step with title/text for BIP32 path
-UX_STEP_NOCB(ux_display_path_step,
-             bnnn_paging,
-             {
-                 .title = "Path",
-                 .text = g_ui_state.path_and_pubkey.bip32_path_str,
-             });
+UX_STEP_NOCB_INIT(ux_display_path_step,
+                  bnnn_paging,
+                  {
+                      update_title("Path", sizeof("Path"));
+                      update_text(g_ui_state.path_and_pubkey.bip32_path_str,
+                                  g_ui_state.path_and_pubkey.bip32_path_str_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with title/text for pubkey
-UX_STEP_NOCB(ux_display_pubkey_step,
-             bnnn_paging,
-             {
-                 .title = "Public key",
-                 .text = g_ui_state.path_and_pubkey.pubkey,
-             });
+UX_STEP_NOCB_INIT(ux_display_pubkey_step,
+                  bnnn_paging,
+                  {
+                      update_title("Public key", sizeof("Public key"));
+                      update_text(g_ui_state.path_and_pubkey.pubkey,
+                                  g_ui_state.path_and_pubkey.pubkey_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with description of a wallet policy
 UX_STEP_NOCB(ux_display_wallet_policy_map_step,

@@ -63,8 +63,11 @@ bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *pubkey) {
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    state->bip32_path_str = bip32_path_str;
+    state->bip32_path_str_len = strlen(bip32_path_str);
+    state->pubkey = pubkey;
+    state->pubkey_len = strlen(pubkey);
+    // TODO: where do we check max length?
 
     if (!is_path_suspicious) {
         ui_display_pubkey_flow();

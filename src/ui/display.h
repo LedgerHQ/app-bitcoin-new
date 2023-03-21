@@ -15,22 +15,26 @@
 #include "../common/script.h"
 #include "../constants.h"
 
+#define MAX_TITLE_LENGTH 32   // TODO
+#define MAX_TEXT_LENGTH  128  // TODO
+
+// TODO: docs
+
+typedef struct {
+    char title[MAX_TITLE_LENGTH];
+    char text[MAX_TEXT_LENGTH];
+} ui_title_and_text_state_t;
+
 // TODO: hard to keep track of what globals are used in the same flows
 //       (especially since the same flow step can be shared in different flows)
 
 typedef struct {
-    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-} ui_path_state_t;
-
-typedef struct {
-    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-    char pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    ui_title_and_text_state_t title_and_text;
+    const char *bip32_path_str;
+    size_t bip32_path_str_len;
+    const char *pubkey;
+    size_t pubkey_len;
 } ui_path_and_pubkey_state_t;
-
-typedef struct {
-    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-    char address[MAX_ADDRESS_LENGTH_STR + 1];
-} ui_path_and_address_state_t;
 
 typedef struct {
     char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
@@ -66,8 +70,9 @@ typedef struct {
  * Union of all the states for each of the UI screens, in order to save memory.
  */
 typedef union {
+    ui_title_and_text_state_t title_and_text;  // TODO: meta
+
     ui_path_and_pubkey_state_t path_and_pubkey;
-    ui_path_and_address_state_t path_and_address;
     ui_path_and_hash_state_t path_and_hash;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
