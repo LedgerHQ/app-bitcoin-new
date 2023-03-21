@@ -100,7 +100,7 @@ async function main(transport) {
 
     // result will be a list of triples [i, partialSig], where:
     // - i is the input index
-    // - partialSignature is an instance of PartialSignature; it contains a pubkey and a signature,
+    // - partialSig is an instance of PartialSignature; it contains a pubkey and a signature,
     //   and it might contain a tapleaf_hash.
     const result = await app.signPsbt(psbt, signingPolicy, signingPolicyHmac);
 
