@@ -37,8 +37,12 @@ typedef struct {
 } ui_path_and_pubkey_state_t;
 
 typedef struct {
-    char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-    char hash_hex[64 + 1];
+    ui_title_and_text_state_t title_and_text;
+
+    const char *bip32_path_str;
+    size_t bip32_path_str_len;
+    const char *hash_hex;
+    size_t hash_hex_len;
 } ui_path_and_hash_state_t;
 
 typedef struct {

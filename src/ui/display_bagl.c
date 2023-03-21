@@ -250,19 +250,29 @@ UX_STEP_NOCB(ux_sign_message_step,
                  "message",
              });
 
-UX_STEP_NOCB(ux_message_sign_display_path_step,
-             bnnn_paging,
-             {
-                 .title = "Path",
-                 .text = g_ui_state.path_and_hash.bip32_path_str,
-             });
+UX_STEP_NOCB_INIT(ux_message_sign_display_path_step,
+                  bnnn_paging,
+                  {
+                      update_title("Path", sizeof("Path"));
+                      update_text(g_ui_state.path_and_hash.bip32_path_str,
+                                  g_ui_state.path_and_hash.bip32_path_str_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
-UX_STEP_NOCB(ux_message_hash_step,
-             bnnn_paging,
-             {
-                 .title = "Message hash",
-                 .text = g_ui_state.path_and_hash.hash_hex,
-             });
+UX_STEP_NOCB_INIT(ux_message_hash_step,
+                  bnnn_paging,
+                  {
+                      update_title("Message hash", sizeof("Message hash"));
+                      update_text(g_ui_state.path_and_hash.hash_hex,
+                                  g_ui_state.path_and_hash.hash_hex_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 UX_STEP_CB(ux_sign_message_accept_new,
            pbb,

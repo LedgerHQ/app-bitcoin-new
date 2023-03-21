@@ -83,8 +83,11 @@ bool ui_display_message_hash(dispatcher_context_t *context,
                              const char *message_hash) {
     ui_path_and_hash_state_t *state = (ui_path_and_hash_state_t *) &g_ui_state;
 
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    strncpy(state->hash_hex, message_hash, sizeof(state->hash_hex));
+    state->bip32_path_str = bip32_path_str;
+    state->bip32_path_str_len = strlen(bip32_path_str);
+
+    state->hash_hex = message_hash;
+    state->hash_hex_len = strlen(message_hash);
 
     ui_sign_message_flow();
 
