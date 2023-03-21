@@ -127,7 +127,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
-    if (cmd->p1 != 0 || cmd->p2 > 1) {
+    if (cmd->p2 > 1) {
         io_send_sw(SW_WRONG_P1P2);
         return;
     }
