@@ -30,6 +30,7 @@ typedef struct {
 
 typedef struct {
     ui_title_and_text_state_t title_and_text;
+
     const char *bip32_path_str;
     size_t bip32_path_str_len;
     const char *pubkey;
@@ -45,29 +46,43 @@ typedef struct {
     size_t hash_hex_len;
 } ui_path_and_hash_state_t;
 
+// wallet-related flows might sometimes use a subset of the fields
 typedef struct {
-    char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
+    ui_title_and_text_state_t title_and_text;
 
-    // no flows show together both a policy map and an address, therefore we share memory
-    union {
-        char descriptor_template[MAX_DESCRIPTOR_TEMPLATE_LENGTH + 1];
-        char address[MAX_ADDRESS_LENGTH_STR + 1];
-    };
+    const char *wallet_name;
+    size_t wallet_name_len;
+    const char *descriptor_template;
+    size_t descriptor_template_len;
+    const char *address;
+    size_t address_len;
 } ui_wallet_state_t;
 
 typedef struct {
-    char pubkey[MAX_POLICY_KEY_INFO_LEN + 1];
-    char signer_index[sizeof("Key @999 <theirs>")];
+    ui_title_and_text_state_t title_and_text;
+
+    const char *pubkey;
+    size_t pubkey_len;
+    const char *signer_index;
+    size_t signer_index_len;
 } ui_cosigner_pubkey_and_index_state_t;
 
 typedef struct {
-    char index[sizeof("output #999")];
-    char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    char amount[MAX_AMOUNT_LENGTH + 1];
+    ui_title_and_text_state_t title_and_text;
+
+    const char *index;
+    size_t index_len;
+    const char *address_or_description;
+    size_t address_or_description_len;
+    const char *amount;
+    size_t amount_len;
 } ui_validate_output_state_t;
 
 typedef struct {
-    char fee[MAX_AMOUNT_LENGTH + 1];
+    ui_title_and_text_state_t title_and_text;
+
+    const char *fee;
+    size_t fee_len;
 } ui_validate_transaction_state_t;
 
 /**

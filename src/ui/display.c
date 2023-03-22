@@ -99,10 +99,11 @@ bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const char *policy_descriptor) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
-    state->wallet_name[wallet_header->name_len] = 0;
-    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
-    state->descriptor_template[wallet_header->descriptor_template_len] = 0;
+    state->wallet_name = wallet_header->name;
+    state->wallet_name_len = wallet_header->name_len;
+
+    state->descriptor_template = policy_descriptor;
+    state->descriptor_template_len = wallet_header->descriptor_template_len;
 
     ui_display_register_wallet_flow();
 
@@ -118,20 +119,20 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
 
     ui_cosigner_pubkey_and_index_state_t *state =
         (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
+    state->pubkey = pubkey;
+    state->pubkey_len = strlen(pubkey);
 
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
+    char signer_index_str[sizeof("Key @999 <theirs>") + 1];
+    memset(signer_index_str, 0, sizeof(signer_index_str));
 
     if (is_internal) {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u <ours>",
-                 cosigner_index);
+        snprintf(signer_index_str, sizeof(signer_index_str), "Key @%u <ours>", cosigner_index);
     } else {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u <theirs>",
-                 cosigner_index);
+        snprintf(signer_index_str, sizeof(signer_index_str), "Key @%u <theirs>", cosigner_index);
     }
+    state->signer_index = signer_index_str;
+    state->signer_index_len = strlen(signer_index_str);
+
     ui_display_policy_map_cosigner_pubkey_flow();
 
     return io_ui_process(context, true);
@@ -142,12 +143,14 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *address) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->address, address, sizeof(state->address));
+    state->address = address;
+    state->address_len = strlen(address);
 
     if (wallet_name == NULL) {
         ui_display_canonical_wallet_address_flow();
     } else {
-        strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+        state->wallet_name = wallet_name;
+        state->wallet_name_len = strlen(wallet_name);
         ui_display_receive_in_wallet_flow();
     }
 
@@ -157,7 +160,9 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
-    strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
+    state->wallet_name = wallet_name;
+    state->wallet_name_len = strlen(wallet_name);
+
     ui_display_spend_from_wallet_flow();
 
     return io_ui_process(context, true);
@@ -191,10 +196,22 @@ bool ui_validate_output(dispatcher_context_t *context,
                         uint64_t amount) {
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
-    strncpy(state->address_or_description,
-            address_or_description,
-            sizeof(state->address_or_description));
-    format_sats_amount(coin_name, amount, state->amount);
+    state->address_or_description = address_or_description;
+    state->address_or_description_len = strlen(address_or_description);
+
+    char amount_str[MAX_AMOUNT_LENGTH + 1];
+    memset(amount_str, 0, sizeof(amount));
+    format_sats_amount(coin_name, amount, amount_str);
+
+    state->amount = amount_str;
+    state->amount_len = strlen(amount_str);
+
+    char index_str[sizeof("output #999") + 1];
+    memset(index_str, 0, sizeof(index_str));
+    snprintf(index_str, sizeof(index_str), "output #%d", index);
+
+    state->index = index_str;
+    state->index_len = strlen(index_str);
 
     if (total_count == 1) {
         ui_display_output_address_amount_no_index_flow(index);
@@ -208,7 +225,12 @@ bool ui_validate_output(dispatcher_context_t *context,
 bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(coin_name, fee, state->fee);
+    char fee_str[MAX_AMOUNT_LENGTH + 1];
+    memset(fee_str, 0, sizeof(fee_str));
+
+    format_sats_amount(coin_name, fee, fee_str);
+    state->fee = fee_str;
+    state->fee_len = strlen(fee_str);
 
     ui_accept_transaction_flow();
 

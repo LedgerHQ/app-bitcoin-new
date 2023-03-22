@@ -130,28 +130,43 @@ UX_STEP_NOCB_INIT(ux_display_pubkey_step,
                   });
 
 // Step with description of a wallet policy
-UX_STEP_NOCB(ux_display_wallet_policy_map_step,
-             bnnn_paging,
-             {
-                 .title = "Wallet policy:",
-                 .text = g_ui_state.wallet.descriptor_template,
-             });
+UX_STEP_NOCB_INIT(ux_display_wallet_policy_map_step,
+                  bnnn_paging,
+                  {
+                      update_title("Wallet policy:", sizeof("Wallet policy:"));
+                      update_text(g_ui_state.wallet.descriptor_template,
+                                  g_ui_state.wallet.descriptor_template_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with index and xpub of a cosigner of a policy_map wallet
-UX_STEP_NOCB(ux_display_wallet_policy_cosigner_pubkey_step,
-             bnnn_paging,
-             {
-                 .title = g_ui_state.cosigner_pubkey_and_index.signer_index,
-                 .text = g_ui_state.cosigner_pubkey_and_index.pubkey,
-             });
+UX_STEP_NOCB_INIT(ux_display_wallet_policy_cosigner_pubkey_step,
+                  bnnn_paging,
+                  {
+                      update_title(g_ui_state.cosigner_pubkey_and_index.signer_index,
+                                   g_ui_state.cosigner_pubkey_and_index.signer_index_len);
+                      update_text(g_ui_state.cosigner_pubkey_and_index.pubkey,
+                                  g_ui_state.cosigner_pubkey_and_index.pubkey_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with title/text for address, used when showing a wallet receive address
-UX_STEP_NOCB(ux_display_wallet_address_step,
-             bnnn_paging,
-             {
-                 .title = "Address",
-                 .text = g_ui_state.wallet.address,
-             });
+UX_STEP_NOCB_INIT(ux_display_wallet_address_step,
+                  bnnn_paging,
+                  {
+                      update_title("Address", sizeof("Address"));
+                      update_text(g_ui_state.wallet.address, g_ui_state.wallet.address_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with warning icon and text explaining that there are external inputs
 UX_STEP_NOCB(ux_display_warning_external_inputs_step,
@@ -171,37 +186,58 @@ UX_STEP_NOCB(ux_unverified_segwit_input_flow_3_step, nn, {"or third party", "wal
 UX_STEP_NOCB(ux_nondefault_sighash_flow_1_step, pb, {&C_icon_warning, "Non-default sighash"});
 
 // Step with eye icon and "Review" and the output index
-UX_STEP_NOCB(ux_review_step,
-             pnn,
-             {
-                 &C_icon_eye,
-                 "Review",
-                 g_ui_state.validate_output.index,
-             });
+UX_STEP_NOCB_INIT(ux_review_step,
+                  pnn,
+                  {
+                      update_title("Review", sizeof("Review"));
+                      update_text(g_ui_state.validate_output.index,
+                                  g_ui_state.validate_output.index_len);
+                  },
+                  {
+                      &C_icon_eye,
+                      g_ui_state.title_and_text.title,
+                      g_ui_state.title_and_text.text,
+                  });
 
 // Step with "Amount" and an output amount
-UX_STEP_NOCB(ux_validate_amount_step,
-             bnnn_paging,
-             {
-                 .title = "Amount",
-                 .text = g_ui_state.validate_output.amount,
-             });
+UX_STEP_NOCB_INIT(ux_validate_amount_step,
+                  bnnn_paging,
+                  {
+                      update_title("Amount", sizeof("Amount"));
+                      update_text(g_ui_state.validate_output.amount,
+                                  g_ui_state.validate_output.amount_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 // Step with "Address" and a paginated address
-UX_STEP_NOCB(ux_validate_address_step,
-             bnnn_paging,
-             {
-                 .title = "Address",
-                 .text = g_ui_state.validate_output.address_or_description,
-             });
+UX_STEP_NOCB_INIT(ux_validate_address_step,
+                  bnnn_paging,
+                  {
+                      update_title("Address", sizeof("Address"));
+                      update_text(g_ui_state.validate_output.address_or_description,
+                                  g_ui_state.validate_output.address_or_description_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
-UX_STEP_NOCB(ux_confirm_transaction_fees_step,
-             bnnn_paging,
-             {
-                 .title = "Fees",
-                 .text = g_ui_state.validate_transaction.fee,
-             });
+UX_STEP_NOCB_INIT(ux_confirm_transaction_fees_step,
+                  bnnn_paging,
+                  {
+                      update_title("Fees", sizeof("Fees"));
+                      update_text(g_ui_state.validate_transaction.fee,
+                                  g_ui_state.validate_transaction.fee_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
+
 UX_STEP_CB(ux_accept_and_send_step,
            pbb,
            set_ux_flow_response(true),
@@ -234,12 +270,16 @@ UX_STEP_NOCB(ux_display_spend_from_registered_wallet_step,
              });
 
 // Step with "Wallet name:", followed by the wallet name
-UX_STEP_NOCB(ux_display_wallet_name_step,
-             bnnn_paging,
-             {
-                 .title = "Wallet name:",
-                 .text = g_ui_state.wallet.wallet_name,
-             });
+UX_STEP_NOCB_INIT(ux_display_wallet_name_step,
+                  bnnn_paging,
+                  {
+                      update_title("Wallet name:", sizeof("Wallet name:"));
+                      update_text(g_ui_state.wallet.wallet_name, g_ui_state.wallet.wallet_name_len);
+                  },
+                  {
+                      .title = g_ui_state.title_and_text.title,
+                      .text = g_ui_state.title_and_text.text,
+                  });
 
 //////////////////////////////////////////////////////////////////////
 UX_STEP_NOCB(ux_sign_message_step,
@@ -479,10 +519,8 @@ void ui_display_nondefault_sighash_flow(void) {
 }
 
 void ui_display_output_address_amount_flow(int index) {
-    snprintf(g_ui_state.validate_output.index,
-             sizeof(g_ui_state.validate_output.index),
-             "output #%d",
-             index);
+    (void) index;
+
     ux_flow_init(0, ux_display_output_address_amount_flow, NULL);
 }
 
