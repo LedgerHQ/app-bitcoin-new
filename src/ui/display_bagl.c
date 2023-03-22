@@ -487,7 +487,40 @@ void ui_sign_message_flow(void) {
 }
 
 void ui_display_register_wallet_flow(void) {
-    ux_flow_init(0, ux_display_register_wallet_flow, NULL);
+    ux_flow_step_t *dynamic_flow[sizeof(ux_display_register_wallet_flow) /
+                                 sizeof(ux_display_register_wallet_flow[0])];
+
+    memcpy(dynamic_flow,
+           ux_display_register_wallet_flow,
+           sizeof(ux_display_register_wallet_flow) * sizeof(ux_display_register_wallet_flow[0]));
+
+    ux_layout_bnnn_paging_params_t new_params = {.title = "LOL", .text = "Yolo"};
+    ux_flow_step_t new_ux_display_wallet_policy_map_step = {
+        ux_display_wallet_policy_map_step_init,
+        &new_params,
+        NULL,
+        NULL,
+    };
+
+    dynamic_flow[1] = &new_ux_display_wallet_policy_map_step;
+
+    ux_flow_init(0, dynamic_flow, NULL);
+
+    // TODO: the remaining code is broken, but this is only to see the result;
+    // we need a bigger refactoring to make sure that we complete the flow before returning.
+
+    // We are not waiting for the client's input, nor we are doing computations on the device
+    io_clear_processing_timeout();
+
+    io_seproxyhal_general_status();
+    do {
+        io_seproxyhal_spi_recv(G_io_seproxyhal_spi_buffer, sizeof(G_io_seproxyhal_spi_buffer), 0);
+        io_seproxyhal_handle_event();
+        io_seproxyhal_general_status();
+    } while (io_seproxyhal_spi_is_status_sent());
+
+    // We're back at work, we want to show the "Processing..." screen when appropriate
+    io_start_processing_timeout();
 }
 
 void ui_display_policy_map_cosigner_pubkey_flow(void) {
