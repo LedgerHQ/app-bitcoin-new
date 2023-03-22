@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <stdbool.h>  // bool
 #include "../boilerplate/dispatcher.h"
 
@@ -15,14 +16,36 @@
 #include "../common/script.h"
 #include "../constants.h"
 
-#define MAX_TITLE_LENGTH 32   // TODO
-#define MAX_TEXT_LENGTH  128  // TODO
+// longest title is currently "Key @999 <theirs>" which is 17 characters
+#define MAX_TITLE_LENGTH 24
 
-// TODO: docs
+// longest text is currently descriptor template length
+#define MAX_TEXT_LENGTH MAX_DESCRIPTOR_TEMPLATE_LENGTH
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+// convenience function to place static asserts inside; it must will never be called
+static void _check_static_asserts_on_text_length() {
+    _Static_assert(MAX_TITLE_LENGTH >= sizeof("Key @999 <theirs>"),
+                   "MAX_TITLE_LENGTH is too small");
+
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_SERIALIZED_BIP32_PATH_LENGTH,
+                   "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_ADDRESS_LENGTH_STR, "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_OPRETURN_OUTPUT_DESC_SIZE,
+                   "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_SERIALIZED_PUBKEY_LENGTH, "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_WALLET_NAME_LENGTH, "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_POLICY_KEY_INFO_LEN, "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_DESCRIPTOR_TEMPLATE_LENGTH,
+                   "MAX_TEXT_LENGTH is too small");
+    _Static_assert(MAX_TEXT_LENGTH >= MAX_AMOUNT_LENGTH, "MAX_TEXT_LENGTH is too small");
+}
+#pragma GCC diagnostic pop
 
 typedef struct {
-    char title[MAX_TITLE_LENGTH];
-    char text[MAX_TEXT_LENGTH];
+    char title[MAX_TITLE_LENGTH + 1];
+    char text[MAX_TEXT_LENGTH + 1];
 } ui_title_and_text_state_t;
 
 // TODO: hard to keep track of what globals are used in the same flows
