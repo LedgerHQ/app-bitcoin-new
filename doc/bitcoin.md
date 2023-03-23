@@ -12,13 +12,14 @@ The messaging format of the app is compatible with the [APDU protocol](https://d
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
-| CLA | INS | COMMAND NAME        | DESCRIPTION |
-|-----|-----|---------------------|-------------|
-|  E1 |  00 | GET_EXTENDED_PUBKEY | Return (and optionally show on screen) extended pubkey |
-|  E1 |  02 | REGISTER_WALLET     | Registers a wallet on the device (with user's approval) |
-|  E1 |  03 | GET_WALLET_ADDRESS  | Return and show on screen an address for a registered or default wallet |
-|  E1 |  04 | SIGN_PSBT           | Signs a PSBT with a registered or default wallet |
-|  E1 |  10 | SIGN_MESSAGE        | Sign a message with a key from a BIP32 path (Bitcoin Message Signing) |
+| CLA | INS | COMMAND NAME           | DESCRIPTION |
+|-----|-----|------------------------|-------------|
+|  E1 |  00 | GET_EXTENDED_PUBKEY    | Return (and optionally show on screen) extended pubkey |
+|  E1 |  02 | REGISTER_WALLET        | Register a wallet policy on the device (with user's approval) |
+|  E1 |  03 | GET_WALLET_ADDRESS     | Return and show on screen an address for a registered or default wallet |
+|  E1 |  04 | SIGN_PSBT              | Sign a PSBT with a registered or default wallet |
+|  E1 |  05 | GET_MASTER_FINGERPRINT | Return the fingerprint of the master public key |
+|  E1 |  10 | SIGN_MESSAGE           | Sign a message with a key from a BIP32 path (Bitcoin Message Signing) |
 
 The `CLA = 0xF8` is used for framework-specific (rather than app-specific) APDUs; at this time, only one command is present.
 
