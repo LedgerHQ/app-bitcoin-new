@@ -1876,6 +1876,24 @@ int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int v
     return parse_script(in_buf, &out_buf, version, 0, 0);
 }
 
+int get_policy_segwit_version(const policy_node_t *policy) {
+    if (policy->type == TOKEN_TR) {
+        return 1;
+    } else if (policy->type == TOKEN_SH) {
+        const policy_node_t *inner =
+            resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script);
+        if (inner->type == TOKEN_WPKH || inner->type == TOKEN_WSH) {
+            return 0;  // wrapped segwit
+        } else {
+            return -1;  // legacy
+        }
+    } else if (policy->type == TOKEN_WPKH || policy->type == TOKEN_WSH) {
+        return 0;  // native segwit
+    } else {
+        return -1;  // legacy
+    }
+}
+
 /**
  * Convenience function that returns a + b, except:
  * - returns -1 if any of a and b is negative

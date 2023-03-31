@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "regexp": "Hold to sign|Confirm wallet name",
+      "actions": [
+        ["finger", 55, 550, true]
+      ]
+    },
+    {
+      "regexp": "Processing",
+      "actions": [
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
+      "text": "Approve",
+      "actions": [
+        [ "button", 1, true ],
+        [ "button", 2, true ],
+        [ "button", 2, false ],
+        [ "button", 1, false ],
+        [ "finger", 55, 550, true]
+      ]
+    },
+    {
+      "regexp": "Continue|Tap to continue|Accept|Warning",
+      "actions": [
+        [ "button", 1, true ],
+        [ "button", 2, true ],
+        [ "button", 2, false ],
+        [ "button", 1, false ],
+        [ "finger", 55, 550, true],
+        [ "finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "Unverified|Update|or third party|[S]?pend from|Wallet name|Review|Amount|Address|Confirm|Fees",
+      "actions": [
+        ["button", 2, true],
+        ["button", 2, false]
+      ]
+    }
+  ]
+}

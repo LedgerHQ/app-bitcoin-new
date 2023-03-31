@@ -396,18 +396,72 @@ def test_sign_psbt_multisig_wsh(client: Client):
     )]
 
 
-# def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
-#     # legacy address
-#     # PSBT for a legacy 1-input 1-output spend
-#     # The spend is valid, but the non-witness utxo is wrong; therefore, it should fail the hash test
-#     # TODO: this fails PSBT decoding; need to make a version we can control for this test.
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_multisig_sh_wsh(client: Client):
+    # wrapped segwit multisig ("sh(wsh(sortedmulti(...)))")
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.SH_WIT,
+        threshold=2,
+        keys_info=[
+            "[e24243b4/48'/1'/0'/1']tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        ],
+        sorted=True
+    )
 
-#     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUySC0BAAA="
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
+    wallet_hmac = bytes.fromhex(
+        "677ec94c2e1a7446c6cac9db2adde8667b9a746dd63fa1e1863553cdb814a54a"
+    )
 
-#     with pytest.raises(IncorrectDataError):
-#         client.sign_psbt(psbt)
+    psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEAigIAAAABAaNw+E0toKUlohxkK0YmapPS7uToo7RG7DA2YLrmoD8BAAAAFxYAFAppBymwQTPq8lpFfFWMuPRNdbTX/v///wI7rUIBAAAAABepFJMyNbbbdF4o3zxQhWSJ5ZXY5naHh60dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHbvokAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex("03e5399097ec930c32353104b30db7347e81c54a65a2f8278b1ffd545ba34dcd7c"),
+            signature=bytes.fromhex(
+                "30440220689c3ee23b8f52c21abe47ea6f37cf8bc72653cab9cd32658199b1a16db193d802200db5d2157044913d5a60f69e9ce10ab9a9d883d421d3fb0400d948b31c3b7ee201"
+            )
+        )
+    )]
+
+
+@has_automation("automations/sign_with_wallet_missing_nonwitnessutxo_accept.json")
+def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(client: Client):
+    # A transaction spending a wrapped segwit address has a script that appears like a legacy UTXO, but uses
+    # the segwit sighash algorithm.
+    # Therefore, if the non-witness-utxo is missing, we should still sign it while giving the warning for unverified inputs,
+    # for consistency with other segwit input types.
+
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.SH_WIT,
+        threshold=2,
+        keys_info=[
+            "[e24243b4/48'/1'/0'/1']tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        ],
+        sorted=True
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "677ec94c2e1a7446c6cac9db2adde8667b9a746dd63fa1e1863553cdb814a54a"
+    )
+
+    psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex("03e5399097ec930c32353104b30db7347e81c54a65a2f8278b1ffd545ba34dcd7c"),
+            signature=bytes.fromhex(
+                "30440220689c3ee23b8f52c21abe47ea6f37cf8bc72653cab9cd32658199b1a16db193d802200db5d2157044913d5a60f69e9ce10ab9a9d883d421d3fb0400d948b31c3b7ee201"
+            )
+        )
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
