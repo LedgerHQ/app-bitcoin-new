@@ -2,19 +2,33 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Unverified|Update|or third party|Review|Amount|Address|Confirm|Fees",
+      "regexp": "Hold to sign",
       "actions": [
-        ["button", 2, true],
-        ["button", 2, false]
+        ["finger", 55, 550, true]
       ]
     },
     {
-      "regexp": "Continue|Approve|Accept",
+      "regexp": "Processing",
+      "actions": [
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "Continue|Tap to continue|Approve|Accept|Warning",
       "actions": [
         [ "button", 1, true ],
         [ "button", 2, true ],
         [ "button", 2, false ],
-        [ "button", 1, false ]
+        [ "button", 1, false ],
+        [ "finger", 55, 550, true],
+        [ "finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "Unverified|Update|or third party|Review|Amount|Address|Confirm|Fees",
+      "actions": [
+        ["button", 2, true],
+        ["button", 2, false]
       ]
     }
   ]

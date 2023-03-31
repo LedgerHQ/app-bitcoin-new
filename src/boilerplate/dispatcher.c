@@ -174,6 +174,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     bool is_ux_dirty = G_dispatcher_state.had_ux_flow || G_was_processing_screen_shown;
     if (G_dispatcher_state.termination_cb != NULL && is_ux_dirty) {
         G_dispatcher_state.termination_cb();
+        G_was_processing_screen_shown = 0;
     }
 
     io_clear_processing_timeout();

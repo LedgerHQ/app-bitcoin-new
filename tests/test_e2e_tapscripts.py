@@ -256,7 +256,8 @@ def test_e2e_tapscript_depth4(rpc, rpc_test_wallet, client: Client, speculos_glo
     run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
-def test_e2e_tapscript_large(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model):
+def test_e2e_tapscript_large(rpc, rpc_test_wallet, client: Client, speculos_globals:
+                             SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model: str):
     # A quite large tapscript with 8 tapleaves and 22 keys in total.
 
     # Takes more memory than Nano S can handle

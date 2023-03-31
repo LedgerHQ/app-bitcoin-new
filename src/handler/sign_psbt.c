@@ -156,8 +156,9 @@ typedef struct {
     // if any of the internal inputs has non-default sighash, we show a warning
     bool show_nondefault_sighash_warning;
 
-    int external_outputs_count;  // count of external outputs that are shown to the user
-    int change_count;            // count of outputs compatible with change outputs
+    int external_outputs_count;        // count of external outputs that are shown to the user
+    int change_count;                  // count of outputs compatible with change outputs
+    int external_outputs_total_count;  // Total count of external outputs in the transaction
 } sign_psbt_state_t;
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
@@ -715,11 +716,15 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
     if (!st->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
+        ui_post_processing_confirm_wallet_spend(dc, false);
         return false;
     }
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
+    if (!st->is_wallet_canonical) {
+        ui_post_processing_confirm_wallet_spend(dc, true);
+    }
     return true;
 }
 
@@ -1200,11 +1205,103 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
         // Show address to the user
         if (!ui_validate_output(dc,
                                 st->external_outputs_count,
+                                st->external_outputs_total_count,
                                 output_address,
                                 COIN_COINID_SHORT,
                                 output->value)) {
             SEND_SW(dc, SW_DENY);
             return false;
+        }
+    }
+    return true;
+}
+
+static bool read_outputs(dispatcher_context_t *dc,
+                         sign_psbt_state_t *st,
+                         placeholder_info_t *placeholder_info,
+                         bool dry_run) {
+    for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
+        output_info_t output;
+        memset(&output, 0, sizeof(output));
+
+        output_keys_callback_data_t callback_data = {.output = &output,
+                                                     .placeholder_info = placeholder_info};
+        int res = call_get_merkleized_map_with_callback(
+            dc,
+            (void *) &callback_data,
+            st->outputs_root,
+            st->n_outputs,
+            cur_output_index,
+            (merkle_tree_elements_callback_t) output_keys_callback,
+            &output.in_out.map);
+
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        if (output.in_out.unexpected_pubkey_error) {
+            PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        if (!dry_run) {
+            // Read output amount
+            uint8_t raw_result[8];
+
+            // Read the output's amount
+            int result_len = call_get_merkleized_map_value(dc,
+                                                           &output.in_out.map,
+                                                           (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                           1,
+                                                           raw_result,
+                                                           sizeof(raw_result));
+            if (result_len != 8) {
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            }
+            uint64_t value = read_u64_le(raw_result, 0);
+
+            output.value = value;
+            st->outputs_total_value += value;
+        }
+
+        // Read the output's scriptPubKey
+        int result_len = call_get_merkleized_map_value(dc,
+                                                       &output.in_out.map,
+                                                       (uint8_t[]){PSBT_OUT_SCRIPT},
+                                                       1,
+                                                       output.in_out.scriptPubKey,
+                                                       sizeof(output.in_out.scriptPubKey));
+
+        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        output.in_out.scriptPubKey_len = result_len;
+
+        int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
+
+        if (is_internal < 0) {
+            PRINTF("Error checking if output %d is internal\n", cur_output_index);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        } else if (is_internal == 0) {
+            if (dry_run) {
+                ++st->external_outputs_total_count;
+            } else {
+                // external output, user needs to validate
+                ++st->external_outputs_count;
+            }
+
+            if (!dry_run && !display_output(dc, st, cur_output_index, &output)) return false;
+        } else if (!dry_run) {
+            // valid change address, nothing to show to the user
+
+            st->change_outputs_total_value += output.value;
+            ++st->change_count;
         }
     }
     return true;
@@ -1225,85 +1322,18 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
-    for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
-        output_info_t output;
-        memset(&output, 0, sizeof(output));
+    // Dry run to get the total amount of external outputs
+    st->external_outputs_total_count = 0;
+    if (!read_outputs(dc, st, &placeholder_info, true)) return false;
 
-        output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .placeholder_info = &placeholder_info};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->outputs_root,
-            st->n_outputs,
-            cur_output_index,
-            (merkle_tree_elements_callback_t) output_keys_callback,
-            &output.in_out.map);
-        if (res < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        if (output.in_out.unexpected_pubkey_error) {
-            PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        // read output amount and scriptpubkey
-
-        uint8_t raw_result[8];
-
-        // Read the output's amount
-        int result_len = call_get_merkleized_map_value(dc,
-                                                       &output.in_out.map,
-                                                       (uint8_t[]){PSBT_OUT_AMOUNT},
-                                                       1,
-                                                       raw_result,
-                                                       sizeof(raw_result));
-        if (result_len != 8) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-        uint64_t value = read_u64_le(raw_result, 0);
-
-        output.value = value;
-        st->outputs_total_value += value;
-
-        // Read the output's scriptPubKey
-        result_len = call_get_merkleized_map_value(dc,
-                                                   &output.in_out.map,
-                                                   (uint8_t[]){PSBT_OUT_SCRIPT},
-                                                   1,
-                                                   output.in_out.scriptPubKey,
-                                                   sizeof(output.in_out.scriptPubKey));
-
-        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        output.in_out.scriptPubKey_len = result_len;
-
-        int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
-
-        if (is_internal < 0) {
-            PRINTF("Error checking if output %d is internal\n", cur_output_index);
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        } else if (is_internal == 0) {
-            // external output, user needs to validate
-            ++st->external_outputs_count;
-
-            if (!display_output(dc, st, cur_output_index, &output)) return false;
-
-        } else {
-            // valid change address, nothing to show to the user
-
-            st->change_outputs_total_value += output.value;
-            ++st->change_count;
-        }
+#ifdef HAVE_NBGL
+    if (!ui_transaction_prompt(dc, st->external_outputs_total_count)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
     }
+#endif
+
+    if (!read_outputs(dc, st, &placeholder_info, false)) return false;
 
     return true;
 }
@@ -1354,6 +1384,7 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // Show final user validation UI
         if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
             SEND_SW(dc, SW_DENY);
+            ui_post_processing_confirm_transaction(dc, false);
             return false;
         };
     }
@@ -2308,6 +2339,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                             policy->tree,
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
+                    SEND_SW(dc, SW_BAD_STATE);
                     return false;
                 }
             }
@@ -2408,6 +2440,7 @@ sign_transaction(dispatcher_context_t *dc,
 
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            ui_post_processing_confirm_transaction(dc, false);
             return false;
         }
 
@@ -2441,6 +2474,7 @@ sign_transaction(dispatcher_context_t *dc,
                         &input.in_out.map);
                     if (res < 0) {
                         SEND_SW(dc, SW_INCORRECT_DATA);
+                        ui_post_processing_confirm_transaction(dc, false);
                         return false;
                     }
 
@@ -2451,14 +2485,18 @@ sign_transaction(dispatcher_context_t *dc,
                                                                               &placeholder_info))
                         return false;
 
-                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i))
+                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
+                        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+                        ui_post_processing_confirm_transaction(dc, false);
                         return false;
+                    }
                 }
         }
 
         ++placeholder_index;
     }
 
+    ui_post_processing_confirm_transaction(dc, true);
     return true;
 }
 
