@@ -6,6 +6,11 @@
 #define CLA_APP 0xE1
 
 /**
+ * Encodes the protocol version, which is passed in the p2 field of APDUs.
+ */
+#define CURRENT_PROTOCOL_VERSION 1
+
+/**
  * Maximum length of a serialized address (in characters).
  * Segwit addresses can reach 74 characters; 76 on regtest because of the longer "bcrt" prefix.
  */

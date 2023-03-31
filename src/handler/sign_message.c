@@ -34,8 +34,8 @@ static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
 
-void handler_sign_message(dispatcher_context_t *dc, uint8_t p2) {
-    (void) p2;
+void handler_sign_message(dispatcher_context_t *dc, uint8_t protocol_version) {
+    (void) protocol_version;
 
     uint8_t bip32_path_len;
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];

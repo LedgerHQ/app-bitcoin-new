@@ -42,8 +42,8 @@
 #include "handlers.h"
 #include "client_commands.h"
 
-void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t p2) {
-    (void) p2;
+void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_version) {
+    (void) protocol_version;
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 

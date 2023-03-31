@@ -139,7 +139,7 @@ typedef struct {
 
     bool is_wallet_canonical;
 
-    uint8_t p2;
+    uint8_t protocol_version;
 
     union {
         uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
@@ -1845,7 +1845,7 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     uint8_t augm_pubkey_len = pubkey_len + (tapleaf_hash != NULL ? 32 : 0);
 
     // the pubkey is not output in version 0 of the protocol
-    if (st->p2 >= 1) {
+    if (st->protocol_version >= 1) {
         dc->add_to_response(&augm_pubkey_len, 1);
         dc->add_to_response(pubkey, pubkey_len);
 
@@ -2474,7 +2474,7 @@ sign_transaction(dispatcher_context_t *dc,
     return true;
 }
 
-void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
+void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     sign_psbt_state_t st;
@@ -2486,7 +2486,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t p2) {
         return;
     }
 
-    st.p2 = p2;
+    st.protocol_version = protocol_version;
 
     // read APDU inputs, intialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
