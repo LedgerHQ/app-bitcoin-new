@@ -24,8 +24,8 @@
 
 #include "handlers.h"
 
-void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t p2) {
-    (void) p2;
+void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t protocol_version) {
+    (void) protocol_version;
 
     // Device must be unlocked
     if (os_global_pin_is_validated() != BOLOS_UX_OK) {
