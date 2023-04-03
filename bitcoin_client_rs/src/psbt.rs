@@ -5,8 +5,16 @@
 /// rust-bitcoin currently support V0.
 use bitcoin::{
     blockdata::transaction::{TxIn, TxOut},
-    consensus::encode::{deserialize, serialize, VarInt},
-    util::psbt::{raw, Input, Output, Psbt},
+    consensus::encode::{deserialize, serialize, Error, VarInt},
+    secp256k1,
+    util::{
+        ecdsa::{EcdsaSig, EcdsaSigError},
+        key::Error as KeyError,
+        psbt::{raw, serialize::Deserialize, Input, Output, Psbt},
+        schnorr::{SchnorrSig, SchnorrSigError},
+        taproot::TapLeafHash,
+    },
+    PublicKey, XOnlyPublicKey,
 };
 
 #[rustfmt::skip]
@@ -376,4 +384,62 @@ pub fn get_v2_output_pairs(output: &Output, txout: &TxOut) -> Vec<raw::Pair> {
 
 pub fn deserialize_pairs(pair: raw::Pair) -> (Vec<u8>, Vec<u8>) {
     (deserialize(&serialize(&pair.key)).unwrap(), pair.value)
+}
+
+pub enum PartialSignature {
+    /// signature stored in pbst.partial_sigs
+    Sig(PublicKey, EcdsaSig),
+    /// signature stored in pbst.tap_script_sigs
+    TapScriptSig(XOnlyPublicKey, Option<TapLeafHash>, SchnorrSig),
+}
+
+impl PartialSignature {
+    pub fn from_slice(slice: &[u8]) -> Result<Self, PartialSignatureError> {
+        let key_augment_byte = slice
+            .get(0)
+            .ok_or(PartialSignatureError::BadKeyAugmentLength)?;
+        let key_augment_len = u8::from_le_bytes([*key_augment_byte]) as usize;
+
+        if key_augment_len >= slice.len() {
+            Err(PartialSignatureError::BadKeyAugmentLength)
+        } else if key_augment_len == 64 {
+            let key = XOnlyPublicKey::from_slice(&slice[1..33])
+                .map_err(PartialSignatureError::XOnlyPubKey)?;
+            let tap_leaf_hash =
+                TapLeafHash::deserialize(&slice[33..65]).map_err(PartialSignatureError::TapLeaf)?;
+            let sig = SchnorrSig::from_slice(&slice[65..])?;
+            Ok(Self::TapScriptSig(key, Some(tap_leaf_hash), sig))
+        } else if key_augment_len == 32 {
+            let key = XOnlyPublicKey::from_slice(&slice[1..33])
+                .map_err(PartialSignatureError::XOnlyPubKey)?;
+            let sig = SchnorrSig::from_slice(&slice[65..])?;
+            Ok(Self::TapScriptSig(key, None, sig))
+        } else {
+            let key = PublicKey::from_slice(&slice[1..key_augment_len + 1])
+                .map_err(PartialSignatureError::PubKey)?;
+            let sig = EcdsaSig::from_slice(&slice[key_augment_len + 1..])?;
+            Ok(Self::Sig(key, sig))
+        }
+    }
+}
+
+pub enum PartialSignatureError {
+    BadKeyAugmentLength,
+    XOnlyPubKey(secp256k1::Error),
+    PubKey(KeyError),
+    EcdsaSig(EcdsaSigError),
+    SchnorrSig(SchnorrSigError),
+    TapLeaf(Error),
+}
+
+impl From<SchnorrSigError> for PartialSignatureError {
+    fn from(e: SchnorrSigError) -> PartialSignatureError {
+        PartialSignatureError::SchnorrSig(e)
+    }
+}
+
+impl From<EcdsaSigError> for PartialSignatureError {
+    fn from(e: EcdsaSigError) -> PartialSignatureError {
+        PartialSignatureError::EcdsaSig(e)
+    }
 }

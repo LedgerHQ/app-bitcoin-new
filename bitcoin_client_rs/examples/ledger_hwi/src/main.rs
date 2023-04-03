@@ -14,6 +14,7 @@ use regex::Regex;
 
 use ledger_bitcoin_client::{
     async_client::{BitcoinClient, Transport},
+    psbt::PartialSignature,
     wallet::{Version, WalletPolicy, WalletPubKey},
 };
 
@@ -178,8 +179,23 @@ async fn sign<T: Transport>(
         .await
         .map_err(|e| format!("{:#?}", e))?;
 
-    for (index, key, sig) in res {
-        println!("index: {}, key: {}, sig: {}", index, key, sig);
+    for (index, sig) in res {
+        match sig {
+            PartialSignature::Sig(key, sig) => {
+                println!("index: {}, key: {}, sig: {}", index, key, sig);
+            }
+            PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
+                println!(
+                    "index: {}, key: {}, tapleaf_hash: {}, sig: {}",
+                    index,
+                    key,
+                    tapleaf_hash
+                        .map(|h| h.to_hex())
+                        .unwrap_or("none".to_string()),
+                    sig.to_vec().to_hex()
+                );
+            }
+        }
     }
     Ok(())
 }
