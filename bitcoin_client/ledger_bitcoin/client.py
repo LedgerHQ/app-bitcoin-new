@@ -3,14 +3,13 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
-from bitcoin_client.ledger_bitcoin.errors import UnknownDeviceError
-
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
 from .client_command import ClientCommandInterpreter
 from .client_base import Client, TransportClient, PartialSignature
 from .client_legacy import LegacyClient
 from .exception import DeviceException
+from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
