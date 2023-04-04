@@ -93,6 +93,10 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
         return;
     }
+    if (address_index >= BIP32_FIRST_HARDENED_CHILD) {
+        SEND_SW(dc, SW_INCORRECT_DATA);  // it must be unhardened
+        return;
+    }
 
     {
         uint8_t serialized_wallet_policy[MAX_WALLET_POLICY_SERIALIZED_LENGTH];
