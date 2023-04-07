@@ -237,6 +237,7 @@ static const generic_processor_command_t commands_or_i[] = {{CMD_CODE_OP, OP_IF}
 
 static const generic_processor_command_t commands_a[] = {{CMD_CODE_OP, OP_TOALTSTACK},
                                                          {CMD_CODE_PROCESS_CHILD, 0},
+                                                         {CMD_CODE_OP, OP_FROMALTSTACK},
                                                          {CMD_CODE_END, 0}};
 
 static const generic_processor_command_t commands_s[] = {{CMD_CODE_OP, OP_SWAP},
