@@ -18,7 +18,7 @@ use crate::{
     error::BitcoinClientError,
     interpreter::{get_merkleized_map_commitment, ClientCommandInterpreter},
     psbt::*,
-    wallet::WalletPolicy,
+    wallet::{contains_a, WalletPolicy},
 };
 
 /// BitcoinClient calls and interprets commands with the Ledger Device.
@@ -61,6 +61,18 @@ impl<T: Transport> BitcoinClient<T> {
         } else {
             Ok(data)
         }
+    }
+
+    fn validate_policy(&self, wallet: &WalletPolicy) -> Result<(), BitcoinClientError<T::Error>> {
+        if contains_a(&wallet.descriptor_template) {
+            let (_, version, _) = self.get_version()?;
+            if version == "2.1.0" || version == "2.1.1" {
+                // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
+                // the `a:` fragment.
+                return Err(BitcoinClientError::UnsupportedAppVersion);
+            }
+        }
+        Ok(())
     }
 
     /// Returns the currently running app's name, version and state flags
@@ -129,6 +141,8 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
         wallet: &WalletPolicy,
     ) -> Result<([u8; 32], [u8; 32]), BitcoinClientError<T::Error>> {
+        self.validate_policy(&wallet)?;
+
         let cmd = command::register_wallet(wallet);
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
@@ -162,6 +176,8 @@ impl<T: Transport> BitcoinClient<T> {
         address_index: u32,
         display: bool,
     ) -> Result<bitcoin::Address, BitcoinClientError<T::Error>> {
+        self.validate_policy(&wallet)?;
+
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
@@ -188,6 +204,8 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
     ) -> Result<Vec<(usize, PublicKey, EcdsaSig)>, BitcoinClientError<T::Error>> {
+        self.validate_policy(&wallet)?;
+
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
