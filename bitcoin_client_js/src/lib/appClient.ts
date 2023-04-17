@@ -63,6 +63,14 @@ function makePartialSignature(pubkeyAugm: Buffer, signature: Buffer): PartialSig
 }
 
 /**
+ * Checks whether a descriptor template contains an `a:` fragment.
+ */
+function containsA(descriptorTemplate: string): boolean {
+  const matches = descriptorTemplate.match(/[asctdvjnlu]+:/g) || [];
+  return matches.some(match => match.includes('a'));
+}
+
+/**
  * This class encapsulates the APDU protocol documented at
  * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/bitcoin.md
  */
@@ -107,6 +115,34 @@ export class AppClient {
   }
 
   /**
+   * Returns an object containing the currently running app's name, version and the device status flags.
+   *
+   * @returns an object with app name, version and device status flags.
+   */
+  public async getAppAndVersion(): Promise<{
+    name: string;
+    version: string;
+    flags: number | Buffer;
+  }> {
+    const r = await this.transport.send(0xb0, 0x01, 0x00, 0x00);
+    let i = 0;
+    const format = r[i++];
+    if (format !== 1) throw new Error("Unexpected response")
+
+    const nameLength = r[i++];
+    const name = r.slice(i, (i += nameLength)).toString("ascii");
+    const versionLength = r[i++];
+    const version = r.slice(i, (i += versionLength)).toString("ascii");
+    const flagLength = r[i++];
+    const flags = r.slice(i, (i += flagLength));
+    return {
+      name,
+      version,
+      flags,
+    };
+  };
+
+  /**
    * Requests the BIP-32 extended pubkey to the hardware wallet.
    * If `display` is `false`, only standard paths will be accepted; an error is returned if an unusual path is
    * requested.
@@ -147,6 +183,8 @@ export class AppClient {
   async registerWallet(
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
+
+    await this.validatePolicy(walletPolicy);
 
     const clientInterpreter = new ClientCommandInterpreter();
 
@@ -198,6 +236,8 @@ export class AppClient {
       throw new Error('Invalid HMAC length');
     }
 
+    await this.validatePolicy(walletPolicy);
+
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -239,6 +279,8 @@ export class AppClient {
     walletHMAC: Buffer | null,
     progressCallback?: () => void
   ): Promise<[number, PartialSignature][]> {
+    await this.validatePolicy(walletPolicy);
+
     if (typeof psbt === 'string') {
       psbt = Buffer.from(psbt, "base64");
     }
@@ -358,6 +400,18 @@ export class AppClient {
     );
 
     return result.toString('base64');
+  }
+
+  /* Performs any additional checks on the policy before using it.*/
+  private async validatePolicy(walletPolicy: WalletPolicy) {
+    if (containsA(walletPolicy.descriptorTemplate)) {
+      const appAndVer = await this.getAppAndVersion();
+      if (["2.1.0", "2.1.1"].includes(appAndVer.version)) {
+        // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
+        // the `a:` fragment.
+        throw new Error("Please update your Ledger Bitcoin app.")
+      }
+    }
   }
 }
 
