@@ -2,6 +2,7 @@ from packaging.version import parse as parse_version
 from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
+import re
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
@@ -51,6 +52,11 @@ def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSign
         return PartialSignature(signature=signature, pubkey=pubkey_augm)
 
 
+def _contains_a_fragment(desc_tmp: str) -> bool:
+    """Returns true if the given descriptor template contains the `a:` fragment."""
+    return any('a' in match for match in re.findall(r'[asctdvjnlu]+:', desc_tmp))
+
+
 class NewClient(Client):
     # internal use for testing: if set to True, sign_psbt will not clone the psbt before converting to psbt version 2
     _no_clone_psbt: bool = False
@@ -87,6 +93,8 @@ class NewClient(Client):
     def register_wallet(self, wallet: WalletPolicy) -> Tuple[bytes, bytes]:
         if wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
             raise ValueError("invalid wallet policy version")
+
+        self._validate_policy(wallet)
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_preimage(wallet.serialize())
@@ -125,6 +133,8 @@ class NewClient(Client):
         if change != 0 and change != 1:
             raise ValueError("Invalid change")
 
+        self._validate_policy(wallet)
+
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
         client_intepreter.add_known_preimage(wallet.serialize())
@@ -145,6 +155,9 @@ class NewClient(Client):
         return response.decode()
 
     def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
+
+        self._validate_policy(wallet)
+
         psbt = normalize_psbt(psbt)
 
         if psbt.version != 2:
@@ -251,6 +264,15 @@ class NewClient(Client):
             raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_MESSAGE)
 
         return base64.b64encode(response).decode('utf-8')
+
+    def _validate_policy(self, wallet_policy: WalletPolicy):
+        """Performs any additional checks before we use a wallet policy"""
+        if _contains_a_fragment(wallet_policy.descriptor_template):
+            _, app_version, _ = self.get_version()
+            if app_version in ["2.1.0", "2.1.1"]:
+                # Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
+                # the `a:` fragment.
+                raise RuntimeError("Please update your Ledger Bitcoin app.")
 
 
 def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:

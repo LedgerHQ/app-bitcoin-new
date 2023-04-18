@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.2.1] - 18-04-2023
+
+### Changed
+- Avoid using miniscript policies containing an `a:` fragment on versions below `2.1.2` of the bitcoin app.
+
+## [0.2.0] - 3-04-2023
+
+This release introduces a breaking change in the return type of the `sign_psbt`method.
+
+### Added
+- Added new `PartialSignature` data class together with support for taproot script signing, which is supported in version `2.1.2` of the bitcoin app.
+
 ## [0.1.2] - 09-01-2023
 
 ### Fixed

@@ -252,6 +252,25 @@ impl core::fmt::Display for WalletPubKey {
     }
 }
 
+/// Returns true iff `descriptor_template` contains a `a:` fragment
+pub fn contains_a(descriptor_template: &str) -> bool {
+    let allowed_chars = ['a', 's', 'c', 't', 'd', 'v', 'j', 'n', 'l', 'u']; // miniscript wrappers
+    let mut sequence = String::new();
+
+    for (i, ch) in descriptor_template.chars().enumerate() {
+        if allowed_chars.contains(&ch) {
+            sequence.push(ch);
+        } else {
+            if ch == ':' && sequence.contains('a') {
+                return true;
+            }
+            sequence.clear();
+        }
+    }
+
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,5 +325,16 @@ mod tests {
             ],
         );
         assert_eq!(wallet.serialize().as_slice().to_hex(), "020c436f6c642073746f726167651fb56c3d5542fa09b3956834a9ff6a1df5c36a38e5b02c63c54b41a9a04403b82602516d2c50a89476ecffeec658057f0110674bbfafc18797dc480c7ed53802f3fb");
+    }
+
+    #[test]
+    fn test_contains_a() {
+        assert_eq!(contains_a("wsh(pkh(@0))"), false);
+        assert_eq!(
+            contains_a("wsh(c:andor(pk(@0/**),pk_k(@1/**),and_v(v:pk(@2/**),pk_k(@3/**))))"),
+            false
+        );
+        assert_eq!(contains_a("wsh(a:pkh(@0))"), true);
+        assert_eq!(contains_a("wsh(or_i(and_v(v:pkh(@0/**),older(65535)),or_d(multi(2,@1/**,@3/**),and_v(v:thresh(1,pkh(@4/**),a:pkh(@5/**)),older(64231)))))"), true);
     }
 }

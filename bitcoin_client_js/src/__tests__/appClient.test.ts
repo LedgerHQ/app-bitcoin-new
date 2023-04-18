@@ -128,6 +128,11 @@ describe("test AppClient", () => {
     await killProcess(sp);
   });
 
+  it("can retrieve the app's version", async () => {
+    const result = await app.getAppAndVersion();
+    expect(result.name).toEqual("Bitcoin Test");
+    expect(result.version.split(".")[0]).toEqual("2")
+  });
 
   it("can retrieve the master fingerprint", async () => {
     const result = await app.getMasterFingerprint();
