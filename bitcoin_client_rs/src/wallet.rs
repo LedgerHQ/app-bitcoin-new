@@ -252,13 +252,13 @@ impl core::fmt::Display for WalletPubKey {
     }
 }
 
-/// Returns true iff `descriptor_template` contains a `a:` fragment
+/// Returns true if `descriptor_template` contains an 'a:' fragment
 pub fn contains_a(descriptor_template: &str) -> bool {
-    let allowed_chars = ['a', 's', 'c', 't', 'd', 'v', 'j', 'n', 'l', 'u']; // miniscript wrappers
+    const MINISCRIPT_WRAPPERS: &[char] = &['a', 's', 'c', 't', 'd', 'v', 'j', 'n', 'l', 'u'];
     let mut sequence = String::new();
 
-    for (i, ch) in descriptor_template.chars().enumerate() {
-        if allowed_chars.contains(&ch) {
+    for ch in descriptor_template.chars() {
+        if MINISCRIPT_WRAPPERS.contains(&ch) {
             sequence.push(ch);
         } else {
             if ch == ':' && sequence.contains('a') {
