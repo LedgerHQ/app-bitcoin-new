@@ -168,6 +168,7 @@ def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wal
              rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
+@pytest.mark.timeout(0)  # disable timeout
 def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], enable_slow_tests: bool):
     # Largest supported multisig with sortedmulti.
     # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
