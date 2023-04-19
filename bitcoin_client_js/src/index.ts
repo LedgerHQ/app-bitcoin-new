@@ -1,4 +1,4 @@
-import AppClient from './lib/appClient';
+import AppClient, { PartialSignature } from './lib/appClient';
 import {
   DefaultDescriptorTemplate,
   DefaultWalletPolicy,
@@ -11,6 +11,7 @@ export {
   PsbtV2,
   DefaultDescriptorTemplate,
   DefaultWalletPolicy,
+  PartialSignature,
   WalletPolicy
 };
 
