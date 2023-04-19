@@ -6,11 +6,17 @@ TypeScript client for Ledger Bitcoin application. Supports versions 2.1.0 and ab
 
 Main repository and documentation: https://github.com/LedgerHQ/app-bitcoin-new
 
-<!--
 ## Install
 
-TODO: fill this once the module is published
--->
+```bash
+$ yarn add ledger-bitcoin
+```
+
+Or if you prefer using npm:
+
+```bash
+$ npm install ledger-bitcoin
+```
 
 ## Building
 
