@@ -75,6 +75,8 @@ static const uint8_t secp256k1_sqr_exponent[] = {
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
 static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
+static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
+static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
 static int secp256k1_point(const uint8_t scalar[static 32], uint8_t out[static 65]);
 
@@ -88,7 +90,7 @@ static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
 }
 
 int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t chain_code[static 32],
+                              uint8_t *chain_code,
                               const uint32_t *bip32_path,
                               uint8_t bip32_path_len) {
     uint8_t raw_private_key[32] = {0};
@@ -425,21 +427,20 @@ int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, siz
 }
 
 int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
-                                           size_t bip32_path_len,
+                                           uint8_t bip32_path_len,
                                            const uint8_t hash[static 32],
                                            uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
                                            uint32_t *info) {
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
-    uint8_t chain_code[32] = {0};
     uint32_t info_internal = 0;
 
     int sig_len = 0;
     bool error = false;
     BEGIN_TRY {
         TRY {
-            crypto_derive_private_key(&private_key, chain_code, bip32_path, bip32_path_len);
+            crypto_derive_private_key(&private_key, NULL, bip32_path, bip32_path_len);
             sig_len = cx_ecdsa_sign(&private_key,
                                     CX_RND_RFC6979,
                                     CX_SHA256,
@@ -493,18 +494,8 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
     crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
 }
 
-static void crypto_tr_tagged_hash(const uint8_t *tag,
-                                  uint16_t tag_len,
-                                  const uint8_t *data,
-                                  uint16_t data_len,
-                                  uint8_t out[static 32]) {
-    cx_sha256_t hash_context;
-    cx_sha256_init(&hash_context);
-
-    crypto_tr_tagged_hash_init(&hash_context, tag, tag_len);
-
-    crypto_hash_update(&hash_context.header, data, data_len);
-    crypto_hash_digest(&hash_context.header, out, 32);
+void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
+    crypto_tr_tagged_hash_init(hash_context, BIP0341_tapleaf_tag, sizeof(BIP0341_tapleaf_tag));
 }
 
 static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
@@ -541,12 +532,63 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
     return 0;
 }
 
-// Like taproot_tweak_pubkey of BIP0341, with empty string h
-// TODO: should it recycle pubkey also for the output (like crypto_tr_tweak_seckey below)?
-int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t out[static 32]) {
+// Computes a tagged hash according to BIP-340.
+// If data2_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
+// Somewhat weird signature, but this helps to optimize stack usage.
+static void __attribute__((noinline)) crypto_tr_tagged_hash(const uint8_t *tag,
+                                                            uint16_t tag_len,
+                                                            const uint8_t *data,
+                                                            uint16_t data_len,
+                                                            const uint8_t *data2,
+                                                            uint16_t data2_len,
+                                                            uint8_t out[static 32]) {
+    cx_sha256_t hash_context;
+    cx_sha256_init(&hash_context);
+
+    crypto_tr_tagged_hash_init(&hash_context, tag, tag_len);
+
+    crypto_hash_update(&hash_context.header, data, data_len);
+    if (data2_len > 0) crypto_hash_update(&hash_context.header, data2, data2_len);
+    crypto_hash_digest(&hash_context.header, out, 32);
+}
+
+void crypto_tr_combine_taptree_hashes(const uint8_t left_h[static 32],
+                                      const uint8_t right_h[static 32],
+                                      uint8_t out[static 32]) {
+    if (memcmp(left_h, right_h, 32) < 0) {
+        crypto_tr_tagged_hash(BIP0341_tapbranch_tag,
+                              sizeof(BIP0341_tapbranch_tag),
+                              left_h,
+                              32,
+                              right_h,
+                              32,
+                              out);
+    } else {
+        crypto_tr_tagged_hash(BIP0341_tapbranch_tag,
+                              sizeof(BIP0341_tapbranch_tag),
+                              right_h,
+                              32,
+                              left_h,
+                              32,
+                              out);
+    }
+}
+
+// Like taproot_tweak_pubkey of BIP0341
+int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
+                           const uint8_t *h,
+                           size_t h_len,
+                           uint8_t *y_parity,
+                           uint8_t out[static 32]) {
     uint8_t t[32];
 
-    crypto_tr_tagged_hash(BIP0341_taptweak_tag, sizeof(BIP0341_taptweak_tag), pubkey, 32, t);
+    crypto_tr_tagged_hash(BIP0341_taptweak_tag,
+                          sizeof(BIP0341_taptweak_tag),
+                          pubkey,
+                          32,
+                          h,
+                          h_len,
+                          t);
 
     // fail if t is not smaller than the curve order
     if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
@@ -574,8 +616,11 @@ int crypto_tr_tweak_pubkey(uint8_t pubkey[static 32], uint8_t *y_parity, uint8_t
     return 0;
 }
 
-// Like taproot_tweak_seckey of BIP0341, with empty string h
-int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
+// Like taproot_tweak_seckey of BIP0341
+int crypto_tr_tweak_seckey(const uint8_t seckey[static 32],
+                           const uint8_t *h,
+                           size_t h_len,
+                           uint8_t out[static 32]) {
     uint8_t P[65];
 
     int ret = 0;
@@ -583,9 +628,11 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
         TRY {
             secp256k1_point(seckey, P);
 
+            memmove(out, seckey, 32);
+
             if (P[64] & 1) {
                 // odd y, negate the secret key
-                cx_math_sub(seckey, secp256k1_n, seckey, 32);
+                cx_math_sub(out, secp256k1_n, out, 32);
             }
 
             uint8_t t[32];
@@ -593,6 +640,8 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
                                   sizeof(BIP0341_taptweak_tag),
                                   &P[1],  // P[1:33] is x(P)
                                   32,
+                                  h,
+                                  h_len,
                                   t);
 
             // fail if t is not smaller than the curve order
@@ -602,7 +651,7 @@ int crypto_tr_tweak_seckey(uint8_t seckey[static 32]) {
                 goto end;
             }
 
-            cx_math_addm(seckey, seckey, t, secp256k1_n, 32);
+            cx_math_addm(out, out, t, secp256k1_n, 32);
         }
         CATCH_ALL {
             ret = -1;

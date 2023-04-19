@@ -9,6 +9,7 @@ pub enum BitcoinClientError<T: Debug> {
     Interpreter(InterpreterError),
     Device { command: u8, status: StatusWord },
     UnexpectedResult { command: u8, data: Vec<u8> },
+    UnsupportedAppVersion,
 }
 
 impl<T: Debug> From<InterpreterError> for BitcoinClientError<T> {

@@ -13,7 +13,7 @@ on:
 
 jobs:
   job_build:
-    name: Compilation for NanoS, X and S+
+    name: Compilation for NanoS, X, S+, and Stax
 
     strategy:
       matrix:
@@ -24,6 +24,8 @@ jobs:
             SDK: "$NANOX_SDK"
           - model: nanosp
             SDK: "$NANOSP_SDK"
+          - model: stax
+            SDK: "$STAX_SDK"
 
     runs-on: ubuntu-latest
 
@@ -104,11 +106,9 @@ jobs:
       matrix:
         include:
           - model: nanos
-            SDK: "2.1"
           - model: nanox
-            SDK: "2.0.2"
           - model: nanosp
-            SDK: "1.0.3"
+          - model: stax
 
     needs: job_build
     runs-on: ubuntu-latest
@@ -138,7 +138,7 @@ jobs:
         run: |
           cd tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }}
 
   job_test_mainnet:
     name: Tests on mainnet
@@ -146,11 +146,9 @@ jobs:
       matrix:
         include:
           - model: nanos
-            SDK: "2.1"
           - model: nanox
-            SDK: "2.0.2"
           - model: nanosp
-            SDK: "1.0.3"
+          - model: stax
 
     needs: job_build
     runs-on: ubuntu-latest
@@ -180,7 +178,7 @@ jobs:
         run: |
           cd tests_mainnet
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --sdk=${{ matrix.SDK }}
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }}
 
   job_test_python_lib_legacyapp:
     name: Tests with the Python library and legacy Bitcoin app

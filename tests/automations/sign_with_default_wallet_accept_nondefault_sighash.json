@@ -9,12 +9,26 @@
       ]
     },
     {
-      "regexp": "Approve|Accept|Continue",
+      "regexp": "Tap to continue|Warning",
+      "actions": [
+        ["finger", 55, 550, true],
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "Hold|Accept|Continue|Approve",
       "actions": [
         [ "button", 1, true ],
         [ "button", 2, true ],
         [ "button", 2, false ],
-        [ "button", 1, false ]
+        [ "button", 1, false ],
+        [ "finger", 55, 550, true]
+      ]
+    },
+    {
+      "regexp": "SIGNED",
+      "actions": [
+        ["finger", 55, 550, false]
       ]
     }
   ]

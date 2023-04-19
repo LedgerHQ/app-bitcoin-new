@@ -114,8 +114,8 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     return true;
 }
 
-void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t p2) {
-    (void) p2;
+void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_version) {
+    (void) protocol_version;
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 

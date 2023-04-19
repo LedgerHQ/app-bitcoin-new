@@ -9,7 +9,7 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType
+from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType, PartialSignature
 from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 
 from bitcoin_client.ledger_bitcoin.psbt import PSBT
@@ -54,18 +54,37 @@ def should_go_right(event: dict):
     return False
 
 
+def ux_thread_sign_psbt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
+    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
+
+    first_approve = True
+
+    while True:
+        event = speculos_client.get_next_event()
+        all_events.append(event)
+
+        if "Tap to continue" in event["text"]:
+            speculos_client.finger_touch(55, 550)
+
+        elif first_approve and "Hold to sign" in event["text"]:
+            first_approve = False
+            speculos_client.finger_touch(55, 550, 3)
+
+        elif "SIGNED" in event["text"]:
+            break
+
+
 def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     # press right until the last screen (will press the "right" button more times than needed)
-
     while True:
         event = speculos_client.get_next_event()
         all_events.append(event)
 
         if should_go_right(event):
             speculos_client.press_and_release("right")
-        elif event["text"] == "Approve":
+        elif "Approve" in event["text"]:
             speculos_client.press_and_release("both")
         elif event["text"] == "Accept":
             speculos_client.press_and_release("both")
@@ -95,18 +114,30 @@ def parse_signing_events(events: List[dict]) -> dict:
             ret["amounts"].append("")
             next_step = ""
 
+        elif ev["text"].startswith("Tap"):
+            ret["addresses"].append("")
+            ret["amounts"].append("")
+            next_step = ""
+            continue
+
         elif ev["text"].startswith(keywords):
             next_step = ev["text"]
             continue
 
         if next_step.startswith("Address"):
-            ret["addresses"][-1] += ev["text"]
+            if len(ret["addresses"]) == 0:
+                ret["addresses"].append("")
+
+            ret["addresses"][-1] += ev["text"].strip().replace("O", "0")  # OCR misreads O for 0
 
         elif next_step.startswith("Fees"):
-            ret["fees"] += ev["text"]
+            ret["fees"] += ev["text"].strip()
 
         elif next_step.startswith("Amount"):
-            ret["amounts"][-1] += ev["text"]
+            if len(ret["amounts"]) == 0:
+                ret["amounts"].append("")
+
+            ret["amounts"][-1] += ev["text"].strip()
 
     return ret
 
@@ -141,9 +172,11 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
-        bytes.fromhex(
-            "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+        PartialSignature(
+            pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+            signature=bytes.fromhex(
+                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            )
         )
     )]
 
@@ -170,9 +203,11 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
-        bytes.fromhex(
-            "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+        PartialSignature(
+            pubkey=bytes.fromhex("024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67"),
+            signature=bytes.fromhex(
+                "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
+            )
         )
     )]
 
@@ -200,9 +235,11 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
-        bytes.fromhex(
-            "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03ee2c3d98eb1f93c0a1aa8e5a4009b70eb7b44ead15f1666f136b012ad58d3068"),
+            signature=bytes.fromhex(
+                "3045022100ab44f34dd7e87c9054591297a101e8500a0641d1d591878d0d23cf8096fa79e802205d12d1062d925e27b57bdcf994ecf332ad0a8e67b8fe407bab2101255da632aa01"
+            )
         )
     )]
 
@@ -233,16 +270,20 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
-        bytes.fromhex(
-            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+            signature=bytes.fromhex(
+                "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+            )
         )
     ), (
         1,
-        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
-        bytes.fromhex(
-            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-        ),
+        PartialSignature(
+            pubkey=bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+            signature=bytes.fromhex(
+                "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+            ),
+        )
     )]
 
 
@@ -277,16 +318,20 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
-        bytes.fromhex(
-            "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+        PartialSignature(
+            pubkey=bytes.fromhex("03455ee7cedc97b0ba435b80066fc92c963a34c600317981d135330c4ee43ac7a3"),
+            signature=bytes.fromhex(
+                "304402206b3e877655f08c6e7b1b74d6d893a82cdf799f68a5ae7cecae63a71b0339e5ce022019b94aa3fb6635956e109f3d89c996b1bfbbaf3c619134b5a302badfaf52180e01"
+            )
         )
     ), (
         1,
-        bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
-        bytes.fromhex(
-            "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
-        ),
+        PartialSignature(
+            pubkey=bytes.fromhex("0271b5b779ad870838587797bcf6f0c7aec5abe76a709d724f48d2e26cf874f0a0"),
+            signature=bytes.fromhex(
+                "3045022100e2e98e4f8c70274f10145c89a5d86e216d0376bdf9f42f829e4315ea67d79d210220743589fd4f55e540540a976a5af58acd610fa5e188a5096dfe7d36baf3afb94001"
+            )
+        )
     )]
 
 
@@ -342,25 +387,81 @@ def test_sign_psbt_multisig_wsh(client: Client):
 
     assert result == [(
         0,
-        bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
-        bytes.fromhex(
-            "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
+        PartialSignature(
+            pubkey=bytes.fromhex("036b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac"),
+            signature=bytes.fromhex(
+                "304402206ab297c83ab66e573723892061d827c5ac0150e2044fed7ed34742fedbcfb26e0220319cdf4eaddff63fc308cdf53e225ea034024ef96de03fd0939b6deeea1e8bd301"
+            )
         )
     )]
 
 
-# def test_sign_psbt_legacy_wrong_non_witness_utxo(client: Client):
-#     # legacy address
-#     # PSBT for a legacy 1-input 1-output spend
-#     # The spend is valid, but the non-witness utxo is wrong; therefore, it should fail the hash test
-#     # TODO: this fails PSBT decoding; need to make a version we can control for this test.
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_multisig_sh_wsh(client: Client):
+    # wrapped segwit multisig ("sh(wsh(sortedmulti(...)))")
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.SH_WIT,
+        threshold=2,
+        keys_info=[
+            "[e24243b4/48'/1'/0'/1']tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        ],
+        sorted=True
+    )
 
-#     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUySC0BAAA="
-#     psbt = PSBT()
-#     psbt.deserialize(unsigned_raw_psbt_base64)
+    wallet_hmac = bytes.fromhex(
+        "677ec94c2e1a7446c6cac9db2adde8667b9a746dd63fa1e1863553cdb814a54a"
+    )
 
-#     with pytest.raises(IncorrectDataError):
-#         client.sign_psbt(psbt)
+    psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEAigIAAAABAaNw+E0toKUlohxkK0YmapPS7uToo7RG7DA2YLrmoD8BAAAAFxYAFAppBymwQTPq8lpFfFWMuPRNdbTX/v///wI7rUIBAAAAABepFJMyNbbbdF4o3zxQhWSJ5ZXY5naHh60dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHbvokAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex("03e5399097ec930c32353104b30db7347e81c54a65a2f8278b1ffd545ba34dcd7c"),
+            signature=bytes.fromhex(
+                "30440220689c3ee23b8f52c21abe47ea6f37cf8bc72653cab9cd32658199b1a16db193d802200db5d2157044913d5a60f69e9ce10ab9a9d883d421d3fb0400d948b31c3b7ee201"
+            )
+        )
+    )]
+
+
+@has_automation("automations/sign_with_wallet_missing_nonwitnessutxo_accept.json")
+def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(client: Client):
+    # A transaction spending a wrapped segwit address has a script that appears like a legacy UTXO, but uses
+    # the segwit sighash algorithm.
+    # Therefore, if the non-witness-utxo is missing, we should still sign it while giving the warning for unverified inputs,
+    # for consistency with other segwit input types.
+
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.SH_WIT,
+        threshold=2,
+        keys_info=[
+            "[e24243b4/48'/1'/0'/1']tpubDFY2NoEHyYsp4J98UCMAaRT5LzRYeXjWqh2txK2RsxPAR5YWKWyTeZBBncRJ7z5nL5RUQPEgycbgbbmywbeLaH9yWK6rnFAYQn28HyiYc1Y",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+        ],
+        sorted=True
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "677ec94c2e1a7446c6cac9db2adde8667b9a746dd63fa1e1863553cdb814a54a"
+    )
+
+    psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert result == [(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex("03e5399097ec930c32353104b30db7347e81c54a65a2f8278b1ffd545ba34dcd7c"),
+            signature=bytes.fromhex(
+                "30440220689c3ee23b8f52c21abe47ea6f37cf8bc72653cab9cd32658199b1a16db193d802200db5d2157044913d5a60f69e9ce10ab9a9d883d421d3fb0400d948b31c3b7ee201"
+            )
+        )
+    )]
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -390,55 +491,64 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     # get the (tweaked) pubkey from the scriptPubKey
     pubkey0_psbt = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    idx0, pubkey0, sig0 = result[0]
+    idx0, partial_sig0 = result[0]
     assert idx0 == 0
-    assert pubkey0 == pubkey0_psbt
+    assert partial_sig0.pubkey == pubkey0_psbt
+    assert partial_sig0.tapleaf_hash is None
 
     # the sighash 0x01 is appended to the signature
-    assert len(sig0) == 64+1
-    assert sig0[-1] == 0x01
+    assert len(partial_sig0.signature) == 64+1
+    assert partial_sig0.signature[-1] == 0x01
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, sig0[:-1])
+    assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, partial_sig0.signature[:-1])
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
-    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-default.psbt")
+    # Test two times:
+    # - the first PSBT has SIGHASH_DEFAULT;
+    # - the second PSBT does not specify the sighash type.
+    # The behavior for taproot transactions should be the same, producing 64-byte signatures
 
-    wallet = WalletPolicy(
-        "",
-        "tr(@0/**)",
-        [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
-        ],
-    )
+    for psbt_file_name in ["tr-1to2-sighash-default", "tr-1to2-sighash-omitted"]:
+        psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/{psbt_file_name}.psbt")
 
-    result = client.sign_psbt(psbt, wallet, None)
+        wallet = WalletPolicy(
+            "",
+            "tr(@0/**)",
+            [
+                "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U"
+            ],
+        )
 
-    # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
-    # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
-    # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
+        result = client.sign_psbt(psbt, wallet, None)
 
-    # sighash verified with bitcoin-core
-    sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
+        # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
+        # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
+        # transaction was sent), and we verify the produced Schnorr signature with the reference bip340 implementation.
 
-    # get the (tweaked) pubkey from the scriptPubKey
-    expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
+        # sighash verified with bitcoin-core
+        sighash0 = bytes.fromhex("75C96FB06A12DB4CD011D8C95A5995DB758A4F2837A22F30F0F579619A4466F3")
 
-    assert len(result) == 1
+        # get the (tweaked) pubkey from the scriptPubKey
+        expected_pubkey0 = psbt.inputs[0].witness_utxo.scriptPubKey[2:]
 
-    idx0, pubkey0, sig0 = result[0]
+        assert len(result) == 1
 
-    assert idx0 == 0
-    assert pubkey0 == expected_pubkey0
-    assert len(sig0) == 64
+        idx0, partial_sig0 = result[0]
 
-    assert bip0340.schnorr_verify(sighash0, pubkey0, sig0)
+        assert idx0 == 0
+        assert partial_sig0.pubkey == expected_pubkey0
+        assert len(partial_sig0.signature) == 64
+        assert partial_sig0.tapleaf_hash is None
+
+        assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool,
+                                       model: str):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -477,7 +587,11 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
+    else:
+        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+
     x.start()
     result = client.sign_psbt(psbt, wallet, None)
     x.join()
@@ -496,13 +610,15 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
             assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
                     (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
-            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
+            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(
+                network=NETWORKS["test"]).replace('O', '0')  # OCR misreads O for 0
             assert parsed_events["addresses"][shown_out_idx] == out_addr
 
             shown_out_idx += 1
 
 
-def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool):
+def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool,
+                                          model: str):
     # Test with a transaction with an extremely large amount
 
     if not is_speculos:
@@ -530,7 +646,10 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     all_events: List[dict] = []
 
-    x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
+    else:
+        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
     x.start()
     result = client.sign_psbt(psbt, wallet, None)
     x.join()
@@ -578,9 +697,20 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     assert len(result) == n_inputs
 
 
-def test_sign_psbt_fail_11_changes(client: Client):
+def ux_thread_acept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
+    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
+
+    while True:
+        event = speculos_client.get_next_event()
+        all_events.append(event)
+        if "Tap to continue" in event["text"]:
+            speculos_client.finger_touch(55, 550)
+            break
+
+
+def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: str):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
-    # before any user interaction
+    # before any user interaction on nanos.
 
     wallet = WalletPolicy(
         "",
@@ -597,6 +727,12 @@ def test_sign_psbt_fail_11_changes(client: Client):
         [True] * 11,
     )
 
+    all_events: List[dict] = []
+
+    if model == "stax":
+        x = threading.Thread(target=ux_thread_acept_prompt_stax, args=[comm, all_events])
+
+        x.start()
     with pytest.raises(NotSupportedError):
         client.sign_psbt(psbt, wallet, None)
 
@@ -771,8 +907,51 @@ def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
 
         assert result == [(
             0,
-            bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
-            bytes.fromhex(
-                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            PartialSignature(
+                pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+                signature=bytes.fromhex(
+                    "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+                )
             )
         )]
+
+
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
+    # Transaction signed with SIGHASH_ALL, therefore producing a 65-byte signature
+
+    wallet = WalletPolicy(
+        name="Taproot foreign internal key, and our script key",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7"
+    )
+
+    psbt = PSBT()
+    psbt.deserialize("cHNidP8BAFICAAAAAR/BzFdxy4OGDMVtlLz+2ThgjBf2NmJDW0HpxE/8/TFCAQAAAAD9////ATkFAAAAAAAAFgAUqo7zdMr638p2kC3bXPYcYLv9nYUAAAAAAAEBK0wGAAAAAAAAIlEg/AoQ0wjH5BtLvDZC+P2KwomFOxznVaDG0NSV8D2fLaQBAwQBAAAAIhXBUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUjIGsW6MH5efpMwPBbajAK//+UFFm28g3nfeVbAWDvjkysrMAhFlAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1HQB2IjpuMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIRZrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrD0BCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKT1rML9MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAARcgUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUBGCAJLtoDNhfiEO5/fQ43ikBK6hxItWqhAwIr7Pd0bkcApAAA")
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    assert len(result) == 1
+
+    # sighash verified with bitcoin-core (real transaction)
+    sighash0 = bytes.fromhex("39CEACF28A980B46749DD416EABE6E380C0C3742D19AA3E2ABB64F0840251E5B")
+
+    assert len(result) == 1
+
+    idx0, partial_sig0 = result[0]
+
+    assert idx0 == 0
+    assert partial_sig0.pubkey == bytes.fromhex("6b16e8c1f979fa4cc0f05b6a300affff941459b6f20de77de55b0160ef8e4cac")
+    assert partial_sig0.tapleaf_hash == bytes.fromhex(
+        "092eda033617e210ee7f7d0e378a404aea1c48b56aa103022becf7746e4700a4")
+
+    assert len(partial_sig0.signature) == 65
+    assert partial_sig0.signature[-1] == 1  # SIGHASH_ALL
+
+    assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature[:64])

@@ -62,8 +62,11 @@ def test_register_wallet_accept_wit(client: Client, speculos_globals):
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_with_long_name(client: Client, speculos_globals):
+    name = "Cold storage with a pretty long name that requires 64 characters"
+    assert len(name) == 64
+
     run_register_test(client, speculos_globals, MultisigWallet(
-        name="Cold storage with a pretty long name that requires 64 characters",
+        name=name,
         address_type=AddressType.WIT,
         threshold=2,
         keys_info=[
@@ -91,9 +94,12 @@ def test_register_wallet_reject_header(client: Client):
 
 @has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_invalid_names(client: Client):
+    too_long_name = "This wallet name is much too long since it requires 65 characters"
+    assert len(too_long_name) == 65
+
     for invalid_name in [
         "",  # empty name not allowed
-        "Very long walletz",  # 17 characters is too long
+        too_long_name,  # 65 characters is too long
         " Test", "Test ",  # can't start with spaces
         "Tæst",  # characters out of allowed range
     ]:
@@ -107,8 +113,8 @@ def test_register_wallet_invalid_names(client: Client):
             ],
         )
 
-    with pytest.raises(IncorrectDataError):
-        client.register_wallet(wallet)
+        with pytest.raises(IncorrectDataError):
+            client.register_wallet(wallet)
 
 
 @has_automation("automations/register_wallet_accept.json")
@@ -126,7 +132,7 @@ def test_register_wallet_unsupported_policy(client: Client):
 
 
 @has_automation("automations/register_wallet_accept.json")
-def test_register_miniscript_long_policy(client: Client, speculos_globals, model):
+def test_register_miniscript_long_policy(client: Client, speculos_globals, model: str):
     # This test makes sure that policies longer than 256 bytes work as expected on all devices,
     # except on Nano S that has 196 bytes as a technical limitation.
     wallet = WalletPolicy(
@@ -247,4 +253,29 @@ def test_register_unusual_singlesig_accounts(client: Client, speculos_globals):
         name="Unusual Taproot",
         descriptor_template="tr(@0/**)",
         keys_info=["[f5acc2fd/1'/2'/3']tpubDCsHVWwqALkDzorr5zdc91Wj93zR3so1kUEH6LWsPrLtC9MVPjb8NEQwCzhPM4TEFP6KbgmTb7xAsyrbf3oEBh31Q7iAKhzMHj2FZ5YGNrr"]
+    ))
+
+
+@has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_tr_script_pk(client: Client, speculos_globals):
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Taproot foreign internal key, and our script key",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ))
+
+
+@has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_tr_script_sortedmulti(client: Client, speculos_globals):
+    run_register_test(client, speculos_globals, WalletPolicy(
+        name="Taproot single-key or multisig 2-of-2",
+        descriptor_template="tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
     ))

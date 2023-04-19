@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.2] - 03-04-2023
+
+### Added
+
+- 🥕 Initial support for taproot scripts; taproot trees support up to 8 leaves, and the only supported scripts in tapleaves are `pk`, `multi_a` and `sortedmulti_a`.
+
+### Fixed
+
+- Nested segwit transactions (P2SH-P2WPKH and P2SH-P2WSH) can now be signed (with a warning) if the PSBT contains the witness-utxo but no non-witness-utxo. This aligns their behavior to other types of Segwitv0 transactions since version 2.0.6.
+
 ## [2.1.1] - 23-01-2023
 
 ### Changed

@@ -326,6 +326,17 @@ static inline buffer_t buffer_create(void *ptr, size_t size) {
 void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned);
 
 /**
+ * Checks if the current position in the buffer is aligned in memory to a 4-byte boundary.
+ *
+ * @param[in]  buffer Pointer to a buffer struct.
+ *
+ * @return `true` if the current position in the buffer is aligned, `false` otherwise.
+ */
+static inline bool buffer_is_cur_aligned(const buffer_t *buffer) {
+    return (size_t) (buffer->ptr + buffer->offset) % 4 == 0;
+}
+
+/**
  * Saves a snapshot of the current position within the buffer.
  *
  * @param[in] buffer The buffer whose position is saved.

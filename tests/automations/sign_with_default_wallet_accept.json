@@ -2,6 +2,16 @@
   "version": 1,
   "rules": [
     {
+      "regexp": "Approve|Accept|Hold to sign",
+      "actions": [
+        [ "button", 1, true ],
+        [ "button", 2, true ],
+        [ "button", 2, false ],
+        [ "button", 1, false ],
+        [ "finger", 55, 550, true]
+      ]
+    },
+    {
       "regexp": "Review|Amount|Address|Confirm|Fees",
       "actions": [
         ["button", 2, true],
@@ -9,12 +19,16 @@
       ]
     },
     {
-      "regexp": "Approve|Accept",
+      "regexp": "Tap to continue",
       "actions": [
-        [ "button", 1, true ],
-        [ "button", 2, true ],
-        [ "button", 2, false ],
-        [ "button", 1, false ]
+        ["finger", 55, 550, true],
+        ["finger", 55, 550, false]
+      ]
+    },
+    {
+      "regexp": "SIGNED",
+      "actions": [
+        ["finger", 55, 550, false]
       ]
     }
   ]

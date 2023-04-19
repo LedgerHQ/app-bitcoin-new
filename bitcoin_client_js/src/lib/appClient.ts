@@ -11,7 +11,7 @@ import { createVarint, parseVarint } from './varint';
 const CLA_BTC = 0xe1;
 const CLA_FRAMEWORK = 0xf8;
 
-const CURRENT_PROTOCOL_VERSION = 1; // from supported from version 2.1.0 of the app
+const CURRENT_PROTOCOL_VERSION = 1; // supported from version 2.1.0 of the app
 
 enum BitcoinIns {
   GET_PUBKEY = 0x00,
@@ -24,6 +24,50 @@ enum BitcoinIns {
 
 enum FrameworkIns {
   CONTINUE_INTERRUPTED = 0x01,
+}
+
+/**
+ * This class represents a partial signature produced by the app during signing.
+ * It always contains the `signature` and the corresponding `pubkey` whose private key
+ * was used for signing; in the case of taproot script paths, it also contains the
+ * tapleaf hash.
+ */
+export class PartialSignature {
+  readonly pubkey: Buffer;
+  readonly signature: Buffer;
+  readonly tapleafHash?: Buffer;
+
+  constructor(pubkey: Buffer, signature: Buffer, tapleafHash?: Buffer) {
+    this.pubkey = pubkey;
+    this.signature = signature;
+    this.tapleafHash = tapleafHash;
+  }
+}
+
+/**
+ * Creates an instance of `PartialSignature` from the returned raw augmented pubkey and signature.
+ * @param pubkeyAugm the public key, concatenated with the tapleaf hash in the case of taproot script path spend.
+ * @param signature the signature
+ * @returns an instance of `PartialSignature`.
+ */
+function makePartialSignature(pubkeyAugm: Buffer, signature: Buffer): PartialSignature {
+  if (pubkeyAugm.length == 64) {
+    // tapscript spend: concatenation of 32-bytes x-only pubkey and 32-bytes tapleaf_hash
+    return new PartialSignature(pubkeyAugm.slice(0, 32), signature, pubkeyAugm.slice(32, 64));
+  } else if (pubkeyAugm.length == 32 || pubkeyAugm.length == 33) {
+    // legacy, segwit or taproot keypath spend: pubkeyAugm is just the pubkey
+    return new PartialSignature(pubkeyAugm, signature);
+  } else {
+    throw new Error(`Invalid length for pubkeyAugm: ${pubkeyAugm.length} bytes.`);
+  }
+}
+
+/**
+ * Checks whether a descriptor template contains an `a:` fragment.
+ */
+function containsA(descriptorTemplate: string): boolean {
+  const matches = descriptorTemplate.match(/[asctdvjnlu]+:/g) || [];
+  return matches.some(match => match.includes('a'));
 }
 
 /**
@@ -71,6 +115,34 @@ export class AppClient {
   }
 
   /**
+   * Returns an object containing the currently running app's name, version and the device status flags.
+   *
+   * @returns an object with app name, version and device status flags.
+   */
+  public async getAppAndVersion(): Promise<{
+    name: string;
+    version: string;
+    flags: number | Buffer;
+  }> {
+    const r = await this.transport.send(0xb0, 0x01, 0x00, 0x00);
+    let i = 0;
+    const format = r[i++];
+    if (format !== 1) throw new Error("Unexpected response")
+
+    const nameLength = r[i++];
+    const name = r.slice(i, (i += nameLength)).toString("ascii");
+    const versionLength = r[i++];
+    const version = r.slice(i, (i += versionLength)).toString("ascii");
+    const flagLength = r[i++];
+    const flags = r.slice(i, (i += flagLength));
+    return {
+      name,
+      version,
+      flags,
+    };
+  };
+
+  /**
    * Requests the BIP-32 extended pubkey to the hardware wallet.
    * If `display` is `false`, only standard paths will be accepted; an error is returned if an unusual path is
    * requested.
@@ -111,6 +183,8 @@ export class AppClient {
   async registerWallet(
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
+
+    await this.validatePolicy(walletPolicy);
 
     const clientInterpreter = new ClientCommandInterpreter();
 
@@ -162,6 +236,8 @@ export class AppClient {
       throw new Error('Invalid HMAC length');
     }
 
+    await this.validatePolicy(walletPolicy);
+
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -188,22 +264,33 @@ export class AppClient {
    * Signs a psbt using a (standard or registered) `WalletPolicy`. This is an interactive command, as user validation
    * is necessary using the device's secure screen.
    * On success, a map of input indexes and signatures is returned.
-   * @param psbt an instance of `PsbtV2`
+   * @param psbt a base64-encoded string, or a psbt in a binary Buffer. Using the `PsbtV2` type is deprecated.
    * @param walletPolicy the `WalletPolicy` to use for signing
    * @param walletHMAC the 32-byte hmac obtained during wallet policy registration, or `null` for a standard policy
    * @param progressCallback optionally, a callback that will be called every time a signature is produced during
    * the signing process. The callback does not receive any argument, but can be used to track progress.
-   * @returns an array of of tuples with 3 elements containing:
+   * @returns an array of of tuples with 2 elements containing:
    *    - the index of the input being signed;
-   *    - a Buffer with either a 33-byte compressed pubkey or a 32-byte x-only pubkey whose corresponding secret key was used to sign;
-   *    - a Buffer with the corresponding signature.
+   *    - an instance of PartialSignature
    */
   async signPsbt(
-    psbt: PsbtV2,
+    psbt: PsbtV2 | string | Buffer,
     walletPolicy: WalletPolicy,
     walletHMAC: Buffer | null,
     progressCallback?: () => void
-  ): Promise<[number, Buffer, Buffer][]> {
+  ): Promise<[number, PartialSignature][]> {
+    await this.validatePolicy(walletPolicy);
+
+    if (typeof psbt === 'string') {
+      psbt = Buffer.from(psbt, "base64");
+    }
+
+    if (Buffer.isBuffer(psbt)) {
+      const psbtObj = new PsbtV2()
+      psbtObj.deserialize(psbt);
+      psbt = psbtObj;
+    }
+
     const merkelizedPsbt = new MerkelizedPsbt(psbt);
 
     if (walletHMAC != null && walletHMAC.length != 32) {
@@ -248,16 +335,18 @@ export class AppClient {
 
     const yielded = clientInterpreter.getYielded();
 
-    const ret: [number, Buffer, Buffer][] = [];
+    const ret: [number, PartialSignature][] = [];
     for (const inputAndSig of yielded) {
       // inputAndSig contains:
       // <inputIndex : varint> <pubkeyLen : 1 byte> <pubkey : pubkeyLen bytes (32 or 33)> <signature : variable length>
       const [inputIndex, inputIndexLen] = parseVarint(inputAndSig, 0);
-      const pubkeyLen = inputAndSig[inputIndexLen];
-      const pubkey = inputAndSig.subarray(inputIndexLen + 1, inputIndexLen + 1 + pubkeyLen);
-      const signature = inputAndSig.subarray(inputIndexLen + 1 + pubkeyLen)
+      const pubkeyAugmLen = inputAndSig[inputIndexLen];
+      const pubkeyAugm = inputAndSig.subarray(inputIndexLen + 1, inputIndexLen + 1 + pubkeyAugmLen);
+      const signature = inputAndSig.subarray(inputIndexLen + 1 + pubkeyAugmLen)
 
-      ret.push([Number(inputIndex), pubkey, signature]);
+      const partialSig = makePartialSignature(pubkeyAugm, signature);
+
+      ret.push([Number(inputIndex), partialSig]);
     }
     return ret;
   }
@@ -311,6 +400,18 @@ export class AppClient {
     );
 
     return result.toString('base64');
+  }
+
+  /* Performs any additional checks on the policy before using it.*/
+  private async validatePolicy(walletPolicy: WalletPolicy) {
+    if (containsA(walletPolicy.descriptorTemplate)) {
+      const appAndVer = await this.getAppAndVersion();
+      if (["2.1.0", "2.1.1"].includes(appAndVer.version)) {
+        // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
+        // the `a:` fragment.
+        throw new Error("Please update your Ledger Bitcoin app.")
+      }
+    }
   }
 }
 

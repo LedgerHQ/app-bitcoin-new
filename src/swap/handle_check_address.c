@@ -70,7 +70,11 @@ bool get_address_from_compressed_public_key(unsigned char format,
                 uint8_t tweaked_key[32];
 
                 uint8_t parity;
-                crypto_tr_tweak_pubkey(compressed_pub_key + 1, &parity, tweaked_key);
+                crypto_tr_tweak_pubkey(compressed_pub_key + 1,
+                                       (uint8_t[]){},
+                                       0,
+                                       &parity,
+                                       tweaked_key);
 
                 if (!segwit_addr_encode(address, native_segwit_prefix, 1, tweaked_key, 32)) {
                     return false;
