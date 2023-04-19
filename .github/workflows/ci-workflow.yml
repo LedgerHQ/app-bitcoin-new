@@ -138,7 +138,7 @@ jobs:
         run: |
           cd tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }}
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
 
   job_test_mainnet:
     name: Tests on mainnet
@@ -178,7 +178,7 @@ jobs:
         run: |
           cd tests_mainnet
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }}
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
 
   job_test_python_lib_legacyapp:
     name: Tests with the Python library and legacy Bitcoin app
@@ -204,7 +204,7 @@ jobs:
         run: |
           cd bitcoin_client/tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300
 
 
   job_test_js_lib:

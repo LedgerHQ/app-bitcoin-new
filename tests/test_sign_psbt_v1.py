@@ -487,6 +487,7 @@ def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClien
             (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
 
 
+@pytest.mark.timeout(0)  # disable timeout
 @has_automation("automations/sign_with_default_wallet_accept.json")
 def test_sign_psbt_singlesig_wpkh_512to256_v1(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
