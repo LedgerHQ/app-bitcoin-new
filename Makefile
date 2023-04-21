@@ -21,6 +21,10 @@ endif
 
 include $(BOLOS_SDK)/Makefile.defines
 
+ifeq ($(TARGET_NAME),TARGET_STAX)
+$(error Currently Stax deploys are not possible)
+endif
+
 # TODO: compile with the right path restrictions
 # APP_LOAD_PARAMS  = --curve secp256k1
 APP_LOAD_PARAMS  = $(COMMON_LOAD_PARAMS)
