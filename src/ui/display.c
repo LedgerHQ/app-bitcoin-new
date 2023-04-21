@@ -72,7 +72,7 @@ bool ui_display_pubkey(dispatcher_context_t *context,
         ui_display_pubkey_suspicious_flow();
     }
 
-    return io_ui_process(context, false);
+    return io_ui_process(context, true);
 }
 
 bool ui_display_message_hash(dispatcher_context_t *context,
@@ -145,7 +145,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
         ui_display_receive_in_wallet_flow();
     }
 
-    return io_ui_process(context, false);
+    return io_ui_process(context, true);
 }
 
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
