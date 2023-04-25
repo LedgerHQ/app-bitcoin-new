@@ -286,3 +286,80 @@ def test_e2e_tapscript_large(rpc, rpc_test_wallet, client: Client, speculos_glob
         keys_info=keys_info)
 
     run_test_e2e(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_tapminiscript_keypath_or_decaying_3of3(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # The key path is external
+    # The only script path is a decaying 3-of-3 that becomes a 2-of-3 after the timelock.
+    # Only one internal key in the script path.
+
+    path = "499'/1'/0'"
+    _, core_xpub_orig_1 = create_new_wallet()
+    core_name_2, core_xpub_orig_2 = create_new_wallet()
+    core_name_3, core_xpub_orig_3 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    wallet_policy = WalletPolicy(
+        name="Internal or decaying 3-of-3",
+        descriptor_template="tr(@0/**,thresh(3,pk(@1/**),s:pk(@2/**),s:pk(@3/**),sln:older(12960)))",
+        keys_info=[
+            f"{core_xpub_orig_1}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig_2}",
+            f"{core_xpub_orig_3}",
+        ])
+
+    run_test_e2e(wallet_policy, [core_name_2, core_name_3],
+                 rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_e2e_tapminiscript_mixed_leaves(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+    # A leaf has miniscript, a leaf has sortedmulti_a (which is not miniscript)
+
+    path = "499'/1'/0'"
+    _, core_xpub_orig_1 = create_new_wallet()
+    _, core_xpub_orig_2 = create_new_wallet()
+    _, core_xpub_orig_3 = create_new_wallet()
+    _, core_xpub_orig_4 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    wallet_policy = WalletPolicy(
+        name="Mixed tapminiscript and not",
+        descriptor_template="tr(@0/**,{sortedmulti_a(1,@1/**,@2/**),or_b(pk(@3/**),s:pk(@4/**))})",
+        keys_info=[
+            f"{core_xpub_orig_1}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig_2}",
+            f"{core_xpub_orig_3}",
+            f"{core_xpub_orig_4}",
+        ])
+
+    run_test_e2e(wallet_policy, [],
+                 rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
+def test_invalid_tapminiscript(client: Client, speculos_globals: SpeculosGlobals):
+    path = "48'/1'/0'/2'"
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig3 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
+
+    # can't have scripts in the key path
+    run_test_invalid(client, "tr(pk(@0/**))", [internal_xpub_orig])
+    run_test_invalid(client, "tr(pk(@0/**),pk(@1/**))", [internal_xpub_orig, core_xpub_orig1])
+
+    # test scripts that are invalid inside taproot trees
+    run_test_invalid(client, "tr(@0,sh(pk(@1/**)))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "tr(@0,wsh(pk(@1/**)))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "tr(@0,multi(1,@1/**,@2/**))", [internal_xpub_orig, core_xpub_orig1, core_xpub_orig2])
+    run_test_invalid(client, "tr(@0,sortedmulti(1,@1/**,@2/**))",
+                     [internal_xpub_orig, core_xpub_orig1, core_xpub_orig2])
+
+    # sortedmulti_a is not valid tapminiscript (but it's valid as a tapscript)
+    run_test_invalid(client, "tr(@0,or_d(pk(@1/**),sortedmulti_a(2,@2/**,@3/**)))",
+                     [
+                         internal_xpub_orig,
+                         f"{core_xpub_orig1}",
+                         f"{core_xpub_orig2}",
+                         f"{core_xpub_orig3}",
+                     ])
