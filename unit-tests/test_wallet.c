@@ -393,7 +393,9 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
 
         policy_node_with_script_t *policy = (policy_node_with_script_t *) out;
         policy_node_ext_info_t ext_info;
-        res = compute_miniscript_policy_ext_info(resolve_ptr(&policy->script), &ext_info);
+        res = compute_miniscript_policy_ext_info(resolve_ptr(&policy->script),
+                                                 &ext_info,
+                                                 MINISCRIPT_CONTEXT_P2WSH);
 
         assert_true(res == 0);
 

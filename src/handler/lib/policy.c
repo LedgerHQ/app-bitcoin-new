@@ -91,7 +91,7 @@ typedef struct {
 static const uint8_t fragment_whitelist_sh[] = {TOKEN_WPKH, TOKEN_MULTI, TOKEN_SORTEDMULTI};
 static const uint8_t fragment_whitelist_sh_wsh[] = {TOKEN_MULTI, TOKEN_SORTEDMULTI};
 static const uint8_t fragment_whitelist_wsh[] = {
-    /* tokens for miniscript on segwit */
+    /* tokens for scripts on segwit */
     TOKEN_0,
     TOKEN_1,
     TOKEN_PK,
@@ -126,9 +126,42 @@ static const uint8_t fragment_whitelist_wsh[] = {
     TOKEN_N,
     TOKEN_L,
     TOKEN_U};
-static const uint8_t fragment_whitelist_tapscript[] = {TOKEN_PK,
-                                                       TOKEN_MULTI_A,
-                                                       TOKEN_SORTEDMULTI_A};
+static const uint8_t fragment_whitelist_tapscript[] = {
+    /* tokens for scripts in taptrees */
+    TOKEN_0,
+    TOKEN_1,
+    TOKEN_PK,
+    TOKEN_PKH,
+    TOKEN_PK_K,
+    TOKEN_PK_H,
+    TOKEN_OLDER,
+    TOKEN_AFTER,
+    TOKEN_SHA256,
+    TOKEN_HASH256,
+    TOKEN_RIPEMD160,
+    TOKEN_HASH160,
+    TOKEN_ANDOR,
+    TOKEN_AND_V,
+    TOKEN_AND_B,
+    TOKEN_AND_N,
+    TOKEN_MULTI_A,
+    TOKEN_OR_B,
+    TOKEN_OR_C,
+    TOKEN_OR_D,
+    TOKEN_OR_I,
+    TOKEN_SORTEDMULTI_A,
+    TOKEN_THRESH,
+    // wrappers
+    TOKEN_A,
+    TOKEN_S,
+    TOKEN_C,
+    TOKEN_T,
+    TOKEN_D,
+    TOKEN_V,
+    TOKEN_J,
+    TOKEN_N,
+    TOKEN_L,
+    TOKEN_U};
 
 static const generic_processor_command_t commands_0[] = {{CMD_CODE_OP_V, OP_0}, {CMD_CODE_END, 0}};
 static const generic_processor_command_t commands_1[] = {{CMD_CODE_OP_V, OP_1}, {CMD_CODE_END, 0}};
@@ -559,7 +592,12 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                                              compressed_pubkey)) {
                     return -1;
                 }
-                crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+                if (!state->is_taproot) {
+                    crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+                } else {
+                    // x-only pubkey if within taproot
+                    crypto_hash160(compressed_pubkey + 1, 32, compressed_pubkey);  // reuse memory
+                }
 
                 update_output_u8(state, 20);  // PUSH 20 bytes
                 update_output(state, compressed_pubkey, 20);
@@ -649,12 +687,22 @@ __attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_pars
 
         update_output_u8(state, 20);  // PUSH 20 bytes
 
-        crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+        if (!state->is_taproot) {
+            crypto_hash160(compressed_pubkey, 33, compressed_pubkey);  // reuse memory
+        } else {
+            // x-only pubkey if within taproot
+            crypto_hash160(compressed_pubkey + 1, 32, compressed_pubkey);  // reuse memory
+        }
         update_output(state, compressed_pubkey, 20);
 
         update_output_u8(state, OP_EQUALVERIFY);
         update_output_op_v(state, OP_CHECKSIG);
     } else {  // policy->base.type == TOKEN_WPKH
+        if (state->is_taproot) {
+            PRINTF("wpkh is invalid within taproot context");
+            return -1;
+        }
+
         update_output_u8(state, OP_0);
 
         update_output_u8(state, 20);  // PUSH 20 bytes
@@ -1689,6 +1737,91 @@ static int get_pubkey_from_merkle_tree(dispatcher_context_t *dispatcher_context,
     return 0;
 }
 
+static int is_miniscript_sane(const policy_node_t *script, MiniscriptContext context) {
+    if (context != MINISCRIPT_CONTEXT_P2WSH && context != MINISCRIPT_CONTEXT_TAPSCRIPT) {
+        return WITH_ERROR(-1, "Unknown miniscript context");
+    }
+    if (!script->flags.is_miniscript) {
+        return WITH_ERROR(-1, "This function can only be called for miniscript");
+    }
+
+    // Top level node in miniscript must be type B
+    if (script->flags.miniscript_type != MINISCRIPT_TYPE_B) {
+        return WITH_ERROR(-1, "Top level miniscript node must be of type B");
+    }
+
+    // check miniscript sanity conditions
+    policy_node_ext_info_t ext_info;
+    if (0 > compute_miniscript_policy_ext_info(script, &ext_info, context)) {
+        return WITH_ERROR(-1, "Error analyzing miniscript policy");
+    }
+
+    // Check that non-malleability can be guaranteed
+    if (!ext_info.m) {
+        return WITH_ERROR(-1, "Miniscript cannot always be satisfied non-malleably");
+    }
+
+    // Check that a signature is always required to satisfy the miniscript
+    if (!ext_info.s) {
+        return WITH_ERROR(-1, "Miniscript does not always require a signature");
+    }
+
+    // Check that there is no time-lock mix
+    if (!ext_info.k) {
+        return WITH_ERROR(-1, "Miniscript with time-lock mix");
+    }
+
+    // Note: the following limits could be relaxed for taproot miniscript; however, that
+    // would mean that tapscripts could run into the maximum stack size limits during
+    // execution, which we didn't implement explicit checks against.
+    // Therefore, we rather apply the conservative limit for segwit even to tapscripts.
+    // We don't expect these limits to be reached in real-world policies.
+
+    // Check the maximum stack size to satisfy the policy
+    if (ext_info.ss.sat == -1 || (uint32_t) ext_info.ss.sat > MAX_STANDARD_P2WSH_STACK_ITEMS) {
+        return WITH_ERROR(-1, "Miniscript exceeds maximum standard stack size");
+    }
+
+    if (ext_info.ops.sat == -1) {
+        // Should never happen for non-malleable scripts
+        return WITH_ERROR(-1, "Invalid maximum ops computations");
+    }
+
+    // Check ops limit
+    if ((uint32_t) ext_info.ops.count + (uint32_t) ext_info.ops.sat > MAX_OPS_PER_SCRIPT) {
+        return WITH_ERROR(-1, "Miniscript exceeds maximum ops");
+    }
+
+    // Check the script size
+    if (ext_info.script_size > MAX_STANDARD_P2WSH_SCRIPT_SIZE) {
+        return WITH_ERROR(-1, "Miniscript exceeds maximum script size");
+    }
+    return 0;
+}
+
+static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
+    // Recurse until leaves are found, then check sanity if they contain miniscript.
+    // No check is performed on leaves not containing miniscript.
+    if (taptree->is_leaf) {
+        const policy_node_t *script = resolve_node_ptr(&taptree->script);
+        if (script->flags.is_miniscript &&  // only check for miniscript leaves
+            0 > is_miniscript_sane(script, MINISCRIPT_CONTEXT_TAPSCRIPT)) {
+            return -1;
+        }
+    } else {
+        if (0 > is_taptree_miniscript_sane(
+                    (const policy_node_tree_t *) resolve_node_ptr(&taptree->left_tree))) {
+            return -1;
+        }
+        if (0 > is_taptree_miniscript_sane(
+                    (const policy_node_tree_t *) resolve_node_ptr(&taptree->right_tree))) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -1698,52 +1831,15 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
         const policy_node_t *inner =
             resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script);
         if (inner->flags.is_miniscript) {
-            // Top level node in miniscript must be type B
-            if (inner->flags.miniscript_type != MINISCRIPT_TYPE_B) {
-                return WITH_ERROR(-1, "Top level miniscript node must be of type B");
+            if (0 > is_miniscript_sane(inner, MINISCRIPT_CONTEXT_P2WSH)) {
+                return -1;
             }
-
-            // check miniscript sanity conditions
-            policy_node_ext_info_t ext_info;
-            if (0 > compute_miniscript_policy_ext_info(inner, &ext_info)) {
-                return WITH_ERROR(-1, "Error analyzing miniscript policy");
-            }
-
-            // Check that non-malleability can be guaranteed
-            if (!ext_info.m) {
-                return WITH_ERROR(-1, "Miniscript cannot always be satisfied non-malleably");
-            }
-
-            // Check that a signature is always required to satisfy the miniscript
-            if (!ext_info.s) {
-                return WITH_ERROR(-1, "Miniscript does not always require a signature");
-            }
-
-            // Check that there is no time-lock mix
-            if (!ext_info.k) {
-                return WITH_ERROR(-1, "Miniscript with time-lock mix");
-            }
-
-            // Check the maximum stack size to satisfy the policy
-            if (ext_info.ss.sat == -1 ||
-                (uint32_t) ext_info.ss.sat > MAX_STANDARD_P2WSH_STACK_ITEMS) {
-                return WITH_ERROR(-1, "Miniscript exceeds maximum standard stack size");
-            }
-
-            if (ext_info.ops.sat == -1) {
-                // Should never happen for non-malleable scripts
-                return WITH_ERROR(-1, "Invalid maximum ops computations");
-            }
-
-            // Check ops limit
-            if ((uint32_t) ext_info.ops.count + (uint32_t) ext_info.ops.sat > MAX_OPS_PER_SCRIPT) {
-                return WITH_ERROR(-1, "Miniscript exceeds maximum ops");
-            }
-
-            // Check the script size
-            if (ext_info.script_size > MAX_STANDARD_P2WSH_SCRIPT_SIZE) {
-                return WITH_ERROR(-1, "Miniscript exceeds maximum script size");
-            }
+        }
+    } else if (policy->type == TOKEN_TR) {
+        // if there is a taptree, we check the sanity of every miniscript leaf
+        const policy_node_tree_t *taptree = ((const policy_node_tr_t *) policy)->tree;
+        if (taptree != NULL && 0 > is_taptree_miniscript_sane(taptree)) {
+            return -1;
         }
     }
 
