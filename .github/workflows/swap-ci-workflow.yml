@@ -13,3 +13,4 @@ jobs:
     uses: LedgerHQ/app-exchange/.github/workflows/reusable_swap_functional_tests.yml@develop
     with:
       branch_for_bitcoin: ${{ github.ref }}
+      test_filter: '"btc or bitcoin or Bitcoin"'
