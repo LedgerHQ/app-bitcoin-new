@@ -3,6 +3,7 @@
 #include "ux.h"
 #include "usbd_core.h"
 #include "os_io_seproxyhal.h"
+#include "os.h"
 
 #include "handle_swap_sign_transaction.h"
 
@@ -41,6 +42,7 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
            sign_transaction_params->fee_amount,
            sign_transaction_params->fee_amount_length);
 
+    os_explicit_zero_BSS_segment();
     G_swap_state.amount = read_u64_be(amount, 0);
     G_swap_state.fees = read_u64_be(fees, 0);
     memcpy(G_swap_state.destination_address,
