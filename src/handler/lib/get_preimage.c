@@ -86,8 +86,7 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
             return -8;
         }
 
-        uint8_t *data_ptr =
-            dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);

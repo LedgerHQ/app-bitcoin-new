@@ -276,8 +276,7 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
                                           uint8_t pubkey[static 33],
                                           uint8_t chain_code[]) {
     struct {
-        uint8_t prefix;
-        uint8_t raw_public_key[64];
+        uint8_t raw_public_key[65];
         uint8_t chain_code[32];
     } keydata;
 
@@ -287,7 +286,6 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
     bool result = true;
     BEGIN_TRY {
         TRY {
-            keydata.prefix = 0x04;  // uncompressed public keys always start with 04
             // derive private key according to BIP32 path
             crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
 
@@ -298,7 +296,7 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
             // generate corresponding public key
             cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
 
-            memmove(keydata.raw_public_key, public_key.W + 1, 64);
+            memmove(keydata.raw_public_key, public_key.W, 65);
 
             // compute compressed public key
             if (crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey) < 0) {
