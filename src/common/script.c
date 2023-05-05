@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <limits.h>
 
 #include "../common/bip32.h"
@@ -122,7 +123,7 @@ int format_opscript_script(const uint8_t script[],
         return -1;
     }
 
-    strcpy(out, "OP_RETURN ");
+    strncpy(out, "OP_RETURN ", MAX_OPRETURN_OUTPUT_DESC_SIZE);
     int out_ctr = 10;
 
     uint8_t opcode = script[1];  // the push opcode

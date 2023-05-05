@@ -32,12 +32,11 @@ int semihosted_printf(const char *format, ...) {
 
 // Returns the current stack pointer
 static unsigned int __attribute__((noinline)) get_stack_pointer() {
-    int stack_top = 0;
-    // Returning an address on the stack is unusual, so we disable the warning
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-stack-address"
-    return (unsigned int) &stack_top;
-#pragma GCC diagnostic pop
+    unsigned int stack_top = 0;
+
+    __asm__ __volatile__("mov %0, sp" : "=r"(stack_top) : :);
+
+    return stack_top;
 }
 
 void print_stack_pointer(const char *file, int line, const char *func_name) {

@@ -8,9 +8,9 @@
 #include "io.h"
 
 typedef struct {
-    char *confirm;           // text displayed in last transaction page
-    char *confirmed_status;  // text displayed in confirmation page (after long press)
-    char *rejected_status;   // text displayed in rejection page (after reject confirmed)
+    const char *confirm;           // text displayed in last transaction page
+    const char *confirmed_status;  // text displayed in confirmation page (after long press)
+    const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
     nbgl_layoutTagValue_t tagValuePair[3];
     nbgl_layoutTagValueList_t tagValueList;
     nbgl_pageInfoLongPress_t infoLongPress;

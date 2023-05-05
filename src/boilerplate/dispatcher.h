@@ -74,7 +74,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
 
 // Debug utilities
 
-#if DEBUG == 0
+#if !defined(DEBUG) || DEBUG == 0
 #define LOG_PROCESSOR(file, line, func)
 #else
 // Print current filename, line number and function name.

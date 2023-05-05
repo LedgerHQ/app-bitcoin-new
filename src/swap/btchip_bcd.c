@@ -69,7 +69,6 @@ unsigned char btchip_convert_hex_amount_to_displayable_no_globals(unsigned char*
     workOffset = offset;
     for (i = 0; i < LOOP2; i++) {
         unsigned char allZero = 1;
-        unsigned char j;
         for (j = i; j < LOOP2; j++) {
             if (scratch[workOffset + j] != 0) {
                 allZero = 0;
