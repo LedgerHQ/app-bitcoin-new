@@ -15,6 +15,8 @@ Dates are in `dd-mm-yyyy` format.
 
 ### Fixed
 
+- Miniscript policies containing an `a:` fragment returned an incorrect address in versions `2.1.0` and `2.1.1` of the app. The **upgrade is strongly recommended** for users of miniscript wallets.
+- The app will now reject showing or returning an address for a wallet policy if the `address_index` is larger than or equal to `2147483648`; previous version would return an address for a hardened derivation, which is undesirable.
 - Nested segwit transactions (P2SH-P2WPKH and P2SH-P2WSH) can now be signed (with a warning) if the PSBT contains the witness-utxo but no non-witness-utxo. This aligns their behavior to other types of Segwitv0 transactions since version 2.0.6.
 
 ## [2.1.1] - 23-01-2023
