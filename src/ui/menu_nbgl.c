@@ -22,7 +22,7 @@
 #include "menu.h"
 
 static const char* const infoTypes[] = {"Version", "Developer", "Copyright"};
-static const char* const infoContents[] = {APPVERSION, "Ledger", "(c) 2022 Ledger"};
+static const char* const infoContents[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
 
 static bool navigation_cb(uint8_t page, nbgl_pageContent_t* content) {
     UNUSED(page);
@@ -42,7 +42,12 @@ void ui_menu_main_flow_bitcoin(void) {
 }
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
-    nbgl_useCaseHome("Bitcoin Testnet", &C_Bitcoin_64px, NULL, false, ui_menu_about, exit);
+    nbgl_useCaseHome("Bitcoin Test",
+                     &C_Bitcoin_64px,
+                     "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+                     false,
+                     ui_menu_about,
+                     exit);
 }
 
 void ui_menu_about(void) {
@@ -50,6 +55,6 @@ void ui_menu_about(void) {
 }
 
 void ui_menu_about_testnet(void) {
-    nbgl_useCaseSettings("Bitcoin Testnet", 0, 1, false, ui_menu_main, navigation_cb, NULL);
+    nbgl_useCaseSettings("Bitcoin Test", 0, 1, false, ui_menu_main, navigation_cb, NULL);
 }
 #endif  // HAVE_NBGL
