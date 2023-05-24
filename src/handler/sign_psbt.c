@@ -1313,10 +1313,14 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     memset(&st->outputs, 0, sizeof(st->outputs));
 
-    // Dry run to get the total count of external outputs
+#ifdef HAVE_NBGL
+    // Only on Stax, we need to preprocess all the outputs in order to
+    // compute the total number of non-change outputs.
+    // As it's a time-consuming operation, we use avoid doing this useless
+    // work on other models.
+
     if (!read_outputs(dc, st, &placeholder_info, true)) return false;
 
-#ifdef HAVE_NBGL
     if (!ui_transaction_prompt(dc, st->outputs.n_external)) {
         SEND_SW(dc, SW_DENY);
         return false;
