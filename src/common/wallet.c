@@ -988,7 +988,7 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "children of and_n must be miniscript");
             }
 
-            // and_n(X, Y) is equivalent to andor(X, Y, 1)
+            // and_n(X, Y) is equivalent to andor(X, Y, 0)
             // X is Bdu; Y is B
 
             const policy_node_t *X = resolve_node_ptr(&node->scripts[0]);
@@ -1118,7 +1118,7 @@ static int parse_script(buffer_t *in_buf,
             node->base.flags.is_miniscript = 1;
             node->base.flags.miniscript_type = MINISCRIPT_TYPE_V;
             node->base.flags.miniscript_mod_z = X->flags.miniscript_mod_z & Z->flags.miniscript_mod_z;
-            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_o & Z->flags.miniscript_mod_o;
+            node->base.flags.miniscript_mod_o = X->flags.miniscript_mod_o & Z->flags.miniscript_mod_z;
             node->base.flags.miniscript_mod_n = 0;
             node->base.flags.miniscript_mod_d = 0;
             node->base.flags.miniscript_mod_u = 0;
