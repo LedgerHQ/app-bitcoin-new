@@ -283,11 +283,16 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
     cx_ecfp_private_key_t private_key = {0};
     cx_ecfp_public_key_t public_key;
 
-    bool result = true;
+    bool result = false;
     BEGIN_TRY {
         TRY {
             // derive private key according to BIP32 path
-            crypto_derive_private_key(&private_key, keydata.chain_code, bip32_path, bip32_path_len);
+            if (crypto_derive_private_key(&private_key,
+                                          keydata.chain_code,
+                                          bip32_path,
+                                          bip32_path_len) < 0) {
+                goto end;
+            }
 
             if (chain_code != NULL) {
                 memmove(chain_code, keydata.chain_code, 32);
@@ -300,13 +305,15 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
 
             // compute compressed public key
             if (crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey) < 0) {
-                result = false;
+                goto end;
             }
+            result = true;
         }
         CATCH_ALL {
             result = false;
         }
         FINALLY {
+        end:
             // delete sensitive data
             explicit_bzero(keydata.chain_code, 32);
             explicit_bzero(&private_key, sizeof(private_key));
