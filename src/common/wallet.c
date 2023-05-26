@@ -1343,8 +1343,8 @@ static int parse_script(buffer_t *in_buf,
             node->base.flags.miniscript_mod_z = (count_z == node->n) ? 1 : 0;
             node->base.flags.miniscript_mod_o = (count_z == node->n - 1 && count_o == 1) ? 1 : 0;
             node->base.flags.miniscript_mod_n = 0;
-            node->base.flags.miniscript_mod_d = 0;
-            node->base.flags.miniscript_mod_u = 0;
+            node->base.flags.miniscript_mod_d = 1;
+            node->base.flags.miniscript_mod_u = 1;
             // clang-format on
 
             break;
