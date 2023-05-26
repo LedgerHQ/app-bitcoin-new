@@ -275,6 +275,36 @@ def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculo
     run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
+def test_e2e_miniscript_me_large_vault(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model: str):
+    if (model == "nanos"):
+        pytest.skip("Not supported on Nano S due to memory limitations")
+
+    path = "48'/1'/0'/2'"
+    _, core_xpub_orig1 = create_new_wallet()
+    _, core_xpub_orig2 = create_new_wallet()
+    _, core_xpub_orig3 = create_new_wallet()
+    _, core_xpub_orig4 = create_new_wallet()
+    _, core_xpub_orig5 = create_new_wallet()
+    _, core_xpub_orig6 = create_new_wallet()
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
+
+    wallet_policy = WalletPolicy(
+        name="Large vault",
+        descriptor_template="wsh(or_d(pk(@0/**),andor(thresh(1,utv:thresh(1,pkh(@1/**),a:pkh(@2/**)),autv:thresh(1,pkh(@3/**),a:pkh(@4/**))),after(1685577600),and_v(v:and_v(v:pkh(@5/**),thresh(1,pkh(@6/**))),after(1685318400)))))",
+        keys_info=[
+            internal_xpub_orig,
+            f"{core_xpub_orig1}",
+            f"{core_xpub_orig2}",
+            f"{core_xpub_orig3}",
+            f"{core_xpub_orig4}",
+            f"{core_xpub_orig5}",
+            f"{core_xpub_orig6}",
+        ])
+
+    run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
+
+
 def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
     # policy: or(and(pk(A1), pk(B)),and(pk(A2), pk(C)))
     # where A1 and A2 are both internal keys; therefore, two signatures per input must be returned
