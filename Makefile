@@ -1,6 +1,6 @@
 # ****************************************************************************
 #    Ledger App for Bitcoin
-#    (c) 2021 Ledger SAS.
+#    (c) 2023 Ledger SAS.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -23,26 +23,37 @@ include $(BOLOS_SDK)/Makefile.defines
 
 # TODO: compile with the right path restrictions
 
-APP_LOAD_PARAMS  = $(COMMON_LOAD_PARAMS)
-APP_LOAD_PARAMS  += --curve secp256k1
-APP_LOAD_PARAMS  += --path ""
-APP_LOAD_PARAMS  += --path_slip21 "LEDGER-Wallet policy"
+# Application allowed derivation curves.
+CURVE_APP_LOAD_PARAMS = secp256k1
 
+# Application allowed derivation paths.
+PATH_APP_LOAD_PARAMS = ""
+APP_LOAD_PARAMS += --path_slip21 "LEDGER-Wallet policy"
+
+# Application version
 APPVERSION_M = 2
 APPVERSION_N = 1
 APPVERSION_P = 2
 APPVERSION   = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
-
 APP_STACK_SIZE = 3072
+
+# Setting to allow building variant applications
+VARIANT_PARAM = COIN
+VARIANT_VALUES = bitcoin_testnet bitcoin
 
 # simplify for tests
 ifndef COIN
 COIN=bitcoin_testnet
 endif
 
-# Flags: BOLOS_SETTINGS, GLOBAL_PIN, DERIVE_MASTER
-APP_LOAD_FLAGS=--appFlags 0xa50
+########################################
+#     Application custom permissions   #
+########################################
+HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
+HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
+HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
+HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ifeq ($(COIN),bitcoin_testnet)
 
@@ -76,33 +87,39 @@ $(error Unsupported COIN - use bitcoin_testnet, bitcoin)
 endif
 endif
 
-APP_LOAD_PARAMS += $(APP_LOAD_FLAGS)
+# Application icons following guidelines:
+# https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
+ICON_NANOS = icons/nanos_app_bitcoin.gif
+ICON_NANOX = icons/nanox_app_bitcoin.gif
+ICON_NANOSP = icons/nanox_app_bitcoin.gif
+ICON_STAX = icons/stax_app_bitcoin.gif
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME=icons/nanos_app_bitcoin.gif
-else ifeq ($(TARGET_NAME),TARGET_STAX)
-ICONNAME=icons/stax_app_bitcoin.gif
-else
-ICONNAME=icons/nanox_app_bitcoin.gif
-endif
+########################################
+# Application communication interfaces #
+########################################
+ENABLE_BLUETOOTH = 1
 
-all: default
+########################################
+#         NBGL custom features         #
+########################################
+ENABLE_NBGL_QRCODE = 1
 
-# TODO: double check if all those flags are still relevant/needed (was copied from legacy app-bitcoin)
+########################################
+#          Features disablers          #
+########################################
+# Don't use standard app file to avoid conflicts for now
+DISABLE_STANDARD_APP_FILES = 1
 
-DEFINES   += APPNAME=\"$(APPNAME)\"
-DEFINES   += APPVERSION=\"$(APPVERSION)\"
-DEFINES   += MAJOR_VERSION=$(APPVERSION_M) MINOR_VERSION=$(APPVERSION_N) PATCH_VERSION=$(APPVERSION_P)
-DEFINES   += OS_IO_SEPROXYHAL
-DEFINES   += HAVE_SPRINTF HAVE_SNPRINTF_FORMAT_U
+# Don't use default IO_SEPROXY_BUFFER_SIZE to use another
+# value for NANOS for an unknown reason.
+DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
+
+# Don't use STANDARD_USB as we want IO_USB_MAX_ENDPOINTS=4
+# and the default is 6
+DISABLE_STANDARD_USB = 1
+
 DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=4 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-DEFINES   += LEDGER_MAJOR_VERSION=$(APPVERSION_M) LEDGER_MINOR_VERSION=$(APPVERSION_N) LEDGER_PATCH_VERSION=$(APPVERSION_P) TCS_LOADER_PATCH_VERSION=0
-
-DEFINES   += HAVE_WEBUSB WEBUSB_URL_SIZE_B=0 WEBUSB_URL=""
-
 DEFINES   += UNUSED\(x\)=\(void\)x
-DEFINES   += APPVERSION=\"$(APPVERSION)\"
-
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
 
@@ -111,24 +128,6 @@ DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=72
 DEFINES       += HAVE_WALLET_ID_SDK
 else
 DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
-endif
-
-ifeq ($(TARGET_NAME),TARGET_STAX)
-    DEFINES    += NBGL_QRCODE
-else
-    DEFINES    += HAVE_BAGL HAVE_UX_FLOW
-    ifneq ($(TARGET_NAME),TARGET_NANOS)
-        DEFINES       += HAVE_BAGL BAGL_WIDTH=128 BAGL_HEIGHT=64
-        DEFINES       += HAVE_BAGL_ELLIPSIS # long label truncation feature
-        DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
-        DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
-        DEFINES       += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-    endif
-endif
-
-ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_STAX))
-DEFINES       += HAVE_BLE BLE_COMMAND_TIMEOUT_MS=2000
-DEFINES       += HAVE_BLE_APDU # basic ledger apdu transport over BLE
 endif
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
@@ -141,81 +140,19 @@ CFLAGS    += -include debug-helpers/debug.h
 
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
-ifndef DEBUG
-        DEBUG = 0
+ifeq ($(DEBUG),10)
+    $(warning Using semihosted PRINTF. Only run with speculos!)
+    DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
 endif
-
-ifeq ($(DEBUG),0)
-        DEFINES   += PRINTF\(...\)=
-else
-        ifeq ($(DEBUG),10)
-                $(warning Using semihosted PRINTF. Only run with speculos!)
-                DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
-        else
-                ifeq ($(TARGET_NAME),TARGET_NANOS)
-                        DEFINES   += HAVE_PRINTF PRINTF=screen_printf
-                else
-                        DEFINES   += HAVE_PRINTF PRINTF=mcu_usb_printf
-                endif
-        endif
-endif
-
 
 # Needed to be able to include the definition of G_cx
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
-
-ifneq ($(BOLOS_ENV),)
-$(info BOLOS_ENV=$(BOLOS_ENV))
-CLANGPATH := $(BOLOS_ENV)/clang-arm-fropi/bin/
-GCCPATH   := $(BOLOS_ENV)/gcc-arm-none-eabi-5_3-2016q1/bin/
-else
-$(info BOLOS_ENV is not set: falling back to CLANGPATH and GCCPATH)
-endif
-ifeq ($(CLANGPATH),)
-$(info CLANGPATH is not set: clang will be used from PATH)
-endif
-ifeq ($(GCCPATH),)
-$(info GCCPATH is not set: arm-none-eabi-* will be used from PATH)
-endif
-
-CC      := $(CLANGPATH)clang
-CFLAGS  += -Oz
-AS      := $(GCCPATH)arm-none-eabi-gcc
-LD      := $(GCCPATH)arm-none-eabi-gcc
-LDFLAGS += -O3 -Os
-LDLIBS  += -lm -lgcc -lc
-
-include $(BOLOS_SDK)/Makefile.glyphs
-
+# Application source files
 APP_SOURCE_PATH += src
 SDK_SOURCE_PATH += lib_stusb lib_stusb_impl
 
-ifneq ($(TARGET_NAME),TARGET_STAX)
-SDK_SOURCE_PATH += lib_ux
-endif
-
-ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_STAX))
-    SDK_SOURCE_PATH += lib_blewbxx lib_blewbxx_impl
-endif
-
-load: all
-	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
-
-load-offline: all
-	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS) --offline
-
-delete:
-	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
-
-include $(BOLOS_SDK)/Makefile.rules
-
-dep/%.d: %.c Makefile
-
-
-listvariants:
-	@echo VARIANTS COIN bitcoin_testnet bitcoin
-
+include $(BOLOS_SDK)/Makefile.standard_app
 
 # Makes a detailed report of code and data size in debug/size-report.txt
 # More useful for production builds with DEBUG=0
