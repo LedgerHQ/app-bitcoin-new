@@ -90,41 +90,6 @@ static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
     return cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, out, 65, k, 32);
 }
 
-int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t *chain_code,
-                              const uint32_t *bip32_path,
-                              uint8_t bip32_path_len) {
-    uint8_t raw_private_key[32] = {0};
-
-    int ret = 0;
-    BEGIN_TRY {
-        TRY {
-            // derive the seed with bip32_path
-
-            os_perso_derive_node_bip32(CX_CURVE_256K1,
-                                       bip32_path,
-                                       bip32_path_len,
-                                       raw_private_key,
-                                       chain_code);
-
-            // new private_key from raw
-            cx_ecfp_init_private_key(CX_CURVE_256K1,
-                                     raw_private_key,
-                                     sizeof(raw_private_key),
-                                     private_key);
-        }
-        CATCH_ALL {
-            ret = -1;
-        }
-        FINALLY {
-            explicit_bzero(&raw_private_key, sizeof(raw_private_key));
-        }
-    }
-    END_TRY;
-
-    return ret;
-}
-
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
                  serialized_extended_pubkey_t *child) {
