@@ -412,38 +412,45 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
     cx_ecfp_public_key_t public_key;
     uint32_t info_internal = 0;
 
-    int sig_len = 0;
-    bool error = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_private_key(&private_key, NULL, bip32_path, bip32_path_len);
-            sig_len = cx_ecdsa_sign(&private_key,
-                                    CX_RND_RFC6979,
-                                    CX_SHA256,
-                                    hash,
-                                    32,
-                                    out,
-                                    MAX_DER_SIG_LEN,
-                                    &info_internal);
+    size_t sig_len = MAX_DER_SIG_LEN;
+    bool error = true;
 
-            // generate corresponding public key
-            cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
+    if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
+                                      bip32_path,
+                                      bip32_path_len,
+                                      &private_key,
+                                      NULL) != CX_OK) {
+        goto end;
+    }
 
-            if (pubkey != NULL) {
-                // compute compressed public key
-                if (crypto_get_compressed_pubkey(public_key.W, pubkey) < 0) {
-                    error = true;
-                }
-            }
+    if (cx_ecdsa_sign_no_throw(&private_key,
+                               CX_RND_RFC6979,
+                               CX_SHA256,
+                               hash,
+                               32,
+                               out,
+                               &sig_len,
+                               &info_internal) != CX_OK) {
+        goto end;
+    }
+
+    if (pubkey != NULL) {
+        // Generate associated pubkey
+        if (cx_ecfp_generate_pair_no_throw(CX_CURVE_256K1, &public_key, &private_key, true) !=
+            CX_OK) {
+            goto end;
         }
-        CATCH_ALL {
-            error = true;
-        }
-        FINALLY {
-            explicit_bzero(&private_key, sizeof(private_key));
+
+        // compute compressed public key
+        if (crypto_get_compressed_pubkey(public_key.W, pubkey) < 0) {
+            goto end;
         }
     }
-    END_TRY;
+
+    error = false;
+
+end:
+    explicit_bzero(&private_key, sizeof(private_key));
 
     if (error) {
         // unexpected error when signing
