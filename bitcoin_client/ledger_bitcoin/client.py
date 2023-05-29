@@ -2,7 +2,8 @@ from packaging.version import parse as parse_version
 from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
-import re
+
+from .bip380.descriptors import Descriptor
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
@@ -14,6 +15,7 @@ from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
+from . import segwit_addr
 from ._serialize import deser_string
 
 
@@ -50,11 +52,6 @@ def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSign
             raise UnknownDeviceError(f"Invalid pubkey length returned: {len(pubkey_augm)}")
 
         return PartialSignature(signature=signature, pubkey=pubkey_augm)
-
-
-def _contains_a_fragment(desc_tmp: str) -> bool:
-    """Returns true if the given descriptor template contains the `a:` fragment."""
-    return any('a' in match for match in re.findall(r'[asctdvjnlu]+:', desc_tmp))
 
 
 class NewClient(Client):
@@ -94,8 +91,6 @@ class NewClient(Client):
         if wallet.version not in [WalletType.WALLET_POLICY_V1, WalletType.WALLET_POLICY_V2]:
             raise ValueError("invalid wallet policy version")
 
-        self._validate_policy(wallet)
-
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_preimage(wallet.serialize())
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
@@ -116,6 +111,13 @@ class NewClient(Client):
         wallet_id = response[0:32]
         wallet_hmac = response[32:64]
 
+        if self._should_validate_address(wallet):
+            # sanity check: for miniscripts, derive the first address independently with python-bip380
+            first_addr_device = self.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
+
+            if first_addr_device != self._derive_segwit_address_for_policy(wallet, False, 0):
+                raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new")
+
         return wallet_id, wallet_hmac
 
     def get_wallet_address(
@@ -132,8 +134,6 @@ class NewClient(Client):
 
         if change != 0 and change != 1:
             raise ValueError("Invalid change")
-
-        self._validate_policy(wallet)
 
         client_intepreter = ClientCommandInterpreter()
         client_intepreter.add_known_list([k.encode() for k in wallet.keys_info])
@@ -152,11 +152,17 @@ class NewClient(Client):
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.GET_WALLET_ADDRESS)
 
-        return response.decode()
+        result = response.decode()
+
+        if self._should_validate_address(wallet):
+            # sanity check: for miniscripts, derive the address independently with python-bip380
+
+            if result != self._derive_segwit_address_for_policy(wallet, change, address_index):
+                raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new")
+
+        return result
 
     def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
-
-        self._validate_policy(wallet)
 
         psbt = normalize_psbt(psbt)
 
@@ -265,14 +271,18 @@ class NewClient(Client):
 
         return base64.b64encode(response).decode('utf-8')
 
-    def _validate_policy(self, wallet_policy: WalletPolicy):
-        """Performs any additional checks before we use a wallet policy"""
-        if _contains_a_fragment(wallet_policy.descriptor_template):
-            _, app_version, _ = self.get_version()
-            if app_version in ["2.1.0", "2.1.1"]:
-                # Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
-                # the `a:` fragment.
-                raise RuntimeError("Please update your Ledger Bitcoin app.")
+    def _should_validate_address(self, wallet: WalletPolicy) -> bool:
+        # TODO: extend to taproot miniscripts once supported
+        return wallet.descriptor_template.startswith("wsh(") and not wallet.descriptor_template.startswith("wsh(sortedmulti(")
+
+    def _derive_segwit_address_for_policy(self, wallet: WalletPolicy, change: bool, address_index: int) -> bool:
+        desc = Descriptor.from_str(wallet.get_descriptor(change))
+        desc.derive(address_index)
+        spk = desc.script_pubkey
+        if spk[0:2] != b'\x00\x20' or len(spk) != 34:
+            raise RuntimeError("Invalid scriptPubKey")
+        hrp = "bc" if self.chain == Chain.MAIN else "tb"
+        return segwit_addr.encode(hrp, 0, spk[2:])
 
 
 def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = Chain.MAIN, debug: bool = False) -> Union[LegacyClient, NewClient]:

@@ -1,0 +1,4 @@
+This folder is based on https://github.com/Eunovo/python-bip380/tree/4226b7f2b70211d696155f6fd39edc611761ed0b, in turn built on https://github.com/darosior/python-bip380/commit/d2f5d8f5b41cba189bd793c1081e9d61d2d160c1.
+
+The library is "not ready for any real world use", however we _only_ use it in order to generate addresses for descriptors containing miniscript, and compare the result with the address computed by the device.
+This is a generic mitigation for any bug related to address generation on the device, like [this](https://donjon.ledger.com/lsb/019/).
