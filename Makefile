@@ -152,6 +152,10 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 APP_SOURCE_PATH += src
 SDK_SOURCE_PATH += lib_stusb lib_stusb_impl
 
+# Allow usage of function from lib_standard_app/crypto_helpers.c
+INCLUDES_PATH  += ${BOLOS_SDK}
+APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/crypto_helpers.c
+
 include $(BOLOS_SDK)/Makefile.standard_app
 
 # Makes a detailed report of code and data size in debug/size-report.txt
