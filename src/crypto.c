@@ -27,6 +27,7 @@
 #include "cx_ram.h"
 #include "lcx_ripemd160.h"
 #include "cx_ripemd160.h"
+#include "lib_standard_app/crypto_helpers.h"
 
 #include "common/base58.h"
 #include "common/bip32.h"
@@ -275,52 +276,22 @@ bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
                                           uint8_t bip32_path_len,
                                           uint8_t pubkey[static 33],
                                           uint8_t chain_code[]) {
-    struct {
-        uint8_t raw_public_key[65];
-        uint8_t chain_code[32];
-    } keydata;
+    uint8_t raw_public_key[65];
 
-    cx_ecfp_private_key_t private_key = {0};
-    cx_ecfp_public_key_t public_key;
-
-    bool result = false;
-    BEGIN_TRY {
-        TRY {
-            // derive private key according to BIP32 path
-            if (crypto_derive_private_key(&private_key,
-                                          keydata.chain_code,
-                                          bip32_path,
-                                          bip32_path_len) < 0) {
-                goto end;
-            }
-
-            if (chain_code != NULL) {
-                memmove(chain_code, keydata.chain_code, 32);
-            }
-
-            // generate corresponding public key
-            cx_ecfp_generate_pair(CX_CURVE_256K1, &public_key, &private_key, 1);
-
-            memmove(keydata.raw_public_key, public_key.W, 65);
-
-            // compute compressed public key
-            if (crypto_get_compressed_pubkey((uint8_t *) &keydata, pubkey) < 0) {
-                goto end;
-            }
-            result = true;
-        }
-        CATCH_ALL {
-            result = false;
-        }
-        FINALLY {
-        end:
-            // delete sensitive data
-            explicit_bzero(keydata.chain_code, 32);
-            explicit_bzero(&private_key, sizeof(private_key));
-        }
+    if (bip32_derive_get_pubkey_256(CX_CURVE_256K1,
+                                    bip32_path,
+                                    bip32_path_len,
+                                    raw_public_key,
+                                    chain_code,
+                                    CX_SHA512) != CX_OK) {
+        return false;
     }
-    END_TRY;
-    return result;
+
+    if (crypto_get_compressed_pubkey(raw_public_key, pubkey) < 0) {
+        return false;
+    }
+
+    return true;
 }
 
 uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {
