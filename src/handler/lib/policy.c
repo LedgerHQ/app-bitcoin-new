@@ -675,11 +675,30 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     const policy_node_thresh_t *policy = (const policy_node_thresh_t *) node->policy_node;
 
-    // [X1] [X2] ADD ... [Xn] ADD ... <k> EQUAL
+    // [X1] [X2] ADD ... [Xn] ADD <k> EQUAL
+
+    /*
+      It's a bit unnatural to encode thresh in a way that is compatible with our
+      stack-based encoder, as every "step" that needs to recur on a child Script
+      must emit the child script as its last thing. The natural way of splitting
+      this would be:
+
+      [X1]   /   [X2] ADD   /   [X3] ADD   /   ...   /   [Xn] ADD   /   <k> EQUAL
+
+      Instead, we have to split it as follows:
+
+      [X1]   /   [X2]   /   ADD [X3]   /   ...   /   ADD [Xn]   /   ADD <k> EQUAL
+
+      But this is incorrect if n == 1, because the correct encoding is just
+
+      [X1] <k> EQUAL
+
+      Therefore, the case n == 1 needs to be handled separately to avoid the extra ADD.
+    */
 
     // n+1 steps
-    // at step i, for 0 <= i < n, we produce [Xi] (or ADD X[i])
-    // at step i, for i == n, we produce ADD <k> EQUAL
+    // at step i, for 0 <= i < n, we produce [Xi] if i <= 1, or ADD [Xi] otherwise
+    // at step n, we produce <k> EQUAL if n == 1, or ADD <k> EQUAL otherwise
 
     if (node->step < policy->n) {
         // find the current child node
@@ -700,7 +719,8 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
         return 0;
     } else {
         // final step
-        if (policy->n >= 1) {
+        if (policy->n >= 2) {
+            // no OP_ADD if n == 1, per comment above
             update_output_u8(state, OP_ADD);
         }
         update_output_push_u32(state, policy->k);
