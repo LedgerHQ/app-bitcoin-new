@@ -79,15 +79,14 @@ static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a'
 static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
 static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
-static int secp256k1_point(const uint8_t scalar[static 32], uint8_t out[static 65]);
-
 /**
  * Gets the point on the SECP256K1 that corresponds to kG, where G is the curve's generator point.
- * Returns 0 if point is Infinity, encoding length otherwise.
+ * Returns -1 if point is Infinity or any error occurs; 0 otherwise.
  */
 static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
     memcpy(out, secp256k1_generator, 65);
-    return cx_ecfp_scalar_mult(CX_CURVE_SECP256K1, out, 65, k, 32);
+    if (CX_OK != cx_ecfp_scalar_mult_no_throw(CX_CURVE_SECP256K1, out, k, 32)) return -1;
+    return 0;
 }
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
@@ -100,7 +99,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     }
 
     if (parent->depth == 255) {
-        return -2;  // maximum derivation depth reached
+        return -1;  // maximum derivation depth reached
     }
 
     uint8_t I[64];
@@ -118,7 +117,8 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     uint8_t *I_R = &I[32];
 
     // fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
-    if (cx_math_cmp(I_L, secp256k1_n, 32) >= 0) {
+    int diff;
+    if (CX_OK != cx_math_cmp_no_throw(I_L, secp256k1_n, 32, &diff) || diff >= 0) {
         return -1;
     }
 
@@ -127,18 +127,15 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     {  // make sure that heavy memory allocations are freed as soon as possible
         // compute point(I_L)
         uint8_t P[65];
-        secp256k1_point(I_L, P);
+        if (0 > secp256k1_point(I_L, P)) return -1;
 
         uint8_t K_par[65];
         crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
 
         // add K_par
-        if (cx_ecfp_add_point(CX_CURVE_SECP256K1,
-                              child_uncompressed_pubkey,
-                              P,
-                              K_par,
-                              sizeof(child_uncompressed_pubkey)) == 0) {
-            return -3;  // the point at infinity is not a valid child pubkey (should never happen in
+        if (CX_OK !=
+            cx_ecfp_add_point_no_throw(CX_CURVE_SECP256K1, child_uncompressed_pubkey, P, K_par)) {
+            return -1;  // the point at infinity is not a valid child pubkey (should never happen in
                         // practice)
         }
     }
@@ -214,15 +211,18 @@ int crypto_get_uncompressed_pubkey(const uint8_t compressed_key[static 33],
     // we use y for intermediate results, in order to save memory
 
     uint8_t e = 3;
-    cx_math_powm(y, x, &e, 1, secp256k1_p, 32);  // tmp = x^3 (mod p)
+    if (CX_OK != cx_math_powm_no_throw(y, x, &e, 1, secp256k1_p, 32))
+        return -1;  // tmp = x^3 (mod p)
     uint8_t scalar[32] = {0};
     scalar[31] = 7;
-    cx_math_addm(y, y, scalar, secp256k1_p, 32);                      // tmp = x^3 + 7 (mod p)
-    cx_math_powm(y, y, secp256k1_sqr_exponent, 32, secp256k1_p, 32);  // tmp = sqrt(x^3 + 7) (mod p)
+    if (CX_OK != cx_math_addm_no_throw(y, y, scalar, secp256k1_p, 32))
+        return -1;  // tmp = x^3 + 7 (mod p)
+    if (CX_OK != cx_math_powm_no_throw(y, y, secp256k1_sqr_exponent, 32, secp256k1_p, 32))
+        return -1;  // tmp = sqrt(x^3 + 7) (mod p)
 
     // if the prefix and y don't have the same parity, take the opposite root (mod p)
     if (((prefix ^ y[31]) & 1) != 0) {
-        cx_math_sub(y, secp256k1_p, y, 32);
+        if (CX_OK != cx_math_sub_no_throw(y, secp256k1_p, y, 32)) return -1;
     }
 
     out[0] = 0x04;
@@ -457,24 +457,27 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
     uint8_t *c = out + 1;
 
     uint8_t e = 3;
-    cx_math_powm(c, x, &e, 1, secp256k1_p, 32);  // c = x^3 (mod p)
+    if (CX_OK != cx_math_powm_no_throw(c, x, &e, 1, secp256k1_p, 32)) return -1;  // c = x^3 (mod p)
     uint8_t scalar[32] = {0};
     scalar[31] = 7;
-    cx_math_addm(c, c, scalar, secp256k1_p, 32);  // c = x^3 + 7 (mod p)
+    if (CX_OK != cx_math_addm_no_throw(c, c, scalar, secp256k1_p, 32))
+        return -1;  // c = x^3 + 7 (mod p)
 
-    cx_math_powm(y, c, secp256k1_sqr_exponent, 32, secp256k1_p, 32);  // y = sqrt(x^3 + 7) (mod p)
+    if (CX_OK != cx_math_powm_no_throw(y, c, secp256k1_sqr_exponent, 32, secp256k1_p, 32))
+        return -1;  // y = sqrt(x^3 + 7) (mod p)
 
     // sanity check: fail if y * y % p != x^3 + 7
     uint8_t y_2[32];
     e = 2;
-    cx_math_powm(y_2, y, &e, 1, secp256k1_p, 32);  // y^2 (mod p)
-    if (cx_math_cmp(y_2, c, 32) != 0) {
+    if (CX_OK != cx_math_powm_no_throw(y_2, y, &e, 1, secp256k1_p, 32)) return -1;  // y^2 (mod p)
+    int diff;
+    if (CX_OK != cx_math_cmp_no_throw(y_2, c, 32, &diff) || diff != 0) {
         return -1;
     }
 
     if (y[31] & 1) {
         // y must be even: take the negation
-        cx_math_sub(out + 1 + 32, secp256k1_p, y, 32);
+        if (CX_OK != cx_math_sub_no_throw(out + 1 + 32, secp256k1_p, y, 32)) return -1;
     }
 
     // add the 0x04 prefix; copy x verbatim
@@ -543,7 +546,8 @@ int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
                           t);
 
     // fail if t is not smaller than the curve order
-    if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
+    int diff;
+    if (CX_OK != cx_math_cmp_no_throw(t, secp256k1_n, 32, &diff) || diff >= 0) {
         return -1;
     }
 
@@ -554,13 +558,13 @@ int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
         return -1;
     }
 
-    if (secp256k1_point(t, Q) == 0) {
-        // point at infinity
+    if (0 > secp256k1_point(t, Q)) {
+        // point at infinity, or error
         return -1;
     }
 
-    if (cx_ecfp_add_point(CX_CURVE_SECP256K1, Q, Q, lifted_pubkey, sizeof(Q)) == 0) {
-        return -1;  // the point at infinity is not valid (should never happen in practice)
+    if (CX_OK != cx_ecfp_add_point_no_throw(CX_CURVE_SECP256K1, Q, Q, lifted_pubkey)) {
+        return -1;  // error, or point at Infinity
     }
 
     *y_parity = Q[64] & 1;
@@ -575,45 +579,36 @@ int crypto_tr_tweak_seckey(const uint8_t seckey[static 32],
                            uint8_t out[static 32]) {
     uint8_t P[65];
 
-    int ret = 0;
-    BEGIN_TRY {
-        TRY {
-            secp256k1_point(seckey, P);
+    int ret = -1;
+    do {  // loop to break out in case of error
+        if (0 > secp256k1_point(seckey, P)) break;
 
-            memmove(out, seckey, 32);
+        memmove(out, seckey, 32);
 
-            if (P[64] & 1) {
-                // odd y, negate the secret key
-                cx_math_sub(out, secp256k1_n, out, 32);
-            }
-
-            uint8_t t[32];
-            crypto_tr_tagged_hash(BIP0341_taptweak_tag,
-                                  sizeof(BIP0341_taptweak_tag),
-                                  &P[1],  // P[1:33] is x(P)
-                                  32,
-                                  h,
-                                  h_len,
-                                  t);
-
-            // fail if t is not smaller than the curve order
-            if (cx_math_cmp(t, secp256k1_n, 32) >= 0) {
-                CLOSE_TRY;
-                ret = -1;
-                goto end;
-            }
-
-            cx_math_addm(out, out, t, secp256k1_n, 32);
+        if (P[64] & 1) {
+            // odd y, negate the secret key
+            if (CX_OK != cx_math_sub_no_throw(out, secp256k1_n, out, 32)) break;
         }
-        CATCH_ALL {
-            ret = -1;
-        }
-        FINALLY {
-        end:
-            explicit_bzero(&P, sizeof(P));
-        }
-    }
-    END_TRY;
+
+        uint8_t t[32];
+        crypto_tr_tagged_hash(BIP0341_taptweak_tag,
+                              sizeof(BIP0341_taptweak_tag),
+                              &P[1],  // P[1:33] is x(P)
+                              32,
+                              h,
+                              h_len,
+                              t);
+
+        // fail if t is not smaller than the curve order
+        int diff;
+        if (CX_OK != cx_math_cmp_no_throw(t, secp256k1_n, 32, &diff) || diff >= 0) break;
+
+        if (CX_OK != cx_math_addm_no_throw(out, out, t, secp256k1_n, 32)) break;
+
+        ret = 0;
+    } while (0);
+
+    explicit_bzero(&P, sizeof(P));
 
     return ret;
 }

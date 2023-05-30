@@ -50,7 +50,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  serialized_extended_pubkey_t *child);
 
 /**
- * Convenience wrapper for cx_hash to add some data to an initialized hash context.
+ * Convenience wrapper for cx_hash_no_throw to add some data to an initialized hash context.
  *
  * @param[in] hash_context
  *   The context of the hash, which must already be initialized.
@@ -59,14 +59,14 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
  * @param[in] in_len
  *   Size of the passed data.
  *
- * @return the return value of cx_hash.
+ * @return the return value of cx_hash_no_throw.
  */
 static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len) {
-    return cx_hash(hash_context, 0, in, in_len, NULL, 0);
+    return cx_hash_no_throw(hash_context, 0, in, in_len, NULL, 0);
 }
 
 /**
- * Convenience wrapper for cx_hash to compute the final hash, without adding any extra data
+ * Convenience wrapper for cx_hash_no_throw to compute the final hash, without adding any extra data
  * to the hash context.
  *
  * @param[in] hash_context
@@ -76,10 +76,10 @@ static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, si
  * @param[in] out_len
  *   Size of output buffer, which must be large enough to contain the result.
  *
- * @return the return value of cx_hash.
+ * @return the return value of cx_hash_no_throw.
  */
 static inline int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
-    return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
+    return cx_hash_no_throw(hash_context, CX_LAST, NULL, 0, out, out_len);
 }
 
 /**
