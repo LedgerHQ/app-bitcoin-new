@@ -90,7 +90,7 @@ impl<T: Transport> BitcoinClient<T> {
         if data.is_empty() || data[0] != 0x01 {
             return Err(BitcoinClientError::UnexpectedResult {
                 command: cmd.ins,
-                data: data.clone(),
+                data,
             });
         }
 
@@ -151,7 +151,7 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
         wallet: &WalletPolicy,
     ) -> Result<([u8; 32], [u8; 32]), BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet).await?;
+        self.validate_policy(wallet).await?;
 
         let cmd = command::register_wallet(wallet);
         let mut intpr = ClientCommandInterpreter::new();
@@ -188,7 +188,7 @@ impl<T: Transport> BitcoinClient<T> {
         address_index: u32,
         display: bool,
     ) -> Result<bitcoin::Address, BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet).await?;
+        self.validate_policy(wallet).await?;
 
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
@@ -218,7 +218,7 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
     ) -> Result<Vec<(usize, PartialSignature)>, BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet).await?;
+        self.validate_policy(wallet).await?;
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();

@@ -74,7 +74,7 @@ pub fn get_v2_global_pairs(psbt: &Psbt) -> Vec<raw::Pair> {
                 ret.extend(fingerprint.as_bytes());
                 derivation
                     .into_iter()
-                    .for_each(|n| ret.extend(&u32::from(*n).to_le_bytes()));
+                    .for_each(|n| ret.extend(u32::from(*n).to_le_bytes()));
                 ret
             },
         });
@@ -396,7 +396,7 @@ pub enum PartialSignature {
 impl PartialSignature {
     pub fn from_slice(slice: &[u8]) -> Result<Self, PartialSignatureError> {
         let key_augment_byte = slice
-            .get(0)
+            .first()
             .ok_or(PartialSignatureError::BadKeyAugmentLength)?;
         let key_augment_len = u8::from_le_bytes([*key_augment_byte]) as usize;
 
