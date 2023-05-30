@@ -31,26 +31,6 @@ typedef struct {
 } serialized_extended_pubkey_check_t;
 
 /**
- * Derive private key given BIP32 path.
- * It must be wrapped in a TRY block that wipes the output private key in the FINALLY block.
- *
- * @param[out] private_key
- *   Pointer to private key.
- * @param[out] chain_code
- *   Pointer to 32 bytes array for chain code, or NULL if the chain_code is not required.
- * @param[in]  bip32_path
- *   Pointer to buffer with BIP32 path.
- * @param[in]  bip32_path_len
- *   Number of path in BIP32 path.
- *
- * @return 0 if success, -1 otherwise.
- */
-int crypto_derive_private_key(cx_ecfp_private_key_t *private_key,
-                              uint8_t *chain_code,
-                              const uint32_t *bip32_path,
-                              uint8_t bip32_path_len);
-
-/**
  * Generates the child extended public key, from a parent extended public key and non-hardened
  * index.
  *
@@ -70,7 +50,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  serialized_extended_pubkey_t *child);
 
 /**
- * Convenience wrapper for cx_hash to add some data to an initialized hash context.
+ * Convenience wrapper for cx_hash_no_throw to add some data to an initialized hash context.
  *
  * @param[in] hash_context
  *   The context of the hash, which must already be initialized.
@@ -79,14 +59,14 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
  * @param[in] in_len
  *   Size of the passed data.
  *
- * @return the return value of cx_hash.
+ * @return the return value of cx_hash_no_throw.
  */
 static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, size_t in_len) {
-    return cx_hash(hash_context, 0, in, in_len, NULL, 0);
+    return cx_hash_no_throw(hash_context, 0, in, in_len, NULL, 0);
 }
 
 /**
- * Convenience wrapper for cx_hash to compute the final hash, without adding any extra data
+ * Convenience wrapper for cx_hash_no_throw to compute the final hash, without adding any extra data
  * to the hash context.
  *
  * @param[in] hash_context
@@ -96,10 +76,10 @@ static inline int crypto_hash_update(cx_hash_t *hash_context, const void *in, si
  * @param[in] out_len
  *   Size of output buffer, which must be large enough to contain the result.
  *
- * @return the return value of cx_hash.
+ * @return the return value of cx_hash_no_throw.
  */
 static inline int crypto_hash_digest(cx_hash_t *hash_context, uint8_t *out, size_t out_len) {
-    return cx_hash(hash_context, CX_LAST, NULL, 0, out, out_len);
+    return cx_hash_no_throw(hash_context, CX_LAST, NULL, 0, out, out_len);
 }
 
 /**
@@ -296,7 +276,6 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.
- * Must be wrapped in a TRY/FINALLY block to make sure that the output key is wiped after using it.
  *
  * @param[in]  label
  *   Pointer to the label. The first byte of the label must be 0x00 to comply with SLIP-0021.
@@ -305,7 +284,7 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
  * @param[out] key
  *   Pointer to a 32-byte output buffer that will contain the generated key.
  */
-void crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]);
+bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]);
 
 /**
  * Encodes a 20-bytes hash in base58 with checksum, after prepending a version prefix.

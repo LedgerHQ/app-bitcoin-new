@@ -1290,18 +1290,17 @@ bool compute_wallet_hmac(const uint8_t wallet_id[static 32], uint8_t wallet_hmac
     uint8_t key[32];
 
     bool result = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
-            cx_hmac_sha256(key, sizeof(key), wallet_id, 32, wallet_hmac, 32);
-            result = true;
-        }
-        FINALLY {
-            explicit_bzero(key, sizeof(key));
-        }
+    if (!crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key)) {
+        goto end;
     }
-    END_TRY;
+
+    cx_hmac_sha256(key, sizeof(key), wallet_id, 32, wallet_hmac, 32);
+
+    result = true;
+
+end:
+    explicit_bzero(key, sizeof(key));
 
     return result;
 }
@@ -1311,22 +1310,20 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
     uint8_t correct_hmac[32];
 
     bool result = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
-            cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
-
-            // It is important to use a constant-time function to compare the hmac,
-            // to avoid timing-attack that could be exploited to extract it.
-            result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
-        }
-        FINALLY {
-            explicit_bzero(key, sizeof(key));
-            explicit_bzero(correct_hmac, sizeof(correct_hmac));
-        }
+    if (!crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key)) {
+        goto end;
     }
-    END_TRY;
+
+    cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
+
+    // It is important to use a constant-time function to compare the hmac,
+    // to avoid timing-attack that could be exploited to extract it.
+    result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
+
+end:
+    explicit_bzero(key, sizeof(key));
+    explicit_bzero(correct_hmac, sizeof(correct_hmac));
 
     return result;
 }

@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 
+#include "lib_standard_app/crypto_helpers.h"
+
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
 #include "../common/bitvector.h"
@@ -1963,7 +1965,11 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
         int sign_path_len = placeholder_info->key_derivation_length + 2;
 
-        if (0 > crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len)) {
+        if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
+                                          sign_path,
+                                          sign_path_len,
+                                          &private_key,
+                                          NULL) != CX_OK) {
             error = true;
             break;
         }
