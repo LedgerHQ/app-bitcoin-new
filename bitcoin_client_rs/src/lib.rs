@@ -1,11 +1,11 @@
 mod command;
 mod interpreter;
 mod merkle;
-mod psbt;
 
 pub mod apdu;
 pub mod client;
 pub mod error;
+pub mod psbt;
 pub mod wallet;
 
 #[cfg(feature = "async")]

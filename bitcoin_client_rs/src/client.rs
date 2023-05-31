@@ -3,13 +3,11 @@ use core::str::FromStr;
 
 use bitcoin::{
     consensus::encode::{deserialize_partial, VarInt},
-    secp256k1::ecdsa::Signature,
+    secp256k1::ecdsa,
     util::{
         bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
-        ecdsa::EcdsaSig,
         psbt::PartiallySignedTransaction as Psbt,
     },
-    PublicKey,
 };
 
 use crate::{
@@ -82,7 +80,7 @@ impl<T: Transport> BitcoinClient<T> {
         if data.is_empty() || data[0] != 0x01 {
             return Err(BitcoinClientError::UnexpectedResult {
                 command: cmd.ins,
-                data: data.clone(),
+                data,
             });
         }
 
@@ -141,7 +139,7 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
         wallet: &WalletPolicy,
     ) -> Result<([u8; 32], [u8; 32]), BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet)?;
+        self.validate_policy(wallet)?;
 
         let cmd = command::register_wallet(wallet);
         let mut intpr = ClientCommandInterpreter::new();
@@ -176,7 +174,7 @@ impl<T: Transport> BitcoinClient<T> {
         address_index: u32,
         display: bool,
     ) -> Result<bitcoin::Address, BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet)?;
+        self.validate_policy(wallet)?;
 
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
@@ -203,9 +201,8 @@ impl<T: Transport> BitcoinClient<T> {
         psbt: &Psbt,
         wallet: &WalletPolicy,
         wallet_hmac: Option<&[u8; 32]>,
-    ) -> Result<Vec<(usize, PublicKey, EcdsaSig)>, BitcoinClientError<T::Error>> {
-        self.validate_policy(&wallet)?;
-
+    ) -> Result<Vec<(usize, PartialSignature)>, BitcoinClientError<T::Error>> {
+        self.validate_policy(wallet)?;
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
@@ -277,40 +274,21 @@ impl<T: Transport> BitcoinClient<T> {
 
         let mut signatures = Vec::new();
         for result in results {
-            let (input_index, i1): (VarInt, usize) =
+            let (input_index, i): (VarInt, usize) =
                 deserialize_partial(&result).map_err(|_| BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
                     data: result.clone(),
                 })?;
 
-            let key_byte = result.get(i1).ok_or(BitcoinClientError::UnexpectedResult {
-                command: cmd.ins,
-                data: result.clone(),
-            })?;
-            let key_len = u8::from_le_bytes([*key_byte]) as usize;
-
-            if i1 + 1 + key_len > result.len() {
-                return Err(BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data: result.clone(),
-                });
-            }
-
-            let key = PublicKey::from_slice(&result[i1 + 1..i1 + 1 + key_len]).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data: result.clone(),
-                }
-            })?;
-
-            let sig = EcdsaSig::from_slice(&result[i1 + 1 + key_len..]).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
-                    command: cmd.ins,
-                    data: result.clone(),
-                }
-            })?;
-
-            signatures.push((input_index.0 as usize, key, sig));
+            signatures.push((
+                input_index.0 as usize,
+                PartialSignature::from_slice(&result[i..]).map_err(|_| {
+                    BitcoinClientError::UnexpectedResult {
+                        command: cmd.ins,
+                        data: result.clone(),
+                    }
+                })?,
+            ));
         }
 
         Ok(signatures)
@@ -322,7 +300,7 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
         message: &[u8],
         path: &DerivationPath,
-    ) -> Result<(u8, Signature), BitcoinClientError<T::Error>> {
+    ) -> Result<(u8, ecdsa::Signature), BitcoinClientError<T::Error>> {
         let chunks: Vec<&[u8]> = message.chunks(64).collect();
         let mut intpr = ClientCommandInterpreter::new();
         let message_commitment_root = intpr.add_known_list(&chunks);
@@ -330,7 +308,7 @@ impl<T: Transport> BitcoinClient<T> {
         self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
             Ok((
                 data[0],
-                Signature::from_compact(&data[1..]).map_err(|_| {
+                ecdsa::Signature::from_compact(&data[1..]).map_err(|_| {
                     BitcoinClientError::UnexpectedResult {
                         command: cmd.ins,
                         data: data.to_vec(),
