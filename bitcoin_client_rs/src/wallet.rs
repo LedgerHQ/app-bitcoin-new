@@ -140,6 +140,31 @@ impl WalletPolicy {
         res
     }
 
+    pub fn get_descriptor(&self, change: bool) -> Result<String, WalletError> {
+        let mut desc = self.descriptor_template.clone();
+
+        for (i, key) in self.keys.iter().enumerate().rev() {
+            desc = desc.replace(&format!("@{}", i), &key.to_string());
+        }
+
+        desc = desc.replace("/**", &format!("/{}/{}", if change { 1 } else { 0 }, "*"));
+
+        // For every "/<M;N>" expression, replace with M if not change, or with N if change
+        if let Some(start) = desc.find("/<") {
+            if let Some(end) = desc.find(">") {
+                let nums: Vec<&str> = desc[start + 2..end].split(";").collect();
+                if nums.len() == 2 {
+                    let replacement = if change { nums[1] } else { nums[0] };
+                    desc = format!("{}{}{}", &desc[..start + 1], replacement, &desc[end + 1..]);
+                } else {
+                    return Err(WalletError::InvalidPolicy);
+                }
+            }
+        }
+
+        Ok(desc)
+    }
+
     pub fn id(&self) -> [u8; 32] {
         let mut engine = sha256::Hash::engine();
         engine.input(&self.serialize());
@@ -151,6 +176,7 @@ impl WalletPolicy {
 pub enum WalletError {
     InvalidThreshold,
     UnsupportedAddressType,
+    InvalidPolicy,
 }
 
 pub struct WalletPubKey {
@@ -252,25 +278,6 @@ impl core::fmt::Display for WalletPubKey {
     }
 }
 
-/// Returns true if `descriptor_template` contains an 'a:' fragment
-pub fn contains_a(descriptor_template: &str) -> bool {
-    const MINISCRIPT_WRAPPERS: &[char] = &['a', 's', 'c', 't', 'd', 'v', 'j', 'n', 'l', 'u'];
-    let mut sequence = String::new();
-
-    for ch in descriptor_template.chars() {
-        if MINISCRIPT_WRAPPERS.contains(&ch) {
-            sequence.push(ch);
-        } else {
-            if ch == ':' && sequence.contains('a') {
-                return true;
-            }
-            sequence.clear();
-        }
-    }
-
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,13 +335,18 @@ mod tests {
     }
 
     #[test]
-    fn test_contains_a() {
-        assert_eq!(contains_a("wsh(pkh(@0))"), false);
-        assert_eq!(
-            contains_a("wsh(c:andor(pk(@0/**),pk_k(@1/**),and_v(v:pk(@2/**),pk_k(@3/**))))"),
-            false
+    fn test_get_descriptor() {
+        let wallet = WalletPolicy::new(
+            "Cold storage".to_string(),
+            Version::V2,
+            "wsh(sortedmulti(2,@0/**,@1/<12;3>/*))".to_string(),
+            vec![
+               WalletPubKey::from_str("[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF").unwrap(),
+               WalletPubKey::from_str("[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK").unwrap(),
+            ],
         );
-        assert_eq!(contains_a("wsh(a:pkh(@0))"), true);
-        assert_eq!(contains_a("wsh(or_i(and_v(v:pkh(@0/**),older(65535)),or_d(multi(2,@1/**,@3/**),and_v(v:thresh(1,pkh(@4/**),a:pkh(@5/**)),older(64231)))))"), true);
+
+        assert_eq!(wallet.get_descriptor(false).unwrap(), "wsh(sortedmulti(2,[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/0/*,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/12/*))");
+        assert_eq!(wallet.get_descriptor(true).unwrap(), "wsh(sortedmulti(2,[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/1/*,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/3/*))");
     }
 }

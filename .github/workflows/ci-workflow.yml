@@ -264,4 +264,4 @@ jobs:
       - name: Run tests
         run: |
           cd bitcoin_client_rs/
-          cargo test
+          cargo test --no-default-features --features="async"
