@@ -45,18 +45,6 @@
 #include "swap/handle_get_printable_amount.h"
 #include "swap/handle_check_address.h"
 
-// we don't import main_old.h in legacy-only mode, but we still need libargs_s; will refactor later
-struct libargs_s {
-    unsigned int id;
-    unsigned int command;
-    void *unused;  // it used to be the coin_config; unused in the new app
-    union {
-        check_address_parameters_t *check_address;
-        create_transaction_parameters_t *create_transaction;
-        get_printable_amount_parameters_t *get_printable_amount;
-    };
-};
-
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
 #endif
@@ -259,7 +247,7 @@ void coin_main() {
     app_exit();
 }
 
-static void swap_library_main_helper(struct libargs_s *args) {
+static void swap_library_main_helper(libargs_t *args) {
     check_api_level(CX_COMPAT_APILEVEL);
     PRINTF("Inside a library \n");
     switch (args->command) {
@@ -310,7 +298,7 @@ static void swap_library_main_helper(struct libargs_s *args) {
     }
 }
 
-void swap_library_main(struct libargs_s *args) {
+void swap_library_main(libargs_t *args) {
     bool end = false;
     /* This loop ensures that swap_library_main_helper and os_lib_end are called
      * within a try context, even if an exception is thrown */
@@ -344,7 +332,7 @@ __attribute__((section(".boot"))) int main(int arg0) {
     }
 
     // Application launched as library (for swap support)
-    struct libargs_s *args = (struct libargs_s *) arg0;
+    libargs_t *args = (libargs_t *) arg0;
     if (args->id != 0x100) {
         app_exit();
         return 0;
