@@ -404,11 +404,29 @@ export class AppClient {
 
   /* Performs any additional checks on the policy before using it.*/
   private async validatePolicy(walletPolicy: WalletPolicy) {
+    // TODO: Once an independent implementation of miniscript in JavaScript is available,
+    // we will replace the checks in this section with a generic comparison between the
+    // address produced by the app and the one computed locally (like the python and Rust
+    // clients). Until then, we filter for any known bug.
+
+    let appAndVer = undefined;
+
     if (containsA(walletPolicy.descriptorTemplate)) {
-      const appAndVer = await this.getAppAndVersion();
+      appAndVer = appAndVer || await this.getAppAndVersion();
       if (["2.1.0", "2.1.1"].includes(appAndVer.version)) {
         // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
         // the `a:` fragment.
+        throw new Error("Please update your Ledger Bitcoin app.")
+      }
+    }
+
+    if (walletPolicy.descriptorTemplate.includes("thresh(1,")) {
+      appAndVer = appAndVer || await this.getAppAndVersion();
+      if (["2.1.0", "2.1.1", "2.1.2"].includes(appAndVer.version)) {
+        // Versions 2.1.0 and 2.1.1 and "2.1.2" produced incorrect scripts for policies
+        // containing an unusual thresh fragment with k = n = 1, that is "thresh(1,X)".
+        // (The check above has false positives, as it also matches "thresh" fragments
+        // where n > 1; however, better to be overzealous).
         throw new Error("Please update your Ledger Bitcoin app.")
       }
     }

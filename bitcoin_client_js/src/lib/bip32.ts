@@ -32,7 +32,7 @@ export function pathStringToArray(path: string): readonly number[] {
 }
 
 export function pubkeyFromXpub(xpub: string): Buffer {
-  const xpubBuf = bs58check.decode(xpub);
+  const xpubBuf = Buffer.from(bs58check.decode(xpub));
   return xpubBuf.slice(xpubBuf.length - 33);
 }
 
@@ -41,7 +41,7 @@ export function getXpubComponents(xpub: string): {
   readonly pubkey: Buffer;
   readonly version: number;
 } {
-  const xpubBuf: Buffer = bs58check.decode(xpub);
+  const xpubBuf = Buffer.from(bs58check.decode(xpub));
   return {
     chaincode: xpubBuf.slice(13, 13 + 32),
     pubkey: xpubBuf.slice(xpubBuf.length - 33),
