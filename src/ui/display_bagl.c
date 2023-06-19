@@ -168,6 +168,7 @@ UX_STEP_NOCB(ux_validate_address_step,
              });
 
 UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
+UX_STEP_NOCB(ux_confirm_selftransfer_step, pnn, {&C_icon_eye, "Confirm", "self-transfer"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
              bnnn_paging,
              {
@@ -386,12 +387,23 @@ UX_FLOW(ux_display_output_address_amount_flow,
         &ux_display_reject_step);
 
 // Finalize see the transaction fees and finally accept signing
-// #1 screen: eye icon + "Confirm Transaction"
+// #1 screen: eye icon + "Confirm transaction"
 // #2 screen: fee amount
 // #3 screen: "Accept and send", with approve button
 // #4 screen: reject button
 UX_FLOW(ux_accept_transaction_flow,
         &ux_confirm_transaction_step,
+        &ux_confirm_transaction_fees_step,
+        &ux_accept_and_send_step,
+        &ux_display_reject_step);
+
+// Finalize see the transaction fees and finally accept signing
+// #1 screen: eye icon + "Confirm self-transfer"
+// #2 screen: fee amount
+// #3 screen: "Accept and send", with approve button
+// #4 screen: reject button
+UX_FLOW(ux_accept_selftransfer_flow,
+        &ux_confirm_selftransfer_step,
         &ux_confirm_transaction_fees_step,
         &ux_accept_and_send_step,
         &ux_display_reject_step);
@@ -456,6 +468,10 @@ void ui_display_output_address_amount_no_index_flow(int index) {
 
 void ui_accept_transaction_flow(void) {
     ux_flow_init(0, ux_accept_transaction_flow, NULL);
+}
+
+void ui_accept_selftransfer_flow(void) {
+    ux_flow_init(0, ux_accept_selftransfer_flow, NULL);
 }
 
 #endif  // HAVE_BAGL

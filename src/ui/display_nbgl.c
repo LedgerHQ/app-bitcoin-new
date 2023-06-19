@@ -22,7 +22,8 @@ enum {
     CANCEL_TOKEN = 0,
     CONFIRM_TOKEN,
     SILENT_CONFIRM_TOKEN,
-    BACK_TOKEN,
+    BACK_TOKEN_TRANSACTION,   // for most transactions
+    BACK_TOKEN_SELFTRANSFER,  // special case when it's a self-transfer (no external outputs)
 };
 
 extern bool G_was_processing_screen_shown;
@@ -91,8 +92,11 @@ static void transaction_confirm_callback(int token, uint8_t index) {
         case SILENT_CONFIRM_TOKEN:
             ux_flow_response(true);
             break;
-        case BACK_TOKEN:
+        case BACK_TOKEN_TRANSACTION:
             ui_accept_transaction_flow();
+            break;
+        case BACK_TOKEN_SELFTRANSFER:
+            ui_accept_selftransfer_flow();
             break;
         default:
             PRINTF("Unhandled token : %d", token);
@@ -149,13 +153,17 @@ static void continue_callback(void) {
 static void transaction_confirm(int token, uint8_t index) {
     (void) index;
 
+    // If it's a self-transfer, the UX is slightly different
+    int backToken =
+        transactionContext.extOutputCount == 0 ? BACK_TOKEN_SELFTRANSFER : BACK_TOKEN_TRANSACTION;
+
     if (token == CONFIRM_TOKEN) {
         nbgl_pageNavigationInfo_t info = {.activePage = transactionContext.extOutputCount + 1,
                                           .nbPages = transactionContext.extOutputCount + 2,
                                           .navType = NAV_WITH_TAP,
                                           .progressIndicator = true,
                                           .navWithTap.backButton = true,
-                                          .navWithTap.backToken = BACK_TOKEN,
+                                          .navWithTap.backToken = backToken,
                                           .navWithTap.nextPageText = NULL,
                                           .navWithTap.quitText = "Reject transaction",
                                           .quitToken = CANCEL_TOKEN,
@@ -180,6 +188,37 @@ void ui_accept_transaction_flow(void) {
     transactionContext.tagValuePair[0].value = g_ui_state.validate_transaction.fee;
 
     transactionContext.tagValueList.nbPairs = 1;
+
+    transactionContext.confirm = "Sign transaction\nto send Bitcoin?";
+    transactionContext.confirmed_status = "TRANSACTION\nSIGNED";
+    transactionContext.rejected_status = "Transaction rejected";
+
+    nbgl_pageNavigationInfo_t info = {.activePage = transactionContext.extOutputCount,
+                                      .nbPages = transactionContext.extOutputCount + 2,
+                                      .navType = NAV_WITH_TAP,
+                                      .progressIndicator = true,
+                                      .navWithTap.backButton = false,
+                                      .navWithTap.nextPageText = "Tap to continue",
+                                      .navWithTap.nextPageToken = CONFIRM_TOKEN,
+                                      .navWithTap.quitText = "Reject transaction",
+                                      .quitToken = CANCEL_TOKEN,
+                                      .tuneId = TUNE_TAP_CASUAL};
+
+    nbgl_pageContent_t content = {.type = TAG_VALUE_LIST,
+                                  .tagValueList.nbPairs = transactionContext.tagValueList.nbPairs,
+                                  .tagValueList.pairs = transactionContext.tagValuePair};
+
+    nbgl_pageDrawGenericContent(&transaction_confirm, &info, &content);
+    nbgl_refresh();
+}
+
+void ui_accept_selftransfer_flow(void) {
+    transactionContext.tagValuePair[0].item = "Amount";
+    transactionContext.tagValuePair[0].value = "Self-transfer";
+    transactionContext.tagValuePair[1].item = "Fees";
+    transactionContext.tagValuePair[1].value = g_ui_state.validate_transaction.fee;
+
+    transactionContext.tagValueList.nbPairs = 2;
 
     transactionContext.confirm = "Sign transaction\nto send Bitcoin?";
     transactionContext.confirmed_status = "TRANSACTION\nSIGNED";

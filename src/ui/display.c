@@ -209,6 +209,17 @@ bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_nam
     return io_ui_process(context, true);
 }
 
+// Special case when all the outputs are change: show a "Self-transfer" screen in the flow
+bool ui_validate_selftransfer(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
+    ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
+
+    format_sats_amount(coin_name, fee, state->fee);
+
+    ui_accept_selftransfer_flow();
+
+    return io_ui_process(context, true);
+}
+
 #ifdef HAVE_BAGL
 bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
     (void) context;

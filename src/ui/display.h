@@ -134,6 +134,8 @@ bool ui_validate_output(dispatcher_context_t *context,
 
 bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee);
 
+bool ui_validate_selftransfer(dispatcher_context_t *context, const char *coin_name, uint64_t fee);
+
 void set_ux_flow_response(bool approved);
 
 void ui_display_pubkey_flow(void);
@@ -163,6 +165,8 @@ void ui_display_output_address_amount_flow(int index);
 void ui_display_output_address_amount_no_index_flow(int index);
 
 void ui_accept_transaction_flow(void);
+
+void ui_accept_selftransfer_flow(void);
 
 void ui_display_transaction_prompt(const int external_outputs_total_count);
 

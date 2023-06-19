@@ -1378,11 +1378,20 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     } else {
         // Show final user validation UI
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
-            SEND_SW(dc, SW_DENY);
-            ui_post_processing_confirm_transaction(dc, false);
-            return false;
-        };
+        if (st->outputs.n_external == 0) {
+            // All outputs are change; show the user it's a self transfer
+            if (!ui_validate_selftransfer(dc, COIN_COINID_SHORT, fee)) {
+                SEND_SW(dc, SW_DENY);
+                ui_post_processing_confirm_transaction(dc, false);
+                return false;
+            }
+        } else {
+            if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
+                SEND_SW(dc, SW_DENY);
+                ui_post_processing_confirm_transaction(dc, false);
+                return false;
+            }
+        }
     }
 
     return true;
