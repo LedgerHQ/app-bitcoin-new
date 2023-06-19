@@ -235,6 +235,9 @@ static void test_format_opscript_script_valid(void **state) {
 
     uint8_t input22[] = {OP_RETURN, OP_1NEGATE};
     CHECK_VALID_TESTCASE(input22, "OP_RETURN -1");
+
+    uint8_t input_23[] = {OP_RETURN};
+    CHECK_VALID_TESTCASE(input_23, "OP_RETURN");
 }
 
 static void test_format_opscript_script_invalid(void **state) {
@@ -243,9 +246,6 @@ static void test_format_opscript_script_invalid(void **state) {
     uint8_t input_empty[] = {0};  // can't declare 0-length array
     char out[MAX_OPRETURN_OUTPUT_DESC_SIZE];
     assert_int_equal(format_opscript_script(input_empty, 0, out), -1);
-
-    uint8_t input_no_push[] = {OP_RETURN};
-    CHECK_INVALID_TESTCASE(input_no_push);
 
     uint8_t input_not_opreturn[] = {OP_DUP};
     CHECK_INVALID_TESTCASE(input_not_opreturn);

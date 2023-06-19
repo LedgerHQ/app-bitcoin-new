@@ -791,6 +791,27 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
     assert len(hww_sigs) == 1
 
 
+def test_sign_psbt_with_naked_opreturn(client: Client, comm: SpeculosClient):
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+        ],
+    )
+
+    # Same psbt as in test_sign_psbt_with_opreturn, but the first output is a naked OP_RETURN script (no data).
+    # Signing such outputs is needed in BIP-0322.
+    psbt_b64 = "cHNidP8BAFwCAAAAAZ0gZDu3l28lrZWbtsuoIfI07zpsaXXMe6sMHHJn03LPAAAAAAD+////AgAAAAAAAAAAAWrBlZgAAAAAABYAFCuTP2nl6yRKHwS+1J6OyeTsk7yfAAAAAAABAHECAAAAAZ6afPCN0VxFOW9vKyNxhgF2lpJPsNbBKlg1xV3WnCoPAAAAAAD+////AoCWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JrzWm0pAQAAABYAFAgOnmT0kCvYJ6vJ4DkmkNGXT3iFQQAAAAEBH4CWmAAAAAAAFgAUE0foKgN7Xbs4z4xHWfJCsfXH4JoiBgJ8t100sAXE659iu/LEV9djjoE+dX787I+mhnfZULY2Yhj1rML9VAAAgAEAAIAAAACAAAAAAAAAAAAAACICAxmbidg1b1fhzjgKEgXPKGBtvqiYVbEcPf7PuKGlM1aJGPWswv1UAACAAQAAgAAAAIABAAAAAQAAAAA="
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
+        hww_sigs = client.sign_psbt(psbt, wallet, None)
+
+    assert len(hww_sigs) == 1
+
+
 def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
     # This psbt contains an output with future psbt version 16 (corresponding to address
     # tb1sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4hu3px).
