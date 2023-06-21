@@ -93,10 +93,10 @@ static void transaction_confirm_callback(int token, uint8_t index) {
             ux_flow_response(true);
             break;
         case BACK_TOKEN_TRANSACTION:
-            ui_accept_transaction_flow();
+            ui_accept_transaction_flow(false);
             break;
         case BACK_TOKEN_SELFTRANSFER:
-            ui_accept_selftransfer_flow();
+            ui_accept_transaction_flow(true);
             break;
         default:
             PRINTF("Unhandled token : %d", token);
@@ -183,42 +183,20 @@ static void transaction_confirm(int token, uint8_t index) {
     }
 }
 
-void ui_accept_transaction_flow(void) {
-    transactionContext.tagValuePair[0].item = "Fees";
-    transactionContext.tagValuePair[0].value = g_ui_state.validate_transaction.fee;
+void ui_accept_transaction_flow(bool is_self_transfer) {
+    if (!is_self_transfer) {
+        transactionContext.tagValuePair[0].item = "Fees";
+        transactionContext.tagValuePair[0].value = g_ui_state.validate_transaction.fee;
 
-    transactionContext.tagValueList.nbPairs = 1;
+        transactionContext.tagValueList.nbPairs = 1;
+    } else {
+        transactionContext.tagValuePair[0].item = "Amount";
+        transactionContext.tagValuePair[0].value = "Self-transfer";
+        transactionContext.tagValuePair[1].item = "Fees";
+        transactionContext.tagValuePair[1].value = g_ui_state.validate_transaction.fee;
 
-    transactionContext.confirm = "Sign transaction\nto send Bitcoin?";
-    transactionContext.confirmed_status = "TRANSACTION\nSIGNED";
-    transactionContext.rejected_status = "Transaction rejected";
-
-    nbgl_pageNavigationInfo_t info = {.activePage = transactionContext.extOutputCount,
-                                      .nbPages = transactionContext.extOutputCount + 2,
-                                      .navType = NAV_WITH_TAP,
-                                      .progressIndicator = true,
-                                      .navWithTap.backButton = false,
-                                      .navWithTap.nextPageText = "Tap to continue",
-                                      .navWithTap.nextPageToken = CONFIRM_TOKEN,
-                                      .navWithTap.quitText = "Reject transaction",
-                                      .quitToken = CANCEL_TOKEN,
-                                      .tuneId = TUNE_TAP_CASUAL};
-
-    nbgl_pageContent_t content = {.type = TAG_VALUE_LIST,
-                                  .tagValueList.nbPairs = transactionContext.tagValueList.nbPairs,
-                                  .tagValueList.pairs = transactionContext.tagValuePair};
-
-    nbgl_pageDrawGenericContent(&transaction_confirm, &info, &content);
-    nbgl_refresh();
-}
-
-void ui_accept_selftransfer_flow(void) {
-    transactionContext.tagValuePair[0].item = "Amount";
-    transactionContext.tagValuePair[0].value = "Self-transfer";
-    transactionContext.tagValuePair[1].item = "Fees";
-    transactionContext.tagValuePair[1].value = g_ui_state.validate_transaction.fee;
-
-    transactionContext.tagValueList.nbPairs = 2;
+        transactionContext.tagValueList.nbPairs = 2;
+    }
 
     transactionContext.confirm = "Sign transaction\nto send Bitcoin?";
     transactionContext.confirmed_status = "TRANSACTION\nSIGNED";

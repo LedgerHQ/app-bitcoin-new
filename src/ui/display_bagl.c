@@ -466,12 +466,10 @@ void ui_display_output_address_amount_no_index_flow(int index) {
     ui_display_output_address_amount_flow(index);
 }
 
-void ui_accept_transaction_flow(void) {
-    ux_flow_init(0, ux_accept_transaction_flow, NULL);
-}
-
-void ui_accept_selftransfer_flow(void) {
-    ux_flow_init(0, ux_accept_selftransfer_flow, NULL);
+void ui_accept_transaction_flow(bool is_self_transfer) {
+    ux_flow_init(0,
+                 is_self_transfer ? ux_accept_selftransfer_flow : ux_accept_transaction_flow,
+                 NULL);
 }
 
 #endif  // HAVE_BAGL
