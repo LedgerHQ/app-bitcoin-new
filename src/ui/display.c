@@ -199,12 +199,15 @@ bool ui_validate_output(dispatcher_context_t *context,
     return io_ui_process(context, true);
 }
 
-bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
+bool ui_validate_transaction(dispatcher_context_t *context,
+                             const char *coin_name,
+                             uint64_t fee,
+                             bool is_self_transfer) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_sats_amount(coin_name, fee, state->fee);
 
-    ui_accept_transaction_flow();
+    ui_accept_transaction_flow(is_self_transfer);
 
     return io_ui_process(context, true);
 }
