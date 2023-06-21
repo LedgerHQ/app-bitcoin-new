@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.3] - 21-06-2023
+
+### Changed
+
+- Improved UX for self-transfers, that is, transactions where all the outputs are change outputs.
+- Outputs containing a single `OP_RETURN` (without any data push) can now be signed in order to support [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki) implementations.
+
+
+### Fixed
+
+- Wrong address generation for miniscript policies containing an unusual `thresh(1,X)` fragment (that is, with threshold 1, and a single condition). This should not happen in practice, as the policy is redundant for just `X`. Client libraries have been updated to detect and prevent usage of these policies.
+- Resolved a slight regression in signing performance introduced in v2.1.2.
+
 ## [2.1.2] - 03-04-2023
 
 ### Added
