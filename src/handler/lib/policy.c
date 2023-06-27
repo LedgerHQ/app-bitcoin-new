@@ -598,21 +598,29 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
             case CMD_CODE_PROCESS_CHILD: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), 0);
+                if (0 > state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), 0)) {
+                    return -1;
+                }
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_V: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), node->flags);
+                if (0 > state_stack_push(state,
+                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         node->flags)) {
+                    return -1;
+                }
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_VV: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state,
-                                 resolve_node_ptr(&policy->scripts[cmd_data]),
-                                 node->flags | PROCESSOR_FLAG_V);
+                if (0 > state_stack_push(state,
+                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         node->flags | PROCESSOR_FLAG_V)) {
+                    return -1;
+                }
                 break;
             }
             default:
