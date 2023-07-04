@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.4] - 04-07-2023
+
+### Changed
+
+- Bitcoin now returns in Exchange after a swap operation
+
+
 ## [2.1.3] - 21-06-2023
 
 ### Changed
