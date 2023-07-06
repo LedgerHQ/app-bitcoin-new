@@ -61,7 +61,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     uint8_t wallet_id[32];
     uint8_t wallet_hmac[32];
 
-    bool is_wallet_canonical;
+    bool is_wallet_default;  // whether the wallet policy can be used without being registered
     int address_type;
 
     policy_map_wallet_header_t wallet_header;
@@ -133,7 +133,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     }
 
     if (hmac_or == 0) {
-        // No hmac, verify that the policy is a canonical one that is allowed by default
+        // No hmac, verify that the policy is a default one
         address_type = get_policy_address_type(&wallet_policy_map.parsed);
         if (address_type == -1) {
             PRINTF("Non-standard policy, and no hmac provided\n");
@@ -197,7 +197,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
 
         // check if derivation path is indeed standard
 
-        // Based on the address type, we set the expected bip44 purpose for this canonical wallet
+        // Based on the address type, we set the expected bip44 purpose
         int bip44_purpose = get_bip44_purpose(address_type);
 
         if (key_info.master_key_derivation_len != 3) {
@@ -219,7 +219,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
             return;
         }
 
-        is_wallet_canonical = true;
+        is_wallet_default = true;
     } else {
         // Verify hmac
 
@@ -229,12 +229,12 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
             return;
         }
 
-        is_wallet_canonical = false;
+        is_wallet_default = false;
     }
 
-    // Swap feature: check that wallet is canonical
-    if (G_swap_state.called_from_swap && !is_wallet_canonical) {
-        PRINTF("Must be a canonical wallet for swap feature\n");
+    // Swap feature: check that the wallet policy is a default one
+    if (G_swap_state.called_from_swap && !is_wallet_default) {
+        PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -282,7 +282,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
 
         if (display_address != 0) {
             if (!ui_display_wallet_address(dc,
-                                           is_wallet_canonical ? NULL : wallet_header.name,
+                                           is_wallet_default ? NULL : wallet_header.name,
                                            address)) {
                 SEND_SW(dc, SW_DENY);
                 return;

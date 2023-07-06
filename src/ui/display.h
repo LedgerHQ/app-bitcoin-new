@@ -151,7 +151,7 @@ void ui_display_policy_map_cosigner_pubkey_flow(void);
 
 void ui_display_receive_in_wallet_flow(void);
 
-void ui_display_canonical_wallet_address_flow(void);
+void ui_display_default_wallet_address_flow(void);
 
 void ui_display_spend_from_wallet_flow(void);
 

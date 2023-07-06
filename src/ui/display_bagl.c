@@ -320,11 +320,11 @@ UX_FLOW(ux_display_receive_in_wallet_flow,
         &ux_display_approve_step,
         &ux_display_reject_step);
 
-// FLOW to display an address of a canonical wallet:
+// FLOW to display an address of a default wallet policy:
 // #1 screen: wallet address (paginated)
 // #2 screen: approve button
 // #3 screen: reject button
-UX_FLOW(ux_display_canonical_wallet_address_flow,
+UX_FLOW(ux_display_default_wallet_address_flow,
         &ux_display_wallet_address_step,
         &ux_display_approve_step,
         &ux_display_reject_step);
@@ -432,8 +432,8 @@ void ui_display_receive_in_wallet_flow(void) {
     ux_flow_init(0, ux_display_receive_in_wallet_flow, NULL);
 }
 
-void ui_display_canonical_wallet_address_flow(void) {
-    ux_flow_init(0, ux_display_canonical_wallet_address_flow, NULL);
+void ui_display_default_wallet_address_flow(void) {
+    ux_flow_init(0, ux_display_default_wallet_address_flow, NULL);
 }
 
 void ui_display_spend_from_wallet_flow(void) {

@@ -142,7 +142,7 @@ typedef struct {
         int n_external;                // count of external outputs
     } outputs;
 
-    bool is_wallet_canonical;
+    bool is_wallet_default;
 
     uint8_t protocol_version;
 
@@ -590,9 +590,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
 
-        st->is_wallet_canonical = false;
+        st->is_wallet_default = false;
     } else {
-        st->is_wallet_canonical = true;
+        st->is_wallet_default = true;
     }
 
     {
@@ -627,8 +627,8 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                sizeof(wallet_header.keys_info_merkle_root));
         st->wallet_header_n_keys = wallet_header.n_keys;
 
-        if (st->is_wallet_canonical) {
-            // verify that the policy is indeed a canonical one that is allowed by default
+        if (st->is_wallet_default) {
+            // verify that the policy is indeed a default one that is allowed by default
 
             if (st->wallet_header_n_keys != 1) {
                 PRINTF("Non-standard policy, it should only have 1 key\n");
@@ -643,8 +643,8 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                 return false;
             }
 
-            // Based on the address type, we set the expected bip44 purpose for this canonical
-            // wallet
+            // Based on the address type, we set the expected bip44 purpose for this default
+            // wallet policy
             int bip44_purpose = get_bip44_purpose(address_type);
             if (bip44_purpose < 0) {
                 SEND_SW(dc, SW_BAD_STATE);
@@ -652,8 +652,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             }
 
             // We check that the pubkey has indeed 3 derivation steps, and it follows bip44
-            // standards We skip checking that we can indeed deriva the same pubkey (no security
-            // risk here, as the xpub itself isn't really used for the canonical wallet policies).
+            // standards.
+            // We skip checking that we can indeed derive the same pubkey (no security
+            // risk here, as the xpub itself isn't really used for the default wallet policies).
             policy_map_key_info_t key_info;
             {
                 char key_info_str[MAX_POLICY_KEY_INFO_LEN];
@@ -693,15 +694,15 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     }
 
-    // Swap feature: check that wallet is canonical
-    if (G_swap_state.called_from_swap && !st->is_wallet_canonical) {
-        PRINTF("Must be a canonical wallet for swap feature\n");
+    // Swap feature: check that wallet policy is a default one
+    if (G_swap_state.called_from_swap && !st->is_wallet_default) {
+        PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
 
-    // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
-    if (!st->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
+    // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
+    if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
         ui_post_processing_confirm_wallet_spend(dc, false);
         return false;
@@ -709,7 +710,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
-    if (!st->is_wallet_canonical) {
+    if (!st->is_wallet_default) {
         ui_post_processing_confirm_wallet_spend(dc, true);
     }
     return true;
