@@ -29,10 +29,7 @@
 
 #define H 0x80000000ul
 
-static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
-                                           size_t bip32_path_len,
-                                           const uint32_t coin_types[],
-                                           size_t coin_types_length) {
+static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[], size_t bip32_path_len) {
     // Exception for Electrum: it historically used "m/4541509h/1112098098h"
     // to derive encryption keys, so we whitelist it.
     if (bip32_path_len == 2 && bip32_path[0] == (4541509 ^ H) &&
@@ -85,14 +82,7 @@ static bool is_path_safe_for_pubkey_export(const uint32_t bip32_path[],
     }
 
     uint32_t coin_type = bip32_path[1] & 0x7FFFFFFF;
-    bool coin_type_found = false;
-    for (unsigned int i = 0; i < coin_types_length; i++) {
-        if (coin_type == coin_types[i]) {
-            coin_type_found = true;
-        }
-    }
-
-    if (!coin_type_found) {
+    if (coin_type != BIP44_COIN_TYPE) {
         return false;
     }
 
@@ -144,8 +134,7 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
         return;
     }
 
-    uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
-    bool is_safe = is_path_safe_for_pubkey_export(bip32_path, bip32_path_len, coin_types, 2);
+    bool is_safe = is_path_safe_for_pubkey_export(bip32_path, bip32_path_len);
 
     if (!is_safe && !display) {
         SEND_SW(dc, SW_NOT_SUPPORTED);

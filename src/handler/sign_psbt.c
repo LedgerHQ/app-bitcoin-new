@@ -628,69 +628,21 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         st->wallet_header_n_keys = wallet_header.n_keys;
 
         if (st->is_wallet_default) {
-            // verify that the policy is indeed a default one that is allowed by default
-
-            if (st->wallet_header_n_keys != 1) {
-                PRINTF("Non-standard policy, it should only have 1 key\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
-            }
-
-            int address_type = get_policy_address_type(&st->wallet_policy_map);
-            if (address_type == -1) {
+            // No hmac, verify that the policy is indeed a default one
+            if (!is_wallet_policy_standard(dc, &wallet_header, &st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
-            // Based on the address type, we set the expected bip44 purpose for this default
-            // wallet policy
-            int bip44_purpose = get_bip44_purpose(address_type);
-            if (bip44_purpose < 0) {
-                SEND_SW(dc, SW_BAD_STATE);
-                return false;
-            }
-
-            // We check that the pubkey has indeed 3 derivation steps, and it follows bip44
-            // standards.
-            // We skip checking that we can indeed derive the same pubkey (no security
-            // risk here, as the xpub itself isn't really used for the default wallet policies).
-            policy_map_key_info_t key_info;
-            {
-                char key_info_str[MAX_POLICY_KEY_INFO_LEN];
-
-                int key_info_len =
-                    call_get_merkle_leaf_element(dc,
-                                                 st->wallet_header_keys_info_merkle_root,
-                                                 st->wallet_header_n_keys,
-                                                 0,
-                                                 (uint8_t *) key_info_str,
-                                                 sizeof(key_info_str));
-                if (key_info_len == -1) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-
-                buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
-
-                if (parse_policy_map_key_info(&key_info_buffer,
-                                              &key_info,
-                                              st->wallet_header_version) == -1) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-            }
-
-            uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
-            if (key_info.master_key_derivation_len != 3 ||
-                !is_pubkey_path_standard(key_info.master_key_derivation,
-                                         key_info.master_key_derivation_len,
-                                         bip44_purpose,
-                                         coin_types,
-                                         2)) {
+            if (wallet_header.name_len != 0) {
+                PRINTF("Name must be zero-length for a standard wallet policy\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
+
+            // unlike in get_wallet_address, we do not check if the address_index is small:
+            // if funds were already sent there, there is no point in preventing to spend them.
         }
     }
 

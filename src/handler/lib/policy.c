@@ -7,6 +7,7 @@
 #include "../../crypto.h"
 #include "../../common/base58.h"
 #include "../../common/bitvector.h"
+#include "../../common/read.h"
 #include "../../common/script.h"
 #include "../../common/segwit_addr.h"
 #include "../../common/wallet.h"
@@ -1285,25 +1286,127 @@ __attribute__((noinline)) int get_wallet_internal_script_hash(
 
 #pragma GCC diagnostic pop
 
-int get_policy_address_type(const policy_node_t *policy) {
-    // legacy, native segwit, wrapped segwit, or taproot
-    switch (policy->type) {
+// For a standard descriptor template, return the corresponding BIP44 purpose
+// Otherwise, returns -1.
+static int get_bip44_purpose(const policy_node_t *descriptor_template) {
+    const policy_node_key_placeholder_t *kp = NULL;
+    int purpose = -1;
+    switch (descriptor_template->type) {
         case TOKEN_PKH:
-            return ADDRESS_TYPE_LEGACY;
+            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            purpose = 44;  // legacy
+            break;
         case TOKEN_WPKH:
-            return ADDRESS_TYPE_WIT;
-        case TOKEN_SH:
-            // wrapped segwit
-            if (resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script)->type ==
-                TOKEN_WPKH) {
-                return ADDRESS_TYPE_SH_WIT;
+            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            purpose = 84;  // native segwit
+            break;
+        case TOKEN_SH: {
+            const policy_node_t *inner = resolve_node_ptr(
+                &((const policy_node_with_script_t *) descriptor_template)->script);
+            if (inner->type != TOKEN_WPKH) {
+                return -1;
             }
-            return -1;
+
+            kp = ((const policy_node_with_key_t *) inner)->key_placeholder;
+            purpose = 49;  // nested segwit
+            break;
+        }
         case TOKEN_TR:
-            return ADDRESS_TYPE_TR;
+            if (((const policy_node_tr_t *) descriptor_template)->tree != NULL) {
+                return -1;
+            }
+
+            kp = ((const policy_node_tr_t *) descriptor_template)->key_placeholder;
+            purpose = 86;  // standard single-key P2TR
+            break;
         default:
             return -1;
     }
+
+    if (kp->key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
+        return -1;
+    }
+
+    return purpose;
+}
+
+bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
+                               const policy_map_wallet_header_t *wallet_policy_header,
+                               const policy_node_t *descriptor_template) {
+    // Based on the address type, we set the expected bip44 purpose
+    int bip44_purpose = get_bip44_purpose(descriptor_template);
+    if (bip44_purpose < 0) {
+        PRINTF("Non-standard policy, and no hmac provided\n");
+        return false;
+    }
+
+    if (wallet_policy_header->n_keys != 1) {
+        PRINTF("Standard wallets must have exactly 1 key\n");
+        return false;
+    }
+
+    // we check if the key is indeed internal
+    uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
+
+    uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+    int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
+                                                    wallet_policy_header->keys_info_merkle_root,
+                                                    wallet_policy_header->n_keys,
+                                                    0,  // only one key
+                                                    key_info_str,
+                                                    sizeof(key_info_str));
+    if (key_info_len < 0) {
+        return false;
+    }
+
+    // Make a sub-buffer for the pubkey info
+    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+    policy_map_key_info_t key_info;
+    if (0 > parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_policy_header->version)) {
+        return false;
+    }
+
+    if (!key_info.has_key_origin) {
+        return false;
+    }
+
+    if (read_u32_be(key_info.master_key_fingerprint, 0) != master_key_fingerprint) {
+        return false;
+    }
+
+    // generate pubkey and check if it matches
+    char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    int serialized_pubkey_len =
+        get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                               key_info.master_key_derivation_len,
+                                               BIP32_PUBKEY_VERSION,
+                                               pubkey_derived,
+                                               NULL);
+    if (serialized_pubkey_len == -1) {
+        PRINTF("Failed to derive pubkey\n");
+        return false;
+    }
+
+    if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+        return false;
+    }
+
+    // check if derivation path of the key is indeed standard
+
+    // per BIP-0044, derivation must be
+    // m / purpose' / coin_type' / account'
+
+    const uint32_t H = BIP32_FIRST_HARDENED_CHILD;
+    if (key_info.master_key_derivation_len != 3 ||
+        key_info.master_key_derivation[0] != H + bip44_purpose ||
+        key_info.master_key_derivation[1] != H + BIP44_COIN_TYPE ||
+        key_info.master_key_derivation[2] < H ||
+        key_info.master_key_derivation[2] > H + MAX_BIP44_ACCOUNT_RECOMMENDED) {
+        return false;
+    }
+
+    return true;
 }
 
 bool compute_wallet_hmac(const uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
