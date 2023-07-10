@@ -25,11 +25,18 @@ A wallet descriptor template is a `SCRIPT` expression.
 `addr` if you only know the pubkey hash).
 - `wpkh(KP)` (top level or inside `sh` only): P2WPKH output for the given
 compressed pubkey.
-- `multi(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script.
-- `sortedmulti(k,KP_1,KP_2,...,KP_n)`: k-of-n multisig script with keys
+- `multi(k,KP_1,KP_2,...,KP_n)` (not inside `tr`): k-of-n multisig script using OP_CHECKMULTISIG.
+- `sortedmulti(k,KP_1,KP_2,...,KP_n)` (not inside `tr`): k-of-n multisig script with keys
 sorted lexicographically in the resulting script.
-- `tr(KP)`: P2TR output with the specified key as internal key.
-- any valid [miniscript](https://bitcoin.sipa.be/miniscript) template (only inside top-level `wsh`).
+- `multi_a(k,KP_1,KP_2,...,KP_n)` (only inside `tr`): k-of-n multisig script.
+- `sortedmulti_a(k,KP_1,KP_2,...,KP_n)` (only inside `tr`): k-of-n multisig script with keys
+sorted lexicographically in the resulting script.
+- `tr(KP)` or `tr(KP,TREE)`: P2TR output with the specified key placeholder internal key, and optionally a tree of script paths.
+- any valid [miniscript](https://bitcoin.sipa.be/miniscript) template (only inside top-level `wsh`, or in `TREE`).
+
+`TREE` expressions:
+- any `SCRIPT`expression.
+- An open brace `{`, a `TREE` expression, a comma `,`, a `TREE` expression, and a closing brace `}`.
 
 `KP` expressions (key placeholders) consist of
 - a single character `@`
@@ -46,8 +53,6 @@ receive/change addresses, and is equivalent to `<0;1>`.
 The placeholder `@i` for some number *i* represents the *i*-th key in the
 vector of key origin information (which must be of size at least *i* + 1,
 or the wallet policy is invalid).
-
-NOTE: the `tr(KP)` descriptor will be generalized to a `tr(KP,TREE)` expression to support taproot scripts in a future version.
 
 ### Keys information vector
 
@@ -160,19 +165,27 @@ The hardware wallet will reject registration for wallet names not respecting the
 
 ## Supported policies
 
-The following policy types are currently supported:
+The following policy types are currently supported as top-level scripts:
 
 - `sh(multi(...))` and `sh(sortedmulti(...))` (legacy multisignature wallets);
 - `sh(wsh(multi(...)))` and `sh(wsh(sortedmulti(...)))` (wrapped-segwit multisignature wallets);
-- `wsh(multi(...))` and `wsh(sortedmulti(...))` (native segwit multisignature wallets);
-- `wsh(SCRIPT)` (where `SCRIPT` is an arbitrary [miniscript](https://bitcoin.sipa.be/miniscript) template).
+- `wsh(SCRIPT)`;
+- `tr(KP)` and `tr(KP,TREE)`.
+
+`SCRIPT` expression within `wsh` can be:
+- `multi` or `sortedmulti`;
+- a valid SegWit miniscript template.
+
+`SCRIPT` expression within `TREE` can be:
+- `multi_a` or `sortedmulti_a`;
+- a valid taproot miniscript template.
 
 # Default wallets
 A few policies that correspond to standardized single-key wallets can be used without requiring any registration; in the serialization, the wallet name must be a zero-length string. Those are the following policies:
 
-- ``pkh(@0)`` - legacy addresses as per [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
-- ``wpkh(@0)`` - native segwit addresses per [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)
-- ``sh(wpkh(@0))`` - nested segwit addresses as per [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)
-- ``tr(@0)`` - single Key P2TR as per [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
+- ``pkh(@0/**)`` - legacy addresses as per [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki)
+- ``wpkh(@0/**)`` - native segwit addresses per [BIP-84](https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki)
+- ``sh(wpkh(@0/**))`` - nested segwit addresses as per [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)
+- ``tr(@0/**)`` - single Key P2TR as per [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
 
 Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adhere to the corresponding BIP. Moreover, the BIP-44 `account` level must be at most `100`, and the `address index` at most `50000`. Larger values can still be used by registering the policy.  
