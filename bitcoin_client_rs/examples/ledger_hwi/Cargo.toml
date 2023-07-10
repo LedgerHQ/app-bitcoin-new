@@ -8,7 +8,8 @@ edition = "2018"
 clap = { version = "4.0.18", features = ["derive"] }
 ledger_bitcoin_client = { path = "../.." }
 async-trait = { version = "0.1"}
-bitcoin = { version = "0.29.1", default-features = false, features = ["no-std"] }
+bitcoin = { version = "0.30", default-features = false, features = ["no-std"] }
+hex = "0.4"
 base64 = "0.13.0"
 ledger-apdu = "0.10"
 ledger-transport-hid = "0.10"
