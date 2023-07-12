@@ -256,7 +256,7 @@ impl FromStr for WalletPubKey {
 }
 
 impl core::fmt::Display for WalletPubKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if self.source.is_none() {
             write!(f, "{}", self.inner)
         } else {
