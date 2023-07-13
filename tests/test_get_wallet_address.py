@@ -72,7 +72,17 @@ def test_get_wallet_address_singlesig_taproot(client: Client):
 
 # Failure cases for default wallets
 
-def test_get_wallet_address_default_fail_wrongkeys(client: Client):
+def test_get_wallet_address_fail_nonstandard(client: Client):
+    # Not empty name should be rejected
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="Not empty",
+            descriptor_template="pkh(@0/**)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0,  0, False)
+
     # 0 keys info should be rejected
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(WalletPolicy(
@@ -131,6 +141,36 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0,  100000, False)
+
+    # missing key origin info
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="pkh(@0/**)",
+            keys_info=[
+                f"tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
+
+    # non-standard final derivation steps
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="pkh(@0/<0;2>/*)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
+
+    # taproot single-sig with non-empty script
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="tr(@0,0)",
+            keys_info=[
+                f"[f5acc2fd/86'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
 
 
 # Multisig

@@ -454,7 +454,7 @@ static void address_display(void) {
     nbgl_useCaseAddressConfirmation(g_ui_state.wallet.address, status_confirmation_callback);
 }
 
-void ui_display_canonical_wallet_address_flow(void) {
+void ui_display_default_wallet_address_flow(void) {
     transactionContext.confirm = "Confirm address";
     transactionContext.confirmed_status = "ADDRESS\nVERIFIED";
     transactionContext.rejected_status = "Address verification\ncancelled";

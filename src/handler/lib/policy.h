@@ -127,6 +127,30 @@ __attribute__((warn_unused_result)) int get_wallet_internal_script_hash(
 int get_policy_address_type(const policy_node_t *policy);
 
 /**
+ * Returns true if the descriptor template is a standard one.
+ * Standard wallet policies are single-signature policies as per the following standards:
+ *  - BIP-44 (legacy, P2PKH)
+ *  - BIP-84 (native segwit, P2WPKH)
+ *  - BIP-49 (wrapped segwit, P2SH-P2WPKH)
+ *  - BIP-86 (standard single key P2TR)
+ * with the standard derivations for the key placeholders, and unhardened steps for the
+ * change / address_index steps (using 0 for non-change, 1 for change addresses).
+ *
+ * @param[in] dispatcher_context
+ *   Pointer to the dispatcher context
+ * @param[in] wallet_policy_header
+ *   Pointer the wallet policy header
+ * @param[in] descriptor_template
+ *   Pointer to the root node of the policy
+ *
+ * @return true if the descriptor_template is not standard; false if not, or in case of error.
+ */
+__attribute__((warn_unused_result)) bool is_wallet_policy_standard(
+    dispatcher_context_t *dispatcher_context,
+    const policy_map_wallet_header_t *wallet_policy_header,
+    const policy_node_t *descriptor_template);
+
+/**
  * Computes and returns the wallet_hmac, using the symmetric key derived
  * with the WALLET_SLIP0021_LABEL label according to SLIP-0021.
  *

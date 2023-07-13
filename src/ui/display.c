@@ -139,7 +139,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     strncpy(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
-        ui_display_canonical_wallet_address_flow();
+        ui_display_default_wallet_address_flow();
     } else {
         strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
         ui_display_receive_in_wallet_flow();
