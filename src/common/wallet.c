@@ -382,6 +382,16 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
         return WITH_ERROR(-1, "Error decoding serialized extended pubkey");
     }
 
+    // verify checksum
+    uint8_t checksum[4];
+    crypto_get_checksum((uint8_t *) &ext_pubkey_check.serialized_extended_pubkey,
+                        sizeof(ext_pubkey_check.serialized_extended_pubkey),
+                        checksum);
+
+    if (memcmp(&ext_pubkey_check.checksum, checksum, sizeof(checksum)) != 0) {
+        return WITH_ERROR(-1, "Wrong extended pubkey checksum");
+    }
+
     out->ext_pubkey = ext_pubkey_check.serialized_extended_pubkey;
 
     // either the string terminates now, or it has a final "/**" suffix for the wildcard.
