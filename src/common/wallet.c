@@ -2,6 +2,7 @@
 #include <string.h>
 #include <limits.h>
 
+#include "../common/base58.h"
 #include "../common/bip32.h"
 #include "../common/buffer.h"
 #include "../common/script.h"
@@ -358,19 +359,30 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 
     // consume the rest of the buffer into the pubkey, except possibly the final "/**"
     unsigned int ext_pubkey_len = 0;
+    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH];
     uint8_t c;
     while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_peek(buffer, &c) &&
            is_alphanumeric(c)) {
-        out->ext_pubkey[ext_pubkey_len] = c;
+        ext_pubkey_str[ext_pubkey_len] = c;
         ++ext_pubkey_len;
         buffer_seek_cur(buffer, 1);
     }
-    out->ext_pubkey[ext_pubkey_len] = '\0';
+    ext_pubkey_str[ext_pubkey_len] = '\0';
 
     if (ext_pubkey_len < 111 || ext_pubkey_len > 112) {
         // loose sanity check; pubkeys in bitcoin can be 111 or 112 characters long
         return WITH_ERROR(-1, "Invalid extended pubkey length");
     }
+
+    serialized_extended_pubkey_check_t ext_pubkey_check;
+    if (base58_decode(ext_pubkey_str,
+                      ext_pubkey_len,
+                      (uint8_t *) &ext_pubkey_check,
+                      sizeof(ext_pubkey_check)) < 0) {
+        return WITH_ERROR(-1, "Error decoding serialized extended pubkey");
+    }
+
+    out->ext_pubkey = ext_pubkey_check.serialized_extended_pubkey;
 
     // either the string terminates now, or it has a final "/**" suffix for the wildcard.
     if (!buffer_can_read(buffer, 1)) {
