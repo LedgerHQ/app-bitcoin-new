@@ -1,4 +1,8 @@
+import * as descriptors from '@bitcoinerlab/descriptors';
+import * as secp256k1 from '@bitcoinerlab/secp256k1';
+const { Descriptor } = descriptors.DescriptorsFactory(secp256k1);
 import Transport from '@ledgerhq/hw-transport';
+import { networks } from 'bitcoinjs-lib';
 
 import { pathElementsToBuffer, pathStringToArray } from './bip32';
 import { ClientCommandInterpreter } from './clientCommands';
@@ -184,8 +188,6 @@ export class AppClient {
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
 
-    await this.validatePolicy(walletPolicy);
-
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -236,8 +238,6 @@ export class AppClient {
       throw new Error('Invalid HMAC length');
     }
 
-    await this.validatePolicy(walletPolicy);
-
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -257,7 +257,9 @@ export class AppClient {
       clientInterpreter
     );
 
-    return response.toString('ascii');
+    const address = response.toString('ascii');
+    await this.validateAddress(address, walletPolicy, change, addressIndex);
+    return address;
   }
 
   /**
@@ -279,7 +281,6 @@ export class AppClient {
     walletHMAC: Buffer | null,
     progressCallback?: () => void
   ): Promise<[number, PartialSignature][]> {
-    await this.validatePolicy(walletPolicy);
 
     if (typeof psbt === 'string') {
       psbt = Buffer.from(psbt, "base64");
@@ -402,12 +403,69 @@ export class AppClient {
     return result.toString('base64');
   }
 
+  /* Performs any additional check on the genetated address before returning it.*/
+  private async validateAddress(
+    address: string,
+    walletPolicy: WalletPolicy,
+    change: number,
+    addressIndex: number
+  ) {
+    if (change !== 0 && change !== 1)
+      throw new Error('Change can only be 0 or 1');
+    if (addressIndex < 0 || !Number.isInteger(addressIndex))
+        throw new Error('Invalid address index');
+    const appAndVer = await this.getAppAndVersion();
+    let network;
+    if (appAndVer.name === 'Bitcoin Test') {
+      network = networks.testnet;
+    } else if (appAndVer.name === 'Bitcoin') {
+      network = networks.bitcoin;
+    } else {
+      throw new Error(
+        `Invalid network: ${appAndVer.name}. Expected 'Bitcoin Test' or 'Bitcoin'.`
+      );
+    }
+    let expression = walletPolicy.descriptorTemplate;
+    for (let i = 0; i < walletPolicy.keys.length; i++) {
+      const keyPath = walletPolicy.keys[i] + '/' + change + '/' + addressIndex;
+      expression = expression
+        .replace('@' + i + '/**', keyPath)
+        .replace('@' + i + '/<0;1>', keyPath);
+    }
+    let thirdPartyValidationApplicable = true;
+    let thirdPartyGeneratedAddress: string;
+    try {
+      thirdPartyGeneratedAddress = new Descriptor({
+        expression,
+        network
+      }).getAddress();
+    } catch(err) {
+      // Note: @bitcoinerlab/descriptors@1.0.x does not support Tapscript yet.
+      // These are the supported descriptors:
+      //  - pkh(KEY)
+      //  - wpkh(KEY)
+      //  - sh(wpkh(KEY))
+      //  - sh(SCRIPT)
+      //  - wsh(SCRIPT)
+      //  - sh(wsh(SCRIPT)), where
+      // SCRIPT is any of the (non-tapscript) fragments in: https://bitcoin.sipa.be/miniscript/
+      //
+      // Other expressions are not supported and third party validation would not be applicable:
+      thirdPartyValidationApplicable = false;
+    }
+    if (thirdPartyValidationApplicable) {
+      if (address !== thirdPartyGeneratedAddress) {
+        throw new Error(
+          `Third party address validation mismatch: ${address} != ${thirdPartyGeneratedAddress}`
+        );
+      }
+    } else {
+      await this.validatePolicy(walletPolicy);
+    }
+  }
+
   /* Performs any additional checks on the policy before using it.*/
   private async validatePolicy(walletPolicy: WalletPolicy) {
-    // TODO: Once an independent implementation of miniscript in JavaScript is available,
-    // we will replace the checks in this section with a generic comparison between the
-    // address produced by the app and the one computed locally (like the python and Rust
-    // clients). Until then, we filter for any known bug.
 
     let appAndVer = undefined;
 
