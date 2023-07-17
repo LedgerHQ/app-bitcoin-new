@@ -1,5 +1,7 @@
 [build-system]
 requires = [
+    "bip32~=3.0",
+    "coincurve~=18.0",
     "typing-extensions>=3.7",
     "ledgercomm>=1.1.0",
     "setuptools>=42",

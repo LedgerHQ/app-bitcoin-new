@@ -72,7 +72,17 @@ def test_get_wallet_address_singlesig_taproot(client: Client):
 
 # Failure cases for default wallets
 
-def test_get_wallet_address_default_fail_wrongkeys(client: Client):
+def test_get_wallet_address_fail_nonstandard(client: Client):
+    # Not empty name should be rejected
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="Not empty",
+            descriptor_template="pkh(@0/**)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0,  0, False)
+
     # 0 keys info should be rejected
     with pytest.raises(IncorrectDataError):
         client.get_wallet_address(WalletPolicy(
@@ -131,6 +141,36 @@ def test_get_wallet_address_default_fail_wrongkeys(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0,  100000, False)
+
+    # missing key origin info
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="pkh(@0/**)",
+            keys_info=[
+                f"tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
+
+    # non-standard final derivation steps
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="pkh(@0/<0;2>/*)",
+            keys_info=[
+                f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
+
+    # taproot single-sig with non-empty script
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(WalletPolicy(
+            name="",
+            descriptor_template="tr(@0,0)",
+            keys_info=[
+                f"[f5acc2fd/86'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            ],
+        ), None, 0, 0, False)
 
 
 # Multisig
@@ -231,3 +271,26 @@ def test_get_wallet_address_tr_script_sortedmulti(client: Client):
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
     assert res == "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7"
+
+
+def test_get_wallet_address_large_addr_index(client: Client):
+    # 2**31 - 1 is the largest index allowed, per BIP-32
+
+    wallet = MultisigWallet(
+        name="Cold storage",
+        address_type=AddressType.WIT,
+        threshold=2,
+        keys_info=[
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    )
+    wallet_hmac = bytes.fromhex(
+        "d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371"
+    )
+
+    client.get_wallet_address(wallet, wallet_hmac, 0, 2**31 - 1, False)
+
+    # too large address_index, not allowed for an unhardened step
+    with pytest.raises(IncorrectDataError):
+        client.get_wallet_address(wallet, wallet_hmac, 0, 2**31, False)

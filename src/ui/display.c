@@ -72,7 +72,7 @@ bool ui_display_pubkey(dispatcher_context_t *context,
         ui_display_pubkey_suspicious_flow();
     }
 
-    return io_ui_process(context, false);
+    return io_ui_process(context, true);
 }
 
 bool ui_display_message_hash(dispatcher_context_t *context,
@@ -139,13 +139,13 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     strncpy(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
-        ui_display_canonical_wallet_address_flow();
+        ui_display_default_wallet_address_flow();
     } else {
         strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
         ui_display_receive_in_wallet_flow();
     }
 
-    return io_ui_process(context, false);
+    return io_ui_process(context, true);
 }
 
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
@@ -199,12 +199,15 @@ bool ui_validate_output(dispatcher_context_t *context,
     return io_ui_process(context, true);
 }
 
-bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee) {
+bool ui_validate_transaction(dispatcher_context_t *context,
+                             const char *coin_name,
+                             uint64_t fee,
+                             bool is_self_transfer) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_sats_amount(coin_name, fee, state->fee);
 
-    ui_accept_transaction_flow();
+    ui_accept_transaction_flow(is_self_transfer);
 
     return io_ui_process(context, true);
 }

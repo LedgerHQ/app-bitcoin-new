@@ -6,7 +6,7 @@ use bitcoin::{
     hashes::hex::{FromHex, ToHex},
     util::{bip32::DerivationPath, psbt::Psbt},
 };
-use ledger_bitcoin_client::{async_client, client, wallet};
+use ledger_bitcoin_client::{async_client, client, psbt::PartialSignature, wallet};
 
 fn test_cases(path: &str) -> Vec<serde_json::Value> {
     let data = std::fs::read_to_string(path).expect("Unable to read file");
@@ -300,6 +300,11 @@ async fn test_sign_psbt() {
             h
         });
 
+        let sigs: Vec<serde_json::Value> = case
+            .get("sigs")
+            .map(|v| serde_json::from_value(v.clone()).unwrap())
+            .unwrap();
+
         let psbt_str: String = case
             .get("psbt")
             .map(|v| serde_json::from_value(v.clone()).unwrap())
@@ -314,9 +319,41 @@ async fn test_sign_psbt() {
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
 
-        let _res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+        let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .await
             .unwrap();
+
+        for (i, psbt_sig) in res {
+            for (j, res_sig) in sigs.iter().enumerate() {
+                if i == j {
+                    match psbt_sig {
+                        PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
+                            assert_eq!(
+                                res_sig
+                                    .get("key")
+                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
+                                    .unwrap(),
+                                key.to_hex()
+                            );
+                            if let Some(tapleaf_hash_res) = res_sig
+                                .get("tapleaf_hash")
+                                .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
+                            {
+                                assert_eq!(tapleaf_hash_res, tapleaf_hash.unwrap().to_hex());
+                            }
+                            assert_eq!(
+                                res_sig
+                                    .get("sig")
+                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
+                                    .unwrap(),
+                                sig.to_vec().to_hex()
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
     }
 }

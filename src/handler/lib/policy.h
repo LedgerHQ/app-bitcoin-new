@@ -22,7 +22,7 @@
  * @return 0 on success, a negative number in case of error.
  */
 // TODO: we should distinguish actual errors from just "policy too big to fit in memory"
-int read_and_parse_wallet_policy(
+__attribute__((warn_unused_result)) int read_and_parse_wallet_policy(
     dispatcher_context_t *dispatcher_context,
     buffer_t *buf,
     policy_map_wallet_header_t *wallet_header,
@@ -65,10 +65,11 @@ typedef struct {
  *
  * @return 0 on success, a negative number on failure.
  */
-int compute_taptree_hash(dispatcher_context_t *dispatcher_context,
-                         const wallet_derivation_info_t *wdi,
-                         const policy_node_tree_t *tree,
-                         uint8_t out[static 32]);
+__attribute__((warn_unused_result)) int compute_taptree_hash(
+    dispatcher_context_t *dispatcher_context,
+    const wallet_derivation_info_t *wdi,
+    const policy_node_tree_t *tree,
+    uint8_t out[static 32]);
 
 /**
  * Computes the script corresponding to a wallet policy, for a certain change and address index.
@@ -86,10 +87,10 @@ int compute_taptree_hash(dispatcher_context_t *dispatcher_context,
  * @return The length of the output on success; -1 in case of error.
  *
  */
-int get_wallet_script(dispatcher_context_t *dispatcher_context,
-                      const policy_node_t *policy,
-                      const wallet_derivation_info_t *wdi,
-                      uint8_t out[static 34]);
+__attribute__((warn_unused_result)) int get_wallet_script(dispatcher_context_t *dispatcher_context,
+                                                          const policy_node_t *policy,
+                                                          const wallet_derivation_info_t *wdi,
+                                                          uint8_t out[static 34]);
 
 /**
  * Computes the script corresponding to a wallet policy, for a certain change and address index.
@@ -107,11 +108,12 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
  * @return the length of the script on success; a negative number in case of error.
  *
  */
-int get_wallet_internal_script_hash(dispatcher_context_t *dispatcher_context,
-                                    const policy_node_t *policy,
-                                    const wallet_derivation_info_t *wdi,
-                                    internal_script_type_e script_type,
-                                    cx_hash_t *hash_context);
+__attribute__((warn_unused_result)) int get_wallet_internal_script_hash(
+    dispatcher_context_t *dispatcher_context,
+    const policy_node_t *policy,
+    const wallet_derivation_info_t *wdi,
+    internal_script_type_e script_type,
+    cx_hash_t *hash_context);
 
 /**
  * Returns the address type constant corresponding to a standard policy type.
@@ -123,6 +125,30 @@ int get_wallet_internal_script_hash(dispatcher_context_t *dispatcher_context,
  * the policy pattern is one of the expected types; -1 otherwise.
  */
 int get_policy_address_type(const policy_node_t *policy);
+
+/**
+ * Returns true if the descriptor template is a standard one.
+ * Standard wallet policies are single-signature policies as per the following standards:
+ *  - BIP-44 (legacy, P2PKH)
+ *  - BIP-84 (native segwit, P2WPKH)
+ *  - BIP-49 (wrapped segwit, P2SH-P2WPKH)
+ *  - BIP-86 (standard single key P2TR)
+ * with the standard derivations for the key placeholders, and unhardened steps for the
+ * change / address_index steps (using 0 for non-change, 1 for change addresses).
+ *
+ * @param[in] dispatcher_context
+ *   Pointer to the dispatcher context
+ * @param[in] wallet_policy_header
+ *   Pointer the wallet policy header
+ * @param[in] descriptor_template
+ *   Pointer to the root node of the policy
+ *
+ * @return true if the descriptor_template is not standard; false if not, or in case of error.
+ */
+__attribute__((warn_unused_result)) bool is_wallet_policy_standard(
+    dispatcher_context_t *dispatcher_context,
+    const policy_map_wallet_header_t *wallet_policy_header,
+    const policy_node_t *descriptor_template);
 
 /**
  * Computes and returns the wallet_hmac, using the symmetric key derived
@@ -163,10 +189,11 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
  *   If not NULL, it is a pointer that will receive the i-th placeholder of the policy.
  * @return the number of placeholders in the policy on success; -1 in case of error.
  */
-int get_key_placeholder_by_index(const policy_node_t *policy,
-                                 unsigned int i,
-                                 const policy_node_t **out_tapleaf_ptr,
-                                 policy_node_key_placeholder_t *out_placeholder);
+__attribute__((warn_unused_result)) int get_key_placeholder_by_index(
+    const policy_node_t *policy,
+    unsigned int i,
+    const policy_node_t **out_tapleaf_ptr,
+    policy_node_key_placeholder_t *out_placeholder);
 
 /**
  * Checks if a wallet policy is sane, verifying that pubkeys are never repeated and (if miniscript)
@@ -183,8 +210,8 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
  *   The number of keys in the vector of keys
  * @return 0 on success; -1 in case of error.
  */
-int is_policy_sane(dispatcher_context_t *dispatcher_context,
-                   const policy_node_t *policy,
-                   int wallet_version,
-                   const uint8_t keys_merkle_root[static 32],
-                   uint32_t n_keys);
+__attribute__((warn_unused_result)) int is_policy_sane(dispatcher_context_t *dispatcher_context,
+                                                       const policy_node_t *policy,
+                                                       int wallet_version,
+                                                       const uint8_t keys_merkle_root[static 32],
+                                                       uint32_t n_keys);

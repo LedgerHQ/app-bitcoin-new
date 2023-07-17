@@ -132,7 +132,10 @@ bool ui_validate_output(dispatcher_context_t *context,
                         const char *coin_name,
                         uint64_t amount);
 
-bool ui_validate_transaction(dispatcher_context_t *context, const char *coin_name, uint64_t fee);
+bool ui_validate_transaction(dispatcher_context_t *context,
+                             const char *coin_name,
+                             uint64_t fee,
+                             bool is_self_transfer);
 
 void set_ux_flow_response(bool approved);
 
@@ -148,7 +151,7 @@ void ui_display_policy_map_cosigner_pubkey_flow(void);
 
 void ui_display_receive_in_wallet_flow(void);
 
-void ui_display_canonical_wallet_address_flow(void);
+void ui_display_default_wallet_address_flow(void);
 
 void ui_display_spend_from_wallet_flow(void);
 
@@ -162,7 +165,7 @@ void ui_display_output_address_amount_flow(int index);
 
 void ui_display_output_address_amount_no_index_flow(int index);
 
-void ui_accept_transaction_flow(void);
+void ui_accept_transaction_flow(bool is_self_transfer);
 
 void ui_display_transaction_prompt(const int external_outputs_total_count);
 

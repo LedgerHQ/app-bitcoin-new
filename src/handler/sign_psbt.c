@@ -17,6 +17,8 @@
 
 #include <stdint.h>
 
+#include "lib_standard_app/crypto_helpers.h"
+
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
 #include "../common/bitvector.h"
@@ -130,14 +132,17 @@ typedef struct {
     unsigned int n_outputs;
     uint8_t outputs_root[32];  // merkle root of the vector of output maps commitments
 
-    uint64_t inputs_total_value;
-    uint64_t outputs_total_value;
+    uint64_t inputs_total_amount;
 
-    uint64_t internal_inputs_total_value;
+    // aggregate info on outputs
+    struct {
+        uint64_t total_amount;         // amount of all the outputs (external + change)
+        uint64_t change_total_amount;  // total amount of all change outputs
+        int n_change;                  // count of outputs compatible with change outputs
+        int n_external;                // count of external outputs
+    } outputs;
 
-    uint64_t change_outputs_total_value;
-
-    bool is_wallet_canonical;
+    bool is_wallet_default;
 
     uint8_t protocol_version;
 
@@ -155,10 +160,6 @@ typedef struct {
 
     // if any of the internal inputs has non-default sighash, we show a warning
     bool show_nondefault_sighash_warning;
-
-    int external_outputs_count;        // count of external outputs that are shown to the user
-    int change_count;                  // count of outputs compatible with change outputs
-    int external_outputs_total_count;  // Total count of external outputs in the transaction
 } sign_psbt_state_t;
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
@@ -589,9 +590,9 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
 
-        st->is_wallet_canonical = false;
+        st->is_wallet_default = false;
     } else {
-        st->is_wallet_canonical = true;
+        st->is_wallet_default = true;
     }
 
     {
@@ -626,81 +627,34 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                sizeof(wallet_header.keys_info_merkle_root));
         st->wallet_header_n_keys = wallet_header.n_keys;
 
-        if (st->is_wallet_canonical) {
-            // verify that the policy is indeed a canonical one that is allowed by default
-
-            if (st->wallet_header_n_keys != 1) {
-                PRINTF("Non-standard policy, it should only have 1 key\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
-            }
-
-            int address_type = get_policy_address_type(&st->wallet_policy_map);
-            if (address_type == -1) {
+        if (st->is_wallet_default) {
+            // No hmac, verify that the policy is indeed a default one
+            if (!is_wallet_policy_standard(dc, &wallet_header, &st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
-            // Based on the address type, we set the expected bip44 purpose for this canonical
-            // wallet
-            int bip44_purpose = get_bip44_purpose(address_type);
-            if (bip44_purpose < 0) {
-                SEND_SW(dc, SW_BAD_STATE);
-                return false;
-            }
-
-            // We check that the pubkey has indeed 3 derivation steps, and it follows bip44
-            // standards We skip checking that we can indeed deriva the same pubkey (no security
-            // risk here, as the xpub itself isn't really used for the canonical wallet policies).
-            policy_map_key_info_t key_info;
-            {
-                char key_info_str[MAX_POLICY_KEY_INFO_LEN];
-
-                int key_info_len =
-                    call_get_merkle_leaf_element(dc,
-                                                 st->wallet_header_keys_info_merkle_root,
-                                                 st->wallet_header_n_keys,
-                                                 0,
-                                                 (uint8_t *) key_info_str,
-                                                 sizeof(key_info_str));
-                if (key_info_len == -1) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-
-                buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
-
-                if (parse_policy_map_key_info(&key_info_buffer,
-                                              &key_info,
-                                              st->wallet_header_version) == -1) {
-                    SEND_SW(dc, SW_INCORRECT_DATA);
-                    return false;
-                }
-            }
-
-            uint32_t coin_types[2] = {BIP44_COIN_TYPE, BIP44_COIN_TYPE_2};
-            if (key_info.master_key_derivation_len != 3 ||
-                !is_pubkey_path_standard(key_info.master_key_derivation,
-                                         key_info.master_key_derivation_len,
-                                         bip44_purpose,
-                                         coin_types,
-                                         2)) {
+            if (wallet_header.name_len != 0) {
+                PRINTF("Name must be zero-length for a standard wallet policy\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
+
+            // unlike in get_wallet_address, we do not check if the address_index is small:
+            // if funds were already sent there, there is no point in preventing to spend them.
         }
     }
 
-    // Swap feature: check that wallet is canonical
-    if (G_swap_state.called_from_swap && !st->is_wallet_canonical) {
-        PRINTF("Must be a canonical wallet for swap feature\n");
+    // Swap feature: check that wallet policy is a default one
+    if (G_swap_state.called_from_swap && !st->is_wallet_default) {
+        PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
 
-    // If it's not a canonical wallet, ask the user for confirmation, and abort if they deny
-    if (!st->is_wallet_canonical && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
+    // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
+    if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
         ui_post_processing_confirm_wallet_spend(dc, false);
         return false;
@@ -708,7 +662,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
 
-    if (!st->is_wallet_canonical) {
+    if (!st->is_wallet_default) {
         ui_post_processing_confirm_wallet_spend(dc, true);
     }
     return true;
@@ -931,7 +885,7 @@ preprocess_inputs(dispatcher_context_t *dc,
                 return false;
             }
 
-            st->inputs_total_value += input.prevout_amount;
+            st->inputs_total_amount += input.prevout_amount;
         }
 
         if (input.has_witnessUtxo) {
@@ -963,7 +917,7 @@ preprocess_inputs(dispatcher_context_t *dc,
                 }
             } else {
                 // we extract the scriptPubKey and prevout amount from the witness utxo
-                st->inputs_total_value += wit_utxo_prevout_amount;
+                st->inputs_total_amount += wit_utxo_prevout_amount;
 
                 input.prevout_amount = wit_utxo_prevout_amount;
                 input.in_out.scriptPubKey_len = wit_utxo_scriptPubkey_len;
@@ -984,7 +938,6 @@ preprocess_inputs(dispatcher_context_t *dc,
         }
 
         bitvector_set(internal_inputs, cur_input_index, 1);
-        st->internal_inputs_total_value += input.prevout_amount;
 
         int segwit_version = get_policy_segwit_version(&st->wallet_policy_map);
 
@@ -1147,6 +1100,7 @@ static void output_keys_callback(dispatcher_context_t *dc,
 static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
                                                      sign_psbt_state_t *st,
                                                      int cur_output_index,
+                                                     int external_outputs_count,
                                                      const output_info_t *output) {
     (void) cur_output_index;
 
@@ -1189,8 +1143,8 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
     } else {
         // Show address to the user
         if (!ui_validate_output(dc,
-                                st->external_outputs_count,
-                                st->external_outputs_total_count,
+                                external_outputs_count,
+                                st->outputs.n_external,
                                 output_address,
                                 COIN_COINID_SHORT,
                                 output->value)) {
@@ -1205,6 +1159,10 @@ static bool read_outputs(dispatcher_context_t *dc,
                          sign_psbt_state_t *st,
                          placeholder_info_t *placeholder_info,
                          bool dry_run) {
+    // the counter used when showing outputs to the user, which ignores change outputs
+    // (0-indexed here, although the UX starts with 1)
+    int external_outputs_count = 0;
+
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
         output_info_t output;
         memset(&output, 0, sizeof(output));
@@ -1249,7 +1207,7 @@ static bool read_outputs(dispatcher_context_t *dc,
             uint64_t value = read_u64_le(raw_result, 0);
 
             output.value = value;
-            st->outputs_total_value += value;
+            st->outputs.total_amount += value;
         }
 
         // Read the output's scriptPubKey
@@ -1274,21 +1232,22 @@ static bool read_outputs(dispatcher_context_t *dc,
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         } else if (is_internal == 0) {
-            if (dry_run) {
-                ++st->external_outputs_total_count;
-            } else {
-                // external output, user needs to validate
-                ++st->external_outputs_count;
-            }
+            // external output, user needs to validate
+            ++external_outputs_count;
 
-            if (!dry_run && !display_output(dc, st, cur_output_index, &output)) return false;
+            if (!dry_run &&
+                !display_output(dc, st, cur_output_index, external_outputs_count, &output))
+                return false;
         } else if (!dry_run) {
             // valid change address, nothing to show to the user
 
-            st->change_outputs_total_value += output.value;
-            ++st->change_count;
+            st->outputs.change_total_amount += output.value;
+            ++st->outputs.n_change;
         }
     }
+
+    st->outputs.n_external = external_outputs_count;
+
     return true;
 }
 
@@ -1307,12 +1266,17 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
 
-    // Dry run to get the total amount of external outputs
-    st->external_outputs_total_count = 0;
-    if (!read_outputs(dc, st, &placeholder_info, true)) return false;
+    memset(&st->outputs, 0, sizeof(st->outputs));
 
 #ifdef HAVE_NBGL
-    if (!ui_transaction_prompt(dc, st->external_outputs_total_count)) {
+    // Only on Stax, we need to preprocess all the outputs in order to
+    // compute the total number of non-change outputs.
+    // As it's a time-consuming operation, we use avoid doing this useless
+    // work on other models.
+
+    if (!read_outputs(dc, st, &placeholder_info, true)) return false;
+
+    if (!ui_transaction_prompt(dc, st->outputs.n_external)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1327,39 +1291,39 @@ static bool __attribute__((noinline))
 confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->inputs_total_value < st->outputs_total_value) {
+    if (st->inputs_total_amount < st->outputs.total_amount) {
         PRINTF("Negative fee is invalid\n");
         // negative fee transaction is invalid
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
 
-    if (st->change_count > 10) {
+    if (st->outputs.n_change > 10) {
         // As the information regarding change outputs is aggregated, we want to prevent the user
         // from unknowingly signing a transaction that sends the change to too many (possibly
         // unspendable) outputs.
-        PRINTF("Too many change outputs: %d\n", st->change_count);
+        PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return false;
     }
 
-    uint64_t fee = st->inputs_total_value - st->outputs_total_value;
+    uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
 
     if (G_swap_state.called_from_swap) {
-        // Swap feature: check total amount and fees are as expected; moreover, only one external
-        // output
-        if (st->external_outputs_count != 1) {
+        // Swap feature: there must be only one external output
+        if (st->outputs.n_external != 1) {
             PRINTF("Swap transaction must have exactly 1 external output\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
+        // Swap feature: check total amount and fees are as expected
         if (fee != G_swap_state.fees) {
             PRINTF("Mismatching fee for swap\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
-        uint64_t spent_amount = st->outputs_total_value - st->change_outputs_total_value;
+        uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
         if (spent_amount != G_swap_state.amount) {
             PRINTF("Mismatching spent amount for swap\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1367,11 +1331,12 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     } else {
         // Show final user validation UI
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee)) {
+        bool is_self_transfer = st->outputs.n_external == 0;
+        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, is_self_transfer)) {
             SEND_SW(dc, SW_DENY);
             ui_post_processing_confirm_transaction(dc, false);
             return false;
-        };
+        }
     }
 
     return true;
@@ -1954,7 +1919,11 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
         int sign_path_len = placeholder_info->key_derivation_length + 2;
 
-        if (0 > crypto_derive_private_key(&private_key, NULL, sign_path, sign_path_len)) {
+        if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
+                                          sign_path,
+                                          sign_path_len,
+                                          &private_key,
+                                          NULL) != CX_OK) {
             error = true;
             break;
         }

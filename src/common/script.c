@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <limits.h>
 
 #include "../common/bip32.h"
@@ -122,60 +123,70 @@ int format_opscript_script(const uint8_t script[],
         return -1;
     }
 
-    strcpy(out, "OP_RETURN ");
+    strncpy(out, "OP_RETURN ", MAX_OPRETURN_OUTPUT_DESC_SIZE);
     int out_ctr = 10;
 
-    uint8_t opcode = script[1];  // the push opcode
-    if (opcode > OP_16 || opcode == OP_RESERVED || opcode == OP_PUSHDATA2 ||
-        opcode == OP_PUSHDATA4) {
-        return -1;  // unsupported
-    }
+    // If the length of the script is 1 (just "OP_RETURN"), then it's not standard per bitcoin-core.
+    // However, signing such outputs is part of BIP-0322, and there's no danger in allowing them.
 
-    int hex_offset = 1;
-    size_t hex_length =
-        0;  // if non-zero, `hex_length` bytes starting from script[hex_offset] must be hex-encoded
-
-    if (opcode == OP_0) {
-        if (script_len != 1 + 1) return -1;
-        out[out_ctr++] = '0';
-    } else if (opcode >= 1 && opcode <= 75) {
-        hex_offset += 1;
-        hex_length = opcode;
-
-        if (script_len != 1 + 1 + hex_length) return -1;
-    } else if (opcode == OP_PUSHDATA1) {
-        // OP_RETURN OP_PUSHDATA1 <len:1-byte> <data:len bytes>
-        hex_offset += 2;
-        hex_length = script[2];
-
-        if (script_len != 1 + 1 + 1 + hex_length || hex_length > 80) return -1;
-    } else if (opcode == OP_1NEGATE) {
-        if (script_len != 1 + 1) return -1;
-
-        out[out_ctr++] = '-';
-        out[out_ctr++] = '1';
-    } else if (opcode >= OP_1 && opcode <= OP_16) {
-        if (script_len != 1 + 1) return -1;
-
-        // encode OP_1 to OP_16 as a decimal number
-        uint8_t num = opcode - 0x50;
-        if (num >= 10) {
-            out[out_ctr++] = '0' + (num / 10);
-        }
-        out[out_ctr++] = '0' + (num % 10);
+    if (script_len == 1) {
+        --out_ctr;  // remove extra space
     } else {
-        return -1;  // can never happen
-    }
+        // We parse the rest as a single push opcode.
+        // This supports a subset of the scripts that bitcoin-core considers standard.
 
-    if (hex_length > 0) {
-        const char hex[] = "0123456789abcdef";
+        uint8_t opcode = script[1];  // the push opcode
+        if (opcode > OP_16 || opcode == OP_RESERVED || opcode == OP_PUSHDATA2 ||
+            opcode == OP_PUSHDATA4) {
+            return -1;  // unsupported
+        }
 
-        out[out_ctr++] = '0';
-        out[out_ctr++] = 'x';
-        for (unsigned int i = 0; i < hex_length; i++) {
-            uint8_t data = script[hex_offset + i];
-            out[out_ctr++] = hex[data / 16];
-            out[out_ctr++] = hex[data % 16];
+        int hex_offset = 1;
+        size_t hex_length = 0;  // if non-zero, `hex_length` bytes starting from script[hex_offset]
+                                // must be hex-encoded
+
+        if (opcode == OP_0) {
+            if (script_len != 1 + 1) return -1;
+            out[out_ctr++] = '0';
+        } else if (opcode >= 1 && opcode <= 75) {
+            hex_offset += 1;
+            hex_length = opcode;
+
+            if (script_len != 1 + 1 + hex_length) return -1;
+        } else if (opcode == OP_PUSHDATA1) {
+            // OP_RETURN OP_PUSHDATA1 <len:1-byte> <data:len bytes>
+            hex_offset += 2;
+            hex_length = script[2];
+
+            if (script_len != 1 + 1 + 1 + hex_length || hex_length > 80) return -1;
+        } else if (opcode == OP_1NEGATE) {
+            if (script_len != 1 + 1) return -1;
+
+            out[out_ctr++] = '-';
+            out[out_ctr++] = '1';
+        } else if (opcode >= OP_1 && opcode <= OP_16) {
+            if (script_len != 1 + 1) return -1;
+
+            // encode OP_1 to OP_16 as a decimal number
+            uint8_t num = opcode - 0x50;
+            if (num >= 10) {
+                out[out_ctr++] = '0' + (num / 10);
+            }
+            out[out_ctr++] = '0' + (num % 10);
+        } else {
+            return -1;  // can never happen
+        }
+
+        if (hex_length > 0) {
+            const char hex[] = "0123456789abcdef";
+
+            out[out_ctr++] = '0';
+            out[out_ctr++] = 'x';
+            for (unsigned int i = 0; i < hex_length; i++) {
+                uint8_t data = script[hex_offset + i];
+                out[out_ctr++] = hex[data / 16];
+                out[out_ctr++] = hex[data % 16];
+            }
         }
     }
 

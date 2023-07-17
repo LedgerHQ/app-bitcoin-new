@@ -1,6 +1,6 @@
 [package]
 name = "ledger_bitcoin_client"
-version = "0.1.3"
+version = "0.2.0"
 authors = ["Edouard Paris <m@edouard.paris>"]
 edition = "2018"
 description = "Ledger Bitcoin application client"
@@ -9,12 +9,20 @@ license = "Apache-2.0"
 documentation = "https://docs.rs/ledger_bitcoin_client/"
 
 [features]
-default = ["async"]
+default = ["async", "paranoid_client"]
 async = ["async-trait"]
+
+# The paranoid_client feature makes sure that the client independently derives wallet
+# policy addresses using rust-miniscript, returning an error if they do not match.
+# It is strongly recommended to not disable this feature, unless the same check is
+# performed elsewhere.
+# Read more at https://donjon.ledger.com/lsb/019/
+paranoid_client = ["miniscript"]
 
 [dependencies]
 async-trait = { version = "0.1", optional = true }
 bitcoin = { version = "0.29.1", default-features = false, features = ["no-std"] }
+miniscript = { version = "9.0.1", optional = true, default-features = false, features = ["no-std"] }
 
 [workspace]
 members = ["examples/ledger_hwi"]

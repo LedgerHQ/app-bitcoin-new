@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.1.3] - 21-06-2023
+
+### Changed
+
+- Improved UX for self-transfers, that is, transactions where all the outputs are change outputs.
+- Outputs containing a single `OP_RETURN` (without any data push) can now be signed in order to support [BIP-0322](https://github.com/bitcoin/bips/blob/master/bip-0322.mediawiki) implementations.
+
+
+### Fixed
+
+- Wrong address generation for miniscript policies containing an unusual `thresh(1,X)` fragment (that is, with threshold 1, and a single condition). This should not happen in practice, as the policy is redundant for just `X`. Client libraries have been updated to detect and prevent usage of these policies.
+- Resolved a slight regression in signing performance introduced in v2.1.2.
+
 ## [2.1.2] - 03-04-2023
 
 ### Added
@@ -15,6 +28,8 @@ Dates are in `dd-mm-yyyy` format.
 
 ### Fixed
 
+- Miniscript policies containing an `a:` fragment returned an incorrect address in versions `2.1.0` and `2.1.1` of the app. The **upgrade is strongly recommended** for users of miniscript wallets.
+- The app will now reject showing or returning an address for a wallet policy if the `address_index` is larger than or equal to `2147483648`; previous version would return an address for a hardened derivation, which is undesirable.
 - Nested segwit transactions (P2SH-P2WPKH and P2SH-P2WSH) can now be signed (with a warning) if the PSBT contains the witness-utxo but no non-witness-utxo. This aligns their behavior to other types of Segwitv0 transactions since version 2.0.6.
 
 ## [2.1.1] - 23-01-2023

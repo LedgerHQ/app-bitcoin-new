@@ -8,9 +8,9 @@
 #include "io.h"
 
 typedef struct {
-    char *confirm;           // text displayed in last transaction page
-    char *confirmed_status;  // text displayed in confirmation page (after long press)
-    char *rejected_status;   // text displayed in rejection page (after reject confirmed)
+    const char *confirm;           // text displayed in last transaction page
+    const char *confirmed_status;  // text displayed in confirmation page (after long press)
+    const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
     nbgl_layoutTagValue_t tagValuePair[3];
     nbgl_layoutTagValueList_t tagValueList;
     nbgl_pageInfoLongPress_t infoLongPress;
@@ -22,7 +22,8 @@ enum {
     CANCEL_TOKEN = 0,
     CONFIRM_TOKEN,
     SILENT_CONFIRM_TOKEN,
-    BACK_TOKEN,
+    BACK_TOKEN_TRANSACTION,   // for most transactions
+    BACK_TOKEN_SELFTRANSFER,  // special case when it's a self-transfer (no external outputs)
 };
 
 extern bool G_was_processing_screen_shown;
@@ -91,8 +92,11 @@ static void transaction_confirm_callback(int token, uint8_t index) {
         case SILENT_CONFIRM_TOKEN:
             ux_flow_response(true);
             break;
-        case BACK_TOKEN:
-            ui_accept_transaction_flow();
+        case BACK_TOKEN_TRANSACTION:
+            ui_accept_transaction_flow(false);
+            break;
+        case BACK_TOKEN_SELFTRANSFER:
+            ui_accept_transaction_flow(true);
             break;
         default:
             PRINTF("Unhandled token : %d", token);
@@ -149,13 +153,17 @@ static void continue_callback(void) {
 static void transaction_confirm(int token, uint8_t index) {
     (void) index;
 
+    // If it's a self-transfer, the UX is slightly different
+    int backToken =
+        transactionContext.extOutputCount == 0 ? BACK_TOKEN_SELFTRANSFER : BACK_TOKEN_TRANSACTION;
+
     if (token == CONFIRM_TOKEN) {
         nbgl_pageNavigationInfo_t info = {.activePage = transactionContext.extOutputCount + 1,
                                           .nbPages = transactionContext.extOutputCount + 2,
                                           .navType = NAV_WITH_TAP,
                                           .progressIndicator = true,
                                           .navWithTap.backButton = true,
-                                          .navWithTap.backToken = BACK_TOKEN,
+                                          .navWithTap.backToken = backToken,
                                           .navWithTap.nextPageText = NULL,
                                           .navWithTap.quitText = "Reject transaction",
                                           .quitToken = CANCEL_TOKEN,
@@ -175,11 +183,20 @@ static void transaction_confirm(int token, uint8_t index) {
     }
 }
 
-void ui_accept_transaction_flow(void) {
-    transactionContext.tagValuePair[0].item = "Fees";
-    transactionContext.tagValuePair[0].value = g_ui_state.validate_transaction.fee;
+void ui_accept_transaction_flow(bool is_self_transfer) {
+    if (!is_self_transfer) {
+        transactionContext.tagValuePair[0].item = "Fees";
+        transactionContext.tagValuePair[0].value = g_ui_state.validate_transaction.fee;
 
-    transactionContext.tagValueList.nbPairs = 1;
+        transactionContext.tagValueList.nbPairs = 1;
+    } else {
+        transactionContext.tagValuePair[0].item = "Amount";
+        transactionContext.tagValuePair[0].value = "Self-transfer";
+        transactionContext.tagValuePair[1].item = "Fees";
+        transactionContext.tagValuePair[1].value = g_ui_state.validate_transaction.fee;
+
+        transactionContext.tagValueList.nbPairs = 2;
+    }
 
     transactionContext.confirm = "Sign transaction\nto send Bitcoin?";
     transactionContext.confirmed_status = "TRANSACTION\nSIGNED";
@@ -437,7 +454,7 @@ static void address_display(void) {
     nbgl_useCaseAddressConfirmation(g_ui_state.wallet.address, status_confirmation_callback);
 }
 
-void ui_display_canonical_wallet_address_flow(void) {
+void ui_display_default_wallet_address_flow(void) {
     transactionContext.confirm = "Confirm address";
     transactionContext.confirmed_status = "ADDRESS\nVERIFIED";
     transactionContext.rejected_status = "Address verification\ncancelled";

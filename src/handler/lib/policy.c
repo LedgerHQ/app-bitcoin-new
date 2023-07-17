@@ -7,6 +7,7 @@
 #include "../../crypto.h"
 #include "../../common/base58.h"
 #include "../../common/bitvector.h"
+#include "../../common/read.h"
 #include "../../common/script.h"
 #include "../../common/segwit_addr.h"
 #include "../../common/wallet.h"
@@ -326,9 +327,9 @@ int read_and_parse_wallet_policy(
 /**
  * Pushes a node onto the stack. Returns 0 on success, -1 if the stack is exhausted.
  */
-static int state_stack_push(policy_parser_state_t *state,
-                            const policy_node_t *policy_node,
-                            uint8_t flags) {
+__attribute__((warn_unused_result)) static int state_stack_push(policy_parser_state_t *state,
+                                                                const policy_node_t *policy_node,
+                                                                uint8_t flags) {
     ++state->node_stack_eos;
 
     if (state->node_stack_eos >= MAX_POLICY_DEPTH) {
@@ -348,7 +349,7 @@ static int state_stack_push(policy_parser_state_t *state,
  * Pops a node from the stack.
  * Returns the emitted length on success, -1 on error.
  */
-static int state_stack_pop(policy_parser_state_t *state) {
+__attribute__((warn_unused_result)) static int state_stack_pop(policy_parser_state_t *state) {
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     if (state->node_stack_eos <= -1) {
@@ -363,9 +364,8 @@ static int state_stack_pop(policy_parser_state_t *state) {
     return node->length;
 }
 
-static inline int execute_processor(policy_parser_state_t *state,
-                                    policy_parser_processor_t proc,
-                                    const void *arg) {
+__attribute__((warn_unused_result)) static inline int
+execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, const void *arg) {
     int ret = proc(state, arg);
 
     // if the processor is done, pop the stack
@@ -382,10 +382,11 @@ static inline int execute_processor(policy_parser_state_t *state,
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
-static int __attribute__((noinline)) get_extended_pubkey(dispatcher_context_t *dispatcher_context,
-                                                         const wallet_derivation_info_t *wdi,
-                                                         int key_index,
-                                                         serialized_extended_pubkey_t *out) {
+__attribute__((noinline, warn_unused_result)) static int get_extended_pubkey(
+    dispatcher_context_t *dispatcher_context,
+    const wallet_derivation_info_t *wdi,
+    int key_index,
+    serialized_extended_pubkey_t *out) {
     PRINT_STACK_POINTER();
 
     policy_map_key_info_t key_info;
@@ -428,10 +429,11 @@ static int __attribute__((noinline)) get_extended_pubkey(dispatcher_context_t *d
     return key_info.has_wildcard ? 1 : 0;
 }
 
-static int get_derived_pubkey(dispatcher_context_t *dispatcher_context,
-                              const wallet_derivation_info_t *wdi,
-                              const policy_node_key_placeholder_t *key_placeholder,
-                              uint8_t out[static 33]) {
+__attribute__((warn_unused_result)) static int get_derived_pubkey(
+    dispatcher_context_t *dispatcher_context,
+    const wallet_derivation_info_t *wdi,
+    const policy_node_key_placeholder_t *key_placeholder,
+    uint8_t out[static 33]) {
     PRINT_STACK_POINTER();
 
     serialized_extended_pubkey_t ext_pubkey;
@@ -513,7 +515,8 @@ static void update_output_op_v(policy_parser_state_t *state, uint8_t op) {
     }
 }
 
-static int process_generic_node(policy_parser_state_t *state, const void *arg) {
+__attribute__((warn_unused_result)) static int process_generic_node(policy_parser_state_t *state,
+                                                                    const void *arg) {
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
 
     const generic_processor_command_t *commands = (const generic_processor_command_t *) arg;
@@ -598,21 +601,29 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
             case CMD_CODE_PROCESS_CHILD: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), 0);
+                if (0 > state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), 0)) {
+                    return -1;
+                }
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_V: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), node->flags);
+                if (0 > state_stack_push(state,
+                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         node->flags)) {
+                    return -1;
+                }
                 break;
             }
             case CMD_CODE_PROCESS_CHILD_VV: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                state_stack_push(state,
-                                 resolve_node_ptr(&policy->scripts[cmd_data]),
-                                 node->flags | PROCESSOR_FLAG_V);
+                if (0 > state_stack_push(state,
+                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         node->flags | PROCESSOR_FLAG_V)) {
+                    return -1;
+                }
                 break;
             }
             default:
@@ -624,7 +635,8 @@ static int process_generic_node(policy_parser_state_t *state, const void *arg) {
     }
 }
 
-static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) {
+__attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_parser_state_t *state,
+                                                                     const void *arg) {
     UNUSED(arg);
 
     PRINT_STACK_POINTER();
@@ -667,7 +679,8 @@ static int process_pkh_wpkh_node(policy_parser_state_t *state, const void *arg) 
     return 1;
 }
 
-static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
+__attribute__((warn_unused_result)) static int process_thresh_node(policy_parser_state_t *state,
+                                                                   const void *arg) {
     UNUSED(arg);
 
     PRINT_STACK_POINTER();
@@ -675,11 +688,30 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
     policy_parser_node_state_t *node = &state->nodes[state->node_stack_eos];
     const policy_node_thresh_t *policy = (const policy_node_thresh_t *) node->policy_node;
 
-    // [X1] [X2] ADD ... [Xn] ADD ... <k> EQUAL
+    // [X1] [X2] ADD ... [Xn] ADD <k> EQUAL
+
+    /*
+      It's a bit unnatural to encode thresh in a way that is compatible with our
+      stack-based encoder, as every "step" that needs to recur on a child Script
+      must emit the child script as its last thing. The natural way of splitting
+      this would be:
+
+      [X1]   /   [X2] ADD   /   [X3] ADD   /   ...   /   [Xn] ADD   /   <k> EQUAL
+
+      Instead, we have to split it as follows:
+
+      [X1]   /   [X2]   /   ADD [X3]   /   ...   /   ADD [Xn]   /   ADD <k> EQUAL
+
+      But this is incorrect if n == 1, because the correct encoding is just
+
+      [X1] <k> EQUAL
+
+      Therefore, the case n == 1 needs to be handled separately to avoid the extra ADD.
+    */
 
     // n+1 steps
-    // at step i, for 0 <= i < n, we produce [Xi] (or ADD X[i])
-    // at step i, for i == n, we produce ADD <k> EQUAL
+    // at step i, for 0 <= i < n, we produce [Xi] if i <= 1, or ADD [Xi] otherwise
+    // at step n, we produce <k> EQUAL if n == 1, or ADD <k> EQUAL otherwise
 
     if (node->step < policy->n) {
         // find the current child node
@@ -700,7 +732,8 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
         return 0;
     } else {
         // final step
-        if (policy->n >= 1) {
+        if (policy->n >= 2) {
+            // no OP_ADD if n == 1, per comment above
             update_output_u8(state, OP_ADD);
         }
         update_output_push_u32(state, policy->k);
@@ -709,7 +742,9 @@ static int process_thresh_node(policy_parser_state_t *state, const void *arg) {
     }
 }
 
-static int process_multi_sortedmulti_node(policy_parser_state_t *state, const void *arg) {
+__attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
+    policy_parser_state_t *state,
+    const void *arg) {
     UNUSED(arg);
 
     PRINT_STACK_POINTER();
@@ -785,7 +820,9 @@ static int process_multi_sortedmulti_node(policy_parser_state_t *state, const vo
     return 1;
 }
 
-static int process_multi_a_sortedmulti_a_node(policy_parser_state_t *state, const void *arg) {
+__attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_node(
+    policy_parser_state_t *state,
+    const void *arg) {
     UNUSED(arg);
 
     PRINT_STACK_POINTER();
@@ -856,10 +893,11 @@ static int process_multi_a_sortedmulti_a_node(policy_parser_state_t *state, cons
     return 1;
 }
 
-static int __attribute__((noinline)) compute_tapleaf_hash(dispatcher_context_t *dispatcher_context,
-                                                          const wallet_derivation_info_t *wdi,
-                                                          const policy_node_t *script_policy,
-                                                          uint8_t out[static 32]) {
+__attribute__((warn_unused_result, noinline)) static int compute_tapleaf_hash(
+    dispatcher_context_t *dispatcher_context,
+    const wallet_derivation_info_t *wdi,
+    const policy_node_t *script_policy,
+    uint8_t out[static 32]) {
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
@@ -891,11 +929,11 @@ static int __attribute__((noinline)) compute_tapleaf_hash(dispatcher_context_t *
 }
 
 // Separated from compute_taptree_hash to optimize its stack usage
-static int __attribute__((noinline))
-compute_and_combine_taptree_child_hashes(dispatcher_context_t *dc,
-                                         const wallet_derivation_info_t *wdi,
-                                         const policy_node_tree_t *tree,
-                                         uint8_t out[static 32]) {
+__attribute__((warn_unused_result, noinline)) static int compute_and_combine_taptree_child_hashes(
+    dispatcher_context_t *dc,
+    const wallet_derivation_info_t *wdi,
+    const policy_node_tree_t *tree,
+    uint8_t out[static 32]) {
     uint8_t left_h[32], right_h[32];
     if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->left_tree), left_h)) return -1;
     if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->right_tree), right_h)) return -1;
@@ -904,7 +942,7 @@ compute_and_combine_taptree_child_hashes(dispatcher_context_t *dc,
 }
 
 // See taproot_tree_helper in BIP-0341
-int __attribute__((noinline)) compute_taptree_hash(dispatcher_context_t *dc,
+__attribute__((noinline)) int compute_taptree_hash(dispatcher_context_t *dc,
                                                    const wallet_derivation_info_t *wdi,
                                                    const policy_node_tree_t *tree,
                                                    uint8_t out[static 32]) {
@@ -1044,7 +1082,9 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
 
         int h_length = 0;
         if (tr_policy->tree != NULL) {
-            compute_taptree_hash(dispatcher_context, wdi, tr_policy->tree, h);
+            if (0 > compute_taptree_hash(dispatcher_context, wdi, tr_policy->tree, h)) {
+                return -1;
+            }
             h_length = 32;
         }
 
@@ -1058,11 +1098,12 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
     return -1;
 }
 
-int get_wallet_internal_script_hash(dispatcher_context_t *dispatcher_context,
-                                    const policy_node_t *policy,
-                                    const wallet_derivation_info_t *wdi,
-                                    internal_script_type_e script_type,
-                                    cx_hash_t *hash_context) {
+__attribute__((noinline)) int get_wallet_internal_script_hash(
+    dispatcher_context_t *dispatcher_context,
+    const policy_node_t *policy,
+    const wallet_derivation_info_t *wdi,
+    internal_script_type_e script_type,
+    cx_hash_t *hash_context) {
     const uint8_t *whitelist;
     size_t whitelist_len;
     switch (script_type) {
@@ -1245,43 +1286,144 @@ int get_wallet_internal_script_hash(dispatcher_context_t *dispatcher_context,
 
 #pragma GCC diagnostic pop
 
-int get_policy_address_type(const policy_node_t *policy) {
-    // legacy, native segwit, wrapped segwit, or taproot
-    switch (policy->type) {
+// For a standard descriptor template, return the corresponding BIP44 purpose
+// Otherwise, returns -1.
+static int get_bip44_purpose(const policy_node_t *descriptor_template) {
+    const policy_node_key_placeholder_t *kp = NULL;
+    int purpose = -1;
+    switch (descriptor_template->type) {
         case TOKEN_PKH:
-            return ADDRESS_TYPE_LEGACY;
+            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            purpose = 44;  // legacy
+            break;
         case TOKEN_WPKH:
-            return ADDRESS_TYPE_WIT;
-        case TOKEN_SH:
-            // wrapped segwit
-            if (resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script)->type ==
-                TOKEN_WPKH) {
-                return ADDRESS_TYPE_SH_WIT;
+            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            purpose = 84;  // native segwit
+            break;
+        case TOKEN_SH: {
+            const policy_node_t *inner = resolve_node_ptr(
+                &((const policy_node_with_script_t *) descriptor_template)->script);
+            if (inner->type != TOKEN_WPKH) {
+                return -1;
             }
-            return -1;
+
+            kp = ((const policy_node_with_key_t *) inner)->key_placeholder;
+            purpose = 49;  // nested segwit
+            break;
+        }
         case TOKEN_TR:
-            return ADDRESS_TYPE_TR;
+            if (((const policy_node_tr_t *) descriptor_template)->tree != NULL) {
+                return -1;
+            }
+
+            kp = ((const policy_node_tr_t *) descriptor_template)->key_placeholder;
+            purpose = 86;  // standard single-key P2TR
+            break;
         default:
             return -1;
     }
+
+    if (kp->key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
+        return -1;
+    }
+
+    return purpose;
+}
+
+bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
+                               const policy_map_wallet_header_t *wallet_policy_header,
+                               const policy_node_t *descriptor_template) {
+    // Based on the address type, we set the expected bip44 purpose
+    int bip44_purpose = get_bip44_purpose(descriptor_template);
+    if (bip44_purpose < 0) {
+        PRINTF("Non-standard policy, and no hmac provided\n");
+        return false;
+    }
+
+    if (wallet_policy_header->n_keys != 1) {
+        PRINTF("Standard wallets must have exactly 1 key\n");
+        return false;
+    }
+
+    // we check if the key is indeed internal
+    uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
+
+    uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
+    int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
+                                                    wallet_policy_header->keys_info_merkle_root,
+                                                    wallet_policy_header->n_keys,
+                                                    0,  // only one key
+                                                    key_info_str,
+                                                    sizeof(key_info_str));
+    if (key_info_len < 0) {
+        return false;
+    }
+
+    // Make a sub-buffer for the pubkey info
+    buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
+
+    policy_map_key_info_t key_info;
+    if (0 > parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_policy_header->version)) {
+        return false;
+    }
+
+    if (!key_info.has_key_origin) {
+        return false;
+    }
+
+    if (read_u32_be(key_info.master_key_fingerprint, 0) != master_key_fingerprint) {
+        return false;
+    }
+
+    // generate pubkey and check if it matches
+    char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    int serialized_pubkey_len =
+        get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
+                                               key_info.master_key_derivation_len,
+                                               BIP32_PUBKEY_VERSION,
+                                               pubkey_derived,
+                                               NULL);
+    if (serialized_pubkey_len == -1) {
+        PRINTF("Failed to derive pubkey\n");
+        return false;
+    }
+
+    if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+        return false;
+    }
+
+    // check if derivation path of the key is indeed standard
+
+    // per BIP-0044, derivation must be
+    // m / purpose' / coin_type' / account'
+
+    const uint32_t H = BIP32_FIRST_HARDENED_CHILD;
+    if (key_info.master_key_derivation_len != 3 ||
+        key_info.master_key_derivation[0] != H + bip44_purpose ||
+        key_info.master_key_derivation[1] != H + BIP44_COIN_TYPE ||
+        key_info.master_key_derivation[2] < H ||
+        key_info.master_key_derivation[2] > H + MAX_BIP44_ACCOUNT_RECOMMENDED) {
+        return false;
+    }
+
+    return true;
 }
 
 bool compute_wallet_hmac(const uint8_t wallet_id[static 32], uint8_t wallet_hmac[static 32]) {
     uint8_t key[32];
 
     bool result = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
-            cx_hmac_sha256(key, sizeof(key), wallet_id, 32, wallet_hmac, 32);
-            result = true;
-        }
-        FINALLY {
-            explicit_bzero(key, sizeof(key));
-        }
+    if (!crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key)) {
+        goto end;
     }
-    END_TRY;
+
+    cx_hmac_sha256(key, sizeof(key), wallet_id, 32, wallet_hmac, 32);
+
+    result = true;
+
+end:
+    explicit_bzero(key, sizeof(key));
 
     return result;
 }
@@ -1291,22 +1433,20 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
     uint8_t correct_hmac[32];
 
     bool result = false;
-    BEGIN_TRY {
-        TRY {
-            crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key);
 
-            cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
-
-            // It is important to use a constant-time function to compare the hmac,
-            // to avoid timing-attack that could be exploited to extract it.
-            result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
-        }
-        FINALLY {
-            explicit_bzero(key, sizeof(key));
-            explicit_bzero(correct_hmac, sizeof(correct_hmac));
-        }
+    if (!crypto_derive_symmetric_key(WALLET_SLIP0021_LABEL, WALLET_SLIP0021_LABEL_LEN, key)) {
+        goto end;
     }
-    END_TRY;
+
+    cx_hmac_sha256(key, sizeof(key), wallet_id, 32, correct_hmac, 32);
+
+    // It is important to use a constant-time function to compare the hmac,
+    // to avoid timing-attack that could be exploited to extract it.
+    result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
+
+end:
+    explicit_bzero(key, sizeof(key));
+    explicit_bzero(correct_hmac, sizeof(correct_hmac));
 
     return result;
 }
