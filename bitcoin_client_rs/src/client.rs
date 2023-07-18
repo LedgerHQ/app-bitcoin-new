@@ -2,12 +2,11 @@ use core::fmt::Debug;
 use core::str::FromStr;
 
 use bitcoin::{
+    address,
+    bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
     consensus::encode::{deserialize_partial, VarInt},
+    psbt::PartiallySignedTransaction as Psbt,
     secp256k1::ecdsa,
-    util::{
-        bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
-        psbt::PartiallySignedTransaction as Psbt,
-    },
 };
 
 #[cfg(feature = "paranoid_client")]
@@ -72,7 +71,7 @@ impl<T: Transport> BitcoinClient<T> {
         wallet: &WalletPolicy,
         change: bool,
         address_index: u32,
-        expected_address: &bitcoin::Address,
+        expected_address: &bitcoin::Address<address::NetworkUnchecked>,
     ) -> Result<(), BitcoinClientError<T::Error>> {
         let desc_str = wallet
             .get_descriptor(change)
@@ -83,8 +82,11 @@ impl<T: Transport> BitcoinClient<T> {
 
         if descriptor
             .at_derivation_index(address_index)
+            .map_err(|_| {
+                BitcoinClientError::ClientError("Failed to derive descriptor".to_string())
+            })?
             .script_pubkey()
-            != expected_address.script_pubkey()
+            != expected_address.payload.script_pubkey()
         {
             return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new".to_string()));
         }
@@ -130,8 +132,18 @@ impl<T: Transport> BitcoinClient<T> {
     /// Retrieve the master fingerprint.
     pub fn get_master_fingerprint(&self) -> Result<Fingerprint, BitcoinClientError<T::Error>> {
         let cmd = command::get_master_fingerprint();
-        self.make_request(&cmd, None)
-            .map(|data| Fingerprint::from(data.as_slice()))
+        self.make_request(&cmd, None).and_then(|data| {
+            if data.len() < 4 {
+                Err(BitcoinClientError::UnexpectedResult {
+                    command: cmd.ins,
+                    data,
+                })
+            } else {
+                let mut fg = [0x00; 4];
+                fg.copy_from_slice(&data[0..4]);
+                Ok(Fingerprint::from(fg))
+            }
+        })
     }
 
     /// Retrieve the bip32 extended pubkey derived with the given path
@@ -198,7 +210,7 @@ impl<T: Transport> BitcoinClient<T> {
         change: bool,
         address_index: u32,
         display: bool,
-    ) -> Result<bitcoin::Address, BitcoinClientError<T::Error>> {
+    ) -> Result<bitcoin::Address<address::NetworkUnchecked>, BitcoinClientError<T::Error>> {
         let mut intpr = ClientCommandInterpreter::new();
         intpr.add_known_preimage(wallet.serialize());
         let keys: Vec<String> = wallet.keys.iter().map(|k| k.to_string()).collect();
@@ -207,12 +219,11 @@ impl<T: Transport> BitcoinClient<T> {
         intpr.add_known_preimage(wallet.descriptor_template.as_bytes().to_vec());
         let cmd = command::get_wallet_address(wallet, wallet_hmac, change, address_index, display);
         let address = self.make_request(&cmd, Some(&mut intpr)).and_then(|data| {
-            bitcoin::Address::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
-                BitcoinClientError::UnexpectedResult {
+            bitcoin::Address::<address::NetworkUnchecked>::from_str(&String::from_utf8_lossy(&data))
+                .map_err(|_| BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
                     data,
-                }
-            })
+                })
         })?;
 
         #[cfg(feature = "paranoid_client")]
@@ -241,7 +252,7 @@ impl<T: Transport> BitcoinClient<T> {
 
         let global_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_global_pairs(psbt)
             .into_iter()
-            .map(deserialize_pairs)
+            .map(deserialize_pair)
             .collect();
         intpr.add_known_mapping(&global_map);
         let global_mapping_commitment = get_merkleized_map_commitment(&global_map);
@@ -255,7 +266,7 @@ impl<T: Transport> BitcoinClient<T> {
                 .ok_or(BitcoinClientError::InvalidPsbt)?;
             let input_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_input_pairs(input, txin)
                 .into_iter()
-                .map(deserialize_pairs)
+                .map(deserialize_pair)
                 .collect();
             intpr.add_known_mapping(&input_map);
             input_commitments.push(get_merkleized_map_commitment(&input_map));
@@ -271,7 +282,7 @@ impl<T: Transport> BitcoinClient<T> {
                 .ok_or(BitcoinClientError::InvalidPsbt)?;
             let output_map: Vec<(Vec<u8>, Vec<u8>)> = get_v2_output_pairs(output, txout)
                 .into_iter()
-                .map(deserialize_pairs)
+                .map(deserialize_pair)
                 .collect();
             intpr.add_known_mapping(&output_map);
             output_commitments.push(get_merkleized_map_commitment(&output_map));
