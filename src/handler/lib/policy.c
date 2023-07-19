@@ -411,20 +411,7 @@ __attribute__((noinline, warn_unused_result)) static int get_extended_pubkey(
             return -1;
         }
     }
-
-    // decode pubkey
-    serialized_extended_pubkey_check_t decoded_pubkey_check;
-    if (base58_decode(key_info.ext_pubkey,
-                      strlen(key_info.ext_pubkey),
-                      (uint8_t *) &decoded_pubkey_check,
-                      sizeof(decoded_pubkey_check)) == -1) {
-        return -1;
-    }
-    // TODO: validate checksum
-
-    memcpy(out,
-           &decoded_pubkey_check.serialized_extended_pubkey,
-           sizeof(decoded_pubkey_check.serialized_extended_pubkey));
+    *out = key_info.ext_pubkey;
 
     return key_info.has_wildcard ? 1 : 0;
 }
@@ -1376,19 +1363,16 @@ bool is_wallet_policy_standard(dispatcher_context_t *dispatcher_context,
     }
 
     // generate pubkey and check if it matches
-    char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-    int serialized_pubkey_len =
-        get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
-                                               key_info.master_key_derivation_len,
-                                               BIP32_PUBKEY_VERSION,
-                                               pubkey_derived,
-                                               NULL);
-    if (serialized_pubkey_len == -1) {
+    serialized_extended_pubkey_t derived_pubkey;
+    if (0 > get_extended_pubkey_at_path(key_info.master_key_derivation,
+                                        key_info.master_key_derivation_len,
+                                        BIP32_PUBKEY_VERSION,
+                                        &derived_pubkey)) {
         PRINTF("Failed to derive pubkey\n");
         return false;
     }
 
-    if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+    if (memcmp(&key_info.ext_pubkey, &derived_pubkey, sizeof(derived_pubkey)) != 0) {
         return false;
     }
 
@@ -1661,13 +1645,13 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
     return -1;
 }
 
-// Utility function to extract the i-th xpub from the keys information vector
-static int get_xpub_from_merkle_tree(dispatcher_context_t *dispatcher_context,
-                                     int wallet_version,
-                                     const uint8_t keys_merkle_root[static 32],
-                                     uint32_t n_keys,
-                                     uint32_t index,
-                                     char out[static MAX_SERIALIZED_PUBKEY_LENGTH + 1]) {
+// Utility function to extract and decode the i-th xpub from the keys information vector
+static int get_pubkey_from_merkle_tree(dispatcher_context_t *dispatcher_context,
+                                       int wallet_version,
+                                       const uint8_t keys_merkle_root[static 32],
+                                       uint32_t n_keys,
+                                       uint32_t index,
+                                       serialized_extended_pubkey_t *out) {
     char key_info_str[MAX_POLICY_KEY_INFO_LEN];
     int key_info_len = call_get_merkle_leaf_element(dispatcher_context,
                                                     keys_merkle_root,
@@ -1686,7 +1670,7 @@ static int get_xpub_from_merkle_tree(dispatcher_context_t *dispatcher_context,
     if (parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_version) == -1) {
         return WITH_ERROR(-1, "Failed to parse key information");
     }
-    strncpy(out, key_info.ext_pubkey, MAX_SERIALIZED_PUBKEY_LENGTH + 1);
+    *out = key_info.ext_pubkey;
     return 0;
 }
 
@@ -1750,28 +1734,33 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
 
     // check that all the xpubs are different
     for (unsigned int i = 0; i < n_keys - 1; i++) {  // no point in running this for the last key
-        char xpub_i[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-        if (0 > get_xpub_from_merkle_tree(dispatcher_context,
-                                          wallet_version,
-                                          keys_merkle_root,
-                                          n_keys,
-                                          i,
-                                          xpub_i)) {
+        serialized_extended_pubkey_t pubkey_i;
+        if (0 > get_pubkey_from_merkle_tree(dispatcher_context,
+                                            wallet_version,
+                                            keys_merkle_root,
+                                            n_keys,
+                                            i,
+                                            &pubkey_i)) {
             return -1;
         }
 
         for (unsigned int j = i + 1; j < n_keys; j++) {
-            char xpub_j[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-            if (0 > get_xpub_from_merkle_tree(dispatcher_context,
-                                              wallet_version,
-                                              keys_merkle_root,
-                                              n_keys,
-                                              j,
-                                              xpub_j)) {
+            serialized_extended_pubkey_t pubkey_j;
+            if (0 > get_pubkey_from_merkle_tree(dispatcher_context,
+                                                wallet_version,
+                                                keys_merkle_root,
+                                                n_keys,
+                                                j,
+                                                &pubkey_j)) {
                 return -1;
             }
 
-            if (strncmp(xpub_i, xpub_j, sizeof(xpub_i)) == 0) {
+            // We reject if any two xpubs have the same pubkey
+            // Conservatively, we only compare the compressed pubkey, rather than the whole xpub:
+            // there is no good reason for allowing two different xpubs with the same pubkey.
+            if (memcmp(pubkey_i.compressed_pubkey,
+                       pubkey_j.compressed_pubkey,
+                       sizeof(pubkey_i.compressed_pubkey)) == 0) {
                 // duplicated pubkey
                 return WITH_ERROR(-1, "Repeated pubkey in wallet policy");
             }

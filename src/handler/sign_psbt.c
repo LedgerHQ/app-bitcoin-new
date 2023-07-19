@@ -705,19 +705,17 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
     {
         // it could be a collision on the fingerprint; we verify that we can actually generate
         // the same pubkey
-        char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-        int serialized_pubkey_len =
-            get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
-                                                   key_info.master_key_derivation_len,
-                                                   BIP32_PUBKEY_VERSION,
-                                                   pubkey_derived,
-                                                   &placeholder_info->pubkey);
-        if (serialized_pubkey_len == -1) {
+        if (0 > get_extended_pubkey_at_path(key_info.master_key_derivation,
+                                            key_info.master_key_derivation_len,
+                                            BIP32_PUBKEY_VERSION,
+                                            &placeholder_info->pubkey)) {
             SEND_SW(dc, SW_BAD_STATE);
             return false;
         }
 
-        if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) != 0) {
+        if (memcmp(&key_info.ext_pubkey,
+                   &placeholder_info->pubkey,
+                   sizeof(placeholder_info->pubkey)) != 0) {
             return false;
         }
 

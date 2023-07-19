@@ -296,14 +296,10 @@ bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
     return true;
 }
 
-// TODO: Split serialization from key derivation?
-//       It might be difficult to have a clean API without wasting memory, as the checksum
-//       needs to be concatenated to the data before base58 serialization.
-int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
-                                           uint8_t bip32_path_len,
-                                           uint32_t bip32_pubkey_version,
-                                           char out_xpub[static MAX_SERIALIZED_PUBKEY_LENGTH + 1],
-                                           serialized_extended_pubkey_t *out_pubkey) {
+int get_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                uint8_t bip32_path_len,
+                                uint32_t bip32_pubkey_version,
+                                serialized_extended_pubkey_t *out_pubkey) {
     // find parent key's fingerprint and child number
     uint32_t parent_fingerprint = 0;
     uint32_t child_number = 0;
@@ -312,43 +308,30 @@ int get_serialized_extended_pubkey_at_path(const uint32_t bip32_path[],
         // for the response, in order to save memory
 
         uint8_t parent_pubkey[33];
-        crypto_get_compressed_pubkey_at_path(bip32_path, bip32_path_len - 1, parent_pubkey, NULL);
+        if (!crypto_get_compressed_pubkey_at_path(bip32_path,
+                                                  bip32_path_len - 1,
+                                                  parent_pubkey,
+                                                  NULL)) {
+            return -1;
+        }
 
         parent_fingerprint = crypto_get_key_fingerprint(parent_pubkey);
         child_number = bip32_path[bip32_path_len - 1];
     }
 
-    struct {
-        serialized_extended_pubkey_t ext_pubkey;
-        uint8_t checksum[4];
-    } ext_pubkey_check;  // extended pubkey and checksum
+    write_u32_be(out_pubkey->version, 0, bip32_pubkey_version);
+    out_pubkey->depth = bip32_path_len;
+    write_u32_be(out_pubkey->parent_fingerprint, 0, parent_fingerprint);
+    write_u32_be(out_pubkey->child_number, 0, child_number);
 
-    serialized_extended_pubkey_t *ext_pubkey = &ext_pubkey_check.ext_pubkey;
-
-    write_u32_be(ext_pubkey->version, 0, bip32_pubkey_version);
-    ext_pubkey->depth = bip32_path_len;
-    write_u32_be(ext_pubkey->parent_fingerprint, 0, parent_fingerprint);
-    write_u32_be(ext_pubkey->child_number, 0, child_number);
-
-    crypto_get_compressed_pubkey_at_path(bip32_path,
-                                         bip32_path_len,
-                                         ext_pubkey->compressed_pubkey,
-                                         ext_pubkey->chain_code);
-    crypto_get_checksum((uint8_t *) ext_pubkey, 78, ext_pubkey_check.checksum);
-
-    if (out_pubkey != NULL) {
-        memcpy(out_pubkey, &ext_pubkey_check.ext_pubkey, sizeof(ext_pubkey_check.ext_pubkey));
+    if (!crypto_get_compressed_pubkey_at_path(bip32_path,
+                                              bip32_path_len,
+                                              out_pubkey->compressed_pubkey,
+                                              out_pubkey->chain_code)) {
+        return -1;
     }
 
-    int serialized_pubkey_len = base58_encode((uint8_t *) &ext_pubkey_check,
-                                              78 + 4,
-                                              out_xpub,
-                                              MAX_SERIALIZED_PUBKEY_LENGTH);
-
-    if (serialized_pubkey_len > 0) {
-        out_xpub[serialized_pubkey_len] = '\0';
-    }
-    return serialized_pubkey_len;
+    return 0;
 }
 
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len) {
