@@ -262,31 +262,46 @@ describe("test AppClient", () => {
 
   //https://wizardsardine.com/blog/ledger-vulnerability-disclosure/
   it('can generate a correct address or throw on a:X', async () => {
-    try {
-      const walletPolicy = new WalletPolicy('Fixed Vulnerability', 'wsh(and_b(pk(@0/**),a:1))', [
-        "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
-      ]);
+    for (const template of [
+      'wsh(and_b(pk(@0/**),a:1))',
+      'wsh(and_b(pk(@0/<0;1>/*),a:1))'
+    ]) {
+      try {
+        const walletPolicy = new WalletPolicy('Fixed Vulnerability', template, [
+          "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+        ]);
 
-      const automation = JSON.parse(fs.readFileSync('src/__tests__/automations/register_wallet_accept.json').toString());
-      await setSpeculosAutomation(transport, automation);
+        const automation = JSON.parse(
+          fs
+            .readFileSync(
+              'src/__tests__/automations/register_wallet_accept.json'
+            )
+            .toString()
+        );
+        await setSpeculosAutomation(transport, automation);
 
-      const [walletId, walletHmac] = await app.registerWallet(walletPolicy);
+        const [walletId, walletHmac] = await app.registerWallet(walletPolicy);
 
-      expect(walletId).toEqual(walletPolicy.getId());
-      expect(walletHmac.length).toEqual(32);
+        expect(walletId).toEqual(walletPolicy.getId());
+        expect(walletHmac.length).toEqual(32);
 
-      const address = await app.getWalletAddress(
-        walletPolicy,
-        walletHmac,
-        0,
-        0,
-        false
-      );
-      //version > 2.1.1
-      expect(address).toEqual('tb1q5lyn9807ygs7pc52980mdeuwl9wrq5c8n3kntlhy088h6fqw4gzspw9t9m');
-    } catch (error) {
-      //version <= 2.1.1
-      expect(error.message).toMatch(/^Third party address validation mismatch/);
+        const address = await app.getWalletAddress(
+          walletPolicy,
+          walletHmac,
+          0,
+          0,
+          false
+        );
+        //version > 2.1.1
+        expect(address).toEqual(
+          'tb1q5lyn9807ygs7pc52980mdeuwl9wrq5c8n3kntlhy088h6fqw4gzspw9t9m'
+        );
+      } catch (error) {
+        //version <= 2.1.1
+        expect(error.message).toMatch(
+          /^Third party address validation mismatch/
+        );
+      }
     }
   });
 
@@ -297,6 +312,7 @@ describe("test AppClient", () => {
       [
         "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
         "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        "tpubDCoDDpHR1MYXcFrarTcwBufQvWPXSSZpGxjnhRaW612TMxs5TWDEPdbYRHtQdZ9z1UqtKGQKVQ4FqejzbFSdvQvJsD75yrgh7thVoFho6jE"
       ]
     );
 
