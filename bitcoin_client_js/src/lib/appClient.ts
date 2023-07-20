@@ -441,8 +441,9 @@ export class AppClient {
     }
     // Replace index:
     expression = expression.replace(/\/\*/g, `/${addressIndex}`);
-    // Replace origin:
-    for (let i = 0; i < walletPolicy.keys.length; i++)
+    // Replace origin in reverse order to prevent
+    // misreplacements, e.g., @10 being mistaken for @1 and leaving a 0.
+    for (let i = walletPolicy.keys.length - 1; i >= 0; i--)
       expression = expression.replace(
         new RegExp(`@${i}`, 'g'),
         walletPolicy.keys[i]
