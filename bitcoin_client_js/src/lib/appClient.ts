@@ -67,14 +67,6 @@ function makePartialSignature(pubkeyAugm: Buffer, signature: Buffer): PartialSig
 }
 
 /**
- * Checks whether a descriptor template contains an `a:` fragment.
- */
-function containsA(descriptorTemplate: string): boolean {
-  const matches = descriptorTemplate.match(/[asctdvjnlu]+:/g) || [];
-  return matches.some(match => match.includes('a'));
-}
-
-/**
  * This class encapsulates the APDU protocol documented at
  * https://github.com/LedgerHQ/app-bitcoin-new/blob/master/doc/bitcoin.md
  */
@@ -207,8 +199,20 @@ export class AppClient {
         `Invalid response length. Expected 64 bytes, got ${response.length}`
       );
     }
+    const walletId = response.subarray(0, 32);
+    const walletHMAC = response.subarray(32);
 
-    return [response.subarray(0, 32), response.subarray(32)];
+    // sanity check: derive and validate the first address with a 3rd party
+    const firstAddrDevice = await this.getWalletAddress(
+      walletPolicy,
+      walletHMAC,
+      0,
+      0,
+      false
+    );
+    await this.validateAddress(firstAddrDevice, walletPolicy, 0, 0);
+
+    return [walletId, walletHMAC];
   }
 
   /**
@@ -412,8 +416,9 @@ export class AppClient {
   ) {
     if (change !== 0 && change !== 1)
       throw new Error('Change can only be 0 or 1');
+    const isChange: boolean = change === 1;
     if (addressIndex < 0 || !Number.isInteger(addressIndex))
-        throw new Error('Invalid address index');
+      throw new Error('Invalid address index');
     const appAndVer = await this.getAppAndVersion();
     let network;
     if (appAndVer.name === 'Bitcoin Test') {
@@ -426,12 +431,22 @@ export class AppClient {
       );
     }
     let expression = walletPolicy.descriptorTemplate;
-    for (let i = 0; i < walletPolicy.keys.length; i++) {
-      const keyPath = walletPolicy.keys[i] + '/' + change + '/' + addressIndex;
-      expression = expression
-        .replace('@' + i + '/**', keyPath)
-        .replace('@' + i + '/<0;1>', keyPath);
+    // Replace change:
+    expression = expression.replace(/\/\*\*/g, `/<0;1>/*`);
+    const regExpMN = new RegExp(`/<(\\d+);(\\d+)>`, 'g');
+    let matchMN;
+    while ((matchMN = regExpMN.exec(expression)) !== null) {
+      const [M, N] = [parseInt(matchMN[1], 10), parseInt(matchMN[2], 10)];
+      expression = expression.replace(`/<${M};${N}>`, `/${isChange ? N : M}`);
     }
+    // Replace index:
+    expression = expression.replace(/\/\*/g, `/${addressIndex}`);
+    // Replace origin:
+    for (let i = 0; i < walletPolicy.keys.length; i++)
+      expression = expression.replace(
+        new RegExp(`@${i}`, 'g'),
+        walletPolicy.keys[i]
+      );
     let thirdPartyValidationApplicable = true;
     let thirdPartyGeneratedAddress: string;
     try {
@@ -439,7 +454,7 @@ export class AppClient {
         expression,
         network
       }).getAddress();
-    } catch(err) {
+    } catch (err) {
       // Note: @bitcoinerlab/descriptors@1.0.x does not support Tapscript yet.
       // These are the supported descriptors:
       //  - pkh(KEY)
@@ -453,41 +468,13 @@ export class AppClient {
       // Other expressions are not supported and third party validation would not be applicable:
       thirdPartyValidationApplicable = false;
     }
-    if (thirdPartyValidationApplicable) {
-      if (address !== thirdPartyGeneratedAddress) {
-        throw new Error(
-          `Third party address validation mismatch: ${address} != ${thirdPartyGeneratedAddress}`
-        );
-      }
-    } else {
-      await this.validatePolicy(walletPolicy);
-    }
-  }
-
-  /* Performs any additional checks on the policy before using it.*/
-  private async validatePolicy(walletPolicy: WalletPolicy) {
-
-    let appAndVer = undefined;
-
-    if (containsA(walletPolicy.descriptorTemplate)) {
-      appAndVer = appAndVer || await this.getAppAndVersion();
-      if (["2.1.0", "2.1.1"].includes(appAndVer.version)) {
-        // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
-        // the `a:` fragment.
-        throw new Error("Please update your Ledger Bitcoin app.")
-      }
-    }
-
-    if (walletPolicy.descriptorTemplate.includes("thresh(1,")) {
-      appAndVer = appAndVer || await this.getAppAndVersion();
-      if (["2.1.0", "2.1.1", "2.1.2"].includes(appAndVer.version)) {
-        // Versions 2.1.0 and 2.1.1 and "2.1.2" produced incorrect scripts for policies
-        // containing an unusual thresh fragment with k = n = 1, that is "thresh(1,X)".
-        // (The check above has false positives, as it also matches "thresh" fragments
-        // where n > 1; however, better to be overzealous).
-        throw new Error("Please update your Ledger Bitcoin app.")
-      }
-    }
+    if (
+      thirdPartyValidationApplicable &&
+      address !== thirdPartyGeneratedAddress
+    )
+      throw new Error(
+        `Third party address validation mismatch: ${address} != ${thirdPartyGeneratedAddress}`
+      );
   }
 }
 
