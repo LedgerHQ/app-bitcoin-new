@@ -88,11 +88,18 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
+    if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
+        PRINTF("Number of keys in descriptor template doesn't provided keys\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
     // Compute the wallet id (sha256 of the serialization)
     get_policy_wallet_id(&wallet_header, wallet_id);
 
     // Verify that the name is acceptable
     if (!is_policy_name_acceptable(wallet_header.name, wallet_header.name_len)) {
+        PRINTF("Policy name is not acceptable\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }

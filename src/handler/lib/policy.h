@@ -196,6 +196,18 @@ __attribute__((warn_unused_result)) int get_key_placeholder_by_index(
     policy_node_key_placeholder_t *out_placeholder);
 
 /**
+ * Determines the expected number of unique keys in the provided policy's key information.
+ * The function calculates this by finding the maximum key index from placeholders and increments it
+ * by 1. For instance, if the maximum key index found in the placeholders is `n`, then the result
+ * would be `n + 1`.
+ *
+ * @param[in] policy
+ *   Pointer to the root node of the policy
+ * @return the expected number of items in the keys information vector; -1 in case of error.
+ */
+__attribute__((warn_unused_result)) int count_distinct_keys_info(const policy_node_t *policy);
+
+/**
  * Checks if a wallet policy is sane, verifying that pubkeys are never repeated and (if miniscript)
  * that the miniscript is "sane".
  * @param[in] dispatcher_context

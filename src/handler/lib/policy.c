@@ -1645,6 +1645,21 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
     return -1;
 }
 
+int count_distinct_keys_info(const policy_node_t *policy) {
+    policy_node_key_placeholder_t placeholder;
+    int ret = -1, cur, n_placeholders;
+
+    for (cur = 0;
+         cur < (n_placeholders = get_key_placeholder_by_index(policy, cur, NULL, &placeholder));
+         ++cur) {
+        if (n_placeholders < 0) {
+            return -1;
+        }
+        ret = MAX(ret, placeholder.key_index + 1);
+    }
+    return ret;
+}
+
 // Utility function to extract and decode the i-th xpub from the keys information vector
 static int get_pubkey_from_merkle_tree(dispatcher_context_t *dispatcher_context,
                                        int wallet_version,
