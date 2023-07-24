@@ -118,6 +118,21 @@ def test_register_wallet_invalid_names(client: Client):
 
 
 @has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_missing_key(client: Client):
+    wallet = WalletPolicy(
+        name="Missing a key",
+        descriptor_template="wsh(multi(2,@0/**,@1/**))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            # the second key is missing
+        ],
+    )
+
+    with pytest.raises(IncorrectDataError):
+        client.register_wallet(wallet)
+
+
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_unsupported_policy(client: Client):
     # valid policies, but not supported (might change in the future)
 
