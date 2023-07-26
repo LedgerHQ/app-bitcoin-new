@@ -407,7 +407,7 @@ export class AppClient {
     return result.toString('base64');
   }
 
-  /* Performs any additional check on the genetated address before returning it.*/
+  /* Performs any additional check on the generated address before returning it.*/
   private async validateAddress(
     address: string,
     walletPolicy: WalletPolicy,
