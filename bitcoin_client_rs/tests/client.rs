@@ -2,9 +2,9 @@ mod utils;
 use std::str::FromStr;
 
 use bitcoin::{
-    consensus::encode::deserialize,
-    hashes::hex::{FromHex, ToHex},
-    util::{bip32::DerivationPath, psbt::Psbt},
+    bip32::DerivationPath,
+    hashes::{hex::FromHex, Hash},
+    psbt::Psbt,
 };
 use ledger_bitcoin_client::{async_client, client, psbt::PartialSignature, wallet};
 
@@ -173,7 +173,7 @@ async fn test_register_wallet() {
             .register_wallet(&wallet)
             .unwrap();
 
-        assert_eq!(hmac.to_hex(), hmac_result);
+        assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
 
         let (_id, hmac) =
             async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
@@ -181,7 +181,7 @@ async fn test_register_wallet() {
                 .await
                 .unwrap();
 
-        assert_eq!(hmac.to_hex(), hmac_result);
+        assert_eq!(hmac, <[u8; 32]>::from_hex(&hmac_result).unwrap());
     }
 }
 
@@ -250,7 +250,7 @@ async fn test_get_wallet_address() {
             .get_wallet_address(&wallet, hmac.as_ref(), change, address_index, display)
             .unwrap();
 
-        assert_eq!(address.to_string(), address_result);
+        assert_eq!(address.assume_checked().to_string(), address_result);
 
         let address =
             async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
@@ -258,7 +258,7 @@ async fn test_get_wallet_address() {
                 .await
                 .unwrap();
 
-        assert_eq!(address.to_string(), address_result);
+        assert_eq!(address.assume_checked().to_string(), address_result);
     }
 }
 
@@ -310,50 +310,61 @@ async fn test_sign_psbt() {
             .map(|v| serde_json::from_value(v.clone()).unwrap())
             .unwrap();
 
-        let psbt: Psbt = deserialize(&base64::decode(&psbt_str).unwrap()).unwrap();
+        let psbt = Psbt::deserialize(&base64::decode(&psbt_str).unwrap()).unwrap();
 
         let wallet = wallet::WalletPolicy::new(name, wallet::Version::V2, policy, keys);
 
         let store = utils::RecordStore::new(&exchanges);
-        let _res = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
+        let res = client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .unwrap();
+
+        let check_signatures = |sigs: &[serde_json::Value], res: Vec<(usize, PartialSignature)>| {
+            for (i, psbt_sig) in res {
+                for (j, res_sig) in sigs.iter().enumerate() {
+                    if i == j {
+                        match psbt_sig {
+                            PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
+                                assert_eq!(
+                                    res_sig
+                                        .get("key")
+                                        .map(|v| serde_json::from_value::<String>(v.clone())
+                                            .unwrap())
+                                        .unwrap(),
+                                    key.to_string()
+                                );
+                                if let Some(tapleaf_hash_res) = res_sig
+                                    .get("tapleaf_hash")
+                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
+                                {
+                                    assert_eq!(
+                                        tapleaf_hash_res,
+                                        hex::encode(tapleaf_hash.unwrap().to_byte_array())
+                                    );
+                                }
+                                assert_eq!(
+                                    res_sig
+                                        .get("sig")
+                                        .map(|v| serde_json::from_value::<String>(v.clone())
+                                            .unwrap())
+                                        .unwrap(),
+                                    hex::encode(sig.to_vec())
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        };
+
+        check_signatures(&sigs, res);
 
         let res = async_client::BitcoinClient::new(utils::TransportReplayer::new(store.clone()))
             .sign_psbt(&psbt, &wallet, hmac.as_ref())
             .await
             .unwrap();
 
-        for (i, psbt_sig) in res {
-            for (j, res_sig) in sigs.iter().enumerate() {
-                if i == j {
-                    match psbt_sig {
-                        PartialSignature::TapScriptSig(key, tapleaf_hash, sig) => {
-                            assert_eq!(
-                                res_sig
-                                    .get("key")
-                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
-                                    .unwrap(),
-                                key.to_hex()
-                            );
-                            if let Some(tapleaf_hash_res) = res_sig
-                                .get("tapleaf_hash")
-                                .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
-                            {
-                                assert_eq!(tapleaf_hash_res, tapleaf_hash.unwrap().to_hex());
-                            }
-                            assert_eq!(
-                                res_sig
-                                    .get("sig")
-                                    .map(|v| serde_json::from_value::<String>(v.clone()).unwrap())
-                                    .unwrap(),
-                                sig.to_vec().to_hex()
-                            );
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
+        check_signatures(&sigs, res);
     }
 }

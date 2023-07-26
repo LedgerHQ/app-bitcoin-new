@@ -2,7 +2,7 @@ use core::convert::TryFrom;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use bitcoin::hashes::hex::{FromHex, ToHex};
+use bitcoin::hashes::hex::FromHex;
 
 use ledger_bitcoin_client::{
     apdu::{APDUCommand, StatusWord},
@@ -51,7 +51,7 @@ impl TransportReplayer {
         let current = self.current.load(Ordering::Relaxed);
         if let Some((req, res)) = self.store.queue.get(current) {
             if payload != *req {
-                return Err(MockError::ExchangeNotFound(current, payload.to_hex()));
+                return Err(MockError::ExchangeNotFound(current, hex::encode(payload)));
             }
             self.current.store(current + 1, Ordering::Relaxed);
             let res = res.as_slice();
@@ -64,7 +64,7 @@ impl TransportReplayer {
                 answer.to_vec(),
             ));
         }
-        Err(MockError::ExchangeNotFound(current, payload.to_hex()))
+        Err(MockError::ExchangeNotFound(current, hex::encode(payload)))
     }
 }
 

@@ -1,8 +1,8 @@
 /// APDU commands  for the Bitcoin application.
 ///
 use bitcoin::{
+    bip32::{ChildNumber, DerivationPath},
     consensus::encode::{self, VarInt},
-    util::bip32::{ChildNumber, DerivationPath},
 };
 use core::default::Default;
 

@@ -6,6 +6,7 @@
 #include "common/bip32.h"
 #include "common/buffer.h"
 #include "../constants.h"
+#include "../crypto.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "os.h"
@@ -80,7 +81,7 @@ typedef struct {
     uint8_t master_key_derivation_len;
     uint8_t has_key_origin;
     uint8_t has_wildcard;  // true iff the keys ends with the wildcard (/ followed by **)
-    char ext_pubkey[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    serialized_extended_pubkey_t ext_pubkey;
 } policy_map_key_info_t;
 
 typedef struct {

@@ -3,9 +3,9 @@ use core::iter::IntoIterator;
 use core::str::FromStr;
 
 use bitcoin::{
+    bip32::{DerivationPath, Error, ExtendedPubKey, Fingerprint, KeySource},
     consensus::encode::{self, VarInt},
     hashes::{sha256, Hash, HashEngine},
-    util::bip32::{DerivationPath, Error, ExtendedPubKey, Fingerprint, KeySource},
 };
 
 use crate::merkle::MerkleTree;
@@ -113,7 +113,7 @@ impl WalletPolicy {
         if self.version == Version::V2 {
             let mut engine = sha256::Hash::engine();
             engine.input(self.descriptor_template.as_bytes());
-            let hash = sha256::Hash::from_engine(engine).into_inner();
+            let hash = sha256::Hash::from_engine(engine).to_byte_array();
             res.extend_from_slice(&hash);
         } else {
             res.extend_from_slice(self.descriptor_template.as_bytes());
@@ -130,7 +130,7 @@ impl WalletPolicy {
                         preimage.extend_from_slice(key.to_string().as_bytes());
                         let mut engine = sha256::Hash::engine();
                         engine.input(&preimage);
-                        sha256::Hash::from_engine(engine).into_inner()
+                        sha256::Hash::from_engine(engine).to_byte_array()
                     })
                     .collect(),
             )
@@ -150,7 +150,7 @@ impl WalletPolicy {
         desc = desc.replace("/**", &format!("/{}/{}", if change { 1 } else { 0 }, "*"));
 
         // For every "/<M;N>" expression, replace with M if not change, or with N if change
-        if let Some(start) = desc.find("/<") {
+        while let Some(start) = desc.find("/<") {
             if let Some(end) = desc.find(">") {
                 let nums: Vec<&str> = desc[start + 2..end].split(";").collect();
                 if nums.len() == 2 {
@@ -168,7 +168,7 @@ impl WalletPolicy {
     pub fn id(&self) -> [u8; 32] {
         let mut engine = sha256::Hash::engine();
         engine.input(&self.serialize());
-        sha256::Hash::from_engine(engine).into_inner()
+        sha256::Hash::from_engine(engine).to_byte_array()
     }
 }
 
@@ -256,7 +256,7 @@ impl FromStr for WalletPubKey {
 }
 
 impl core::fmt::Display for WalletPubKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if self.source.is_none() {
             write!(f, "{}", self.inner)
         } else {
@@ -281,7 +281,7 @@ impl core::fmt::Display for WalletPubKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin::hashes::hex::ToHex;
+    use bitcoin::hashes::hex::FromHex;
     use core::str::FromStr;
 
     const MASTER_KEY_EXAMPLE: &str = "[5c9e228d]tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW/**";
@@ -331,7 +331,7 @@ mod tests {
                WalletPubKey::from_str("[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK").unwrap(),
             ],
         );
-        assert_eq!(wallet.serialize().as_slice().to_hex(), "020c436f6c642073746f726167651fb56c3d5542fa09b3956834a9ff6a1df5c36a38e5b02c63c54b41a9a04403b82602516d2c50a89476ecffeec658057f0110674bbfafc18797dc480c7ed53802f3fb");
+        assert_eq!(wallet.serialize().as_slice(), Vec::<u8>::from_hex("020c436f6c642073746f726167651fb56c3d5542fa09b3956834a9ff6a1df5c36a38e5b02c63c54b41a9a04403b82602516d2c50a89476ecffeec658057f0110674bbfafc18797dc480c7ed53802f3fb").unwrap());
     }
 
     #[test]
@@ -348,5 +348,44 @@ mod tests {
 
         assert_eq!(wallet.get_descriptor(false).unwrap(), "wsh(sortedmulti(2,[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/0/*,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/12/*))");
         assert_eq!(wallet.get_descriptor(true).unwrap(), "wsh(sortedmulti(2,[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/1/*,[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK/3/*))");
+
+        let wallet = WalletPolicy::new(
+            "Cold storage".to_string(),
+            Version::V2,
+            "wsh(or_d(pk(@0/<0;1>/*),and_v(v:pkh(@1/<0;1>/*),older(65535))))".to_string(),
+            vec![
+               WalletPubKey::from_str("[ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N").unwrap(),
+               WalletPubKey::from_str("[053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp").unwrap(),
+            ],
+        );
+        assert_eq!(wallet.get_descriptor(false).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/0/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/0/*),older(65535))))");
+
+        assert_eq!(wallet.get_descriptor(true).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/1/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/1/*),older(65535))))");
+
+        let wallet = WalletPolicy::new(
+            "Cold storage".to_string(),
+            Version::V2,
+            "wsh(or_d(pk(@0/<0;1>/*),and_v(v:pkh(@1/**),older(65535))))".to_string(),
+            vec![
+               WalletPubKey::from_str("[ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N").unwrap(),
+               WalletPubKey::from_str("[053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp").unwrap(),
+            ],
+        );
+        assert_eq!(wallet.get_descriptor(false).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/0/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/0/*),older(65535))))");
+
+        assert_eq!(wallet.get_descriptor(true).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/1/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/1/*),older(65535))))");
+
+        let wallet = WalletPolicy::new(
+            "Cold storage".to_string(),
+            Version::V2,
+            "wsh(or_d(pk(@0/**),and_v(v:pkh(@1/**),older(65535))))".to_string(),
+            vec![
+               WalletPubKey::from_str("[ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N").unwrap(),
+               WalletPubKey::from_str("[053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp").unwrap(),
+            ],
+        );
+        assert_eq!(wallet.get_descriptor(false).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/0/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/0/*),older(65535))))");
+
+        assert_eq!(wallet.get_descriptor(true).unwrap(), "wsh(or_d(pk([ffd63c8d/48'/1'/0'/2']tpubDExA3EC3iAsPxPhFn4j6gMiVup6V2eH3qKyk69RcTc9TTNRfFYVPad8bJD5FCHVQxyBT4izKsvr7Btd2R4xmQ1hZkvsqGBaeE82J71uTK4N/1/*),and_v(v:pkh([053f423f/48'/1'/0'/2']tpubDEGZMZiz8Vnp7N7cTM9Cty897GJpQ8jqmw2yyDKMPfbMzqPtRbo8wViKtkx6zfrzY6jW5NPNULeN9j7oYCqvrFxCkhSdJs7QxwZ3qQ1PXSp/1/*),older(65535))))");
     }
 }

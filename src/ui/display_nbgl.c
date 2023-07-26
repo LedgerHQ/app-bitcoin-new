@@ -251,6 +251,7 @@ static void display_output(void) {
                                       .tuneId = TUNE_TAP_CASUAL};
 
     nbgl_pageContent_t content = {.type = TAG_VALUE_LIST,
+                                  .tagValueList.nbMaxLinesForValue = 8,
                                   .tagValueList.nbPairs = transactionContext.tagValueList.nbPairs,
                                   .tagValueList.pairs = transactionContext.tagValuePair};
 

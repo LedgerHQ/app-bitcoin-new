@@ -43,7 +43,7 @@ impl ClientCommandInterpreter {
     pub fn add_known_preimage(&mut self, element: Vec<u8>) {
         let mut engine = sha256::Hash::engine();
         engine.input(&element);
-        let hash = sha256::Hash::from_engine(engine).into_inner();
+        let hash = sha256::Hash::from_engine(engine).to_byte_array();
         self.known_preimages.push((hash, element));
     }
 
@@ -62,7 +62,7 @@ impl ClientCommandInterpreter {
             preimage.extend_from_slice(element.as_ref());
             let mut engine = sha256::Hash::engine();
             engine.input(&preimage);
-            let hash = sha256::Hash::from_engine(engine).into_inner();
+            let hash = sha256::Hash::from_engine(engine).to_byte_array();
             self.known_preimages.push((hash, preimage));
             leaves.push(hash);
         }
@@ -288,13 +288,13 @@ pub fn get_merkleized_map_commitment(mapping: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> 
         preimage.extend_from_slice(key);
         let mut engine = sha256::Hash::engine();
         engine.input(&preimage);
-        keys_hashes.push(sha256::Hash::from_engine(engine).into_inner());
+        keys_hashes.push(sha256::Hash::from_engine(engine).to_byte_array());
 
         let mut preimage = vec![0x00];
         preimage.extend_from_slice(value);
         let mut engine = sha256::Hash::engine();
         engine.input(&preimage);
-        values_hashes.push(sha256::Hash::from_engine(engine).into_inner());
+        values_hashes.push(sha256::Hash::from_engine(engine).to_byte_array());
     }
 
     let mut commitment = encode::serialize(&VarInt(sorted.len() as u64));

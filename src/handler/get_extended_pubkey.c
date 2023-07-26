@@ -20,6 +20,7 @@
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
+#include "../common/base58.h"
 #include "../common/bip32.h"
 #include "../commands.h"
 #include "../constants.h"
@@ -141,27 +142,41 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
         return;
     }
 
-    char serialized_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
-
-    int serialized_pubkey_len = get_serialized_extended_pubkey_at_path(bip32_path,
-                                                                       bip32_path_len,
-                                                                       BIP32_PUBKEY_VERSION,
-                                                                       serialized_pubkey_str,
-                                                                       NULL);
-    if (serialized_pubkey_len == -1) {
+    serialized_extended_pubkey_check_t pubkey_check;
+    if (0 > get_extended_pubkey_at_path(bip32_path,
+                                        bip32_path_len,
+                                        BIP32_PUBKEY_VERSION,
+                                        &pubkey_check.serialized_extended_pubkey)) {
+        PRINTF("Failed getting bip32 pubkey\n");
         SEND_SW(dc, SW_BAD_STATE);
         return;
     }
+
+    crypto_get_checksum((uint8_t *) &pubkey_check.serialized_extended_pubkey,
+                        sizeof(pubkey_check.serialized_extended_pubkey),
+                        pubkey_check.checksum);
+
+    char pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+    int pubkey_str_len = base58_encode((uint8_t *) &pubkey_check,
+                                       sizeof(pubkey_check),
+                                       pubkey_str,
+                                       sizeof(pubkey_str));
+    if (pubkey_str_len != 111 && pubkey_str_len != 112) {
+        PRINTF("Failed encoding base58 pubkey\n");
+        SEND_SW(dc, SW_BAD_STATE);
+        return;
+    }
+    pubkey_str[pubkey_str_len] = 0;
 
     char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1] = "(Master key)";
     if (bip32_path_len > 0) {
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    if (display && !ui_display_pubkey(dc, path_str, !is_safe, serialized_pubkey_str)) {
+    if (display && !ui_display_pubkey(dc, path_str, !is_safe, pubkey_str)) {
         SEND_SW(dc, SW_DENY);
         return;
     }
 
-    SEND_RESPONSE(dc, serialized_pubkey_str, strlen(serialized_pubkey_str), SW_OK);
+    SEND_RESPONSE(dc, pubkey_str, pubkey_str_len, SW_OK);
 }

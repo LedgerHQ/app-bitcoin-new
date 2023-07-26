@@ -84,7 +84,7 @@ impl Tree {
 
         let mut engine = sha256::Hash::engine();
         engine.input(input.as_slice());
-        let value = sha256::Hash::from_engine(engine).into_inner();
+        let value = sha256::Hash::from_engine(engine).to_byte_array();
         Tree::Node {
             height: lchild.height() + 1,
             left: Box::new(lchild),
@@ -215,7 +215,7 @@ mod tests {
 
         let mut engine = sha256::Hash::engine();
         engine.input(input.as_slice());
-        let value = sha256::Hash::from_engine(engine).into_inner();
+        let value = sha256::Hash::from_engine(engine).to_byte_array();
         assert_eq!(tree.get_leaf_proof(2), Some(vec![value.to_vec()]));
 
         let _tree = MerkleTree::new(leaves.to_vec());

@@ -312,7 +312,7 @@ describe("test AppClient", () => {
       [
         "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
         "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
-        "tpubDCoDDpHR1MYXcFrarTcwBufQvWPXSSZpGxjnhRaW612TMxs5TWDEPdbYRHtQdZ9z1UqtKGQKVQ4FqejzbFSdvQvJsD75yrgh7thVoFho6jE"
+        "tpubDCoDDpHR1MYXcFrarTcwBufQvWPXSSZpGxjnhRaW612TMxs5TWDEPdbYRHtQdZ9z1UqtKGQKVQ4FqejzbFSdvQvJsD75yrgh7thVoFho6jE",
       ]
     );
 

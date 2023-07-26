@@ -88,11 +88,18 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
+    if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
+        PRINTF("Number of keys in descriptor template doesn't provided keys\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return;
+    }
+
     // Compute the wallet id (sha256 of the serialization)
     get_policy_wallet_id(&wallet_header, wallet_id);
 
     // Verify that the name is acceptable
     if (!is_policy_name_acceptable(wallet_header.name, wallet_header.name_len)) {
+        PRINTF("Policy name is not acceptable\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -170,20 +177,19 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         if (key_info.has_key_origin &&
             read_u32_be(key_info.master_key_fingerprint, 0) == master_key_fingerprint) {
             // we verify that we can actually generate the same pubkey
-            char pubkey_derived[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
+            serialized_extended_pubkey_t pubkey_derived;
             int serialized_pubkey_len =
-                get_serialized_extended_pubkey_at_path(key_info.master_key_derivation,
-                                                       key_info.master_key_derivation_len,
-                                                       BIP32_PUBKEY_VERSION,
-                                                       pubkey_derived,
-                                                       NULL);
+                get_extended_pubkey_at_path(key_info.master_key_derivation,
+                                            key_info.master_key_derivation_len,
+                                            BIP32_PUBKEY_VERSION,
+                                            &pubkey_derived);
             if (serialized_pubkey_len == -1) {
                 SEND_SW(dc, SW_BAD_STATE);
                 ui_post_processing_confirm_wallet_registration(dc, false);
                 return;
             }
 
-            if (strncmp(key_info.ext_pubkey, pubkey_derived, MAX_SERIALIZED_PUBKEY_LENGTH) == 0) {
+            if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
                 is_key_internal = true;
                 ++n_internal_keys;
             }
