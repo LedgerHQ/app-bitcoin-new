@@ -1,4 +1,8 @@
+import * as descriptors from '@bitcoinerlab/descriptors';
+import * as secp256k1 from '@bitcoinerlab/secp256k1';
+const { Descriptor } = descriptors.DescriptorsFactory(secp256k1);
 import Transport from '@ledgerhq/hw-transport';
+import { networks } from 'bitcoinjs-lib';
 
 import { pathElementsToBuffer, pathStringToArray } from './bip32';
 import { ClientCommandInterpreter } from './clientCommands';
@@ -60,14 +64,6 @@ function makePartialSignature(pubkeyAugm: Buffer, signature: Buffer): PartialSig
   } else {
     throw new Error(`Invalid length for pubkeyAugm: ${pubkeyAugm.length} bytes.`);
   }
-}
-
-/**
- * Checks whether a descriptor template contains an `a:` fragment.
- */
-function containsA(descriptorTemplate: string): boolean {
-  const matches = descriptorTemplate.match(/[asctdvjnlu]+:/g) || [];
-  return matches.some(match => match.includes('a'));
 }
 
 /**
@@ -184,8 +180,6 @@ export class AppClient {
     walletPolicy: WalletPolicy
   ): Promise<readonly [Buffer, Buffer]> {
 
-    await this.validatePolicy(walletPolicy);
-
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -205,8 +199,20 @@ export class AppClient {
         `Invalid response length. Expected 64 bytes, got ${response.length}`
       );
     }
+    const walletId = response.subarray(0, 32);
+    const walletHMAC = response.subarray(32);
 
-    return [response.subarray(0, 32), response.subarray(32)];
+    // sanity check: derive and validate the first address with a 3rd party
+    const firstAddrDevice = await this.getWalletAddress(
+      walletPolicy,
+      walletHMAC,
+      0,
+      0,
+      false
+    );
+    await this.validateAddress(firstAddrDevice, walletPolicy, 0, 0);
+
+    return [walletId, walletHMAC];
   }
 
   /**
@@ -236,8 +242,6 @@ export class AppClient {
       throw new Error('Invalid HMAC length');
     }
 
-    await this.validatePolicy(walletPolicy);
-
     const clientInterpreter = new ClientCommandInterpreter();
 
     clientInterpreter.addKnownWalletPolicy(walletPolicy);
@@ -257,7 +261,9 @@ export class AppClient {
       clientInterpreter
     );
 
-    return response.toString('ascii');
+    const address = response.toString('ascii');
+    await this.validateAddress(address, walletPolicy, change, addressIndex);
+    return address;
   }
 
   /**
@@ -279,7 +285,6 @@ export class AppClient {
     walletHMAC: Buffer | null,
     progressCallback?: () => void
   ): Promise<[number, PartialSignature][]> {
-    await this.validatePolicy(walletPolicy);
 
     if (typeof psbt === 'string') {
       psbt = Buffer.from(psbt, "base64");
@@ -402,34 +407,75 @@ export class AppClient {
     return result.toString('base64');
   }
 
-  /* Performs any additional checks on the policy before using it.*/
-  private async validatePolicy(walletPolicy: WalletPolicy) {
-    // TODO: Once an independent implementation of miniscript in JavaScript is available,
-    // we will replace the checks in this section with a generic comparison between the
-    // address produced by the app and the one computed locally (like the python and Rust
-    // clients). Until then, we filter for any known bug.
-
-    let appAndVer = undefined;
-
-    if (containsA(walletPolicy.descriptorTemplate)) {
-      appAndVer = appAndVer || await this.getAppAndVersion();
-      if (["2.1.0", "2.1.1"].includes(appAndVer.version)) {
-        // Versions 2.1.0 and 2.1.1 produced incorrect scripts for policies containing
-        // the `a:` fragment.
-        throw new Error("Please update your Ledger Bitcoin app.")
-      }
+  /* Performs any additional check on the generated address before returning it.*/
+  private async validateAddress(
+    address: string,
+    walletPolicy: WalletPolicy,
+    change: number,
+    addressIndex: number
+  ) {
+    if (change !== 0 && change !== 1)
+      throw new Error('Change can only be 0 or 1');
+    const isChange: boolean = change === 1;
+    if (addressIndex < 0 || !Number.isInteger(addressIndex))
+      throw new Error('Invalid address index');
+    const appAndVer = await this.getAppAndVersion();
+    let network;
+    if (appAndVer.name === 'Bitcoin Test') {
+      network = networks.testnet;
+    } else if (appAndVer.name === 'Bitcoin') {
+      network = networks.bitcoin;
+    } else {
+      throw new Error(
+        `Invalid network: ${appAndVer.name}. Expected 'Bitcoin Test' or 'Bitcoin'.`
+      );
     }
-
-    if (walletPolicy.descriptorTemplate.includes("thresh(1,")) {
-      appAndVer = appAndVer || await this.getAppAndVersion();
-      if (["2.1.0", "2.1.1", "2.1.2"].includes(appAndVer.version)) {
-        // Versions 2.1.0 and 2.1.1 and "2.1.2" produced incorrect scripts for policies
-        // containing an unusual thresh fragment with k = n = 1, that is "thresh(1,X)".
-        // (The check above has false positives, as it also matches "thresh" fragments
-        // where n > 1; however, better to be overzealous).
-        throw new Error("Please update your Ledger Bitcoin app.")
-      }
+    let expression = walletPolicy.descriptorTemplate;
+    // Replace change:
+    expression = expression.replace(/\/\*\*/g, `/<0;1>/*`);
+    const regExpMN = new RegExp(`/<(\\d+);(\\d+)>`, 'g');
+    let matchMN;
+    while ((matchMN = regExpMN.exec(expression)) !== null) {
+      const [M, N] = [parseInt(matchMN[1], 10), parseInt(matchMN[2], 10)];
+      expression = expression.replace(`/<${M};${N}>`, `/${isChange ? N : M}`);
     }
+    // Replace index:
+    expression = expression.replace(/\/\*/g, `/${addressIndex}`);
+    // Replace origin in reverse order to prevent
+    // misreplacements, e.g., @10 being mistaken for @1 and leaving a 0.
+    for (let i = walletPolicy.keys.length - 1; i >= 0; i--)
+      expression = expression.replace(
+        new RegExp(`@${i}`, 'g'),
+        walletPolicy.keys[i]
+      );
+    let thirdPartyValidationApplicable = true;
+    let thirdPartyGeneratedAddress: string;
+    try {
+      thirdPartyGeneratedAddress = new Descriptor({
+        expression,
+        network
+      }).getAddress();
+    } catch (err) {
+      // Note: @bitcoinerlab/descriptors@1.0.x does not support Tapscript yet.
+      // These are the supported descriptors:
+      //  - pkh(KEY)
+      //  - wpkh(KEY)
+      //  - sh(wpkh(KEY))
+      //  - sh(SCRIPT)
+      //  - wsh(SCRIPT)
+      //  - sh(wsh(SCRIPT)), where
+      // SCRIPT is any of the (non-tapscript) fragments in: https://bitcoin.sipa.be/miniscript/
+      //
+      // Other expressions are not supported and third party validation would not be applicable:
+      thirdPartyValidationApplicable = false;
+    }
+    if (
+      thirdPartyValidationApplicable &&
+      address !== thirdPartyGeneratedAddress
+    )
+      throw new Error(
+        `Third party address validation mismatch: ${address} != ${thirdPartyGeneratedAddress}`
+      );
   }
 }
 
