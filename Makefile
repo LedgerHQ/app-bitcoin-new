@@ -112,11 +112,6 @@ DISABLE_STANDARD_APP_FILES = 1
 # value for NANOS for an unknown reason.
 DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
 
-# Don't use STANDARD_USB as we want IO_USB_MAX_ENDPOINTS=4
-# and the default is 6
-DISABLE_STANDARD_USB = 1
-
-DEFINES   += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=4 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
 DEFINES   += UNUSED\(x\)=\(void\)x
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
@@ -148,10 +143,8 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 # Application source files
 APP_SOURCE_PATH += src
-SDK_SOURCE_PATH += lib_stusb lib_stusb_impl
 
 # Allow usage of function from lib_standard_app/crypto_helpers.c
-INCLUDES_PATH  += ${BOLOS_SDK}
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/crypto_helpers.c
 
 include $(BOLOS_SDK)/Makefile.standard_app
