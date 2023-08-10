@@ -202,7 +202,9 @@ fn extract_keys_and_template(policy: &str) -> Result<(String, Vec<WalletPubKey>)
     let mut pubkeys: Vec<WalletPubKey> = Vec::new();
     for (index, capture) in re.find_iter(policy).enumerate() {
         let pubkey = WalletPubKey::from_str(capture.as_str()).map_err(|e| format!("{}", e))?;
-        pubkeys.push(pubkey);
+        if !pubkeys.contains(&pubkey) {
+            pubkeys.push(pubkey);
+        }
         descriptor_template = descriptor_template.replace(capture.as_str(), &format!("@{}", index));
     }
     if let Some((descriptor_template, _hash)) = descriptor_template.rsplit_once("#") {
