@@ -179,6 +179,7 @@ pub enum WalletError {
     InvalidPolicy,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct WalletPubKey {
     pub inner: ExtendedPubKey,
     pub source: Option<KeySource>,
