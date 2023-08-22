@@ -1274,7 +1274,7 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     if (!read_outputs(dc, st, &placeholder_info, true)) return false;
 
-    if (!ui_transaction_prompt(dc, st->outputs.n_external)) {
+    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc, st->outputs.n_external)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -2381,7 +2381,9 @@ sign_transaction(dispatcher_context_t *dc,
 
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            ui_post_processing_confirm_transaction(dc, false);
+            if (!G_swap_state.called_from_swap) {
+                ui_post_processing_confirm_transaction(dc, false);
+            }
             return false;
         }
 
@@ -2415,7 +2417,9 @@ sign_transaction(dispatcher_context_t *dc,
                         &input.in_out.map);
                     if (res < 0) {
                         SEND_SW(dc, SW_INCORRECT_DATA);
-                        ui_post_processing_confirm_transaction(dc, false);
+                        if (!G_swap_state.called_from_swap) {
+                            ui_post_processing_confirm_transaction(dc, false);
+                        }
                         return false;
                     }
 
@@ -2428,7 +2432,9 @@ sign_transaction(dispatcher_context_t *dc,
 
                     if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
                         SEND_SW(dc, SW_BAD_STATE);  // should never happen
-                        ui_post_processing_confirm_transaction(dc, false);
+                        if (!G_swap_state.called_from_swap) {
+                            ui_post_processing_confirm_transaction(dc, false);
+                        }
                         return false;
                     }
                 }
@@ -2437,7 +2443,9 @@ sign_transaction(dispatcher_context_t *dc,
         ++placeholder_index;
     }
 
-    ui_post_processing_confirm_transaction(dc, true);
+    if (!G_swap_state.called_from_swap) {
+        ui_post_processing_confirm_transaction(dc, true);
+    }
     return true;
 }
 
