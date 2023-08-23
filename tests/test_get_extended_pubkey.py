@@ -165,7 +165,12 @@ def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: Spe
         comm.press_and_release("right")
         comm.wait_for_text_event("Confirm public key")
         comm.press_and_release("right")
-        comm.wait_for_text_event("111'/222'/333'")
+        # Temporary fix for broken OCR
+        if (model == "nanox"):
+            comm.wait_for_text_event("111-/222-/333-")
+        else:
+            comm.wait_for_text_event("111'/222'/333'")
+
         comm.press_and_release("right")
         comm.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
         comm.press_and_release("both")
