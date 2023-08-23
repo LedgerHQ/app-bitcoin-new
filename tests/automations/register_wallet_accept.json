@@ -28,7 +28,7 @@
       ]
     },
     {
-      "regexp": "Processing",
+      "regexp": "Processing|REGISTERED",
       "actions": [
         ["finger", 55, 550, false]
       ]

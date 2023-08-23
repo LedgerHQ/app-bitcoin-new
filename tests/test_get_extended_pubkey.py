@@ -38,7 +38,7 @@ def test_get_extended_pubkey_standard_display(client: Client, comm: SpeculosClie
     def ux_thread_stax():
         event = comm.get_next_event()
 
-        while "Approve" not in event["text"]:
+        while "Approve public key" not in event["text"]:
             if "Tap to continue" in event["text"]:
                 comm.finger_touch(55, 550)
 
