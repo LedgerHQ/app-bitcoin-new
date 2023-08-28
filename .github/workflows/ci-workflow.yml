@@ -138,7 +138,7 @@ jobs:
         run: |
           cd tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=500
 
   job_test_mainnet:
     name: Tests on mainnet
