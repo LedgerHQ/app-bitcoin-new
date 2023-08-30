@@ -38,7 +38,7 @@ def test_get_extended_pubkey_standard_display(client: Client, comm: SpeculosClie
     def ux_thread_stax():
         event = comm.get_next_event()
 
-        while "Approve" not in event["text"]:
+        while "Approve public key" not in event["text"]:
             if "Tap to continue" in event["text"]:
                 comm.finger_touch(55, 550)
 
@@ -165,7 +165,12 @@ def test_get_extended_pubkey_non_standard_reject_early(client: Client, comm: Spe
         comm.press_and_release("right")
         comm.wait_for_text_event("Confirm public key")
         comm.press_and_release("right")
-        comm.wait_for_text_event("111'/222'/333'")
+        # Temporary fix for broken OCR
+        if (model == "nanox"):
+            comm.wait_for_text_event("111-/222-/333-")
+        else:
+            comm.wait_for_text_event("111'/222'/333'")
+
         comm.press_and_release("right")
         comm.wait_for_text_event("not sure")  # second line of "Reject if you're not sure"
         comm.press_and_release("both")
