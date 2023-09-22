@@ -183,6 +183,15 @@ static void transaction_confirm(int token, uint8_t index) {
     }
 }
 
+void ui_warn_high_fee_flow() {
+    nbgl_useCaseChoice(&C_round_warning_64px,
+                       "Warning",
+                       "Fees are above 10%\n of total amount",
+                       "Continue",
+                       "Reject",
+                       ux_flow_response);
+}
+
 void ui_accept_transaction_flow(bool is_self_transfer) {
     if (!is_self_transfer) {
         transactionContext.tagValuePair[0].item = "Fees";

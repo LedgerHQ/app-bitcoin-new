@@ -34,8 +34,8 @@ CURRENCY_TICKER_ALT = "TET"
 def format_amount(ticker: str, amount: int) -> str:
     """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
     assert amount >= 0
-
-    return f"{ticker} {str(Decimal(amount) / 100_000_000)}"
+    btc_amount = f"{(amount/100_000_000):.8f}".rstrip('0').rstrip('.')
+    return f"{ticker} {btc_amount}"
 
 
 def should_go_right(event: dict):
@@ -210,6 +210,34 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
             )
         )
     )]
+
+
+@has_automation("automations/sign_with_default_wallet_accept_highfee.json")
+def test_sign_psbt_highfee(client: Client):
+    # Transactions with fees higher than 10% of total amount
+    # An aditional warning is shown.
+
+    # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
+
+    # Make sure that the fees are at least 10% of the total amount
+    for out in psbt.tx.vout:
+        out.nValue = int(out.nValue * 0.9)
+
+    # the test is only interesting if the total amount is at least 10000 sats
+    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 10000
+
+    wallet = WalletPolicy(
+        "",
+        "sh(wpkh(@0/**))",
+        [
+            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"
+        ],
+    )
+
+    result = client.sign_psbt(psbt, wallet, None)
+
+    assert len(result) == 1
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -586,7 +614,8 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
     n_outs = 3
 
     in_amounts = [10000 + 10000 * i for i in range(n_ins)]
-    out_amounts = [9999 + 9999 * i for i in range(n_outs)]
+    total_in = sum(in_amounts)
+    out_amounts = [total_in // n_outs - i for i in range(n_outs)]
 
     change_index = 1
 

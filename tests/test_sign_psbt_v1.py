@@ -36,8 +36,8 @@ CURRENCY_TICKER_ALT = "TET"
 def format_amount(ticker: str, amount: int) -> str:
     """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
     assert amount >= 0
-
-    return f"{ticker} {str(Decimal(amount) / 100_000_000)}"
+    btc_amount = f"{(amount/100_000_000):.8f}".rstrip('0').rstrip('.')
+    return f"{ticker} {btc_amount}"
 
 
 def should_go_right(event: dict):
@@ -387,7 +387,8 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
     n_outs = 3
 
     in_amounts = [10000 + 10000 * i for i in range(n_ins)]
-    out_amounts = [9999 + 9999 * i for i in range(n_outs)]
+    sum_in = sum(in_amounts)
+    out_amounts = [sum_in // n_outs - i for i in range(n_outs)]
 
     change_index = 1
 
@@ -398,7 +399,6 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
         [i == change_index for i in range(n_outs)]
     )
 
-    sum_in = sum(in_amounts)
     sum_out = sum(out_amounts)
 
     assert sum_out < sum_in
