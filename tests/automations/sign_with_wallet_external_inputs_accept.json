@@ -8,7 +8,7 @@
       ]
     },
     {
-      "regexp": "[S]?pend from|Wallet name|There are|Reject if you['-]re|Review|Amount|Address|Confirm|Fees",
+      "regexp": "Spend from|Wallet name|There are|Reject if you['-]re|Review|Amount|Address|Confirm|Fees",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]

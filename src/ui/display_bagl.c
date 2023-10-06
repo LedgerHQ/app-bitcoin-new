@@ -167,6 +167,25 @@ UX_STEP_NOCB(ux_validate_address_step,
                  .text = g_ui_state.validate_output.address_or_description,
              });
 
+// Step with eye icon and a "high fees" warning
+#ifdef TARGET_NANOS
+UX_STEP_NOCB(ux_high_fee_step,
+             pnn,
+             {
+                 &C_icon_eye,
+                 "Fees over 10%",
+                 "of total value!",
+             });
+#else
+UX_STEP_NOCB(ux_high_fee_step,
+             pnn,
+             {
+                 &C_icon_eye,
+                 "Fees are above 10%",
+                 "of total amount!",
+             });
+#endif
+
 UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
 UX_STEP_NOCB(ux_confirm_selftransfer_step, pnn, {&C_icon_eye, "Confirm", "self-transfer"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
@@ -389,6 +408,16 @@ UX_FLOW(ux_display_output_address_amount_flow,
 // Finalize see the transaction fees and finally accept signing
 // #1 screen: eye icon + "Confirm transaction"
 // #2 screen: fee amount
+// #3 screen: "Continue", with approve button
+// #4 screen: reject button
+UX_FLOW(ux_warn_high_fee_flow,
+        &ux_high_fee_step,
+        &ux_display_continue_step,
+        &ux_display_reject_step);
+
+// Finalize see the transaction fees and finally accept signing
+// #1 screen: eye icon + "Confirm transaction"
+// #2 screen: fee amount
 // #3 screen: "Accept and send", with approve button
 // #4 screen: reject button
 UX_FLOW(ux_accept_transaction_flow,
@@ -464,6 +493,10 @@ void ui_display_output_address_amount_no_index_flow(int index) {
     // Currently we don't want any change in the UX so this function defaults to
     // ui_display_output_address_amount_flow
     ui_display_output_address_amount_flow(index);
+}
+
+void ui_warn_high_fee_flow(void) {
+    ux_flow_init(0, ux_warn_high_fee_flow, NULL);
 }
 
 void ui_accept_transaction_flow(bool is_self_transfer) {

@@ -1328,6 +1328,15 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
     } else {
+        // if the value of fees is 10% or more of the amount, and it's more than 10000
+        if (10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000) {
+            if (!ui_warn_high_fee(dc)) {
+                SEND_SW(dc, SW_DENY);
+                ui_post_processing_confirm_transaction(dc, false);
+                return false;
+            }
+        }
+
         // Show final user validation UI
         bool is_self_transfer = st->outputs.n_external == 0;
         if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, is_self_transfer)) {

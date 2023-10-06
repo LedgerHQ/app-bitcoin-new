@@ -9,7 +9,7 @@
       ]
     },
     {
-      "regexp": "[S]?ign|Path|Message hash|Approve",
+      "regexp": "Sign|Path|Message hash|Approve",
       "actions": [
         ["button", 2, true],
         ["button", 2, false],

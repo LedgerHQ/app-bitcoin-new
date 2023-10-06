@@ -469,6 +469,15 @@ void ui_display_default_wallet_address_flow(void) {
 }
 
 // Warning Flows
+void ui_warn_high_fee_flow(void) {
+    nbgl_useCaseChoice(&C_round_warning_64px,
+                       "Warning",
+                       "Fees are above 10%\n of total amount",
+                       "Continue",
+                       "Reject",
+                       ux_flow_response);
+}
+
 void ui_display_warning_external_inputs_flow(void) {
     nbgl_useCaseChoice(&C_round_warning_64px,
                        "Warning",

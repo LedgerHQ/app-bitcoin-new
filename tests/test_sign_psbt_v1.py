@@ -29,15 +29,13 @@ tests_root: Path = Path(__file__).parent
 
 
 CURRENCY_TICKER = "TEST"
-# For nano X/S+ OCR used in speculos misreads 'S'. See caveats.txt
-CURRENCY_TICKER_ALT = "TET"
 
 
 def format_amount(ticker: str, amount: int) -> str:
     """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
     assert amount >= 0
-
-    return f"{ticker} {str(Decimal(amount) / 100_000_000)}"
+    btc_amount = f"{(amount/100_000_000):.8f}".rstrip('0').rstrip('.')
+    return f"{ticker} {btc_amount}"
 
 
 def should_go_right(event: dict):
@@ -133,7 +131,7 @@ def parse_signing_events(events: List[dict]) -> dict:
             if len(ret["addresses"]) == 0:
                 ret["addresses"].append("")
 
-            ret["addresses"][-1] += ev["text"].strip().replace("O", "0")  # OCR misreads O for 0
+            ret["addresses"][-1] += ev["text"].strip()
 
         elif next_step.startswith("Fees"):
             ret["fees"] += ev["text"]
@@ -387,7 +385,8 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
     n_outs = 3
 
     in_amounts = [10000 + 10000 * i for i in range(n_ins)]
-    out_amounts = [9999 + 9999 * i for i in range(n_outs)]
+    sum_in = sum(in_amounts)
+    out_amounts = [sum_in // n_outs - i for i in range(n_outs)]
 
     change_index = 1
 
@@ -398,7 +397,6 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
         [i == change_index for i in range(n_outs)]
     )
 
-    sum_in = sum(in_amounts)
     sum_out = sum(out_amounts)
 
     assert sum_out < sum_in
@@ -420,15 +418,13 @@ def test_sign_psbt_singlesig_wpkh_4to3_v1(client: Client, comm: SpeculosClient, 
 
     parsed_events = parse_signing_events(all_events)
 
-    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
 
     shown_out_idx = 0
     for out_idx in range(n_outs):
         if out_idx != change_index:
             out_amt = psbt.tx.vout[out_idx].nValue
-            assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
-                    (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+            assert parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)
 
             out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
             assert parsed_events["addresses"][shown_out_idx] == out_addr
@@ -479,12 +475,10 @@ def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClien
 
     parsed_events = parse_signing_events(all_events)
 
-    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
 
     out_amt = psbt.tx.vout[0].nValue
-    assert ((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
-            (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+    assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
 
 
 @pytest.mark.timeout(0)  # disable timeout

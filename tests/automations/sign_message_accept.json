@@ -28,7 +28,7 @@
       ]
     },
     {
-      "regexp": "[S]?ign",
+      "regexp": "Sign",
       "conditions": [
         [ "seen", false ]
       ],
@@ -39,7 +39,7 @@
       ]
     },
     {
-      "regexp": "[S]?ign",
+      "regexp": "Sign",
       "conditions": [
         [ "seen", true ]
       ],

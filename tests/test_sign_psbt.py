@@ -27,15 +27,13 @@ tests_root: Path = Path(__file__).parent
 
 
 CURRENCY_TICKER = "TEST"
-# For nano X/S+ OCR used in speculos misreads 'S'. See caveats.txt
-CURRENCY_TICKER_ALT = "TET"
 
 
 def format_amount(ticker: str, amount: int) -> str:
     """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
     assert amount >= 0
-
-    return f"{ticker} {str(Decimal(amount) / 100_000_000)}"
+    btc_amount = f"{(amount/100_000_000):.8f}".rstrip('0').rstrip('.')
+    return f"{ticker} {btc_amount}"
 
 
 def should_go_right(event: dict):
@@ -128,7 +126,7 @@ def parse_signing_events(events: List[dict]) -> dict:
             if len(ret["addresses"]) == 0:
                 ret["addresses"].append("")
 
-            ret["addresses"][-1] += ev["text"].strip().replace("O", "0")  # OCR misreads O for 0
+            ret["addresses"][-1] += ev["text"].strip()
 
         elif next_step.startswith("Fees"):
             ret["fees"] += ev["text"].strip()
@@ -210,6 +208,34 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
             )
         )
     )]
+
+
+@has_automation("automations/sign_with_default_wallet_accept_highfee.json")
+def test_sign_psbt_highfee(client: Client):
+    # Transactions with fees higher than 10% of total amount
+    # An aditional warning is shown.
+
+    # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
+    psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
+
+    # Make sure that the fees are at least 10% of the total amount
+    for out in psbt.tx.vout:
+        out.nValue = int(out.nValue * 0.9)
+
+    # the test is only interesting if the total amount is at least 10000 sats
+    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 10000
+
+    wallet = WalletPolicy(
+        "",
+        "sh(wpkh(@0/**))",
+        [
+            "[f5acc2fd/49'/1'/0']tpubDC871vGLAiKPcwAw22EjhKVLk5L98UGXBEcGR8gpcigLQVDDfgcYW24QBEyTHTSFEjgJgbaHU8CdRi9vmG4cPm1kPLmZhJEP17FMBdNheh3"
+        ],
+    )
+
+    result = client.sign_psbt(psbt, wallet, None)
+
+    assert len(result) == 1
 
 
 @has_automation("automations/sign_with_default_wallet_accept.json")
@@ -586,7 +612,8 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
     n_outs = 3
 
     in_amounts = [10000 + 10000 * i for i in range(n_ins)]
-    out_amounts = [9999 + 9999 * i for i in range(n_outs)]
+    total_in = sum(in_amounts)
+    out_amounts = [total_in // n_outs - i for i in range(n_outs)]
 
     change_index = 1
 
@@ -619,18 +646,15 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     parsed_events = parse_signing_events(all_events)
 
-    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
 
     shown_out_idx = 0
     for out_idx in range(n_outs):
         if out_idx != change_index:
             out_amt = psbt.tx.vout[out_idx].nValue
-            assert ((parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)) or
-                    (parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+            assert parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)
 
-            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(
-                network=NETWORKS["test"]).replace('O', '0')  # OCR misreads O for 0
+            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
             assert parsed_events["addresses"][shown_out_idx] == out_addr
 
             shown_out_idx += 1
@@ -677,12 +701,10 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     parsed_events = parse_signing_events(all_events)
 
-    assert ((parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)) or
-            (parsed_events["fees"] == format_amount(CURRENCY_TICKER_ALT, fees_amount)))
+    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
 
     out_amt = psbt.tx.vout[0].nValue
-    assert ((parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)) or
-            (parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER_ALT, out_amt)))
+    assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
 
 
 @pytest.mark.timeout(0)  # disable timeout

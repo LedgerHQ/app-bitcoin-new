@@ -132,6 +132,8 @@ bool ui_validate_output(dispatcher_context_t *context,
                         const char *coin_name,
                         uint64_t amount);
 
+bool ui_warn_high_fee(dispatcher_context_t *context);
+
 bool ui_validate_transaction(dispatcher_context_t *context,
                              const char *coin_name,
                              uint64_t fee,
@@ -164,6 +166,8 @@ void ui_display_nondefault_sighash_flow(void);
 void ui_display_output_address_amount_flow(int index);
 
 void ui_display_output_address_amount_no_index_flow(int index);
+
+void ui_warn_high_fee_flow(void);
 
 void ui_accept_transaction_flow(bool is_self_transfer);
 
