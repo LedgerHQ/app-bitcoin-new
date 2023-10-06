@@ -35,7 +35,7 @@
       ]
     },
     {
-      "regexp": "Unverified|Update|or third party|[S]?pend from|Wallet name|Review|Amount|Address|Confirm|Fees",
+      "regexp": "Unverified|Update|or third party|Spend from|Wallet name|Review|Amount|Address|Confirm|Fees",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]
