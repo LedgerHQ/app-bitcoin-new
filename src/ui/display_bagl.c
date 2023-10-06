@@ -495,7 +495,7 @@ void ui_display_output_address_amount_no_index_flow(int index) {
     ui_display_output_address_amount_flow(index);
 }
 
-void ui_warn_high_fee_flow() {
+void ui_warn_high_fee_flow(void) {
     ux_flow_init(0, ux_warn_high_fee_flow, NULL);
 }
 

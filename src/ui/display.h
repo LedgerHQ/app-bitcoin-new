@@ -167,7 +167,7 @@ void ui_display_output_address_amount_flow(int index);
 
 void ui_display_output_address_amount_no_index_flow(int index);
 
-void ui_warn_high_fee_flow();
+void ui_warn_high_fee_flow(void);
 
 void ui_accept_transaction_flow(bool is_self_transfer);
 
