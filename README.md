@@ -40,7 +40,7 @@ the process outputs HTML and LaTeX documentations in `doc/html` and `doc/latex` 
 
 ## Client libraries
 
-A [Python client library](bitcoin_client) and a [TypeScript client library](bitcoin_client_js) are available in this repository.
+A [Python client library](bitcoin_client), a [TypeScript client library](bitcoin_client_js) and a [Rust client library](bitcoin_client_rs) are available in this repository.
 
 ## Tests & Continuous Integration
 
