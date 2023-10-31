@@ -251,7 +251,6 @@ void coin_main() {
 }
 
 static void swap_library_main_helper(libargs_t *args) {
-    check_api_level(CX_COMPAT_APILEVEL);
     PRINTF("Inside a library \n");
     switch (args->command) {
         case CHECK_ADDRESS:
