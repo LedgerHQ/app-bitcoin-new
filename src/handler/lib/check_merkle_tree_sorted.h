@@ -2,11 +2,13 @@
 
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
+#include "../../common/wallet.h"
 
 // this flow aborts if any element is larger than this size
-// This is enough for a PSBT with the control block of a taptree of depth 5 tapbranches
 // TODO: we might remove this limitation altogether with a more careful implementation.
-#define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE 162
+// Here we make sure that we have enough space for control block of a taptree of the maximum
+// supported depth
+#define MAX_CHECK_MERKLE_TREE_SORTED_PREIMAGE_SIZE (34 + 32 * (MAX_TAPTREE_POLICY_DEPTH - 1))
 
 typedef void (*merkle_tree_elements_callback_t)(struct dispatcher_context_s *,
                                                 void *,

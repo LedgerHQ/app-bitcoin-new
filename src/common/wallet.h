@@ -73,7 +73,12 @@
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
 
 // maximum depth of a taproot tree that we support
-#define MAX_TAPTREE_POLICY_DEPTH 4
+// (here depth 1 means only the root of the taptree)
+#ifdef TARGET_NANOS
+#define MAX_TAPTREE_POLICY_DEPTH 5
+#else
+#define MAX_TAPTREE_POLICY_DEPTH 9
+#endif
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];

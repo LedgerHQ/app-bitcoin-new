@@ -236,21 +236,28 @@ def test_e2e_tapscript_multi_a_2of2(rpc, rpc_test_wallet, client: Client, specul
                  rpc, rpc_test_wallet, client, speculos_globals, comm)
 
 
-def test_e2e_tapscript_depth4(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_tapscript_maxdepth(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model: str):
     # A taproot tree with maximum supported depth, where the internal key is in the deepest script
 
+    MAX_TAPTREE_POLICY_DEPTH = 4 if model == "nanos" else 9
+
+    # Make the most unbalanced tree where each script is a simple pk()
+    parts = [f"pk(@{i}/**)" for i in range(1, MAX_TAPTREE_POLICY_DEPTH)]
+    descriptor_template = "tr(@0/**,{" + ',{'.join(parts) + f",pk(@{MAX_TAPTREE_POLICY_DEPTH}/**)" + "}" * (MAX_TAPTREE_POLICY_DEPTH - 1) + ")"
+
     keys_info = []
-    for _ in range(4):
+    for _ in range(MAX_TAPTREE_POLICY_DEPTH):
         _, core_xpub_orig = create_new_wallet()
         keys_info.append(core_xpub_orig)
 
+    # the last (deepest) script is the only one we sign with the ledger key
     path = "499'/1'/0'"
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
     keys_info.append(f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}")
 
     wallet_policy = WalletPolicy(
         name="Tapscriptception",
-        descriptor_template="tr(@0/**,{pk(@1/**),{pk(@2/**),{pk(@3/**),pk(@4/**)}}})",
+        descriptor_template=descriptor_template,
         keys_info=keys_info)
 
     run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
