@@ -34,6 +34,7 @@
 #include "../ui/menu.h"
 
 #include "../swap/swap_globals.h"
+#include "../swap/handle_swap_sign_transaction.h"
 
 #include "lib/policy.h"
 #include "lib/get_preimage.h"
@@ -167,8 +168,8 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     // Swap feature: check that the wallet policy is a default one
     if (G_swap_state.called_from_swap && !is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return;
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
     }
 
     {

@@ -26,6 +26,10 @@ class WrongDataLengthError(Exception):
     pass
 
 
+class SwapError(Exception):
+    pass
+
+
 class InsNotSupportedError(Exception):
     pass
 

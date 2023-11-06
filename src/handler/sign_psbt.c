@@ -53,6 +53,7 @@
 #include "sign_psbt/update_hashes_with_map_value.h"
 
 #include "../swap/swap_globals.h"
+#include "../swap/handle_swap_sign_transaction.h"
 
 // common info that applies to either the current input or the current output
 typedef struct {
@@ -649,8 +650,8 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Swap feature: check that wallet policy is a default one
     if (G_swap_state.called_from_swap && !st->is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
     }
 
     // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
@@ -1032,8 +1033,8 @@ show_alerts(dispatcher_context_t *dc,
             // Swap feature: no external inputs allowed
             if (G_swap_state.called_from_swap) {
                 PRINTF("External inputs not allowed in swap transactions\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
+                SEND_SW(dc, SW_FAIL_SWAP);
+                finalize_exchange_sign_transaction(false);
             }
 
             // some internal and some external inputs, warn the user first
@@ -1135,8 +1136,8 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
             0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
             // address did not match
             PRINTF("Mismatching address for swap\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
         }
     } else {
         // Show address to the user
@@ -1311,21 +1312,21 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // Swap feature: there must be only one external output
         if (st->outputs.n_external != 1) {
             PRINTF("Swap transaction must have exactly 1 external output\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
         }
 
         // Swap feature: check total amount and fees are as expected
         if (fee != G_swap_state.fees) {
             PRINTF("Mismatching fee for swap\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
         }
         uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
         if (spent_amount != G_swap_state.amount) {
             PRINTF("Mismatching spent amount for swap\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
         }
     } else {
         // if the value of fees is 10% or more of the amount, and it's more than 10000
