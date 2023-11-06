@@ -628,6 +628,10 @@ static int parse_script(buffer_t *in_buf,
 
     // We read the token, we'll do different parsing based on what token we find
     PolicyNodeType token = parse_token(in_buf);
+    if (token == TOKEN_INVALID) {
+        PRINTF("Failed to parse token");
+        return -1;
+    }
 
     if (context_flags & CONTEXT_WITHIN_SH) {
         // whitelist of allowed tokens within sh; in particular, no miniscript
@@ -2799,6 +2803,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             PRINTF("Not miniscript: %d\n", policy_node->type);
             return -1;
         default:
+            PRINTF("%s, %d\n", __FILE__, __LINE__);
             PRINTF("Unknown token: %d\n", policy_node->type);
             return -1;
     }
