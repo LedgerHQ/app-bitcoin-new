@@ -3,8 +3,6 @@ import pytest
 
 import threading
 
-from decimal import Decimal
-
 from typing import List
 
 from pathlib import Path
@@ -27,6 +25,9 @@ tests_root: Path = Path(__file__).parent
 
 
 CURRENCY_TICKER = "TEST"
+
+# A TPUB constructed so that nobody knows the public key (unspendable)
+NUMS_TPUB = "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN"
 
 
 def format_amount(ticker: str, amount: int) -> str:
@@ -1018,3 +1019,52 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
     assert partial_sig0.signature[-1] == 1  # SIGHASH_ALL
 
     assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature[:64])
+
+
+def test_sign_psbt_with_only_some_spending_paths(client: Client):
+    psbt_b64 = "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"
+    psbt = PSBT()
+    psbt.deserialize(psbt_b64)
+
+    # key origins of placeholders to keep in the psbt
+    placeholders_to_keep = [
+        "f5acc2fd/44'/1'/0'/2",
+        "f5acc2fd/44'/1'/0'/6",
+    ]
+
+    assert len(psbt.inputs) == 1
+
+    for inp in psbt.inputs:
+        keys_to_remove = []
+        for (pk, (_, key_orig)) in inp.tap_bip32_paths.items():
+            key_orig_str =  key_orig.to_string().replace("h", "'")
+            if not any(key_orig_str.startswith(x) for x in placeholders_to_keep):
+                keys_to_remove.append(pk)
+
+        assert len(keys_to_remove) == len(inp.tap_bip32_paths) - len(placeholders_to_keep)
+
+        for pk in keys_to_remove:
+            del inp.tap_bip32_paths[pk]
+
+
+    wallet = WalletPolicy(
+        "Me and many other folks",
+        "tr(@0/**,{{{and_v(v:pk(@1/<0;1>/*),pk(@2/**)),and_v(v:pk(@1/<2;3>/*),pk(@3/**))},and_v(v:pk(@1/<4;5>/*),pk(@4/**))},{and_v(v:pk(@1/<6;7>/*),pk(@5/**)),and_v(v:pk(@1/<8;9>/*),pk(@6/**))}})",
+        [
+            'tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN',
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            'tpubDDEpcasoHYRbaWG1B2gvRNpqYUjqyZA3v7pCUqiNXFx1PxAZBgqgSVjbg3DPvGCgYZ2ttDzvaCZud2bi24NWUGu95DQc5L62kkum7ZNEaWw',
+            'tpubDCozpjmDA7vvJfbkEtZa4LUu8C4MTPrnhrTiDDYiYWD1uazXnoxRhg5zzWAW4sVMKTS1BGLqmwmbNGRCYbQDA3pVBDPjSwREr7EZN7fYcQa',
+            'tpubDCr7RDsM89XimuQZUttgWSufJ2RN3P8v14xq1LnaWR3yyGM7ZXQJi37NBUr35xKJmJYtDHbb2LLCGPYmHPVbA9EUCY4jotcphMU8i1RGPTV',
+            'tpubDD8UYosQJiexTfiSSEVYXYDdn267KkZy2KVCf8MGALDFXt7T9qXoRwKyGquwf3YHQeCNwf19YKcEquCbewSLA5urvXRvu4LpEU1dKP7S5zo', 'tpubDCWU7GVZLsCuEYpN234yo6AFN1VxjUes8ogV6CbEyGMqFucxxCRQqmtr8fa5zHashcgbrmL2r5h8J71URQCzXLBwhoXR74kPZTcFsVntupo'
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex("2e8161b50d21edcb0fcf30dfd33301eacf3239f922f10e4ce0841450375c05a8")
+
+    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+
+    # TODO: test that the correct signatures are returned
+
+    print(wallet_hmac.hex())
+    print(result)
