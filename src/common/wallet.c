@@ -1547,7 +1547,7 @@ static int parse_script(buffer_t *in_buf,
                 if (token != TOKEN_MULTI_A && token != TOKEN_SORTEDMULTI_A) {
                     return WITH_ERROR(
                         -1,
-                        "multi and sortedmulti can only be used legacy or segwit scripts");
+                        "multi and sortedmulti can only be used in legacy or segwit scripts");
                 }
             } else {  // legacy or segwit scripts
                 if (token != TOKEN_MULTI && token != TOKEN_SORTEDMULTI) {

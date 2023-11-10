@@ -75,7 +75,7 @@
 // maximum depth of a taproot tree that we support
 // (here depth 1 means only the root of the taptree)
 #ifdef TARGET_NANOS
-#define MAX_TAPTREE_POLICY_DEPTH 5
+#define MAX_TAPTREE_POLICY_DEPTH 4
 #else
 #define MAX_TAPTREE_POLICY_DEPTH 9
 #endif
