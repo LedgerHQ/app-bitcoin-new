@@ -73,7 +73,12 @@
     MAX(MAX_WALLET_POLICY_SERIALIZED_LENGTH_V1, MAX_WALLET_POLICY_SERIALIZED_LENGTH_V2)
 
 // maximum depth of a taproot tree that we support
+// (here depth 1 means only the root of the taptree)
+#ifdef TARGET_NANOS
 #define MAX_TAPTREE_POLICY_DEPTH 4
+#else
+#define MAX_TAPTREE_POLICY_DEPTH 9
+#endif
 
 typedef struct {
     uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
@@ -147,6 +152,11 @@ typedef enum {
 
     TOKEN_INVALID = -1  // used to mark invalid tokens
 } PolicyNodeType;
+
+typedef enum {
+    MINISCRIPT_CONTEXT_P2WSH,
+    MINISCRIPT_CONTEXT_TAPSCRIPT,
+} MiniscriptContext;
 
 // miniscript basic types
 #define MINISCRIPT_TYPE_B 0
@@ -407,13 +417,16 @@ int get_policy_segwit_version(const policy_node_t *policy);
 /**
  * Computes additional properties of the given miniscript, to detect malleability and other security
  * properties to assess if the miniscript is sane.
+ * The stack size limits are only valid for miniscript within wsh.
  *
  * @param policy_node a pointer to a miniscript policy node
  * @param out pointer to the output policy_node_ext_info_t
+ * @param ctx either MINISCRIPT_CONTEXT_P2WSH or MINISCRIPT_CONTEXT_TAPSCRIPT
  * @return a negative number on error; 0 on success.
  */
 int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
-                                       policy_node_ext_info_t *out);
+                                       policy_node_ext_info_t *out,
+                                       MiniscriptContext ctx);
 
 #ifndef SKIP_FOR_CMOCKA
 

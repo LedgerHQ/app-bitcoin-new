@@ -3,7 +3,7 @@
 A _wallet policy_ is a structured representation of an account secured by a policy expressed with output script descriptors. It is composed by two parts:
 a wallet descriptor template and the vector of key placeholder expressions.
 
-A _wallet descriptor template_ follows language very similar to output descriptor, with a few differences; the biggest one is that each `KEY` expression with a key placeholder `KP` expression, that refers to to one of the keys in the _keys information vector_, plus the additional derivation steps to use for that key. Contextually, the keys information vector contains all the relevant _xpubs_, and possibly their key origin information.
+A _wallet descriptor template_ follows language very similar to output descriptor, with a few differences; the biggest one is that each `KEY` expression with a key placeholder `KP` expression, that refers to one of the keys in the _keys information vector_, plus the additional derivation steps to use for that key. Contextually, the keys information vector contains all the relevant _xpubs_, and possibly their key origin information.
 
 Each entry in the key information vector contains an _xpub_ (other types of keys supported in output script descriptors are not allowed), possible preceeded by the key origin information. The key origin information is compulsory for internal keys.
 
@@ -89,7 +89,7 @@ derivation steps is used when the corresponding key information is not an
 xpub.
 
 The key information vector *should* be ordered so that placeholder `@i`
-never appear for the first time before an occurrence of `@j`  for some `j < i`; for example, the first placeholder is always `@0`, the next one is
+never appear for the first time before an occurrence of `@j` for some `j < i`; for example, the first placeholder is always `@0`, the next one is
 `@1`, etc.
 
 ### Implementation-specific restrictions
@@ -106,9 +106,9 @@ receive and change addresses by:
 
 - replacing each key placeholder with the corresponding key origin
 information;
-- replacing every `/**`  with `/0/*` for the receive descriptor, and `/1/*`
+- replacing every `/**` with `/0/*` for the receive descriptor, and `/1/*`
 for the change descriptor;
-- replacing every `/<M;N>` with  `/M` for the receive descriptor, and `/N`
+- replacing every `/<M;N>` with `/M` for the receive descriptor, and `/N`
 for the change descriptor.
 
 For example, the wallet descriptor `pkh(@0/**)` with key information
@@ -144,7 +144,7 @@ The wallet policy is serialized as the concatenation of:
 
 - `1 byte`: a byte equal to `0x02`, the version of the wallet policy language
 - `1 byte`: the length of the wallet name (0 for standard wallet)
-- `<variable length>`:  the wallet name (empty for standard wallets)
+- `<variable length>`: the wallet name (empty for standard wallets)
 - `<variable length>`: the length of the wallet descriptor template, encoded as a Bitcoin-style variable-length integer
 - `32 bytes`: the sha256 hash of the wallet descriptor template
 - `<variable length>`: the number of keys in the list of keys, encoded as a Bitcoin-style variable-length integer
@@ -188,4 +188,4 @@ A few policies that correspond to standardized single-key wallets can be used wi
 - ``sh(wpkh(@0/**))`` - nested segwit addresses as per [BIP-49](https://github.com/bitcoin/bips/blob/master/bip-0049.mediawiki)
 - ``tr(@0/**)`` - single Key P2TR as per [BIP-86](https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki)
 
-Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adhere to the corresponding BIP. Moreover, the BIP-44 `account` level must be at most `100`, and the `address index` at most `50000`. Larger values can still be used by registering the policy.  
+Note that the wallet policy is considered standard (and therefore usable for signing without prior registration) only if the signing paths (defined in the key origin information) adhere to the corresponding BIP. Moreover, the BIP-44 `account` level must be at most `100`, and the `address index` at most `50000`. Larger values can still be used by registering the policy.
