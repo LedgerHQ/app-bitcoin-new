@@ -37,6 +37,11 @@
 #define SW_WRONG_DATA_LENGTH 0x6A87
 
 /**
+ * Status word for fail in Swap
+ */
+#define SW_FAIL_SWAP 0x6B00
+
+/**
  * Status word for unknown command with this INS.
  */
 #define SW_INS_NOT_SUPPORTED 0x6D00
