@@ -39,7 +39,7 @@
 /**
  * Status word for fail in Swap
  */
-#define SW_FAIL_SWAP 0x6A8E
+#define SW_FAIL_SWAP 0x6B00
 
 /**
  * Status word for unknown command with this INS.
