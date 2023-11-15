@@ -32,6 +32,7 @@
 #include "common/write.h"
 
 #include "dispatcher.h"
+#include "../swap/swap_globals.h"
 
 uint16_t G_output_len = 0;
 
@@ -126,7 +127,10 @@ uint8_t io_event(uint8_t channel) {
                     ux_flow_init(0, ux_processing_flow, NULL);
 #endif  // HAVE_BAGL
 #ifdef HAVE_NBGL
-                    nbgl_useCaseSpinner("Processing");
+
+                    if (!G_swap_state.called_from_swap) {
+                        nbgl_useCaseSpinner("Processing");
+                    }
 #endif  // HAVE_NBGL
                 }
             }
