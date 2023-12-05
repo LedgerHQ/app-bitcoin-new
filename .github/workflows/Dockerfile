@@ -11,7 +11,7 @@ RUN apt install -y automake autotools-dev bsdmainutils build-essential ccache gi
 
 # clone bitcoin-core from github and compile it
 RUN cd / && \
-    git clone https://github.com/bitcoin/bitcoin.git && \
+    git clone --depth=1 https://github.com/bitcoin/bitcoin.git && \
     cd bitcoin && \
     ./autogen.sh && \
     ./configure --enable-suppress-external-warnings && \
