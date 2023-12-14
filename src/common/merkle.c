@@ -27,6 +27,8 @@
 #include "cx_ram.h"
 #include "debug-helpers/debug.h"
 
+#include "ledger_assert.h"
+
 void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static 32]) {
     cx_sha256_t hash;
     cx_sha256_init(&hash);
@@ -63,10 +65,10 @@ void merkle_combine_hashes(const uint8_t left[static 32],
     cx_sha256_init_no_throw(&G_cx.sha256);
 
     uint8_t prefix = 0x01;
-    cx_sha256_update(&G_cx.sha256, &prefix, 1);
+    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, &prefix, 1) == CX_OK, "It never fails");
 
-    cx_sha256_update(&G_cx.sha256, left, 32);
-    cx_sha256_update(&G_cx.sha256, right, 32);
+    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, left, 32) == CX_OK, "It never fails");
+    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, right, 32) == CX_OK, "It never fails");
 
     cx_sha256_final(&G_cx.sha256, out);
     explicit_bzero(&G_cx.sha256, sizeof(cx_sha256_t));

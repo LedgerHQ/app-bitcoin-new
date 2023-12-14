@@ -28,15 +28,15 @@ CURVE_APP_LOAD_PARAMS = secp256k1
 
 # Application allowed derivation paths.
 PATH_APP_LOAD_PARAMS = ""
-APP_LOAD_PARAMS += --path_slip21 "LEDGER-Wallet policy"
+
+# Allowed SLIP21 paths
+PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 1
 APPVERSION_P = 3
 APPVERSION   = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
-
-APP_STACK_SIZE = 3072
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
