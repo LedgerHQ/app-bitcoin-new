@@ -38,11 +38,11 @@
 #ifdef TARGET_NANOS
 // this amount should be enough for many useful policies
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 192
-#define MAX_WALLET_POLICY_BYTES           264
+#define MAX_WALLET_POLICY_BYTES           308
 #else
 // on larger devices, we can afford to reserve a lot more memory
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES           768
+#define MAX_WALLET_POLICY_BYTES           896
 #endif
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
