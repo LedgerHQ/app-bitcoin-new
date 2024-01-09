@@ -65,12 +65,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
 
     size_t n_internal_keys = 0;
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     uint64_t serialized_policy_map_len;
     if (!buffer_read_varint(&dc->read_buffer, &serialized_policy_map_len)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);

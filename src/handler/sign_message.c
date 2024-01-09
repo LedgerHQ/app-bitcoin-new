@@ -42,12 +42,6 @@ void handler_sign_message(dispatcher_context_t *dc, uint8_t protocol_version) {
     uint64_t message_length;
     uint8_t message_merkle_root[32];
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     if (!buffer_read_u8(&dc->read_buffer, &bip32_path_len) ||
         !buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len) ||
         !buffer_read_varint(&dc->read_buffer, &message_length) ||
