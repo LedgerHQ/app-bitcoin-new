@@ -398,8 +398,9 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
  * @param version either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
- * @return 0 on success; -1 in case of parsing error, if the output buffer is unaligned, or if the
- * output buffer is too small.
+ * @return The memory size of the parsed descriptor template (that is, the number of bytes consumed
+ * in the output buffer) on success; -1 in case of parsing error, if the output buffer is unaligned,
+ * or if the output buffer is too small.
  */
 int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int version);
 

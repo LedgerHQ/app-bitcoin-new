@@ -123,6 +123,15 @@ typedef struct {
     uint8_t sha_outputs[32];
 } segwit_hashes_t;
 
+#ifdef USE_NVRAM_STASH
+struct {
+    // Aligning by 4 is necessary due to platform limitations.
+    // Aligning by 64 further guarantees that most policies will fit in a single
+    // NVRAM page boundary, which minimizes the amount of writes.
+    __attribute__((aligned(64))) uint8_t wallet_policy_bytes[MAX_WALLET_POLICY_BYTES];
+} N_nvram_stash;
+#endif
+
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
@@ -147,10 +156,10 @@ typedef struct {
 
     uint8_t protocol_version;
 
-    union {
-        uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
-        policy_node_t wallet_policy_map;
-    };
+#ifndef USE_NVRAM_STASH
+    __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
+#endif
+    policy_node_t *wallet_policy_map;
 
     int wallet_header_version;
     uint8_t wallet_header_keys_info_merkle_root[32];
@@ -476,7 +485,7 @@ static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
     return compare_wallet_script_at_path(dispatcher_context,
                                          in_out_info->is_change,
                                          in_out_info->address_index,
-                                         &state->wallet_policy_map,
+                                         state->wallet_policy_map,
                                          state->wallet_header_version,
                                          state->wallet_header_keys_info_merkle_root,
                                          state->wallet_header_n_keys,
@@ -612,15 +621,34 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
 
         uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
-        if (0 > read_and_parse_wallet_policy(dc,
-                                             &serialized_wallet_policy_buf,
-                                             &wallet_header,
-                                             policy_map_descriptor,
-                                             st->wallet_policy_map_bytes,
-                                             sizeof(st->wallet_policy_map_bytes))) {
+#ifdef USE_NVRAM_STASH
+        // we need a temporary array to store the parsed policy in RAM before
+        // storing it in the NVRAM stash
+        uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
+#else
+        uint8_t *wallet_policy_map_bytes = st->wallet_policy_map_bytes;
+#endif
+
+        int desc_temp_len = read_and_parse_wallet_policy(dc,
+                                                         &serialized_wallet_policy_buf,
+                                                         &wallet_header,
+                                                         policy_map_descriptor,
+                                                         wallet_policy_map_bytes,
+                                                         MAX_WALLET_POLICY_BYTES);
+        if (desc_temp_len < 0) {
+            PRINTF("Failed to read or parse wallet policy");
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
+
+#ifdef USE_NVRAM_STASH
+        nvm_write(N_nvram_stash.wallet_policy_bytes,
+                  (void *) wallet_policy_map_bytes,
+                  desc_temp_len);
+        st->wallet_policy_map = (policy_node_t *) N_nvram_stash.wallet_policy_bytes;
+#else
+        st->wallet_policy_map = (policy_node_t *) st->wallet_policy_map_bytes;
+#endif
 
         st->wallet_header_version = wallet_header.version;
         memcpy(st->wallet_header_keys_info_merkle_root,
@@ -630,7 +658,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         if (st->is_wallet_default) {
             // No hmac, verify that the policy is indeed a default one
-            if (!is_wallet_policy_standard(dc, &wallet_header, &st->wallet_policy_map)) {
+            if (!is_wallet_policy_standard(dc, &wallet_header, st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
@@ -739,7 +767,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
 
     // find and parse our registered key info in the wallet
     while (true) {
-        int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
+        int n_key_placeholders = get_key_placeholder_by_index(st->wallet_policy_map,
                                                               placeholder_info->cur_index,
                                                               NULL,
                                                               &placeholder_info->placeholder);
@@ -938,7 +966,7 @@ preprocess_inputs(dispatcher_context_t *dc,
 
         bitvector_set(internal_inputs, cur_input_index, 1);
 
-        int segwit_version = get_policy_segwit_version(&st->wallet_policy_map);
+        int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
 
         // For legacy inputs, the non-witness utxo must be present
         if (segwit_version == -1 && !input.has_nonWitnessUtxo) {
@@ -1892,7 +1920,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->wallet_policy_map.type != TOKEN_TR) {
+    if (st->wallet_policy_map->type != TOKEN_TR) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -1936,7 +1964,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
             break;
         }
 
-        policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+        policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
 
         if (!placeholder_info->is_tapscript) {
             if (policy->tree == NULL) {
@@ -2242,7 +2270,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             }
         }
 
-        int segwit_version = get_policy_segwit_version(&st->wallet_policy_map);
+        int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
         uint8_t sighash[32];
         if (segwit_version == 0) {
             if (!input->has_sighash_type) {
@@ -2275,7 +2303,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                           sighash))
                 return false;
 
-            policy_node_tr_t *policy = (policy_node_tr_t *) &st->wallet_policy_map;
+            policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
             if (!placeholder_info->is_tapscript && policy->tree != NULL) {
                 // keypath spend, we compute the taptree hash so that we find it ready
                 // later in sign_sighash_schnorr_and_yield (which has less available stack).
@@ -2384,7 +2412,7 @@ sign_transaction(dispatcher_context_t *dc,
         memset(&placeholder_info, 0, sizeof(placeholder_info));
 
         const policy_node_t *tapleaf_ptr = NULL;
-        int n_key_placeholders = get_key_placeholder_by_index(&st->wallet_policy_map,
+        int n_key_placeholders = get_key_placeholder_by_index(st->wallet_policy_map,
                                                               placeholder_index,
                                                               &tapleaf_ptr,
                                                               &placeholder_info.placeholder);

@@ -1912,7 +1912,13 @@ int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int v
 
     buffer_t out_buf = buffer_create(out, out_len);
 
-    return parse_script(in_buf, &out_buf, version, 0, 0);
+    int result = parse_script(in_buf, &out_buf, version, 0, 0);
+    if (result < 0) {
+        return result;
+    }
+
+    // the offset of the buffer is the size of the parsed descriptor template
+    return (int) out_buf.offset;
 }
 
 int get_policy_segwit_version(const policy_node_t *policy) {

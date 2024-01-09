@@ -348,13 +348,15 @@ int read_and_parse_wallet_policy(
 
     buffer_t policy_map_buffer =
         buffer_create(policy_map_descriptor_template, wallet_header->descriptor_template_len);
-    if (parse_descriptor_template(&policy_map_buffer,
-                                  policy_map_bytes,
-                                  policy_map_bytes_len,
-                                  wallet_header->version) < 0) {
+
+    int desc_temp_len = parse_descriptor_template(&policy_map_buffer,
+                                                  policy_map_bytes,
+                                                  policy_map_bytes_len,
+                                                  wallet_header->version);
+    if (desc_temp_len < 0) {
         return WITH_ERROR(-1, "Failed parsing descriptor template");
     }
-    return 0;
+    return desc_temp_len;
 }
 
 /**
