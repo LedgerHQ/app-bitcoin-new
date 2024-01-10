@@ -396,6 +396,9 @@ typedef struct {
     uint8_t h[32];
 } policy_node_with_hash_256_t;
 
+struct policy_node_tree_s;  // forward declaration, as the struct is recursive
+DEFINE_REL_PTR(policy_node_tree, struct policy_node_tree_s)
+
 // a TREE is either a script, or a {TREE,TREE}
 typedef struct policy_node_tree_s {
     bool is_leaf;  // if this is a leaf, then it contains a pointer to a SCRIPT;
@@ -403,8 +406,8 @@ typedef struct policy_node_tree_s {
     union {
         rptr_policy_node_t script;  // pointer to a policy_node_with_script_t
         struct {
-            ptr_rel_t left_tree;   // pointer to a policy_node_tree_s
-            ptr_rel_t right_tree;  // pointer to a policy_node_tree_s
+            rptr_policy_node_tree_t left_tree;   // pointer to a policy_node_tree_s
+            rptr_policy_node_tree_t right_tree;  // pointer to a policy_node_tree_s
         };
     };
 } policy_node_tree_t;
@@ -412,8 +415,7 @@ typedef struct policy_node_tree_s {
 typedef struct {
     struct policy_node_s base;
     rptr_policy_node_key_placeholder_t key_placeholder;
-    // TODO: change to relative pointers
-    policy_node_tree_t *tree;  // NULL if tr(KP)
+    rptr_policy_node_tree_t tree;  // NULL if tr(KP)
 } policy_node_tr_t;
 
 /**

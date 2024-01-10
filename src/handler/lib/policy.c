@@ -980,8 +980,9 @@ __attribute__((warn_unused_result, noinline)) static int compute_and_combine_tap
     const policy_node_tree_t *tree,
     uint8_t out[static 32]) {
     uint8_t left_h[32], right_h[32];
-    if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->left_tree), left_h)) return -1;
-    if (0 > compute_taptree_hash(dc, wdi, resolve_ptr(&tree->right_tree), right_h)) return -1;
+    if (0 > compute_taptree_hash(dc, wdi, r_policy_node_tree(&tree->left_tree), left_h)) return -1;
+    if (0 > compute_taptree_hash(dc, wdi, r_policy_node_tree(&tree->right_tree), right_h))
+        return -1;
     crypto_tr_combine_taptree_hashes(left_h, right_h, out);
     return 0;
 }
@@ -1125,8 +1126,11 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         uint8_t *h = out + 2;  // hack: re-use the output array to save memory
 
         int h_length = 0;
-        if (tr_policy->tree != NULL) {
-            if (0 > compute_taptree_hash(dispatcher_context, wdi, tr_policy->tree, h)) {
+        if (!isnull_policy_node_tree(&tr_policy->tree)) {
+            if (0 > compute_taptree_hash(dispatcher_context,
+                                         wdi,
+                                         r_policy_node_tree(&tr_policy->tree),
+                                         h)) {
                 return -1;
             }
             h_length = 32;
@@ -1358,8 +1362,9 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
             purpose = 49;  // nested segwit
             break;
         }
-        case TOKEN_TR:
-            if (((const policy_node_tr_t *) descriptor_template)->tree != NULL) {
+        case TOKEN_TR: {
+            const policy_node_tr_t *tr = (const policy_node_tr_t *) descriptor_template;
+            if (!isnull_policy_node_tree(&tr->tree)) {
                 return -1;
             }
 
@@ -1367,6 +1372,7 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 &((const policy_node_tr_t *) descriptor_template)->key_placeholder);
             purpose = 86;  // standard single-key P2TR
             break;
+        }
         default:
             return -1;
     }
@@ -1512,20 +1518,18 @@ static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
         }
         return ret;
     } else {
-        int ret1 = get_key_placeholder_by_index_in_tree(
-            (policy_node_tree_t *) resolve_ptr(&tree->left_tree),
-            i,
-            out_tapleaf_ptr,
-            out_placeholder);
+        int ret1 = get_key_placeholder_by_index_in_tree(r_policy_node_tree(&tree->left_tree),
+                                                        i,
+                                                        out_tapleaf_ptr,
+                                                        out_placeholder);
         if (ret1 < 0) return -1;
 
         bool found = i < (unsigned int) ret1;
 
-        int ret2 = get_key_placeholder_by_index_in_tree(
-            (policy_node_tree_t *) resolve_ptr(&tree->right_tree),
-            found ? 0 : i - ret1,
-            found ? NULL : out_tapleaf_ptr,
-            found ? NULL : out_placeholder);
+        int ret2 = get_key_placeholder_by_index_in_tree(r_policy_node_tree(&tree->right_tree),
+                                                        found ? 0 : i - ret1,
+                                                        found ? NULL : out_tapleaf_ptr,
+                                                        found ? NULL : out_placeholder);
         if (ret2 < 0) return -1;
 
         return ret1 + ret2;
@@ -1569,15 +1573,15 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             return 1;
         }
         case TOKEN_TR: {
+            policy_node_tr_t *tr = (policy_node_tr_t *) policy;
             if (i == 0) {
-                policy_node_tr_t *tr = (policy_node_tr_t *) policy;
                 memcpy(out_placeholder,
                        r_policy_node_key_placeholder(&tr->key_placeholder),
                        sizeof(policy_node_key_placeholder_t));
             }
-            if (((policy_node_tr_t *) policy)->tree != NULL) {
+            if (!isnull_policy_node_tree(&tr->tree)) {
                 int ret_tree = get_key_placeholder_by_index_in_tree(
-                    ((policy_node_tr_t *) policy)->tree,
+                    r_policy_node_tree(&tr->tree),
                     i == 0 ? 0 : i - 1,
                     i == 0 ? NULL : out_tapleaf_ptr,
                     i == 0 ? NULL : out_placeholder);  // if i == 0, we already found it; so we
@@ -1827,10 +1831,10 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
             return -1;
         }
     } else {
-        if (0 > is_taptree_miniscript_sane(r_policy_node(&taptree->left_tree))) {
+        if (0 > is_taptree_miniscript_sane(r_policy_node_tree(&taptree->left_tree))) {
             return -1;
         }
-        if (0 > is_taptree_miniscript_sane(r_policy_node(&taptree->right_tree))) {
+        if (0 > is_taptree_miniscript_sane(r_policy_node_tree(&taptree->right_tree))) {
             return -1;
         }
     }
@@ -1853,7 +1857,8 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
         }
     } else if (policy->type == TOKEN_TR) {
         // if there is a taptree, we check the sanity of every miniscript leaf
-        const policy_node_tree_t *taptree = ((const policy_node_tr_t *) policy)->tree;
+        const policy_node_tr_t *tr = (const policy_node_tr_t *) policy;
+        const policy_node_tree_t *taptree = r_policy_node_tree(&tr->tree);
         if (taptree != NULL && 0 > is_taptree_miniscript_sane(taptree)) {
             return -1;
         }

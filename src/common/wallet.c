@@ -1481,17 +1481,17 @@ static int parse_script(buffer_t *in_buf,
                 buffer_seek_cur(in_buf, 1);  // skip ','
 
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-                node->tree = (policy_node_tree_t *) buffer_get_cur(out_buf);
-
+                policy_node_tree_t *tree = (policy_node_tree_t *) buffer_get_cur(out_buf);
                 if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
                     return WITH_ERROR(-1, "Failed to parse TREE expression");
                 }
+                i_policy_node_tree(&node->tree, tree);
             } else {
                 // no TREE, only tr(KP)
                 if (c != ')') {
                     return WITH_ERROR(-1, "Failed to parse tr");
                 }
-                node->tree = NULL;
+                i_policy_node_tree(&node->tree, NULL);
             }
 
             parsed_node = (policy_node_t *) node;
@@ -1877,7 +1877,7 @@ static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t d
 
         // parse first TREE expression
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        init_relative_ptr(&tree_node->left_tree, buffer_get_cur(out_buf));
+        i_policy_node_tree(&tree_node->left_tree, buffer_get_cur(out_buf));
         if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
             return -1;
         }
@@ -1889,7 +1889,7 @@ static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t d
 
         // parse the second TREE expression
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        init_relative_ptr(&tree_node->right_tree, buffer_get_cur(out_buf));
+        i_policy_node_tree(&tree_node->right_tree, buffer_get_cur(out_buf));
         if (0 > parse_tree(in_buf, out_buf, version, depth + 1)) {
             return -1;
         }

@@ -1967,7 +1967,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
         policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
 
         if (!placeholder_info->is_tapscript) {
-            if (policy->tree == NULL) {
+            if (isnull_policy_node_tree(&policy->tree)) {
                 // tweak as specified in BIP-86 and BIP-386
                 crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
             } else {
@@ -2304,7 +2304,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
 
             policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
-            if (!placeholder_info->is_tapscript && policy->tree != NULL) {
+            if (!placeholder_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
                 // keypath spend, we compute the taptree hash so that we find it ready
                 // later in sign_sighash_schnorr_and_yield (which has less available stack).
                 if (0 > compute_taptree_hash(
@@ -2315,7 +2315,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                 .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
                                 .n_keys = st->wallet_header_n_keys,
                                 .wallet_version = st->wallet_header_version},
-                            policy->tree,
+                            r_policy_node_tree(&policy->tree),
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
                     SEND_SW(dc, SW_BAD_STATE);
