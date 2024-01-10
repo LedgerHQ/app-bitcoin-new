@@ -570,7 +570,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 if (-1 ==
                     get_derived_pubkey(state->dispatcher_context,
                                        state->wdi,
-                                       resolve_node_key_placeholder_ptr(&policy->key_placeholder),
+                                       r_policy_node_key_placeholder(&policy->key_placeholder),
                                        compressed_pubkey)) {
                     return -1;
                 }
@@ -592,7 +592,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 if (-1 ==
                     get_derived_pubkey(state->dispatcher_context,
                                        state->wdi,
-                                       resolve_node_key_placeholder_ptr(&policy->key_placeholder),
+                                       r_policy_node_key_placeholder(&policy->key_placeholder),
                                        compressed_pubkey)) {
                     return -1;
                 }
@@ -630,7 +630,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
             case CMD_CODE_PROCESS_CHILD: {
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
-                if (0 > state_stack_push(state, resolve_node_ptr(&policy->scripts[cmd_data]), 0)) {
+                if (0 > state_stack_push(state, r_policy_node(&policy->scripts[cmd_data]), 0)) {
                     return -1;
                 }
                 break;
@@ -639,7 +639,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
                 if (0 > state_stack_push(state,
-                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         r_policy_node(&policy->scripts[cmd_data]),
                                          node->flags)) {
                     return -1;
                 }
@@ -649,7 +649,7 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_scripts_t *policy =
                     (const policy_node_with_scripts_t *) node->policy_node;
                 if (0 > state_stack_push(state,
-                                         resolve_node_ptr(&policy->scripts[cmd_data]),
+                                         r_policy_node(&policy->scripts[cmd_data]),
                                          node->flags | PROCESSOR_FLAG_V)) {
                     return -1;
                 }
@@ -682,7 +682,7 @@ __attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_pars
 
     if (-1 == get_derived_pubkey(state->dispatcher_context,
                                  state->wdi,
-                                 resolve_node_key_placeholder_ptr(&policy->key_placeholder),
+                                 r_policy_node_key_placeholder(&policy->key_placeholder),
                                  compressed_pubkey)) {
         return -1;
     } else if (policy->base.type == TOKEN_PKH) {
@@ -764,7 +764,7 @@ __attribute__((warn_unused_result)) static int process_thresh_node(policy_parser
             update_output_u8(state, OP_ADD);
         }
 
-        if (-1 == state_stack_push(state, resolve_node_ptr(&cur->script), 0)) {
+        if (-1 == state_stack_push(state, r_policy_node(&cur->script), 0)) {
             return -1;
         }
         ++node->step;
@@ -810,7 +810,7 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
             if (-1 ==
                 get_derived_pubkey(state->dispatcher_context,
                                    state->wdi,
-                                   &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[i],
+                                   &r_policy_node_key_placeholder(&policy->key_placeholders)[i],
                                    compressed_pubkey)) {
                 return -1;
             }
@@ -836,7 +836,7 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
                     if (-1 == get_derived_pubkey(
                                   state->dispatcher_context,
                                   state->wdi,
-                                  &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[j],
+                                  &r_policy_node_key_placeholder(&policy->key_placeholders)[j],
                                   cur_pubkey)) {
                         return -1;
                     }
@@ -888,7 +888,7 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
             if (-1 ==
                 get_derived_pubkey(state->dispatcher_context,
                                    state->wdi,
-                                   &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[i],
+                                   &r_policy_node_key_placeholder(&policy->key_placeholders)[i],
                                    compressed_pubkey)) {
                 return -1;
             }
@@ -904,7 +904,7 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
                     if (-1 == get_derived_pubkey(
                                   state->dispatcher_context,
                                   state->wdi,
-                                  &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[j],
+                                  &r_policy_node_key_placeholder(&policy->key_placeholders)[j],
                                   cur_pubkey)) {
                         return -1;
                     }
@@ -990,7 +990,7 @@ __attribute__((noinline)) int compute_taptree_hash(dispatcher_context_t *dc,
                                                    const policy_node_tree_t *tree,
                                                    uint8_t out[static 32]) {
     if (tree->is_leaf)
-        return compute_tapleaf_hash(dc, wdi, resolve_node_ptr(&tree->script), out);
+        return compute_tapleaf_hash(dc, wdi, r_policy_node(&tree->script), out);
     else
         return compute_and_combine_taptree_child_hashes(dc, wdi, tree, out);
 }
@@ -1013,7 +1013,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *pkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   resolve_node_key_placeholder_ptr(&pkh_policy->key_placeholder),
+                                   r_policy_node_key_placeholder(&pkh_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1032,7 +1032,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *wpkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   resolve_node_key_placeholder_ptr(&wpkh_policy->key_placeholder),
+                                   r_policy_node_key_placeholder(&wpkh_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1046,18 +1046,17 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         const policy_node_t *core_policy;
         if (policy->type == TOKEN_SH) {
             const policy_node_t *child =
-                resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script);
+                r_policy_node(&((const policy_node_with_script_t *) policy)->script);
             if (child->type == TOKEN_WSH) {
                 script_type = WRAPPED_SCRIPT_TYPE_SH_WSH;
-                core_policy =
-                    resolve_node_ptr(&((const policy_node_with_script_t *) child)->script);
+                core_policy = r_policy_node(&((const policy_node_with_script_t *) child)->script);
             } else {
                 script_type = WRAPPED_SCRIPT_TYPE_SH;
                 core_policy = child;
             }
         } else {  // if (policy->type == TOKEN_WSH
             script_type = WRAPPED_SCRIPT_TYPE_WSH;
-            core_policy = resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script);
+            core_policy = r_policy_node(&((const policy_node_with_script_t *) policy)->script);
         }
 
         if (0 > get_wallet_internal_script_hash(dispatcher_context,
@@ -1112,7 +1111,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
 
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   resolve_node_key_placeholder_ptr(&tr_policy->key_placeholder),
+                                   r_policy_node_key_placeholder(&tr_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1336,23 +1335,23 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
     int purpose = -1;
     switch (descriptor_template->type) {
         case TOKEN_PKH:
-            kp = resolve_node_key_placeholder_ptr(
+            kp = r_policy_node_key_placeholder(
                 &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
             purpose = 44;  // legacy
             break;
         case TOKEN_WPKH:
-            kp = resolve_node_key_placeholder_ptr(
+            kp = r_policy_node_key_placeholder(
                 &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
             purpose = 84;  // native segwit
             break;
         case TOKEN_SH: {
-            const policy_node_t *inner = resolve_node_ptr(
-                &((const policy_node_with_script_t *) descriptor_template)->script);
+            const policy_node_t *inner =
+                r_policy_node(&((const policy_node_with_script_t *) descriptor_template)->script);
             if (inner->type != TOKEN_WPKH) {
                 return -1;
             }
 
-            kp = resolve_node_key_placeholder_ptr(
+            kp = r_policy_node_key_placeholder(
                 &((const policy_node_with_key_t *) inner)->key_placeholder);
             purpose = 49;  // nested segwit
             break;
@@ -1362,7 +1361,7 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 return -1;
             }
 
-            kp = resolve_node_key_placeholder_ptr(
+            kp = r_policy_node_key_placeholder(
                 &((const policy_node_tr_t *) descriptor_template)->key_placeholder);
             purpose = 86;  // standard single-key P2TR
             break;
@@ -1505,9 +1504,9 @@ static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
                                                 policy_node_key_placeholder_t *out_placeholder) {
     if (tree->is_leaf) {
         int ret =
-            get_key_placeholder_by_index(resolve_node_ptr(&tree->script), i, NULL, out_placeholder);
+            get_key_placeholder_by_index(r_policy_node(&tree->script), i, NULL, out_placeholder);
         if (ret >= 0 && out_tapleaf_ptr != NULL && i < (unsigned) ret) {
-            *out_tapleaf_ptr = resolve_node_ptr(&tree->script);
+            *out_tapleaf_ptr = r_policy_node(&tree->script);
         }
         return ret;
     } else {
@@ -1562,7 +1561,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             if (i == 0) {
                 policy_node_with_key_t *wpkh = (policy_node_with_key_t *) policy;
                 memcpy(out_placeholder,
-                       resolve_node_key_placeholder_ptr(&wpkh->key_placeholder),
+                       r_policy_node_key_placeholder(&wpkh->key_placeholder),
                        sizeof(policy_node_key_placeholder_t));
             }
             return 1;
@@ -1571,7 +1570,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             if (i == 0) {
                 policy_node_tr_t *tr = (policy_node_tr_t *) policy;
                 memcpy(out_placeholder,
-                       resolve_node_key_placeholder_ptr(&tr->key_placeholder),
+                       r_policy_node_key_placeholder(&tr->key_placeholder),
                        sizeof(policy_node_key_placeholder_t));
             }
             if (((policy_node_tr_t *) policy)->tree != NULL) {
@@ -1599,7 +1598,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
 
             if (i < (unsigned int) node->n) {
                 policy_node_key_placeholder_t *placeholders =
-                    resolve_node_key_placeholder_ptr(&node->key_placeholders);
+                    r_policy_node_key_placeholder(&node->key_placeholders);
                 memcpy(out_placeholder, &placeholders[i], sizeof(policy_node_key_placeholder_t));
             }
 
@@ -1620,7 +1619,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_L:
         case TOKEN_U: {
             return get_key_placeholder_by_index(
-                resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script),
+                r_policy_node(&((const policy_node_with_script_t *) policy)->script),
                 i,
                 out_tapleaf_ptr,
                 out_placeholder);
@@ -1635,14 +1634,14 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_OR_D:
         case TOKEN_OR_I: {
             const policy_node_with_script2_t *node = (const policy_node_with_script2_t *) policy;
-            int ret1 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[0]),
+            int ret1 = get_key_placeholder_by_index(r_policy_node(&node->scripts[0]),
                                                     i,
                                                     out_tapleaf_ptr,
                                                     out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[1]),
+            int ret2 = get_key_placeholder_by_index(r_policy_node(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
                                                     found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
@@ -1654,21 +1653,21 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         // nodes with exactly three child scripts
         case TOKEN_ANDOR: {
             const policy_node_with_script3_t *node = (const policy_node_with_script3_t *) policy;
-            int ret1 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[0]),
+            int ret1 = get_key_placeholder_by_index(r_policy_node(&node->scripts[0]),
                                                     i,
                                                     out_tapleaf_ptr,
                                                     out_placeholder);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[1]),
+            int ret2 = get_key_placeholder_by_index(r_policy_node(&node->scripts[1]),
                                                     found ? 0 : i - ret1,
                                                     found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
             if (ret2 < 0) return -1;
 
             found = i < (unsigned int) (ret1 + ret2);
-            int ret3 = get_key_placeholder_by_index(resolve_node_ptr(&node->scripts[2]),
+            int ret3 = get_key_placeholder_by_index(r_policy_node(&node->scripts[2]),
                                                     found ? 0 : i - ret1 - ret2,
                                                     found ? NULL : out_tapleaf_ptr,
                                                     found ? NULL : out_placeholder);
@@ -1684,7 +1683,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             policy_node_scriptlist_t *cur_child = node->scriptlist;
             for (int script_idx = 0; script_idx < node->n; script_idx++) {
                 found = i < (unsigned int) ret;
-                int ret_partial = get_key_placeholder_by_index(resolve_node_ptr(&cur_child->script),
+                int ret_partial = get_key_placeholder_by_index(r_policy_node(&cur_child->script),
                                                                found ? 0 : i - ret,
                                                                found ? NULL : out_tapleaf_ptr,
                                                                found ? NULL : out_placeholder);
@@ -1817,16 +1816,16 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
     // Recurse until leaves are found, then check sanity if they contain miniscript.
     // No check is performed on leaves not containing miniscript.
     if (taptree->is_leaf) {
-        const policy_node_t *script = resolve_node_ptr(&taptree->script);
+        const policy_node_t *script = r_policy_node(&taptree->script);
         if (script->flags.is_miniscript &&  // only check for miniscript leaves
             0 > is_miniscript_sane(script, MINISCRIPT_CONTEXT_TAPSCRIPT)) {
             return -1;
         }
     } else {
-        if (0 > is_taptree_miniscript_sane(resolve_node_ptr(&taptree->left_tree))) {
+        if (0 > is_taptree_miniscript_sane(r_policy_node(&taptree->left_tree))) {
             return -1;
         }
-        if (0 > is_taptree_miniscript_sane(resolve_node_ptr(&taptree->right_tree))) {
+        if (0 > is_taptree_miniscript_sane(r_policy_node(&taptree->right_tree))) {
             return -1;
         }
     }
@@ -1841,7 +1840,7 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    uint32_t n_keys) {
     if (policy->type == TOKEN_WSH) {
         const policy_node_t *inner =
-            resolve_node_ptr(&((const policy_node_with_script_t *) policy)->script);
+            r_policy_node(&((const policy_node_with_script_t *) policy)->script);
         if (inner->flags.is_miniscript) {
             if (0 > is_miniscript_sane(inner, MINISCRIPT_CONTEXT_P2WSH)) {
                 return -1;
