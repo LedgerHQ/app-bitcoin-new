@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include "ledger_assert.h"
+
 #include "common/bip32.h"
 #include "common/buffer.h"
 #include "../constants.h"
@@ -190,37 +192,57 @@ static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
 
 // Defines a relative pointer type for name##t, and the conversion functions to/from a relative
 // pointer and a pointer to name##_t.
-// Relative pointers use an uint16_t to represent the offset; therefore, the offset must be at most.
-// 65536. Bounds are not checked, therefore it needs to be handled with care.
-#define DEFINE_REL_PTR(name, type)                                                        \
-    /*                                                                                    \
-     * Relative pointer structure for `type`.                                             \
-     *                                                                                    \
-     * This structure holds an offset that is used to calculate the actual pointer        \
-     * to a `type` object.                                                                \
-     */                                                                                   \
-    typedef struct rptr_##name##_s {                                                      \
-        uint16_t offset;                                                                  \
-    } rptr_##name##_t;                                                                    \
-                                                                                          \
-    /*                                                                                    \
-     * Resolve a relative pointer to a `type` object.                                     \
-     *                                                                                    \
-     * @param ptr A pointer to the relative pointer structure.                            \
-     * @return A constant pointer to the `type` object.                                   \
-     */                                                                                   \
-    static inline const type *r_##name(const rptr_##name##_t *ptr) {                      \
-        return (const type *) ((const uint8_t *) ptr + ptr->offset);                      \
-    }                                                                                     \
-                                                                                          \
-    /*                                                                                    \
-     * Initialize a relative pointer to a `type` object.                                  \
-     *                                                                                    \
-     * @param relative_ptr A pointer to the relative pointer structure to be initialized. \
-     * @param node A pointer to the `type` object.                                        \
-     */                                                                                   \
-    static inline void i_##name(rptr_##name##_t *relative_ptr, void *node) {              \
-        relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);  \
+// Relative pointers use an uint16_t to represent the offset; therefore, the offset must be
+// non-negative and at most 65535.
+// An offset of 0 corresponds to a NULL pointer in the conversion (and vice-versa).
+#define DEFINE_REL_PTR(name, type)                                                               \
+    /*                                                                                           \
+     * Relative pointer structure for `type`.                                                    \
+     *                                                                                           \
+     * This structure holds an offset that is used to calculate the actual pointer               \
+     * to a `type` object.                                                                       \
+     */                                                                                          \
+    typedef struct rptr_##name##_s {                                                             \
+        uint16_t offset;                                                                         \
+    } rptr_##name##_t;                                                                           \
+                                                                                                 \
+    /*                                                                                           \
+     * Resolve a relative pointer to a `type` object.                                            \
+     *                                                                                           \
+     * @param ptr A pointer to the relative pointer structure.                                   \
+     * @return A pointer to the `type` object.                                                   \
+     */                                                                                          \
+    static inline type *r_##name(const rptr_##name##_t *ptr) {                                   \
+        if (ptr->offset == 0)                                                                    \
+            return NULL;                                                                         \
+        else                                                                                     \
+            return (type *) ((const uint8_t *) ptr + ptr->offset);                               \
+    }                                                                                            \
+                                                                                                 \
+    /*                                                                                           \
+     * Returns true when the offset of the relative pointer is 0 (equivalent to a NULL pointer). \
+     *                                                                                           \
+     * @param relative_ptr A relative pointer.                                                   \
+     */                                                                                          \
+    static inline bool isnull_##name(const rptr_##name##_t *ptr) {                               \
+        return ptr->offset == 0;                                                                 \
+    }                                                                                            \
+                                                                                                 \
+    /*                                                                                           \
+     * Initialize a relative pointer to a `type` object.                                         \
+     *                                                                                           \
+     * @param relative_ptr A pointer to the relative pointer structure to be initialized.        \
+     * @param obj A pointer to the `type` object.                                                \
+     */                                                                                          \
+    static inline void i_##name(rptr_##name##_t *relative_ptr, void *obj) {                      \
+        if (obj == NULL)                                                                         \
+            relative_ptr->offset = 0;                                                            \
+        else {                                                                                   \
+            int offset = (uint8_t *) obj - (uint8_t *) relative_ptr;                             \
+            LEDGER_ASSERT(offset >= 0 && offset < UINT16_MAX,                                    \
+                          "Relative pointer's offset must be between 0 and 65535");              \
+            relative_ptr->offset = (uint16_t) offset;                                            \
+        }                                                                                        \
     }
 
 // 2 bytes
@@ -346,9 +368,12 @@ typedef struct {
 } policy_node_multisig_t;
 
 // 8 bytes
+struct policy_node_scriptlist_s;  // forward declaration, as the struct is recursive
+
+DEFINE_REL_PTR(policy_node_scriptlist, struct policy_node_scriptlist_s)
+
 typedef struct policy_node_scriptlist_s {
-    // TODO: change to relative pointers
-    struct policy_node_scriptlist_s *next;
+    rptr_policy_node_scriptlist_t next;
     rptr_policy_node_t script;
 } policy_node_scriptlist_t;
 
@@ -357,9 +382,8 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
     int16_t k;                  // threshold
     int16_t n;                  // number of child scripts
-    // TODO: change to relative pointers
-    policy_node_scriptlist_t
-        *scriptlist;  // pointer to array of exactly n pointers to child scripts
+    rptr_policy_node_scriptlist_t
+        scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;
 
 typedef struct {

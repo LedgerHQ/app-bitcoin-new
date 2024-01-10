@@ -14,6 +14,8 @@
 
 #include "debug-helpers/debug.h"
 
+#include "ledger_assert.h"
+
 #define MAX_POLICY_DEPTH 10
 
 // The last opcode must be processed as a VERIFY flag
@@ -754,9 +756,9 @@ __attribute__((warn_unused_result)) static int process_thresh_node(policy_parser
 
     if (node->step < policy->n) {
         // find the current child node
-        policy_node_scriptlist_t *cur = policy->scriptlist;
+        policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&policy->scriptlist);
         for (size_t i = 0; i < node->step; i++) {
-            cur = cur->next;
+            cur = r_policy_node_scriptlist(&cur->next);
         }
 
         // process child node
@@ -1680,8 +1682,11 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy;
             bool found;
             int ret = 0;
-            policy_node_scriptlist_t *cur_child = node->scriptlist;
+            policy_node_scriptlist_t *cur_child = r_policy_node_scriptlist(&node->scriptlist);
             for (int script_idx = 0; script_idx < node->n; script_idx++) {
+                LEDGER_ASSERT(cur_child != NULL,
+                              "The script should always have exactly n child scripts");
+
                 found = i < (unsigned int) ret;
                 int ret_partial = get_key_placeholder_by_index(r_policy_node(&cur_child->script),
                                                                found ? 0 : i - ret,
@@ -1690,7 +1695,7 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
                 if (ret_partial < 0) return -1;
 
                 ret += ret_partial;
-                cur_child = cur_child->next;
+                cur_child = r_policy_node_scriptlist(&cur_child->next);
             }
             return ret;
         }

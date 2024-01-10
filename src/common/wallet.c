@@ -1278,15 +1278,16 @@ static int parse_script(buffer_t *in_buf,
             }
 
             node->n = 0;
-            node->scriptlist =
-                (policy_node_scriptlist_t *) buffer_alloc(out_buf,
-                                                          sizeof(policy_node_scriptlist_t),
-                                                          true);
-            if (node->scriptlist == NULL) {
+            policy_node_scriptlist_t *scriptlist =
+                buffer_alloc(out_buf, sizeof(policy_node_scriptlist_t), true);
+            if (scriptlist == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
-            policy_node_scriptlist_t *cur = node->scriptlist;
-            cur->next = NULL;
+            i_policy_node_scriptlist(&node->scriptlist, scriptlist);
+
+            policy_node_scriptlist_t *cur = scriptlist;
+
+            i_policy_node_scriptlist(&cur->next, NULL);
 
             int count_z = 0;
             int count_o = 0;
@@ -1333,16 +1334,18 @@ static int parse_script(buffer_t *in_buf,
 
                 // peek, if next character is ',', consume it and exit
                 if (consume_character(in_buf, ',')) {
-                    cur->next =
+                    policy_node_scriptlist_t *next =
                         (policy_node_scriptlist_t *) buffer_alloc(out_buf,
                                                                   sizeof(policy_node_scriptlist_t),
                                                                   true);
-                    if (cur->next == NULL) {
+                    if (next == NULL) {
                         return WITH_ERROR(-1, "Out of memory");
                     }
 
-                    cur = cur->next;
-                    cur->next = NULL;
+                    i_policy_node_scriptlist(&cur->next, next);
+
+                    cur = next;
+                    i_policy_node_scriptlist(&cur->next, NULL);
                 } else {
                     // no more scripts to parse
                     break;
@@ -1985,7 +1988,7 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 
-    policy_node_scriptlist_t *cur = node->scriptlist;
+    policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&node->scriptlist);
 
     out->count = 0;
 
@@ -2008,7 +2011,7 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
         ++sats_size;
         memmove(sats, next_sats, sats_size * sizeof(sats[0]));
 
-        cur = cur->next;
+        cur = r_policy_node_scriptlist(&cur->next);
     }
 
     out->sat = sats[node->k];
@@ -2033,7 +2036,7 @@ static int compute_thresh_stacksize(const policy_node_thresh_t *node,
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 
-    policy_node_scriptlist_t *cur = node->scriptlist;
+    policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&node->scriptlist);
 
     sats[0] = 0;
     int sats_size = 1;
@@ -2051,7 +2054,7 @@ static int compute_thresh_stacksize(const policy_node_thresh_t *node,
         ++sats_size;
         memmove(sats, next_sats, sats_size * sizeof(sats[0]));
 
-        cur = cur->next;
+        cur = r_policy_node_scriptlist(&cur->next);
     }
 
     out->sat = sats[node->k];
@@ -2509,7 +2512,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
         case TOKEN_THRESH: {
             const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy_node;
 
-            policy_node_scriptlist_t *cur = node->scriptlist;
+            policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&node->scriptlist);
 
             int count_s = 0;
             int count_e = 0;
@@ -2532,7 +2535,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                 if (t.m) {
                     ++count_m;
                 }
-                cur = cur->next;
+                cur = r_policy_node_scriptlist(&cur->next);
 
                 out->g |= t.g;
                 out->h |= t.h;
