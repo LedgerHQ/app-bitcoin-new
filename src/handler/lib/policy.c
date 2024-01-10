@@ -1189,6 +1189,11 @@ __attribute__((noinline)) int get_wallet_internal_script_hash(
     do {
         const policy_parser_node_state_t *node = &state.nodes[state.node_stack_eos];
 
+        if (node->policy_node == NULL) {
+            PRINTF("Unexpected uninitialized policy_node\n");
+            return -1;
+        }
+
         bool is_whitelisted = false;
         for (size_t i = 0; i < whitelist_len; i++) {
             if (node->policy_node->type == whitelist[i]) {
