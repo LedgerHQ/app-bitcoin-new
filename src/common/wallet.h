@@ -223,6 +223,18 @@ typedef struct ptr_rel_s {
     uint16_t offset;
 } ptr_rel_t;
 
+// Typed versions for each of the kinds of pointers
+
+// relative pointer to policy_node_s
+typedef struct ptr_rel_node_s {
+    uint16_t offset;
+} ptr_rel_node_t;
+
+// relative pointer to policy_node_key_placeholder_s
+typedef struct ptr_rel_node_key_placeholder_s {
+    uint16_t offset;
+} ptr_rel_node_key_placeholder_t;
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
@@ -253,19 +265,19 @@ typedef struct {
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t script;
+    ptr_rel_node_t script;
 } policy_node_with_script_t;
 
 // 6 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t scripts[2];
+    ptr_rel_node_t scripts[2];
 } policy_node_with_script2_t;
 
 // 8 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t scripts[3];
+    ptr_rel_node_t scripts[3];
 } policy_node_with_script3_t;
 
 // generic type with pointer for up to 3 (but constant) number of child scripts
@@ -274,7 +286,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    policy_node_key_placeholder_t *key_placeholder;
+    ptr_rel_node_key_placeholder_t key_placeholder;
 } policy_node_with_key_t;
 
 // 8 bytes
@@ -288,14 +300,15 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
     int16_t k;                  // threshold
     int16_t n;                  // number of keys
-    policy_node_key_placeholder_t
-        *key_placeholders;  // pointer to array of exactly n key placeholders
+    ptr_rel_node_key_placeholder_t
+        key_placeholders;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
 // 8 bytes
 typedef struct policy_node_scriptlist_s {
+    // TODO: change to relative pointers
     struct policy_node_scriptlist_s *next;
-    ptr_rel_t script;
+    ptr_rel_node_t script;
 } policy_node_scriptlist_t;
 
 // 12 bytes, (+ 8 bytes for every script)
@@ -303,6 +316,7 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
     int16_t k;                  // threshold
     int16_t n;                  // number of child scripts
+    // TODO: change to relative pointers
     policy_node_scriptlist_t
         *scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;
@@ -322,7 +336,7 @@ typedef struct policy_node_tree_s {
     bool is_leaf;  // if this is a leaf, then it contains a pointer to a SCRIPT;
                    // otherwise, it contains two pointers to TREE expressions.
     union {
-        ptr_rel_t script;  // pointer to a policy_node_with_script_t
+        ptr_rel_node_t script;  // pointer to a policy_node_with_script_t
         struct {
             ptr_rel_t left_tree;   // pointer to a policy_node_tree_s
             ptr_rel_t right_tree;  // pointer to a policy_node_tree_s
@@ -332,7 +346,8 @@ typedef struct policy_node_tree_s {
 
 typedef struct {
     struct policy_node_s base;
-    policy_node_key_placeholder_t *key_placeholder;
+    ptr_rel_node_key_placeholder_t key_placeholder;
+    // TODO: change to relative pointers
     policy_node_tree_t *tree;  // NULL if tr(KP)
 } policy_node_tr_t;
 
@@ -344,8 +359,14 @@ static inline const void *resolve_ptr(const ptr_rel_t *ptr) {
 }
 
 // Syntactic sugar for resolve_ptr when the return value is a pointer to policy_node_t
-static inline const policy_node_t *resolve_node_ptr(const ptr_rel_t *ptr) {
-    return (const void *) ((const uint8_t *) ptr + ptr->offset);
+static inline const policy_node_t *resolve_node_ptr(const ptr_rel_node_t *ptr) {
+    return (const policy_node_t *) ((const uint8_t *) ptr + ptr->offset);
+}
+
+// Syntactic sugar for resolve_ptr when the return value is a pointer to policy_node_t
+static inline const policy_node_key_placeholder_t *resolve_node_key_placeholder_ptr(
+    const ptr_rel_node_key_placeholder_t *ptr) {
+    return (const policy_node_key_placeholder_t *) ((const uint8_t *) ptr + ptr->offset);
 }
 
 // Initializes a relative pointer so that it points to node.
@@ -353,6 +374,16 @@ static inline const policy_node_t *resolve_node_ptr(const ptr_rel_t *ptr) {
 // relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
 // is potentially dangerous to use.
 static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
+    relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
+}
+
+static inline void init_relative_node_ptr(ptr_rel_node_t *relative_ptr, void *node) {
+    relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
+}
+
+static inline void init_relative_node_key_placeholder_ptr(
+    ptr_rel_node_key_placeholder_t *relative_ptr,
+    void *node) {
     relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
 }
 

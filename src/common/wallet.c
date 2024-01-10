@@ -508,7 +508,7 @@ static int parse_script(buffer_t *in_buf,
 static int parse_child_scripts(buffer_t *in_buf,
                                buffer_t *out_buf,
                                size_t depth,
-                               ptr_rel_t child_scripts[],
+                               ptr_rel_node_t child_scripts[],
                                int n_children,
                                int version,
                                unsigned int context_flags) {
@@ -517,7 +517,7 @@ static int parse_child_scripts(buffer_t *in_buf,
 
     for (int child_index = 0; child_index < n_children; child_index++) {
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        init_relative_ptr(&child_scripts[child_index], buffer_get_cur(out_buf));
+        init_relative_node_ptr(&child_scripts[child_index], buffer_get_cur(out_buf));
 
         if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
             // failed while parsing internal script
@@ -616,7 +616,7 @@ static int parse_script(buffer_t *in_buf,
                 }
 
                 if (inner_wrapper != NULL) {
-                    init_relative_ptr(&inner_wrapper->script, node);
+                    init_relative_node_ptr(&inner_wrapper->script, node);
                 }
                 inner_wrapper = node;
             }
@@ -738,7 +738,7 @@ static int parse_script(buffer_t *in_buf,
             // the internal script is recursively parsed (if successful) in the current location
             // of the output buffer
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            init_relative_ptr(&node->script, buffer_get_cur(out_buf));
+            init_relative_node_ptr(&node->script, buffer_get_cur(out_buf));
 
             if (0 > parse_script(in_buf, out_buf, version, depth + 1, inner_context_flags)) {
                 // failed while parsing internal script
@@ -1294,7 +1294,7 @@ static int parse_script(buffer_t *in_buf,
                 ++node->n;
                 // parse a script into cur->script
                 buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-                init_relative_ptr(&cur->script, buffer_get_cur(out_buf));
+                init_relative_node_ptr(&cur->script, buffer_get_cur(out_buf));
                 if (0 > parse_script(in_buf, out_buf, version, depth + 1, context_flags)) {
                     // failed while parsing internal script
                     return -1;
@@ -1379,12 +1379,13 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            node->key_placeholder = (policy_node_key_placeholder_t *)
+            policy_node_key_placeholder_t *key_placeholder =
                 buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
 
-            if (node->key_placeholder == NULL) {
+            if (key_placeholder == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
+            init_relative_node_key_placeholder_ptr(&node->key_placeholder, key_placeholder);
 
             if (token == TOKEN_WPKH) {
                 if (depth > 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
@@ -1396,7 +1397,7 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_placeholder(in_buf, version, node->key_placeholder)) {
+            if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1459,14 +1460,14 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            node->key_placeholder = (policy_node_key_placeholder_t *)
+            policy_node_key_placeholder_t *key_placeholder =
                 buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
-
-            if (node->key_placeholder == NULL) {
+            if (key_placeholder == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
+            init_relative_node_key_placeholder_ptr(&node->key_placeholder, key_placeholder);
 
-            if (0 > parse_placeholder(in_buf, version, node->key_placeholder)) {
+            if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1581,7 +1582,8 @@ static int parse_script(buffer_t *in_buf,
             // We allocate the array of key indices at the current position in the output buffer
             // (on success)
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            node->key_placeholders = (policy_node_key_placeholder_t *) buffer_get_cur(out_buf);
+            init_relative_node_key_placeholder_ptr(&node->key_placeholders,
+                                                   buffer_get_cur(out_buf));
 
             node->n = 0;
             while (true) {
@@ -1658,7 +1660,7 @@ static int parse_script(buffer_t *in_buf,
     // if there was one or more wrappers, the script of the most internal node must point
     // to the parsed node
     if (inner_wrapper != NULL) {
-        init_relative_ptr(&inner_wrapper->script, parsed_node);
+        init_relative_node_ptr(&inner_wrapper->script, parsed_node);
     }
 
     // Validate and compute the flags (miniscript type and modifiers) for all the wrapper, if any
@@ -1670,7 +1672,7 @@ static int parse_script(buffer_t *in_buf,
         // find the actual node by traversing the list
         policy_node_with_script_t *node = (policy_node_with_script_t *) outermost_node;
         for (int j = 0; j < i; j++) {
-            node = (policy_node_with_script_t *) resolve_ptr(&node->script);
+            node = (policy_node_with_script_t *) resolve_node_ptr(&node->script);
         }
 
         if (!resolve_node_ptr(&node->script)->flags.is_miniscript) {
@@ -1864,7 +1866,7 @@ static int parse_tree(buffer_t *in_buf, buffer_t *out_buf, int version, size_t d
         tree_node->is_leaf = true;
 
         buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-        init_relative_ptr(&tree_node->script, buffer_get_cur(out_buf));
+        init_relative_node_ptr(&tree_node->script, buffer_get_cur(out_buf));
         if (0 > parse_script(in_buf, out_buf, version, depth + 1, CONTEXT_WITHIN_TR)) {
             return -1;
         }

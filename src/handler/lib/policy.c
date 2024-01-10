@@ -567,10 +567,11 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                             state->wdi,
-                                             policy->key_placeholder,
-                                             compressed_pubkey)) {
+                if (-1 ==
+                    get_derived_pubkey(state->dispatcher_context,
+                                       state->wdi,
+                                       resolve_node_key_placeholder_ptr(&policy->key_placeholder),
+                                       compressed_pubkey)) {
                     return -1;
                 }
 
@@ -588,10 +589,11 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                             state->wdi,
-                                             policy->key_placeholder,
-                                             compressed_pubkey)) {
+                if (-1 ==
+                    get_derived_pubkey(state->dispatcher_context,
+                                       state->wdi,
+                                       resolve_node_key_placeholder_ptr(&policy->key_placeholder),
+                                       compressed_pubkey)) {
                     return -1;
                 }
                 if (!state->is_taproot) {
@@ -680,7 +682,7 @@ __attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_pars
 
     if (-1 == get_derived_pubkey(state->dispatcher_context,
                                  state->wdi,
-                                 policy->key_placeholder,
+                                 resolve_node_key_placeholder_ptr(&policy->key_placeholder),
                                  compressed_pubkey)) {
         return -1;
     } else if (policy->base.type == TOKEN_PKH) {
@@ -805,10 +807,11 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
         uint8_t compressed_pubkey[33];
 
         if (policy->base.type == TOKEN_MULTI) {
-            if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                         state->wdi,
-                                         &policy->key_placeholders[i],
-                                         compressed_pubkey)) {
+            if (-1 ==
+                get_derived_pubkey(state->dispatcher_context,
+                                   state->wdi,
+                                   &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[i],
+                                   compressed_pubkey)) {
                 return -1;
             }
         } else {
@@ -830,10 +833,11 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
             for (int j = 0; j < policy->n; j++) {
                 if (!bitvector_get(used, j)) {
                     uint8_t cur_pubkey[33];
-                    if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                                 state->wdi,
-                                                 &policy->key_placeholders[j],
-                                                 cur_pubkey)) {
+                    if (-1 == get_derived_pubkey(
+                                  state->dispatcher_context,
+                                  state->wdi,
+                                  &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[j],
+                                  cur_pubkey)) {
                         return -1;
                     }
 
@@ -881,10 +885,11 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
         uint8_t compressed_pubkey[33];
 
         if (policy->base.type == TOKEN_MULTI_A) {
-            if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                         state->wdi,
-                                         &policy->key_placeholders[i],
-                                         compressed_pubkey)) {
+            if (-1 ==
+                get_derived_pubkey(state->dispatcher_context,
+                                   state->wdi,
+                                   &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[i],
+                                   compressed_pubkey)) {
                 return -1;
             }
         } else {
@@ -896,10 +901,11 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
             for (int j = 0; j < policy->n; j++) {
                 if (!bitvector_get(used, j)) {
                     uint8_t cur_pubkey[33];
-                    if (-1 == get_derived_pubkey(state->dispatcher_context,
-                                                 state->wdi,
-                                                 &policy->key_placeholders[j],
-                                                 cur_pubkey)) {
+                    if (-1 == get_derived_pubkey(
+                                  state->dispatcher_context,
+                                  state->wdi,
+                                  &resolve_node_key_placeholder_ptr(&policy->key_placeholders)[j],
+                                  cur_pubkey)) {
                         return -1;
                     }
 
@@ -1007,7 +1013,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *pkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   pkh_policy->key_placeholder,
+                                   resolve_node_key_placeholder_ptr(&pkh_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1026,7 +1032,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *wpkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   wpkh_policy->key_placeholder,
+                                   resolve_node_key_placeholder_ptr(&wpkh_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1106,7 +1112,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
 
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   tr_policy->key_placeholder,
+                                   resolve_node_key_placeholder_ptr(&tr_policy->key_placeholder),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1330,11 +1336,13 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
     int purpose = -1;
     switch (descriptor_template->type) {
         case TOKEN_PKH:
-            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            kp = resolve_node_key_placeholder_ptr(
+                &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
             purpose = 44;  // legacy
             break;
         case TOKEN_WPKH:
-            kp = ((const policy_node_with_key_t *) descriptor_template)->key_placeholder;
+            kp = resolve_node_key_placeholder_ptr(
+                &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
             purpose = 84;  // native segwit
             break;
         case TOKEN_SH: {
@@ -1344,7 +1352,8 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 return -1;
             }
 
-            kp = ((const policy_node_with_key_t *) inner)->key_placeholder;
+            kp = resolve_node_key_placeholder_ptr(
+                &((const policy_node_with_key_t *) inner)->key_placeholder);
             purpose = 49;  // nested segwit
             break;
         }
@@ -1353,7 +1362,8 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 return -1;
             }
 
-            kp = ((const policy_node_tr_t *) descriptor_template)->key_placeholder;
+            kp = resolve_node_key_placeholder_ptr(
+                &((const policy_node_tr_t *) descriptor_template)->key_placeholder);
             purpose = 86;  // standard single-key P2TR
             break;
         default:
@@ -1497,7 +1507,7 @@ static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
         int ret =
             get_key_placeholder_by_index(resolve_node_ptr(&tree->script), i, NULL, out_placeholder);
         if (ret >= 0 && out_tapleaf_ptr != NULL && i < (unsigned) ret) {
-            *out_tapleaf_ptr = resolve_ptr(&tree->script);
+            *out_tapleaf_ptr = resolve_node_ptr(&tree->script);
         }
         return ret;
     } else {
@@ -1550,16 +1560,18 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_PKH:
         case TOKEN_WPKH: {
             if (i == 0) {
+                policy_node_with_key_t *wpkh = (policy_node_with_key_t *) policy;
                 memcpy(out_placeholder,
-                       ((policy_node_with_key_t *) policy)->key_placeholder,
+                       resolve_node_key_placeholder_ptr(&wpkh->key_placeholder),
                        sizeof(policy_node_key_placeholder_t));
             }
             return 1;
         }
         case TOKEN_TR: {
             if (i == 0) {
+                policy_node_tr_t *tr = (policy_node_tr_t *) policy;
                 memcpy(out_placeholder,
-                       ((policy_node_tr_t *) policy)->key_placeholder,
+                       resolve_node_key_placeholder_ptr(&tr->key_placeholder),
                        sizeof(policy_node_key_placeholder_t));
             }
             if (((policy_node_tr_t *) policy)->tree != NULL) {
@@ -1586,9 +1598,9 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             const policy_node_multisig_t *node = (const policy_node_multisig_t *) policy;
 
             if (i < (unsigned int) node->n) {
-                memcpy(out_placeholder,
-                       &node->key_placeholders[i],
-                       sizeof(policy_node_key_placeholder_t));
+                policy_node_key_placeholder_t *placeholders =
+                    resolve_node_key_placeholder_ptr(&node->key_placeholders);
+                memcpy(out_placeholder, &placeholders[i], sizeof(policy_node_key_placeholder_t));
             }
 
             return node->n;
@@ -1811,12 +1823,10 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
             return -1;
         }
     } else {
-        if (0 > is_taptree_miniscript_sane(
-                    (const policy_node_tree_t *) resolve_node_ptr(&taptree->left_tree))) {
+        if (0 > is_taptree_miniscript_sane(resolve_node_ptr(&taptree->left_tree))) {
             return -1;
         }
-        if (0 > is_taptree_miniscript_sane(
-                    (const policy_node_tree_t *) resolve_node_ptr(&taptree->right_tree))) {
+        if (0 > is_taptree_miniscript_sane(resolve_node_ptr(&taptree->right_tree))) {
             return -1;
         }
     }
