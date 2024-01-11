@@ -172,23 +172,11 @@ typedef enum {
 // policy_nodes, representing a non-negative offset from the position of the structure itself.
 // This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
 // in other structures, as they no longer contain 32-bit pointers.
-typedef struct ptr_rel_s {
-    uint16_t offset;
-} ptr_rel_t;
-
-// TODO: remove the generic versions
-// Converts a relative pointer to the corresponding pointer to the corresponding absolute pointer
-static inline const void *resolve_ptr(const ptr_rel_t *ptr) {
-    return (const void *) ((const uint8_t *) ptr + ptr->offset);
-}
-
-// Initializes a relative pointer so that it points to node.
-// IMPORTANT: the assumption is that node is located in memory at an address larger than
-// relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
-// is potentially dangerous to use.
-static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
-    relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
-}
+// Moreover, avoiding all pointers makes sure that the structure can be copied to a different
+// location if needed (making sure the destination is aligned due to the platform restrictions).
+// The following macro defines the data structure and the helper methods for a relative pointer to a
+// type. The code does not depend on the type, but this allows to keep strong types when dealing
+// with relative pointers, which otherwise would require numerous type casts.
 
 // Defines a relative pointer type for name##t, and the conversion functions to/from a relative
 // pointer and a pointer to name##_t.

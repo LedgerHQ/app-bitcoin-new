@@ -49,11 +49,11 @@ static void test_parse_policy_map_singlesig_1(void **state) {
 
     int res = parse_policy("pkh(@0/**)", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
     assert_int_equal(node_1->base.type, TOKEN_PKH);
-    check_key_placeholder(node_1->key_placeholder, 0, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&node_1->key_placeholder), 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_2(void **state) {
@@ -63,15 +63,15 @@ static void test_parse_policy_map_singlesig_2(void **state) {
 
     int res = parse_policy("sh(wpkh(@0/**))", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) resolve_ptr(&root->script);
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) r_policy_node(&root->script);
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
-    check_key_placeholder(inner->key_placeholder, 0, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&inner->key_placeholder), 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_3(void **state) {
@@ -81,19 +81,19 @@ static void test_parse_policy_map_singlesig_3(void **state) {
 
     int res = parse_policy("sh(wsh(pkh(@0/**)))", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) resolve_ptr(&root->script);
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) r_policy_node(&root->script);
 
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_with_key_t *inner = (policy_node_with_key_t *) resolve_ptr(&mid->script);
+    policy_node_with_key_t *inner = (policy_node_with_key_t *) r_policy_node(&mid->script);
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
-    check_key_placeholder(inner->key_placeholder, 0, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&inner->key_placeholder), 0, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_1(void **state) {
@@ -103,15 +103,15 @@ static void test_parse_policy_map_multisig_1(void **state) {
 
     int res = parse_policy("sortedmulti(2,@0/**,@1/**,@2/**)", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_multisig_t *node_1 = (policy_node_multisig_t *) out;
 
     assert_int_equal(node_1->base.type, TOKEN_SORTEDMULTI);
     assert_int_equal(node_1->k, 2);
     assert_int_equal(node_1->n, 3);
-    check_key_placeholder(&node_1->key_placeholders[0], 0, 0, 1);
-    check_key_placeholder(&node_1->key_placeholders[1], 1, 0, 1);
-    check_key_placeholder(&node_1->key_placeholders[2], 2, 0, 1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&node_1->key_placeholders)[0], 0, 0, 1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&node_1->key_placeholders)[1], 1, 0, 1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&node_1->key_placeholders)[2], 2, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_2(void **state) {
@@ -121,18 +121,18 @@ static void test_parse_policy_map_multisig_2(void **state) {
 
     int res = parse_policy("wsh(multi(3,@0/**,@1/**,@2/**,@3/**,@4/**))", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
     assert_int_equal(root->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) resolve_ptr(&root->script);
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) r_policy_node(&root->script);
     assert_int_equal(inner->base.type, TOKEN_MULTI);
 
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        check_key_placeholder(&inner->key_placeholders[i], i, 0, 1);
+        check_key_placeholder(&r_policy_node_key_placeholder(&inner->key_placeholders)[i], i, 0, 1);
     }
 }
 
@@ -144,21 +144,21 @@ static void test_parse_policy_map_multisig_3(void **state) {
     int res =
         parse_policy("sh(wsh(sortedmulti(3,@0/**,@1/**,@2/**,@3/**,@4/**)))", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_with_script_t *root = (policy_node_with_script_t *) out;
 
     assert_int_equal(root->base.type, TOKEN_SH);
 
-    policy_node_with_script_t *mid = (policy_node_with_script_t *) resolve_ptr(&root->script);
+    policy_node_with_script_t *mid = (policy_node_with_script_t *) r_policy_node(&root->script);
     assert_int_equal(mid->base.type, TOKEN_WSH);
 
-    policy_node_multisig_t *inner = (policy_node_multisig_t *) resolve_ptr(&mid->script);
+    policy_node_multisig_t *inner = (policy_node_multisig_t *) r_policy_node(&mid->script);
     assert_int_equal(inner->base.type, TOKEN_SORTEDMULTI);
 
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        check_key_placeholder(&inner->key_placeholders[i], i, 0, 1);
+        check_key_placeholder(&r_policy_node_key_placeholder(&inner->key_placeholders)[i], i, 0, 1);
     }
 }
 
@@ -171,54 +171,60 @@ static void test_parse_policy_tr(void **state) {
     // Simple tr without a tree
     res = parse_policy("tr(@0/**)", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     policy_node_tr_t *root = (policy_node_tr_t *) out;
 
-    assert_ptr_equal(root->tree, NULL);
-    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+    assert_true(isnull_policy_node_tree(&root->tree));
+    check_key_placeholder(r_policy_node_key_placeholder(&root->key_placeholder), 0, 0, 1);
 
     // Simple tr with a TREE that is a simple script
     res = parse_policy("tr(@0/**,pk(@1/**))", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     root = (policy_node_tr_t *) out;
 
-    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&root->key_placeholder), 0, 0, 1);
 
-    assert_int_equal(root->tree->is_leaf, true);
+    assert_int_equal(r_policy_node_tree(&root->tree)->is_leaf, true);
 
-    policy_node_with_key_t *tapscript = (policy_node_with_key_t *) resolve_ptr(&root->tree->script);
+    policy_node_with_key_t *tapscript =
+        (policy_node_with_key_t *) r_policy_node(&r_policy_node_tree(&root->tree)->script);
 
     assert_int_equal(tapscript->base.type, TOKEN_PK);
-    check_key_placeholder(tapscript->key_placeholder, 1, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&tapscript->key_placeholder), 1, 0, 1);
 
     // Simple tr with a TREE with two tapleaves
     res = parse_policy("tr(@0/**,{pk(@1/**),pk(@2/<5;7>/*)})", out, sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
     root = (policy_node_tr_t *) out;
 
-    check_key_placeholder(root->key_placeholder, 0, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&root->key_placeholder), 0, 0, 1);
 
-    policy_node_tree_t *taptree = root->tree;
+    policy_node_tree_t *taptree = r_policy_node_tree(&root->tree);
 
     assert_int_equal(taptree->is_leaf, false);
 
-    policy_node_tree_t *taptree_left = (policy_node_tree_t *) resolve_ptr(&taptree->left_tree);
+    policy_node_tree_t *taptree_left =
+        (policy_node_tree_t *) r_policy_node_tree(&taptree->left_tree);
     assert_int_equal(taptree_left->is_leaf, true);
     policy_node_with_key_t *tapscript_left =
-        (policy_node_with_key_t *) resolve_ptr(&taptree_left->script);
+        (policy_node_with_key_t *) r_policy_node(&taptree_left->script);
 
     assert_int_equal(tapscript_left->base.type, TOKEN_PK);
-    check_key_placeholder(tapscript_left->key_placeholder, 1, 0, 1);
+    check_key_placeholder(r_policy_node_key_placeholder(&tapscript_left->key_placeholder), 1, 0, 1);
 
-    policy_node_tree_t *taptree_right = (policy_node_tree_t *) resolve_ptr(&taptree->right_tree);
+    policy_node_tree_t *taptree_right =
+        (policy_node_tree_t *) r_policy_node_tree(&taptree->right_tree);
     assert_int_equal(taptree_right->is_leaf, true);
     policy_node_with_key_t *tapscript_right =
-        (policy_node_with_key_t *) resolve_ptr(&taptree_right->script);
+        (policy_node_with_key_t *) r_policy_node(&taptree_right->script);
 
     assert_int_equal(tapscript_right->base.type, TOKEN_PK);
-    check_key_placeholder(tapscript_right->key_placeholder, 2, 5, 7);
+    check_key_placeholder(r_policy_node_key_placeholder(&tapscript_right->key_placeholder),
+                          2,
+                          5,
+                          7);
 }
 
 static void test_parse_policy_tr_multisig(void **state) {
@@ -232,40 +238,57 @@ static void test_parse_policy_tr_multisig(void **state) {
                        out,
                        sizeof(out));
 
-    assert_int_equal(res, 0);
+    assert_true(res >= 0);
 
     policy_node_tr_t *root = (policy_node_tr_t *) out;
 
-    assert_int_equal(root->key_placeholder->key_index, 0);
-    assert_int_equal(root->key_placeholder->num_first, 0);
-    assert_int_equal(root->key_placeholder->num_second, 1);
+    assert_int_equal(r_policy_node_key_placeholder(&root->key_placeholder)->key_index, 0);
+    assert_int_equal(r_policy_node_key_placeholder(&root->key_placeholder)->num_first, 0);
+    assert_int_equal(r_policy_node_key_placeholder(&root->key_placeholder)->num_second, 1);
 
-    policy_node_tree_t *taptree = root->tree;
+    policy_node_tree_t *taptree = r_policy_node_tree(&root->tree);
 
     assert_int_equal(taptree->is_leaf, false);
 
-    policy_node_tree_t *taptree_left = (policy_node_tree_t *) resolve_ptr(&taptree->left_tree);
+    policy_node_tree_t *taptree_left =
+        (policy_node_tree_t *) r_policy_node_tree(&taptree->left_tree);
     assert_int_equal(taptree_left->is_leaf, true);
     policy_node_multisig_t *tapscript_left =
-        (policy_node_multisig_t *) resolve_ptr(&taptree_left->script);
+        (policy_node_multisig_t *) r_policy_node(&taptree_left->script);
 
     assert_int_equal(tapscript_left->base.type, TOKEN_MULTI_A);
     assert_int_equal(tapscript_left->k, 1);
     assert_int_equal(tapscript_left->n, 2);
-    check_key_placeholder(&tapscript_left->key_placeholders[0], 1, 0, 1);
-    check_key_placeholder(&tapscript_left->key_placeholders[1], 2, 0, 1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&tapscript_left->key_placeholders)[0],
+                          1,
+                          0,
+                          1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&tapscript_left->key_placeholders)[1],
+                          2,
+                          0,
+                          1);
 
-    policy_node_tree_t *taptree_right = (policy_node_tree_t *) resolve_ptr(&taptree->right_tree);
+    policy_node_tree_t *taptree_right =
+        (policy_node_tree_t *) r_policy_node_tree(&taptree->right_tree);
     assert_int_equal(taptree_right->is_leaf, true);
     policy_node_multisig_t *tapscript_right =
-        (policy_node_multisig_t *) resolve_ptr(&taptree_right->script);
+        (policy_node_multisig_t *) r_policy_node(&taptree_right->script);
 
     assert_int_equal(tapscript_right->base.type, TOKEN_SORTEDMULTI_A);
     assert_int_equal(tapscript_right->k, 2);
     assert_int_equal(tapscript_right->n, 3);
-    check_key_placeholder(&tapscript_right->key_placeholders[0], 3, 0, 1);
-    check_key_placeholder(&tapscript_right->key_placeholders[1], 4, 0, 1);
-    check_key_placeholder(&tapscript_right->key_placeholders[2], 5, 0, 1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&tapscript_right->key_placeholders)[0],
+                          3,
+                          0,
+                          1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&tapscript_right->key_placeholders)[1],
+                          4,
+                          0,
+                          1);
+    check_key_placeholder(&r_policy_node_key_placeholder(&tapscript_right->key_placeholders)[2],
+                          5,
+                          0,
+                          1);
 }
 
 static void test_get_policy_segwit_version(void **state) {
@@ -436,18 +459,19 @@ static void Test(const char *ms, const char *hexscript, int mode, int opslimit, 
     if (mode == TESTMODE_INVALID) {
         assert_true(res < 0);
     } else {
-        assert_true(res == 0);
+        assert_true(res >= 0);
 
         const policy_node_t *miniscript;
         int context;
         if (((policy_node_t *) out)->type == TOKEN_WSH) {
-            miniscript = resolve_ptr(&((policy_node_with_script_t *) out)->script);
+            miniscript = r_policy_node(&((policy_node_with_script_t *) out)->script);
             context = MINISCRIPT_CONTEXT_P2WSH;
         } else {
             assert_true(((policy_node_t *) out)->type == TOKEN_TR);
-            assert_true(((policy_node_tr_t *) out)->tree->is_leaf);
+            policy_node_tr_t *tr = (policy_node_tr_t *) out;
+            assert_true(r_policy_node_tree(&tr->tree)->is_leaf);
 
-            miniscript = resolve_ptr(&((policy_node_tr_t *) out)->tree->script);
+            miniscript = r_policy_node(&r_policy_node_tree(&tr->tree)->script);
             context = MINISCRIPT_CONTEXT_TAPSCRIPT;
         }
 
