@@ -757,8 +757,10 @@ __attribute__((warn_unused_result)) static int process_thresh_node(policy_parser
     if (node->step < policy->n) {
         // find the current child node
         policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&policy->scriptlist);
+        LEDGER_ASSERT(cur != NULL, "This should never happen");
         for (size_t i = 0; i < node->step; i++) {
             cur = r_policy_node_scriptlist(&cur->next);
+            LEDGER_ASSERT(cur != NULL, "This should never happen");
         }
 
         // process child node
