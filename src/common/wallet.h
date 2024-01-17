@@ -40,9 +40,18 @@
 #ifdef TARGET_NANOS
 // this amount should be enough for many useful policies
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 192
-#define MAX_WALLET_POLICY_BYTES           320
+// As the in-memory representation of wallet policy is implementation-specific, we would like
+// this limit not to be hit for descriptor templates below the maximum length
+// MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2.
+// A policy requiring about 300 bytes after parsing was reported by developers working on the Liana
+// miniscript wallet. 320 = 64*5, so that it is a multiple of the NVRAM page size and fits all known
+// cases.
+#define MAX_WALLET_POLICY_BYTES 320
 #else
-// on larger devices, we can afford to reserve a lot more memory
+// On larger devices, we can afford to reserve a lot more memory.
+// We do not expect these limits to be reached in practice any time soon, and the value
+// of MAX_WALLET_POLICY_BYTES is chosen so that MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 and
+// MAX_WALLET_POLICY_BYTES are approximately in the same proportion as defined on NanoS.
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
 #define MAX_WALLET_POLICY_BYTES           896
 #endif
