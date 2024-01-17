@@ -3,7 +3,7 @@ use core::iter::IntoIterator;
 use core::str::FromStr;
 
 use bitcoin::{
-    bip32::{DerivationPath, Error, ExtendedPubKey, Fingerprint, KeySource},
+    bip32::{DerivationPath, Error, Fingerprint, KeySource, Xpub},
     consensus::encode::{self, VarInt},
     hashes::{sha256, Hash, HashEngine},
 };
@@ -181,7 +181,7 @@ pub enum WalletError {
 
 #[derive(PartialEq, Eq)]
 pub struct WalletPubKey {
-    pub inner: ExtendedPubKey,
+    pub inner: Xpub,
     pub source: Option<KeySource>,
 
     /// Used by Version V1
@@ -189,8 +189,8 @@ pub struct WalletPubKey {
     pub multipath: Option<String>,
 }
 
-impl From<ExtendedPubKey> for WalletPubKey {
-    fn from(inner: ExtendedPubKey) -> Self {
+impl From<Xpub> for WalletPubKey {
+    fn from(inner: Xpub) -> Self {
         Self {
             inner,
             source: None,
@@ -199,8 +199,8 @@ impl From<ExtendedPubKey> for WalletPubKey {
     }
 }
 
-impl From<(KeySource, ExtendedPubKey)> for WalletPubKey {
-    fn from(source_xpub: (KeySource, ExtendedPubKey)) -> Self {
+impl From<(KeySource, Xpub)> for WalletPubKey {
+    fn from(source_xpub: (KeySource, Xpub)) -> Self {
         Self {
             inner: source_xpub.1,
             source: Some(source_xpub.0),
@@ -209,8 +209,8 @@ impl From<(KeySource, ExtendedPubKey)> for WalletPubKey {
     }
 }
 
-impl From<(KeySource, ExtendedPubKey, String)> for WalletPubKey {
-    fn from(source_xpub: (KeySource, ExtendedPubKey, String)) -> Self {
+impl From<(KeySource, Xpub, String)> for WalletPubKey {
+    fn from(source_xpub: (KeySource, Xpub, String)) -> Self {
         Self {
             inner: source_xpub.1,
             source: Some(source_xpub.0),
@@ -223,7 +223,7 @@ impl FromStr for WalletPubKey {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Ok(key) = ExtendedPubKey::from_str(s) {
+        if let Ok(key) = Xpub::from_str(s) {
             Ok(WalletPubKey {
                 inner: key,
                 source: None,
@@ -248,7 +248,7 @@ impl FromStr for WalletPubKey {
                 (xpub_str, None)
             };
             Ok(WalletPubKey {
-                inner: ExtendedPubKey::from_str(xpub_str)?,
+                inner: Xpub::from_str(xpub_str)?,
                 source: Some((fingerprint, derivation_path)),
                 multipath,
             })
@@ -296,7 +296,7 @@ mod tests {
             Fingerprint::from_str("5c9e228d").unwrap()
         );
         assert_eq!(key.source.as_ref().unwrap().1, DerivationPath::master());
-        assert_eq!(key.inner, ExtendedPubKey::from_str("tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW").unwrap());
+        assert_eq!(key.inner, Xpub::from_str("tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW").unwrap());
         assert_eq!(key.multipath, Some("/**".to_string()));
     }
 
@@ -311,7 +311,7 @@ mod tests {
             key.source.as_ref().unwrap().1,
             DerivationPath::from_str("m/48'/1'/0'/0'").unwrap()
         );
-        assert_eq!(key.inner, ExtendedPubKey::from_str("tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW").unwrap());
+        assert_eq!(key.inner, Xpub::from_str("tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW").unwrap());
         assert_eq!(key.multipath, Some("/**".to_string()));
     }
 

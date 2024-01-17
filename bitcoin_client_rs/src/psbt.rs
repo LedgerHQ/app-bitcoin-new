@@ -110,7 +110,7 @@ pub fn get_v2_global_pairs(psbt: &Psbt) -> Vec<raw::Pair> {
             type_value: PSBT_GLOBAL_TX_VERSION,
             key: vec![],
         },
-        value: (psbt.unsigned_tx.version as u32).to_le_bytes().to_vec(),
+        value: psbt.unsigned_tx.version.0.to_le_bytes().to_vec(),
     });
 
     rv.push(raw::Pair {
@@ -343,7 +343,7 @@ pub fn get_v2_output_pairs(output: &Output, txout: &TxOut) -> Vec<raw::Pair> {
             type_value: PSBT_OUT_AMOUNT,
             key: vec![],
         },
-        value: txout.value.to_le_bytes().to_vec(),
+        value: txout.value.to_sat().to_le_bytes().to_vec(),
     });
 
     rv.push(raw::Pair {
@@ -435,8 +435,8 @@ pub enum PartialSignatureError {
     XOnlyPubKey(secp256k1::Error),
     PubKey(KeyError),
     EcdsaSig(ecdsa::Error),
-    TaprootSig(taproot::Error),
-    TapLeaf(bitcoin::hashes::Error),
+    TaprootSig(taproot::SigFromSliceError),
+    TapLeaf(bitcoin::hashes::FromSliceError),
 }
 
 mod serialize {
@@ -623,9 +623,9 @@ mod serialize {
             // would use check the signature assuming sighash_u32 as `0x01`.
             ecdsa::Signature::from_slice(bytes).map_err(|e| match e {
                 ecdsa::Error::EmptySignature => Error::InvalidEcdsaSignature(e),
-                ecdsa::Error::NonStandardSighashType(flag) => Error::NonStandardSighashType(flag),
+                ecdsa::Error::SighashType(flag) => Error::NonStandardSighashType(flag.0),
                 ecdsa::Error::Secp256k1(..) => Error::InvalidEcdsaSignature(e),
-                ecdsa::Error::HexEncoding(..) => {
+                ecdsa::Error::Hex(..) => {
                     unreachable!("Decoding from slice, not hex")
                 }
                 _ => Error::InvalidEcdsaSignature(e),
@@ -812,7 +812,7 @@ mod serialize {
             let capacity = self
                 .script_leaves()
                 .map(|l| {
-                    l.script().len() + VarInt(l.script().len() as u64).len() // script version
+                    l.script().len() + VarInt(l.script().len() as u64).size() // script version
             + 1 // merkle branch
             + 1 // leaf version
                 })
