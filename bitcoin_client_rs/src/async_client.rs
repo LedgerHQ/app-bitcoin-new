@@ -5,10 +5,10 @@ use async_trait::async_trait;
 
 use bitcoin::{
     address,
-    bip32::{DerivationPath, ExtendedPubKey, Fingerprint},
+    bip32::{DerivationPath, Fingerprint, Xpub},
     consensus::encode::{deserialize_partial, VarInt},
-    psbt::PartiallySignedTransaction as Psbt,
     secp256k1::ecdsa::Signature,
+    Psbt,
 };
 
 #[cfg(feature = "paranoid_client")]
@@ -91,7 +91,7 @@ impl<T: Transport> BitcoinClient<T> {
                 BitcoinClientError::ClientError("Failed to derive descriptor".to_string())
             })?
             .script_pubkey()
-            != expected_address.payload.script_pubkey()
+            != expected_address.payload().script_pubkey()
         {
             return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new".to_string()));
         }
@@ -161,10 +161,10 @@ impl<T: Transport> BitcoinClient<T> {
         &self,
         path: &DerivationPath,
         display: bool,
-    ) -> Result<ExtendedPubKey, BitcoinClientError<T::Error>> {
+    ) -> Result<Xpub, BitcoinClientError<T::Error>> {
         let cmd = command::get_extended_pubkey(path, display);
         self.make_request(&cmd, None).await.and_then(|data| {
-            ExtendedPubKey::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
+            Xpub::from_str(&String::from_utf8_lossy(&data)).map_err(|_| {
                 BitcoinClientError::UnexpectedResult {
                     command: cmd.ins,
                     data,
