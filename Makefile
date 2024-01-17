@@ -125,6 +125,8 @@ endif
 ifeq ($(TARGET_NAME),TARGET_NANOS)
     # enables optimizations using the shared 1K CXRAM region
     DEFINES   += USE_CXRAM_SECTION
+    # enables usage of the NVRAM to free up some RAM
+    DEFINES   += USE_NVRAM_STASH
 endif
 
 # debugging helper functions and macros

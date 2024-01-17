@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include "ledger_assert.h"
+
 #include "common/bip32.h"
 #include "common/buffer.h"
 #include "../constants.h"
@@ -38,11 +40,20 @@
 #ifdef TARGET_NANOS
 // this amount should be enough for many useful policies
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 192
-#define MAX_WALLET_POLICY_BYTES           264
+// As the in-memory representation of wallet policy is implementation-specific, we would like
+// this limit not to be hit for descriptor templates below the maximum length
+// MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2.
+// A policy requiring about 300 bytes after parsing was reported by developers working on the Liana
+// miniscript wallet. 320 = 64*5, so that it is a multiple of the NVRAM page size and fits all known
+// cases.
+#define MAX_WALLET_POLICY_BYTES 320
 #else
-// on larger devices, we can afford to reserve a lot more memory
+// On larger devices, we can afford to reserve a lot more memory.
+// We do not expect these limits to be reached in practice any time soon, and the value
+// of MAX_WALLET_POLICY_BYTES is chosen so that MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 and
+// MAX_WALLET_POLICY_BYTES are approximately in the same proportion as defined on NanoS.
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V2 512
-#define MAX_WALLET_POLICY_BYTES           768
+#define MAX_WALLET_POLICY_BYTES           896
 #endif
 
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH \
@@ -164,6 +175,73 @@ typedef enum {
 #define MINISCRIPT_TYPE_K 2
 #define MINISCRIPT_TYPE_W 3
 
+// The various structures used to represent the wallet policy abstract syntax tree contain a lot
+// pointers; using a regular pointer would make each of them 4 bytes long, moreover causing
+// additional loss of memory due to padding. Instead, we use a 2-bytes relative pointer to point to
+// policy_nodes, representing a non-negative offset from the position of the structure itself.
+// This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
+// in other structures, as they no longer contain 32-bit pointers.
+// Moreover, avoiding all pointers makes sure that the structure can be copied to a different
+// location if needed (making sure the destination is aligned due to the platform restrictions).
+// The following macro defines the data structure and the helper methods for a relative pointer to a
+// type. The code does not depend on the type, but this allows to keep strong types when dealing
+// with relative pointers, which otherwise would require numerous type casts.
+
+// Defines a relative pointer type for name##t, and the conversion functions to/from a relative
+// pointer and a pointer to name##_t.
+// Relative pointers use an uint16_t to represent the offset; therefore, the offset must be
+// non-negative and at most 65535.
+// An offset of 0 corresponds to a NULL pointer in the conversion (and vice-versa).
+#define DEFINE_REL_PTR(name, type)                                                               \
+    /*                                                                                           \
+     * Relative pointer structure for `type`.                                                    \
+     *                                                                                           \
+     * This structure holds an offset that is used to calculate the actual pointer               \
+     * to a `type` object.                                                                       \
+     */                                                                                          \
+    typedef struct rptr_##name##_s {                                                             \
+        uint16_t offset;                                                                         \
+    } rptr_##name##_t;                                                                           \
+                                                                                                 \
+    /*                                                                                           \
+     * Resolve a relative pointer to a `type` object.                                            \
+     *                                                                                           \
+     * @param ptr A pointer to the relative pointer structure.                                   \
+     * @return A pointer to the `type` object.                                                   \
+     */                                                                                          \
+    static inline type *r_##name(const rptr_##name##_t *ptr) {                                   \
+        if (ptr->offset == 0)                                                                    \
+            return NULL;                                                                         \
+        else                                                                                     \
+            return (type *) ((const uint8_t *) ptr + ptr->offset);                               \
+    }                                                                                            \
+                                                                                                 \
+    /*                                                                                           \
+     * Returns true when the offset of the relative pointer is 0 (equivalent to a NULL pointer). \
+     *                                                                                           \
+     * @param relative_ptr A relative pointer.                                                   \
+     */                                                                                          \
+    static inline bool isnull_##name(const rptr_##name##_t *ptr) {                               \
+        return ptr->offset == 0;                                                                 \
+    }                                                                                            \
+                                                                                                 \
+    /*                                                                                           \
+     * Initialize a relative pointer to a `type` object.                                         \
+     *                                                                                           \
+     * @param relative_ptr A pointer to the relative pointer structure to be initialized.        \
+     * @param obj A pointer to the `type` object.                                                \
+     */                                                                                          \
+    static inline void i_##name(rptr_##name##_t *relative_ptr, void *obj) {                      \
+        if (obj == NULL)                                                                         \
+            relative_ptr->offset = 0;                                                            \
+        else {                                                                                   \
+            int offset = (uint8_t *) obj - (uint8_t *) relative_ptr;                             \
+            LEDGER_ASSERT(offset >= 0 && offset < UINT16_MAX,                                    \
+                          "Relative pointer's offset must be between 0 and 65535");              \
+            relative_ptr->offset = (uint16_t) offset;                                            \
+        }                                                                                        \
+    }
+
 // 2 bytes
 typedef struct policy_node_s {
     PolicyNodeType type;
@@ -177,6 +255,8 @@ typedef struct policy_node_s {
         unsigned int miniscript_mod_u : 1;
     } flags;  // 1 byte
 } policy_node_t;
+
+DEFINE_REL_PTR(policy_node, policy_node_t)
 
 typedef struct miniscript_ops_s {
     uint16_t count;  // non-push opcodes
@@ -213,16 +293,6 @@ typedef struct policy_node_ext_info_s {
     unsigned int x : 1;  // the last opcode is not EQUAL, CHECKSIG, or CHECKMULTISIG
 } policy_node_ext_info_t;
 
-// The various structures used to represent the wallet policy abstract syntax tree contain a lot
-// pointers; using a regular pointer would make each of them 4 bytes long, moreover causing
-// additional loss of memory due to padding. Instead, we use a 2-bytes relative pointer to point to
-// policy_nodes, representing a non-negative offset from the position of the structure itself.
-// This reduces the memory utilization of those pointers, and moreover it allows to reduce padding
-// in other structures, as they no longer contain 32-bit pointers.
-typedef struct ptr_rel_s {
-    uint16_t offset;
-} ptr_rel_t;
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcomment"
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
@@ -245,6 +315,8 @@ typedef struct {
     int16_t key_index;  // index of the key
 } policy_node_key_placeholder_t;
 
+DEFINE_REL_PTR(policy_node_key_placeholder, policy_node_key_placeholder_t)
+
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
@@ -253,19 +325,19 @@ typedef struct {
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t script;
+    rptr_policy_node_t script;
 } policy_node_with_script_t;
 
 // 6 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t scripts[2];
+    rptr_policy_node_t scripts[2];
 } policy_node_with_script2_t;
 
 // 8 bytes
 typedef struct {
     struct policy_node_s base;
-    ptr_rel_t scripts[3];
+    rptr_policy_node_t scripts[3];
 } policy_node_with_script3_t;
 
 // generic type with pointer for up to 3 (but constant) number of child scripts
@@ -274,7 +346,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    policy_node_key_placeholder_t *key_placeholder;
+    rptr_policy_node_key_placeholder_t key_placeholder;
 } policy_node_with_key_t;
 
 // 8 bytes
@@ -288,14 +360,18 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
     int16_t k;                  // threshold
     int16_t n;                  // number of keys
-    policy_node_key_placeholder_t
-        *key_placeholders;  // pointer to array of exactly n key placeholders
+    rptr_policy_node_key_placeholder_t
+        key_placeholders;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
 // 8 bytes
+struct policy_node_scriptlist_s;  // forward declaration, as the struct is recursive
+
+DEFINE_REL_PTR(policy_node_scriptlist, struct policy_node_scriptlist_s)
+
 typedef struct policy_node_scriptlist_s {
-    struct policy_node_scriptlist_s *next;
-    ptr_rel_t script;
+    rptr_policy_node_scriptlist_t next;
+    rptr_policy_node_t script;
 } policy_node_scriptlist_t;
 
 // 12 bytes, (+ 8 bytes for every script)
@@ -303,8 +379,8 @@ typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
     int16_t k;                  // threshold
     int16_t n;                  // number of child scripts
-    policy_node_scriptlist_t
-        *scriptlist;  // pointer to array of exactly n pointers to child scripts
+    rptr_policy_node_scriptlist_t
+        scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;
 
 typedef struct {
@@ -317,44 +393,27 @@ typedef struct {
     uint8_t h[32];
 } policy_node_with_hash_256_t;
 
+struct policy_node_tree_s;  // forward declaration, as the struct is recursive
+DEFINE_REL_PTR(policy_node_tree, struct policy_node_tree_s)
+
 // a TREE is either a script, or a {TREE,TREE}
 typedef struct policy_node_tree_s {
     bool is_leaf;  // if this is a leaf, then it contains a pointer to a SCRIPT;
                    // otherwise, it contains two pointers to TREE expressions.
     union {
-        ptr_rel_t script;  // pointer to a policy_node_with_script_t
+        rptr_policy_node_t script;  // pointer to a policy_node_with_script_t
         struct {
-            ptr_rel_t left_tree;   // pointer to a policy_node_tree_s
-            ptr_rel_t right_tree;  // pointer to a policy_node_tree_s
+            rptr_policy_node_tree_t left_tree;   // pointer to a policy_node_tree_s
+            rptr_policy_node_tree_t right_tree;  // pointer to a policy_node_tree_s
         };
     };
 } policy_node_tree_t;
 
 typedef struct {
     struct policy_node_s base;
-    policy_node_key_placeholder_t *key_placeholder;
-    policy_node_tree_t *tree;  // NULL if tr(KP)
+    rptr_policy_node_key_placeholder_t key_placeholder;
+    rptr_policy_node_tree_t tree;  // NULL if tr(KP)
 } policy_node_tr_t;
-
-// The following helpers function simplifies dealing with relative pointers to scripts
-
-// Converts a relative pointer to the corresponding pointer to the corresponding absolute pointer
-static inline const void *resolve_ptr(const ptr_rel_t *ptr) {
-    return (const void *) ((const uint8_t *) ptr + ptr->offset);
-}
-
-// Syntactic sugar for resolve_ptr when the return value is a pointer to policy_node_t
-static inline const policy_node_t *resolve_node_ptr(const ptr_rel_t *ptr) {
-    return (const void *) ((const uint8_t *) ptr + ptr->offset);
-}
-
-// Initializes a relative pointer so that it points to node.
-// IMPORTANT: the assumption is that node is located in memory at an address larger than
-// relative_ptr, and at an offset smaller than 65536. No error is detected otherwise, therefore this
-// is potentially dangerous to use.
-static inline void init_relative_ptr(ptr_rel_t *relative_ptr, void *node) {
-    relative_ptr->offset = (uint16_t) ((uint8_t *) node - (uint8_t *) relative_ptr);
-}
 
 /**
  * Parses the string in the `buffer` as a serialized policy map into `header`
@@ -398,8 +457,9 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
  * @param out the pointer to the output buffer, which must be 4-byte aligned
  * @param out_len the length of the output buffer
  * @param version either WALLET_POLICY_VERSION_V1 or WALLET_POLICY_VERSION_V2
- * @return 0 on success; -1 in case of parsing error, if the output buffer is unaligned, or if the
- * output buffer is too small.
+ * @return The memory size of the parsed descriptor template (that is, the number of bytes consumed
+ * in the output buffer) on success; -1 in case of parsing error, if the output buffer is unaligned,
+ * or if the output buffer is too small.
  */
 int parse_descriptor_template(buffer_t *in_buf, void *out, size_t out_len, int version);
 

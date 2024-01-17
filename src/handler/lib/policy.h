@@ -19,7 +19,8 @@
  * @param policy_map_bytes Pointer to an array of bytes that will be used for the parsed abstract
  * syntax tree
  * @param policy_map_bytes_len Length of policy_map_bytes in bytes.
- * @return 0 on success, a negative number in case of error.
+ * @return The memory size of the parsed descriotor template on success, a negative number in case
+ * of error.
  */
 // TODO: we should distinguish actual errors from just "policy too big to fit in memory"
 __attribute__((warn_unused_result)) int read_and_parse_wallet_policy(
