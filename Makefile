@@ -34,9 +34,9 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 1
-APPVERSION_P = 3
-APPVERSION   = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
+APPVERSION_N = 2
+APPVERSION_P = 0
+APPVERSION   = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-rc"
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
@@ -68,6 +68,8 @@ DEFINES   += COIN_COINID_SHORT=\"TEST\"
 APPNAME = "Bitcoin Test"
 
 else ifeq ($(COIN),bitcoin)
+
+$(error Release Candidate, not for mainnet)
 
 # Bitcoin mainnet, no legacy support
 DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
