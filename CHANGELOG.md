@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.2.0] - 29-01-2024
+
+### Added
+
+- 🥕 Support for miniscript on taproot wallet policies.
+- Warning if the fees are above 10% of the amount, if the total amount is above 10000 sats (0.0001 ₿).
+
+### Changed
+
+- Increased limits for the maximum in-memory size of wallet policies.
+
 ## [2.1.3] - 21-06-2023
 
 ### Changed
