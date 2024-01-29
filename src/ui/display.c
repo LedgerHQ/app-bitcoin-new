@@ -14,6 +14,8 @@
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
 
+extern bool G_was_processing_screen_shown;
+
 static bool g_ux_flow_ended;
 static bool g_ux_flow_response;
 
@@ -35,6 +37,8 @@ void set_ux_flow_response(bool approved) {
 // so that the dispatcher refreshes resets the UI at the end of the command handler.
 // Returns true/false depending if the user accepted in the corresponding UX flow.
 static bool io_ui_process(dispatcher_context_t *context, bool set_dirty) {
+    G_was_processing_screen_shown = false;
+
     g_ux_flow_ended = false;
 
     if (set_dirty) {
