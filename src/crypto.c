@@ -163,9 +163,10 @@ static size_t cx_hash_ripemd160(const uint8_t *in, size_t in_len, uint8_t *out, 
     if (out_len < CX_RIPEMD160_SIZE) {
         return 0;
     }
-    cx_ripemd160_init_no_throw((cx_ripemd160_t *) &G_cx);
-    cx_ripemd160_update((cx_ripemd160_t *) &G_cx, in, in_len);
-    cx_ripemd160_final((cx_ripemd160_t *) &G_cx, out);
+    LEDGER_ASSERT(cx_ripemd160_init_no_throw((cx_ripemd160_t *) &G_cx) == CX_OK, "It never fails");
+    LEDGER_ASSERT(cx_ripemd160_update((cx_ripemd160_t *) &G_cx, in, in_len) == CX_OK,
+                  "It never fails");
+    LEDGER_ASSERT(cx_ripemd160_final((cx_ripemd160_t *) &G_cx, out) == CX_OK, "It never fails");
     explicit_bzero((cx_ripemd160_t *) &G_cx, sizeof(cx_sha256_t));
     return CX_RIPEMD160_SIZE;
 }
