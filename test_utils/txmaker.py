@@ -198,9 +198,9 @@ def createPsbt(wallet: WalletPolicy, input_amounts: List[int], output_amounts: L
             psbt.inputs[i].hd_keypaths[input_key] = KeyOriginInfo(
                 master_key_fpr, path)
         elif is_taproot:
-            tweaked_key = get_taproot_output_key(input_key)
-            psbt.inputs[i].tap_bip32_paths[tweaked_key] = (
-                list(), KeyOriginInfo(master_key_fpr, path))
+            internal_key = input_key[1:]
+            psbt.inputs[i].tap_bip32_paths[internal_key] = (
+                {}, KeyOriginInfo(master_key_fpr, path))
         else:
             raise RuntimeError("Unexpected state: unknown transaction type")
 
@@ -224,12 +224,12 @@ def createPsbt(wallet: WalletPolicy, input_amounts: List[int], output_amounts: L
                 psbt.outputs[i].hd_keypaths[output_key] = KeyOriginInfo(
                     master_key_fpr, path)
             elif is_taproot:
-                tweaked_key = get_taproot_output_key(output_key)
-                psbt.outputs[i].tap_bip32_paths[tweaked_key] = (
-                    list(), KeyOriginInfo(master_key_fpr, path))
+                internal_key = output_key[1:]
+                psbt.outputs[i].tap_bip32_paths[internal_key] = (
+                    {}, KeyOriginInfo(master_key_fpr, path))
 
-                psbt.outputs[i].tap_bip32_paths[tweaked_key] = (
-                    list(), KeyOriginInfo(master_key_fpr, path))
+                psbt.outputs[i].tap_bip32_paths[internal_key] = (
+                    {}, KeyOriginInfo(master_key_fpr, path))
 
     psbt.tx = tx
 
