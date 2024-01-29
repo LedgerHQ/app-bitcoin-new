@@ -709,15 +709,12 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
 @pytest.mark.timeout(0)  # disable timeout
 @has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bool):
+def test_sign_psbt_singlesig_tr_512to256(client: Client, enable_slow_tests: bool):
     # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
     if not enable_slow_tests:
         pytest.skip()
-
-    n_inputs = 512
-    n_outputs = 256
 
     wallet = WalletPolicy(
         "",
@@ -727,10 +724,17 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
         ],
     )
 
+    n_inputs = 512
+    n_outputs = 256
+
+    input_amounts = [10000 + 10000 * i for i in range(n_inputs)]
+    total_amount = sum(input_amounts)
+    output_amounts = [(total_amount // n_outputs) - 10 for _ in range(n_outputs)]
+
     psbt = txmaker.createPsbt(
         wallet,
-        [10000 + 10000 * i for i in range(n_inputs)],
-        [999 + 99 * i for i in range(n_outputs)],
+        input_amounts,
+        output_amounts,
         [i == 42 for i in range(n_outputs)]
     )
 
@@ -739,7 +743,7 @@ def test_sign_psbt_singlesig_wpkh_512to256(client: Client, enable_slow_tests: bo
     assert len(result) == n_inputs
 
 
-def ux_thread_acept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
+def ux_thread_accept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
     while True:
@@ -772,7 +776,7 @@ def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: 
     all_events: List[dict] = []
 
     if model == "stax":
-        x = threading.Thread(target=ux_thread_acept_prompt_stax, args=[comm, all_events])
+        x = threading.Thread(target=ux_thread_accept_prompt_stax, args=[comm, all_events])
 
         x.start()
     with pytest.raises(NotSupportedError):

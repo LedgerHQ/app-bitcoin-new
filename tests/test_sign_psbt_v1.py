@@ -481,39 +481,6 @@ def test_sign_psbt_singlesig_large_amount_v1(client: Client, comm: SpeculosClien
     assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
 
 
-@pytest.mark.timeout(0)  # disable timeout
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_512to256_v1(client: Client, enable_slow_tests: bool):
-    # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
-    # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
-
-    if not enable_slow_tests:
-        pytest.skip()
-
-    n_inputs = 512
-    n_outputs = 256
-
-    wallet = WalletPolicy(
-        "",
-        "tr(@0)",
-        [
-            "[f5acc2fd/86'/1'/0']tpubDDKYE6BREvDsSWMazgHoyQWiJwYaDDYPbCFjYxN3HFXJP5fokeiK4hwK5tTLBNEDBwrDXn8cQ4v9b2xdW62Xr5yxoQdMu1v6c7UDXYVH27U/**"
-        ],
-        version=WalletType.WALLET_POLICY_V1
-    )
-
-    psbt = txmaker.createPsbt(
-        wallet,
-        [10000 + 10000 * i for i in range(n_inputs)],
-        [999 + 99 * i for i in range(n_outputs)],
-        [i == 42 for i in range(n_outputs)]
-    )
-
-    result = client.sign_psbt(psbt, wallet, None)
-
-    assert len(result) == n_inputs
-
-
 def ux_thread_accept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
     """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
 
