@@ -969,10 +969,14 @@ preprocess_inputs(dispatcher_context_t *dc,
         int segwit_version = get_policy_segwit_version(st->wallet_policy_map);
 
         // For legacy inputs, the non-witness utxo must be present
-        if (segwit_version == -1 && !input.has_nonWitnessUtxo) {
-            PRINTF("Non-witness utxo missing for legacy input\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
+        // and the witness utxo must be absent.
+        // (This assumption is later relied on when signing).
+        if (segwit_version == -1) {
+            if (!input.has_nonWitnessUtxo || input.has_witnessUtxo) {
+                PRINTF("Legacy inputs must have the non-witness utxo, but no witness utxo.\n");
+                SEND_SW(dc, SW_INCORRECT_DATA);
+                return false;
+            }
         }
 
         // For segwitv0 inputs, the non-witness utxo _should_ be present; we show a warning
