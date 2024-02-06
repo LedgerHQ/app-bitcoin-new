@@ -124,12 +124,17 @@ typedef struct {
 } segwit_hashes_t;
 
 #ifdef USE_NVRAM_STASH
-struct {
+
+typedef struct {
     // Aligning by 4 is necessary due to platform limitations.
     // Aligning by 64 further guarantees that most policies will fit in a single
     // NVRAM page boundary, which minimizes the amount of writes.
     __attribute__((aligned(64))) uint8_t wallet_policy_bytes[MAX_WALLET_POLICY_BYTES];
-} N_nvram_stash;
+} nvram_stash_t;
+
+const nvram_stash_t N_nvram_stash_real;
+#define N_nvram_stash (*(const volatile nvram_stash_t *) PIC(&N_nvram_stash_real))
+
 #endif
 
 typedef struct {
@@ -642,7 +647,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
 
 #ifdef USE_NVRAM_STASH
-        nvm_write(N_nvram_stash.wallet_policy_bytes,
+        nvm_write((void *) N_nvram_stash.wallet_policy_bytes,
                   (void *) wallet_policy_map_bytes,
                   desc_temp_len);
         st->wallet_policy_map = (policy_node_t *) N_nvram_stash.wallet_policy_bytes;
