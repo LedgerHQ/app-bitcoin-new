@@ -242,18 +242,19 @@ UX_STEP_NOCB(ux_sign_message_step,
                  "message",
              });
 
-UX_STEP_NOCB(ux_message_sign_display_path_step,
-             bnnn_paging,
-             {
-                 .title = "Path",
-                 .text = g_ui_state.path_and_hash.bip32_path_str,
-             });
+UX_STEP_CB(ux_message_sign_display_path_step,
+           bnnn_paging,
+           set_ux_flow_response(true),
+           {
+               .title = "Path",
+               .text = g_ui_state.path_and_message.bip32_path_str,
+           });
 
 UX_STEP_NOCB(ux_message_hash_step,
              bnnn_paging,
              {
                  .title = "Message hash",
-                 .text = g_ui_state.path_and_hash.hash_hex,
+                 .text = g_ui_state.path_and_message.message,
              });
 
 UX_STEP_CB(ux_sign_message_accept_new,
@@ -261,18 +262,44 @@ UX_STEP_CB(ux_sign_message_accept_new,
            set_ux_flow_response(true),
            {&C_icon_validate_14, "Sign", "message"});
 
-// FLOW to display BIP32 path and a message hash to sign:
+UX_STEP_CB(ux_message_content_step,
+           custom,
+           set_ux_flow_response(true),
+           {
+               .title = "Message content",
+               .text = g_ui_state.path_and_message.message,
+           });
+
+// FLOW to display BIP32 path to sign a message:
+// #1 screen: certificate icon + "Sign message"
+// #2 screen: display BIP32 Path
+// #3 screen: first page of message content
+UX_FLOW(ux_sign_message_path_and_content_flow,
+        &ux_sign_message_step,
+        &ux_message_sign_display_path_step,
+        &ux_message_content_step);
+
+// FLOW to display a message hash and confirmation to sign a message:
 // #1 screen: certificate icon + "Sign message"
 // #2 screen: display BIP32 Path
 // #3 screen: display message hash
 // #4 screen: "Sign message" and approve button
 // #5 screen: reject button
-UX_FLOW(ux_sign_message_flow,
+UX_FLOW(ux_sign_message_path_hash_and_confirm_flow,
         &ux_sign_message_step,
         &ux_message_sign_display_path_step,
         &ux_message_hash_step,
         &ux_sign_message_accept_new,
         &ux_display_reject_step);
+
+// FLOW to display the message content:
+// #1 screen: display message content
+UX_FLOW(ux_sign_message_content_flow, &ux_message_content_step);
+
+// FLOW to display a confirmation to sign a message:
+// #1 screen: "Sign message" and approve button
+// #2 screen: reject button
+UX_FLOW(ux_sign_message_confirm_flow, &ux_sign_message_accept_new, &ux_display_reject_step);
 
 // FLOW to display BIP32 path and pubkey:
 // #1 screen: eye icon + "Confirm Pubkey"
@@ -445,8 +472,21 @@ void ui_display_pubkey_suspicious_flow(void) {
     ux_flow_init(0, ux_display_pubkey_suspicious_flow, NULL);
 }
 
-void ui_sign_message_flow(void) {
-    ux_flow_init(0, ux_sign_message_flow, NULL);
+void ui_sign_message_path_hash_and_confirm_flow(void) {
+    ux_flow_init(0, ux_sign_message_path_hash_and_confirm_flow, NULL);
+}
+
+void ui_sign_message_content_flow(uint8_t pageCount) {
+    (void) pageCount;
+    if (get_streaming_index() == 0) {
+        ux_flow_init(0, ux_sign_message_path_and_content_flow, NULL);
+    } else {
+        ux_flow_init(0, ux_sign_message_content_flow, NULL);
+    }
+}
+
+void ui_sign_message_confirm_flow(void) {
+    ux_flow_init(0, ux_sign_message_confirm_flow, NULL);
 }
 
 void ui_display_register_wallet_flow(void) {

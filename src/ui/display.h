@@ -15,6 +15,11 @@
 #include "../common/script.h"
 #include "../constants.h"
 
+#define MESSAGE_CHUNK_SIZE        64  // Protocol specific
+#define MESSAGE_CHUNK_PER_DISPLAY 2   // This could be changed depending on screen sizes
+#define MESSAGE_MAX_DISPLAY_SIZE \
+    (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
+
 // TODO: hard to keep track of what globals are used in the same flows
 //       (especially since the same flow step can be shared in different flows)
 
@@ -34,8 +39,8 @@ typedef struct {
 
 typedef struct {
     char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-    char hash_hex[64 + 1];
-} ui_path_and_hash_state_t;
+    char message[MESSAGE_MAX_DISPLAY_SIZE];
+} ui_path_and_message_state_t;
 
 typedef struct {
     char wallet_name[MAX_WALLET_NAME_LENGTH + 1];
@@ -68,7 +73,7 @@ typedef struct {
 typedef union {
     ui_path_and_pubkey_state_t path_and_pubkey;
     ui_path_and_address_state_t path_and_address;
-    ui_path_and_hash_state_t path_and_hash;
+    ui_path_and_message_state_t path_and_message;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
@@ -91,10 +96,16 @@ bool ui_display_pubkey(dispatcher_context_t *context,
                        bool is_path_suspicious,
                        const char *pubkey);
 
-// TODO: docs
-bool ui_display_message_hash(dispatcher_context_t *context,
-                             const char *bip32_path_str,
-                             const char *message_hash);
+bool ui_display_path_and_message_content(dispatcher_context_t *context,
+                                         const char *path_str,
+                                         const char *message_content,
+                                         uint8_t pageCount);
+
+bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
+                                              const char *path_str,
+                                              const char *message_hash);
+
+bool ui_display_message_confirm(dispatcher_context_t *context);
 
 bool ui_display_address(dispatcher_context_t *dispatcher_context,
                         const char *address,
@@ -145,7 +156,11 @@ void ui_display_pubkey_flow(void);
 
 void ui_display_pubkey_suspicious_flow(void);
 
-void ui_sign_message_flow(void);
+void ui_sign_message_path_hash_and_confirm_flow(void);
+
+void ui_sign_message_content_flow(uint8_t pageCount);
+
+void ui_sign_message_confirm_flow(void);
 
 void ui_display_register_wallet_flow(void);
 
@@ -181,13 +196,21 @@ bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool 
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success);
 
+void ui_pre_processing_message(void);
+
 #ifdef HAVE_NBGL
 bool ui_transaction_prompt(dispatcher_context_t *context, const int external_outputs_total_count);
 void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_wallet_registation(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
 void ui_display_post_processing_confirm_wallet_spend(bool success);
+void ui_set_display_prompt(void);
 #else
 #define ux_layout_custom_params_t ux_layout_paging_params_t
 void ux_layout_custom_init(unsigned int stack_slot);
 #endif
+
+uint8_t get_streaming_index(void);
+void reset_streaming_index(void);
+void increase_streaming_index(void);
+void decrease_streaming_index(void);
