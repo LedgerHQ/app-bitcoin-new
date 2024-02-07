@@ -187,4 +187,7 @@ void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_wallet_registation(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
 void ui_display_post_processing_confirm_wallet_spend(bool success);
+#else
+#define ux_layout_custom_params_t ux_layout_paging_params_t
+void ux_layout_custom_init(unsigned int stack_slot);
 #endif
