@@ -122,7 +122,7 @@ STATIC_IF_NOT_INDEXED unsigned int ux_layout_paging_button_callback_common_strea
     switch (button_mask) {
         case BUTTON_EVT_RELEASED | BUTTON_LEFT:
             if (G_ux.layout_paging.current == 0) {
-                reset_streaming_index();
+                decrease_streaming_index();
                 ux_flow_validate();
             } else {
                 ux_layout_paging_prev(redisplay);
