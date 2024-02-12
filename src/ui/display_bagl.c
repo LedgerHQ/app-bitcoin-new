@@ -277,6 +277,7 @@ UX_STEP_CB(ux_message_content_step,
 UX_FLOW(ux_sign_message_path_and_content_flow,
         &ux_sign_message_step,
         &ux_message_sign_display_path_step,
+        &ux_message_content_step,
         &ux_message_content_step);
 
 // FLOW to display a message hash and confirmation to sign a message:
@@ -294,7 +295,7 @@ UX_FLOW(ux_sign_message_path_hash_and_confirm_flow,
 
 // FLOW to display the message content:
 // #1 screen: display message content
-UX_FLOW(ux_sign_message_content_flow, &ux_message_content_step);
+UX_FLOW(ux_sign_message_content_flow, &ux_message_content_step, FLOW_LOOP);
 
 // FLOW to display a confirmation to sign a message:
 // #1 screen: "Sign message" and approve button
