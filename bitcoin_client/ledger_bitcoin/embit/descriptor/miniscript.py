@@ -54,18 +54,23 @@ class Miniscript(DescriptorBase):
 
     @classmethod
     def read_from(cls, s, taproot=False):
-        op, char = read_until(s, b"(")
+        op, char = read_until(s, b"(,)")
         op = op.decode()
         wrappers = ""
         if ":" in op:
             wrappers, op = op.split(":")
-        if char != b"(":
-            raise MiniscriptError("Missing operator")
         if op not in OPERATOR_NAMES:
             raise MiniscriptError("Unknown operator '%s'" % op)
         # number of arguments, classes of args, compile fn, type, validity checker
         MiniscriptCls = OPERATORS[OPERATOR_NAMES.index(op)]
-        args = MiniscriptCls.read_arguments(s, taproot=taproot)
+        if MiniscriptCls.NARGS != 0 and char != b"(":
+            raise MiniscriptError("Missing operator")
+
+        if MiniscriptCls.NARGS is None or MiniscriptCls.NARGS > 0:
+            args = MiniscriptCls.read_arguments(s, taproot=taproot)
+        else:
+            s.seek(-1, 1)
+            args = []
         miniscript = MiniscriptCls(*args, taproot=taproot)
         for w in reversed(wrappers):
             if w not in WRAPPER_NAMES:
@@ -130,6 +135,36 @@ class OneArg(Miniscript):
     @property
     def carg(self):
         return self.arg.compile()
+
+
+class NumberZero(Miniscript):
+    # 0
+
+    NARGS = 0
+    NAME = "0"
+    TYPE = "B"
+    PROPS = "zud"
+
+    def inner_compile(self):
+        return b"\x00"
+
+    def __len__(self):
+        return 1
+
+
+class NumberOne(Miniscript):
+    # 1
+
+    NARGS = 0
+    NAME = "1"
+    TYPE = "B"
+    PROPS = "zu"
+
+    def inner_compile(self):
+        return b"\x51"
+
+    def __len__(self):
+        return 1
 
 
 class PkK(OneArg):
@@ -739,6 +774,8 @@ class Pkh(OneArg):
 
 
 OPERATORS = [
+    NumberZero,
+    NumberOne,
     PkK,
     PkH,
     Older,
