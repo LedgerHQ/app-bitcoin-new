@@ -281,7 +281,7 @@ class LegacyClient(Client):
 
             all_signature_attempts[i_num] = signature_attempts
 
-        result: List[Tuple(int, PartialSignature)] = []
+        result: List[Tuple[int, PartialSignature]] = []
 
         # Sign any segwit inputs
         if has_segwit:
