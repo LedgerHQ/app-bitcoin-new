@@ -27,12 +27,6 @@
 void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t protocol_version) {
     (void) protocol_version;
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     uint8_t master_pubkey[33];
     if (!crypto_get_compressed_pubkey_at_path((uint32_t[]){}, 0, master_pubkey, NULL)) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
