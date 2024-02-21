@@ -194,7 +194,7 @@ __attribute__((warn_unused_result)) int get_key_placeholder_by_index(
     const policy_node_t *policy,
     unsigned int i,
     const policy_node_t **out_tapleaf_ptr,
-    policy_node_key_placeholder_t *out_placeholder);
+    policy_node_keyexpr_t *out_placeholder);
 
 /**
  * Determines the expected number of unique keys in the provided policy's key information.
