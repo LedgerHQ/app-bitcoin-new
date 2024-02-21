@@ -155,25 +155,8 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     return 0;
 }
 
-#ifndef _NR_cx_hash_ripemd160
-/** Missing in some SDKs, we implement it using the cxram section if needed. */
-static size_t cx_hash_ripemd160(const uint8_t *in, size_t in_len, uint8_t *out, size_t out_len) {
-    PRINT_STACK_POINTER();
-
-    if (out_len < CX_RIPEMD160_SIZE) {
-        return 0;
-    }
-    LEDGER_ASSERT(cx_ripemd160_init_no_throw((cx_ripemd160_t *) &G_cx) == CX_OK, "It never fails");
-    LEDGER_ASSERT(cx_ripemd160_update((cx_ripemd160_t *) &G_cx, in, in_len) == CX_OK,
-                  "It never fails");
-    LEDGER_ASSERT(cx_ripemd160_final((cx_ripemd160_t *) &G_cx, out) == CX_OK, "It never fails");
-    explicit_bzero((cx_ripemd160_t *) &G_cx, sizeof(cx_sha256_t));
-    return CX_RIPEMD160_SIZE;
-}
-#endif  // _NR_cx_hash_ripemd160
-
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
-    cx_hash_ripemd160(in, inlen, out, 20);
+    cx_ripemd160_hash(in, inlen, out);
 }
 
 void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
@@ -473,22 +456,35 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
 
 // Computes a tagged hash according to BIP-340.
 // If data2_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
-// Somewhat weird signature, but this helps to optimize stack usage.
-static void __attribute__((noinline)) crypto_tr_tagged_hash(const uint8_t *tag,
-                                                            uint16_t tag_len,
-                                                            const uint8_t *data,
-                                                            uint16_t data_len,
-                                                            const uint8_t *data2,
-                                                            uint16_t data2_len,
-                                                            uint8_t out[static 32]) {
-    cx_sha256_t hash_context;
-    cx_sha256_init(&hash_context);
+static void crypto_tr_tagged_hash(const uint8_t *tag,
+                                  uint16_t tag_len,
+                                  const uint8_t *data,
+                                  uint16_t data_len,
+                                  const uint8_t *data2,
+                                  uint16_t data2_len,
+                                  uint8_t out[static CX_SHA256_SIZE]) {
+    // First compute hashtag, reuse out buffer for that
+    cx_sha256_hash(tag, tag_len, out);
 
-    crypto_tr_tagged_hash_init(&hash_context, tag, tag_len);
-
-    crypto_hash_update(&hash_context.header, data, data_len);
-    if (data2_len > 0) crypto_hash_update(&hash_context.header, data2, data2_len);
-    crypto_hash_digest(&hash_context.header, out, 32);
+    cx_iovec_t iovec[4] = {
+        {
+            .iov_base = out, .iov_len = CX_SHA256_SIZE
+        },
+        {
+            .iov_base = out, .iov_len = CX_SHA256_SIZE
+        },
+        {
+            .iov_base = data, .iov_len = data_len
+        },
+        {
+            .iov_base = data2, .iov_len = data2_len
+        }
+    };
+    if (data2_len > 0) {
+        cx_sha256_hash_iovec(iovec, 4, out);
+    } else {
+        cx_sha256_hash_iovec(iovec, 3, out);
+    }
 }
 
 void crypto_tr_combine_taptree_hashes(const uint8_t left_h[static 32],
