@@ -459,7 +459,7 @@ static int parse_keyexpr(buffer_t *in_buf,
             return WITH_ERROR(-1, "The key index in a placeholder must be at most 32767");
         }
 
-        out->key_index = (int16_t) k;
+        out->k.key_index = (int16_t) k;
     } else if (c == 'm') {
         // parse a musig(key1,...,keyn) expression, where each key is a key expression
         if (!consume_characters(in_buf, "usig(", 5)) {
@@ -535,7 +535,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         musig_info->n = n_musig_keys;
         i_uint16(&musig_info->key_indexes, key_indexes);
 
-        i_musig_aggr_key_info(&out->musig_info, musig_info);
+        i_musig_aggr_key_info(&out->m.musig_info, musig_info);
     } else {
         return WITH_ERROR(-1, "Expected key placeholder starting with '@', or musig");
     }

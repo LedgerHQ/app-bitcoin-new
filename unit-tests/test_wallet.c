@@ -39,7 +39,7 @@ static void check_key_expr_plain(const policy_node_keyexpr_t *ptr,
                                  uint32_t num_first,
                                  uint32_t num_second) {
     assert_int_equal(ptr->type, KEY_EXPRESSION_NORMAL);
-    assert_int_equal(ptr->key_index, key_index);
+    assert_int_equal(ptr->k.key_index, key_index);
     assert_int_equal(ptr->num_first, num_first);
     assert_int_equal(ptr->num_second, num_second);
 }
@@ -51,7 +51,7 @@ static void check_key_expr_musig(const policy_node_keyexpr_t *ptr,
                                  uint32_t num_first,
                                  uint32_t num_second) {
     assert_int_equal(ptr->type, KEY_EXPRESSION_MUSIG);
-    musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&ptr->musig_info);
+    musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&ptr->m.musig_info);
     assert_int_equal(musig_info->n, n_musig_keys);
     uint16_t *musig_key_indexes = r_uint16(&musig_info->key_indexes);
     for (int i = 0; i < n_musig_keys; i++) {
@@ -258,7 +258,7 @@ static void test_parse_policy_tr_multisig(void **state) {
 
     policy_node_tr_t *root = (policy_node_tr_t *) out;
 
-    assert_int_equal(r_policy_node_keyexpr(&root->key)->key_index, 0);
+    assert_int_equal(r_policy_node_keyexpr(&root->key)->k.key_index, 0);
     assert_int_equal(r_policy_node_keyexpr(&root->key)->num_first, 0);
     assert_int_equal(r_policy_node_keyexpr(&root->key)->num_second, 1);
 
