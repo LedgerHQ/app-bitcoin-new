@@ -466,20 +466,10 @@ static void crypto_tr_tagged_hash(const uint8_t *tag,
     // First compute hashtag, reuse out buffer for that
     cx_sha256_hash(tag, tag_len, out);
 
-    cx_iovec_t iovec[4] = {
-        {
-            .iov_base = out, .iov_len = CX_SHA256_SIZE
-        },
-        {
-            .iov_base = out, .iov_len = CX_SHA256_SIZE
-        },
-        {
-            .iov_base = data, .iov_len = data_len
-        },
-        {
-            .iov_base = data2, .iov_len = data2_len
-        }
-    };
+    cx_iovec_t iovec[4] = {{.iov_base = out, .iov_len = CX_SHA256_SIZE},
+                           {.iov_base = out, .iov_len = CX_SHA256_SIZE},
+                           {.iov_base = data, .iov_len = data_len},
+                           {.iov_base = data2, .iov_len = data2_len}};
     if (data2_len > 0) {
         cx_sha256_hash_iovec(iovec, 4, out);
     } else {

@@ -24,22 +24,16 @@
 
 #include "merkle.h"
 
-#include "cx_ram.h"
 #include "debug-helpers/debug.h"
 
 #include "ledger_assert.h"
 
-void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static CX_SHA256_SIZE]) {
+void merkle_compute_element_hash(const uint8_t *in,
+                                 size_t in_len,
+                                 uint8_t out[static CX_SHA256_SIZE]) {
     // H(0x00 | in)
     uint8_t data = 0x00;
-    cx_iovec_t iovec[2] = {
-        {
-            .iov_base = &data, .iov_len = 1
-        },
-        {
-            .iov_base = in, .iov_len = in_len
-        }
-    };
+    cx_iovec_t iovec[2] = {{.iov_base = &data, .iov_len = 1}, {.iov_base = in, .iov_len = in_len}};
     cx_sha256_hash_iovec(iovec, 2, out);
 }
 
@@ -49,17 +43,9 @@ void merkle_combine_hashes(const uint8_t left[static CX_SHA256_SIZE],
     PRINT_STACK_POINTER();
 
     uint8_t prefix = 0x01;
-    cx_iovec_t iovec[3] = {
-        {
-            .iov_base = &prefix, .iov_len = 1
-        },
-        {
-            .iov_base = left, .iov_len = CX_SHA256_SIZE
-        },
-        {
-            .iov_base = right, .iov_len = CX_SHA256_SIZE
-        }
-    };
+    cx_iovec_t iovec[3] = {{.iov_base = &prefix, .iov_len = 1},
+                           {.iov_base = left, .iov_len = CX_SHA256_SIZE},
+                           {.iov_base = right, .iov_len = CX_SHA256_SIZE}};
     cx_sha256_hash_iovec(iovec, 3, out);
 }
 
