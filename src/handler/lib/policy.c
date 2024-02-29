@@ -5,6 +5,7 @@
 #include "../lib/get_merkle_leaf_element.h"
 #include "../lib/get_preimage.h"
 #include "../../crypto.h"
+#include "../../musig/musig.h"
 #include "../../common/base58.h"
 #include "../../common/bitvector.h"
 #include "../../common/read.h"
@@ -462,14 +463,34 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
 
     serialized_extended_pubkey_t ext_pubkey;
 
-    if (key_expr->type != KEY_EXPRESSION_NORMAL) {
-        PRINTF("Not implemented\n");  // TODO
-        return -1;
-    }
+    if (key_expr->type == KEY_EXPRESSION_NORMAL) {
+        if (0 > get_extended_pubkey(dispatcher_context, wdi, key_expr->k.key_index, &ext_pubkey)) {
+            return -1;
+        }
+    } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
+        musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+        uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+        plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
+        for (int i = 0; i < musig_info->n; i++) {
+            // we use ext_pubkey as a temporary variable; will overwrite later
+            if (0 > get_extended_pubkey(dispatcher_context, wdi, key_indexes[i], &ext_pubkey)) {
+                return -1;
+            }
+            memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
+        }
 
-    int ret = get_extended_pubkey(dispatcher_context, wdi, key_expr->k.key_index, &ext_pubkey);
-    if (ret < 0) {
-        return -1;
+        musig_keyagg_context_t musig_ctx;
+        musig_key_agg(keys, musig_info->n, &musig_ctx);
+
+        // compute the aggregated extended pubkey
+        memset(&ext_pubkey, 0, sizeof(ext_pubkey));
+        write_u32_be(ext_pubkey.version, 0, BIP32_PUBKEY_VERSION);
+
+        ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
+        memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
+        memcpy(&ext_pubkey.chain_code, BIP_MUSIG_CHAINCODE, sizeof(BIP_MUSIG_CHAINCODE));
+    } else {
+        LEDGER_ASSERT(false, "Unreachable code");
     }
 
     // we derive the /<change>/<address_index> child of this pubkey
