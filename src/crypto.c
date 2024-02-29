@@ -401,7 +401,7 @@ void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
     crypto_tr_tagged_hash_init(hash_context, BIP0341_tapleaf_tag, sizeof(BIP0341_tapleaf_tag));
 }
 
-static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
+int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
     // save memory by reusing output buffer for intermediate results
     uint8_t *y = out + 1 + 32;
     // we use the memory for the x-coordinate of the output as a temporary variable
@@ -440,13 +440,13 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
 
 // Computes a tagged hash according to BIP-340.
 // If data2_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
-static void crypto_tr_tagged_hash(const uint8_t *tag,
-                                  uint16_t tag_len,
-                                  const uint8_t *data,
-                                  uint16_t data_len,
-                                  const uint8_t *data2,
-                                  uint16_t data2_len,
-                                  uint8_t out[static CX_SHA256_SIZE]) {
+void crypto_tr_tagged_hash(const uint8_t *tag,
+                           uint16_t tag_len,
+                           const uint8_t *data,
+                           uint16_t data_len,
+                           const uint8_t *data2,
+                           uint16_t data2_len,
+                           uint8_t out[static CX_SHA256_SIZE]) {
     // First compute hashtag, reuse out buffer for that
     cx_sha256_hash(tag, tag_len, out);
 
