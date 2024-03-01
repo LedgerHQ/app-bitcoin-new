@@ -3,6 +3,7 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
+from .embit import base58
 from .embit.base import EmbitError 
 from .embit.descriptor import Descriptor
 from .embit.networks import NETWORKS
@@ -17,8 +18,9 @@ from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
-from . import segwit_addr
 from ._serialize import deser_string
+
+from .bip0327 import key_agg, cbytes
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
@@ -37,6 +39,53 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
 
         result[key] = value
     return result
+
+
+def aggr_xpub(pubkeys: List[bytes], chain: Chain) -> str:
+    BIP_MUSIG_CHAINCODE = bytes.fromhex(
+        "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
+    ctx = key_agg(pubkeys)
+    compressed_pubkey = cbytes(ctx.Q)
+
+    # Serialize according to BIP-32
+    if chain == Chain.MAIN:
+        version = 0x0488B21E
+    else:
+        version = 0x043587CF
+
+    return base58.encode_check(b''.join([
+        version.to_bytes(4, byteorder='big'),
+        b'\x00',  # depth
+        b'\x00\x00\x00\x00',  # parent fingerprint
+        b'\x00\x00\x00\x00',  # child number
+        BIP_MUSIG_CHAINCODE,
+        compressed_pubkey
+    ]))
+
+
+# Given a valid descriptor, replaces each musig() (if any) with the
+# corresponding synthetic xpub/tpub.
+def replace_musigs(desc: str, chain: Chain) -> str:
+    while True:
+        musig_start = desc.find("musig(")
+        if musig_start == -1:
+            break
+        musig_end = desc.find(")", musig_start)
+        if musig_end == -1:
+            raise ValueError("Invalid descriptor template")
+
+        key_and_origs = desc[musig_start+6:musig_end].split(",")
+        pubkeys = []
+        for key_orig in key_and_origs:
+            orig_end = key_orig.find("]")
+            xpub = key_orig if orig_end == -1 else key_orig[orig_end+1:]
+            pubkeys.append(base58.decode_check(xpub)[-33:])
+
+        # replace with the aggregate xpub
+        desc = desc[:musig_start] + \
+            aggr_xpub(pubkeys, chain) + desc[musig_end+1:]
+
+    return desc
 
 
 def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSignature:
@@ -273,6 +322,11 @@ class NewClient(Client):
 
     def _derive_address_for_policy(self, wallet: WalletPolicy, change: bool, address_index: int) -> Optional[str]:
         desc_str = wallet.get_descriptor(change)
+
+        # Since embit does not support musig() in descriptors, we replace each
+        # occurrence with the corresponding aggregated xpub
+        desc_str = replace_musigs(desc_str, self.chain)
+
         try:
             desc = Descriptor.from_string(desc_str)
 
