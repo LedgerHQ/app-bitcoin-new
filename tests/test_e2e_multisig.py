@@ -82,6 +82,9 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     result = multisig_rpc.walletcreatefundedpsbt(
         outputs={
             out_address: Decimal("0.01")
+        },
+        options={
+            "changePosition": 1 # We need a fixed position to be able to know how to navigate in the flows
         }
     )
 
