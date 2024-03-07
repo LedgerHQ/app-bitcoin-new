@@ -1,3 +1,11 @@
+import sys
+import os
+
+absolute_path = os.path.dirname(os.path.abspath(__file__))
+relative_bitcoin_path = ('../bitcoin_client')
+absolute_bitcoin_client_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
+sys.path.append(os.path.join(absolute_path, relative_bitcoin_path))
+
 import random
 from typing import Tuple
 
@@ -9,9 +17,36 @@ import shutil
 import subprocess
 from time import sleep
 from decimal import Decimal
+from pathlib import Path
 
-import bitcoin_client.ledger_bitcoin._base58 as base58
-from bitcoin_client.ledger_bitcoin.common import sha256
+from ledger_bitcoin import Chain
+from ledger_bitcoin.common import sha256
+import ledger_bitcoin._base58 as base58
+
+from ragger.conftest import configuration
+from ragger.backend.interface import BackendInterface
+from ragger.backend import RaisePolicy
+from ragger_bitcoin import createRaggerClient, RaggerClient
+
+###########################
+### CONFIGURATION START ###
+###########################
+
+# You can configure optional parameters by overriding the value of ragger.configuration.OPTIONAL_CONFIGURATION
+# Please refer to ragger/conftest/configuration.py for their descriptions and accepted values
+
+MNEMONIC = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
+configuration.OPTIONAL.CUSTOM_SEED = MNEMONIC
+configuration.OPTIONAL.BACKEND_SCOPE = "function"
+
+
+#########################
+### CONFIGURATION END ###
+#########################
+TESTS_ROOT_DIR = Path(__file__).parent
+
+# Pull all features from the base ragger conftest using the overridden configuration
+pytest_plugins = ("ragger.conftest.base_conftest", )
 
 random.seed(0)  # make sure tests are repeatable
 
@@ -20,7 +55,7 @@ random.seed(0)  # make sure tests are repeatable
 os.environ['SPECULOS_APPNAME'] = f'Bitcoin Test:{get_app_version()}'
 
 
-BITCOIN_DIRNAME = os.getenv("BITCOIN_DIRNAME", ".test_bitcoin")
+BITCOIN_DIRNAME = os.getenv("BITCOIN_DIRNAME", "tests/.test_bitcoin")
 
 
 rpc_url = "http://%s:%s@%s:%s" % (
@@ -68,7 +103,7 @@ def run_bitcoind():
     # Run bitcoind in a separate folder
     os.makedirs(BITCOIN_DIRNAME, exist_ok=True)
 
-    bitcoind = os.getenv("BITCOIND", "bitcoind")
+    bitcoind = os.getenv("BITCOIND", "/bitcoin/bin/bitcoind")
 
     shutil.copy(os.path.join(os.path.dirname(__file__), "bitcoin.conf"), BITCOIN_DIRNAME)
     subprocess.Popen([bitcoind, f"--datadir={BITCOIN_DIRNAME}"])
@@ -165,3 +200,18 @@ def testnet_to_regtest_addr(addr: str) -> str:
     if (hrp != "tb"):
         raise ValueError("Not a valid testnet bech32m string")
     return segwit_addr.bech32_encode("bcrt", data, spec)
+
+
+@pytest.fixture
+def client(bitcoin_network: str, backend: BackendInterface) -> RaggerClient:
+    if bitcoin_network == "main":
+        chain = Chain.MAIN
+    elif bitcoin_network == "test":
+        chain = Chain.TEST
+    else:
+        raise ValueError(
+            f'Invalid value for BITCOIN_NETWORK: {bitcoin_network}')
+
+    backend.raise_policy = RaisePolicy.RAISE_CUSTOM
+    backend.whitelisted_status = [0x9000, 0xE000]
+    return createRaggerClient(backend, chain=chain, debug=True, screenshot_dir=TESTS_ROOT_DIR)
