@@ -2,8 +2,11 @@ from hashlib import sha256
 import hmac
 import re
 
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
+from ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy
+from ledger_bitcoin.exception.errors import IncorrectDataError
+from ledger_bitcoin.exception.device_exception import DeviceException
+from ragger.error import ExceptionRAPDU
+from ragger_bitcoin import RaggerClient
 
 from .conftest import testnet_to_regtest_addr as T
 
@@ -14,7 +17,7 @@ from test_utils import SpeculosGlobals
 # TODO: add tests with UI
 
 
-def test_get_wallet_address_singlesig_legacy(client: Client):
+def test_get_wallet_address_singlesig_legacy(client: RaggerClient):
     # legacy address (P2PKH)
     wallet = WalletPolicy(
         name="",
@@ -27,7 +30,7 @@ def test_get_wallet_address_singlesig_legacy(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
 
 
-def test_get_wallet_address_singlesig_wit(client: Client):
+def test_get_wallet_address_singlesig_wit(client: RaggerClient):
     # bech32 address (P2WPKH)
     wallet = WalletPolicy(
         name="",
@@ -40,7 +43,7 @@ def test_get_wallet_address_singlesig_wit(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "tb1qlrvzyx8jcjfj2xuy69du9trtxnsvjuped7e289"
 
 
-def test_get_wallet_address_singlesig_sh_wit(client: Client):
+def test_get_wallet_address_singlesig_sh_wit(client: RaggerClient):
     # wrapped segwit addresses (P2SH-P2WPKH)
     wallet = WalletPolicy(
         name="",
@@ -53,7 +56,7 @@ def test_get_wallet_address_singlesig_sh_wit(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "2NAbM4FSeBQG4o85kbXw2YNfKypcnEZS9MR"
 
 
-def test_get_wallet_address_singlesig_taproot(client: Client):
+def test_get_wallet_address_singlesig_taproot(client: RaggerClient):
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 
     wallet = WalletPolicy(
@@ -79,9 +82,9 @@ def test_get_wallet_address_singlesig_taproot(client: Client):
 
 # Failure cases for default wallets
 
-def test_get_wallet_address_fail_nonstandard(client: Client):
+def test_get_wallet_address_fail_nonstandard(client: RaggerClient):
     # Not empty name should be rejected
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="Not empty",
             descriptor_template="pkh(@0/**)",
@@ -89,17 +92,21 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # 0 keys info should be rejected
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
             keys_info=[],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # more than 1 key should be rejected
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -108,9 +115,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # wrong BIP44 purpose should be rejected (here using 84' for a P2PKH address)
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -118,9 +127,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended pubkey for "84'/1'/0'"")
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -128,9 +139,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P",
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # wrong master fingerprint
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -138,9 +151,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[42424242/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # too large address_index, cannot be done non-silently
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -148,9 +163,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0,  100000, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # missing key origin info
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/**)",
@@ -158,9 +175,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0, 0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # non-standard final derivation steps
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0/<0;2>/*)",
@@ -168,9 +187,11 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0, 0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # taproot single-sig with non-empty script
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="tr(@0,0)",
@@ -178,12 +199,14 @@ def test_get_wallet_address_fail_nonstandard(client: Client):
                 f"[f5acc2fd/86'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
             ],
         ), None, 0, 0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
 
 # Multisig
 
 
-def test_get_wallet_address_multisig_legacy(client: Client):
+def test_get_wallet_address_multisig_legacy(client: RaggerClient):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
@@ -203,7 +226,7 @@ def test_get_wallet_address_multisig_legacy(client: Client):
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
 
-def test_get_wallet_address_multisig_sh_wit(client: Client):
+def test_get_wallet_address_multisig_sh_wit(client: RaggerClient):
     # test for a wrapped segwit multisig wallet
 
     wallet = MultisigWallet(
@@ -223,7 +246,7 @@ def test_get_wallet_address_multisig_sh_wit(client: Client):
     assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
 
 
-def test_get_wallet_address_multisig_wit(client: Client):
+def test_get_wallet_address_multisig_wit(client: RaggerClient):
     # test for a native segwit multisig wallet (bech32 address)
 
     wallet = MultisigWallet(
@@ -243,7 +266,7 @@ def test_get_wallet_address_multisig_wit(client: Client):
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
 
 
-def test_get_wallet_address_tr_script_pk(client: Client):
+def test_get_wallet_address_tr_script_pk(client: RaggerClient):
     wallet = WalletPolicy(
         name="Taproot foreign internal key, and our script key",
         descriptor_template="tr(@0/**,pk(@1/**))",
@@ -261,7 +284,7 @@ def test_get_wallet_address_tr_script_pk(client: Client):
     assert res == "tb1pls9pp5cgcljpkjauxep03lv2c2yc2wcuua26p3ks6j2lq0vl9kjqf5rgm2"
 
 
-def test_get_wallet_address_tr_script_sortedmulti(client: Client):
+def test_get_wallet_address_tr_script_sortedmulti(client: RaggerClient):
     wallet = WalletPolicy(
         name="Taproot single-key or multisig 2-of-2",
         descriptor_template="tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
@@ -280,7 +303,7 @@ def test_get_wallet_address_tr_script_sortedmulti(client: Client):
     assert res == "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7"
 
 
-def test_get_wallet_address_large_addr_index(client: Client):
+def test_get_wallet_address_large_addr_index(client: RaggerClient):
     # 2**31 - 1 is the largest index allowed, per BIP-32
 
     wallet = MultisigWallet(
@@ -299,7 +322,7 @@ def test_get_wallet_address_large_addr_index(client: Client):
     client.get_wallet_address(wallet, wallet_hmac, 0, 2**31 - 1, False)
 
     # too large address_index, not allowed for an unhardened step
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(wallet, wallet_hmac, 0, 2**31, False)
 
 
@@ -408,4 +431,3 @@ def test_get_wallet_address_miniscript_all_fragments(client: Client, speculos_gl
         desc_tmpl = f"tr(@{n_keys}/**,and_b(pk(@{n_keys+1}/**),{prepend_a(fr)}))"
 
         generate_address_and_compare_with_core(desc_tmpl)
-

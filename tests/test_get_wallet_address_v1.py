@@ -1,18 +1,23 @@
 # Tests using the V1 version of the wallet policy language, used before version 2.1.0 of the app
 # Make sure we remain compatible for some time.
 
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy, WalletType
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError
-from speculos.client import SpeculosClient
+from ledger_bitcoin import AddressType, MultisigWallet, WalletPolicy, WalletType
+from ledger_bitcoin.exception.device_exception import DeviceException
+from ledger_bitcoin.exception.errors import IncorrectDataError
+from ragger.navigator import Navigator, NavInsID
+from ragger.firmware import Firmware
+from ragger.error import ExceptionRAPDU
+from ragger_bitcoin import RaggerClient
 
-import threading
+from .instructions import wallet_instruction_approve
+
 
 import pytest
 
 # TODO: add more tests with UI
 
 
-def test_get_wallet_address_singlesig_legacy_v1(client: Client):
+def test_get_wallet_address_singlesig_legacy_v1(client: RaggerClient):
     # legacy address (P2PKH)
     wallet = WalletPolicy(
         name="",
@@ -26,7 +31,7 @@ def test_get_wallet_address_singlesig_legacy_v1(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
 
 
-def test_get_wallet_address_singlesig_wit_v1(client: Client):
+def test_get_wallet_address_singlesig_wit_v1(client: RaggerClient):
     # bech32 address (P2WPKH)
     wallet = WalletPolicy(
         name="",
@@ -40,7 +45,7 @@ def test_get_wallet_address_singlesig_wit_v1(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "tb1qlrvzyx8jcjfj2xuy69du9trtxnsvjuped7e289"
 
 
-def test_get_wallet_address_singlesig_sh_wit_v1(client: Client):
+def test_get_wallet_address_singlesig_sh_wit_v1(client: RaggerClient):
     # wrapped segwit addresses (P2SH-P2WPKH)
     wallet = WalletPolicy(
         name="",
@@ -54,7 +59,7 @@ def test_get_wallet_address_singlesig_sh_wit_v1(client: Client):
     assert client.get_wallet_address(wallet, None, 1, 15, False) == "2NAbM4FSeBQG4o85kbXw2YNfKypcnEZS9MR"
 
 
-def test_get_wallet_address_singlesig_taproot_v1(client: Client):
+def test_get_wallet_address_singlesig_taproot_v1(client: RaggerClient):
     # test for a native taproot wallet (bech32m addresses, per BIP-0086)
 
     wallet = WalletPolicy(
@@ -81,18 +86,20 @@ def test_get_wallet_address_singlesig_taproot_v1(client: Client):
 
 # Failure cases for default wallets
 
-def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
+def test_get_wallet_address_default_fail_wrongkeys_v1(client: RaggerClient):
     # 0 keys info should be rejected
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
             keys_info=[],
             version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # more than 1 key should be rejected
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
@@ -101,9 +108,11 @@ def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT/**"
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # wrong BIP44 purpose should be rejected (here using 84' for a P2PKH address)
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
@@ -112,9 +121,11 @@ def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
             ],
             version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # mismatching pubkey (claiming key origin "44'/1'/0'", but that's the extended dpubkey for "84'/1'/0'"")
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
@@ -122,9 +133,11 @@ def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
                 f"[f5acc2fd/44'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P/**",
             ],
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # wrong master fingerprint
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
@@ -133,9 +146,11 @@ def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
             ],
             version=WalletType.WALLET_POLICY_V1
         ), None, 0,  0, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
     # too large address_index, cannot be done non-silently
-    with pytest.raises(IncorrectDataError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.get_wallet_address(WalletPolicy(
             name="",
             descriptor_template="pkh(@0)",
@@ -144,11 +159,13 @@ def test_get_wallet_address_default_fail_wrongkeys_v1(client: Client):
             ],
             version=WalletType.WALLET_POLICY_V1
         ), None, 0,  100000, False)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
 
 # Multisig
 
-def test_get_wallet_address_multisig_legacy_v1(client: Client):
+def test_get_wallet_address_multisig_legacy_v1(client: RaggerClient):
     # test for a legacy p2sh multisig wallet
 
     wallet = MultisigWallet(
@@ -169,7 +186,7 @@ def test_get_wallet_address_multisig_legacy_v1(client: Client):
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"
 
 
-def test_get_wallet_address_multisig_sh_wit_v1(client: Client):
+def test_get_wallet_address_multisig_sh_wit_v1(client: RaggerClient):
     # test for a wrapped segwit multisig wallet
 
     wallet = MultisigWallet(
@@ -190,7 +207,7 @@ def test_get_wallet_address_multisig_sh_wit_v1(client: Client):
     assert res == "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU"
 
 
-def test_get_wallet_address_multisig_wit_v1(client: Client):
+def test_get_wallet_address_multisig_wit_v1(client: RaggerClient):
     # test for a native segwit multisig wallet (bech32 address)
 
     wallet = MultisigWallet(
@@ -211,35 +228,9 @@ def test_get_wallet_address_multisig_wit_v1(client: Client):
     assert res == "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28"
 
 
-def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: SpeculosClient,
-                                                   is_speculos: bool, model: str):
+def test_get_wallet_address_singlesig_legacy_v1_ui(navigator: Navigator, firmware: Firmware, client:
+                                                   RaggerClient, test_name: str):
     # legacy address (P2PKH)
-    def ux_thread():
-        event = comm.wait_for_text_event("Address")
-
-        # press right until the last screen (will press the "right" button more times than needed)
-        while "Reject" != event["text"]:
-            comm.press_and_release("right")
-
-            event = comm.get_next_event()
-
-        # go back to the Accept screen, then accept
-        comm.press_and_release("left")
-        comm.press_and_release("both")
-
-    def ux_thread_stax():
-        while True:
-            event = comm.get_next_event()
-            if "Tap to continue" in event["text"] or "Show as QR" in event["text"]:
-                comm.finger_touch(55, 550)
-            elif "VERIFIED" in event["text"]:
-                break
-
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_stax)
-    else:
-        x = threading.Thread(target=ux_thread)
-
     wallet = WalletPolicy(
         name="",
         descriptor_template="pkh(@0)",
@@ -248,23 +239,17 @@ def test_get_wallet_address_singlesig_legacy_v1_ui(client: Client, comm: Speculo
         ],
         version=WalletType.WALLET_POLICY_V1
     )
-    x.start()
-    assert client.get_wallet_address(wallet, None, 0,  0, True) == "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
-    x.join()
 
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_stax)
-    else:
-        x = threading.Thread(target=ux_thread)
-    x.start()
-    assert client.get_wallet_address(wallet, None, 1, 15, True) == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
-    x.join()
+    assert client.get_wallet_address(wallet, None, 0,  0, True, navigator=navigator,
+                                     instructions=wallet_instruction_approve(firmware), testname=f"{test_name}_0") == "mz5vLWdM1wHVGSmXUkhKVvZbJ2g4epMXSm"
+
+    assert client.get_wallet_address(wallet, None, 1, 15, True, navigator=navigator,
+                                     instructions=wallet_instruction_approve(firmware), testname=f"{test_name}_1") == "myFCUBRCKFjV7292HnZtiHqMzzHrApobpT"
 
 
-def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: SpeculosClient, is_speculos:
-                                                  bool, model: str):
+def test_get_wallet_address_multisig_legacy_v1_ui(navigator: Navigator, firmware: Firmware,
+                                                  client: RaggerClient, test_name: str):
     # test for a legacy p2sh multisig wallet
-
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.LEGACY,
@@ -279,33 +264,7 @@ def test_get_wallet_address_multisig_legacy_v1_ui(client: Client, comm: Speculos
         "1980a07cde99fbdec0d487671d3bb296507e47b3ddfa778600a9d73d501983bc"
     )
 
-    def ux_thread():
-        event = comm.wait_for_text_event("Receive")
-
-        # press right until the last screen (will press the "right" button more times than needed)
-        while "Reject" != event["text"]:
-            comm.press_and_release("right")
-
-            event = comm.get_next_event()
-
-        # go back to the Accept screen, then accept
-        comm.press_and_release("left")
-        comm.press_and_release("both")
-
-    def ux_thread_stax():
-        while True:
-            event = comm.get_next_event()
-            if "Tap to continue" in event["text"] or "Confirm" in event["text"]:
-                comm.finger_touch(55, 550)
-            elif "CONFIRMED" in event["text"]:
-                break
-
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_stax)
-    else:
-        x = threading.Thread(target=ux_thread)
-
-    x.start()
-    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, True)
-    x.join()
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, True, navigator=navigator,
+                                    instructions=wallet_instruction_approve(firmware),
+                                    testname=test_name)
     assert res == "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j"

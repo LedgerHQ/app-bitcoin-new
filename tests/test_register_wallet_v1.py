@@ -1,11 +1,16 @@
 # Tests using the V1 version of the wallet policy language, used before version 2.1.0 of the app
 # Make sure we remain compatible for some time.
 
-from bitcoin_client.ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy, WalletType
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
-from bitcoin_client.ledger_bitcoin.exception import DenyError
+from ledger_bitcoin import AddressType, MultisigWallet, WalletPolicy, WalletType
+from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError, DenyError
+from ledger_bitcoin.exception.device_exception import DeviceException
 
-from test_utils import has_automation
+from ragger.error import ExceptionRAPDU
+from ragger.navigator import Navigator, NavInsID
+from ragger.firmware import Firmware
+from ragger_bitcoin import RaggerClient
+
+from .instructions import register_wallet_instruction_approve, register_wallet_instruction_approve_long, register_wallet_instruction_approve_unusual, register_wallet_instruction_reject
 
 import hmac
 from hashlib import sha256
@@ -13,8 +18,8 @@ from hashlib import sha256
 import pytest
 
 
-@has_automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_legacy_v1(client: Client, speculos_globals):
+def test_register_wallet_accept_legacy_v1(navigator: Navigator, firmware: Firmware, client:
+                                          RaggerClient, test_name: str, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.LEGACY,
@@ -26,7 +31,9 @@ def test_register_wallet_accept_legacy_v1(client: Client, speculos_globals):
         version=WalletType.WALLET_POLICY_V1
     )
 
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
+                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    testname=test_name)
 
     assert wallet_id == wallet.id
 
@@ -36,8 +43,8 @@ def test_register_wallet_accept_legacy_v1(client: Client, speculos_globals):
     )
 
 
-@has_automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_sh_wit_v1(client: Client, speculos_globals):
+def test_register_wallet_accept_sh_wit_v1(navigator: Navigator, firmware: Firmware, client:
+                                          RaggerClient, test_name: str, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.SH_WIT,
@@ -49,7 +56,9 @@ def test_register_wallet_accept_sh_wit_v1(client: Client, speculos_globals):
         version=WalletType.WALLET_POLICY_V1
     )
 
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
+                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    testname=test_name)
 
     assert wallet_id == wallet.id
 
@@ -59,8 +68,8 @@ def test_register_wallet_accept_sh_wit_v1(client: Client, speculos_globals):
     )
 
 
-@has_automation("automations/register_wallet_accept.json")
-def test_register_wallet_accept_wit_v1(client: Client, speculos_globals):
+def test_register_wallet_accept_wit_v1(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str, speculos_globals):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -72,7 +81,9 @@ def test_register_wallet_accept_wit_v1(client: Client, speculos_globals):
         version=WalletType.WALLET_POLICY_V1
     )
 
-    wallet_id, wallet_hmac = client.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
+                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    testname=test_name)
 
     assert wallet_id == wallet.id
 
@@ -82,8 +93,8 @@ def test_register_wallet_accept_wit_v1(client: Client, speculos_globals):
     )
 
 
-@has_automation("automations/register_wallet_reject.json")
-def test_register_wallet_reject_header_v1(client: Client):
+def test_register_wallet_reject_header_v1(navigator: Navigator, firmware: Firmware, client:
+                                          RaggerClient, test_name: str):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -95,12 +106,17 @@ def test_register_wallet_reject_header_v1(client: Client):
         version=WalletType.WALLET_POLICY_V1
     )
 
-    with pytest.raises(DenyError):
-        client.register_wallet(wallet)
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet, navigator,
+                               instructions=register_wallet_instruction_reject(firmware),
+                               testname=test_name)
+
+    assert DeviceException.exc.get(e.value.status) == DenyError
+    assert len(e.value.data) == 0
 
 
-@has_automation("automations/register_wallet_accept.json")
-def test_register_wallet_invalid_names_v1(client: Client):
+def test_register_wallet_invalid_names_v1(navigator: Navigator, firmware: Firmware, client:
+                                          RaggerClient, test_name: str):
     for invalid_name in [
         "",  # empty name not allowed
         "Very long walletz",  # 17 characters is too long
@@ -118,15 +134,18 @@ def test_register_wallet_invalid_names_v1(client: Client):
             version=WalletType.WALLET_POLICY_V1
         )
 
-    with pytest.raises(IncorrectDataError):
-        client.register_wallet(wallet)
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet, navigator)
+
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
 
 
-@has_automation("automations/register_wallet_accept.json")
-def test_register_wallet_unsupported_policy_v1(client: Client):
+def test_register_wallet_unsupported_policy_v1(navigator: Navigator, firmware: Firmware, client:
+                                               RaggerClient, test_name: str):
     # valid policies, but not supported (might change in the future)
 
-    with pytest.raises(NotSupportedError):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.register_wallet(WalletPolicy(
             name="Unsupported",
             descriptor_template="pk(@0)",  # bare pubkey, not supported
@@ -134,9 +153,15 @@ def test_register_wallet_unsupported_policy_v1(client: Client):
                 f"[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**",
             ],
             version=WalletType.WALLET_POLICY_V1
-        ))
+        ),
+            navigator,
+            testname=test_name)
 
-    with pytest.raises(NotSupportedError):
+    # NotSupportedError
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
+
+    with pytest.raises(ExceptionRAPDU) as e:
         # Not supporting keys without wildcard
         client.register_wallet(MultisigWallet(
             name="Cold storage",
@@ -147,4 +172,10 @@ def test_register_wallet_unsupported_policy_v1(client: Client):
                 f"[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
             ],
             version=WalletType.WALLET_POLICY_V1
-        ))
+        ),
+            navigator,
+            testname=test_name)
+
+    # NotSupportedError
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0

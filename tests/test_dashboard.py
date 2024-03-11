@@ -1,27 +1,24 @@
-import pytest
+from ragger.firmware import Firmware
+from ragger.navigator import NavInsID, Navigator
+from pathlib import Path
 
-from speculos.client import SpeculosClient
+ROOT_SCREENSHOT_PATH = Path(__file__).parent.resolve()
 
 
-def test_dashboard(comm: SpeculosClient, is_speculos: bool, app_version: str, model: str):
+def test_dashboard(navigator: Navigator, firmware: Firmware, test_name: str):
     # Tests that the text shown in the dashboard screens are the expected ones
 
-    if not is_speculos:
-        pytest.skip("Requires speculos")
+    if firmware.device.startswith("nano"):
+        instructions = [
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK
+        ]
+    else:
+        instructions = [
+            NavInsID.USE_CASE_HOME_INFO,
+            NavInsID.USE_CASE_SETTINGS_SINGLE_PAGE_EXIT
+        ]
 
-    if model == "stax":
-        pytest.skip("No dashboard test for stax")
-
-    comm.press_and_release("right")
-    comm.wait_for_text_event("Version")
-    comm.wait_for_text_event(app_version)
-
-    comm.press_and_release("right")
-    comm.wait_for_text_event("About")
-
-    comm.press_and_release("right")
-    comm.wait_for_text_event("Quit")
-
-    comm.press_and_release("right")
-    comm.wait_for_text_event("Bitcoin Testnet")
-    comm.wait_for_text_event("is ready")
+    navigator.navigate_and_compare(ROOT_SCREENSHOT_PATH, test_name, instructions,
+                                   screen_change_before_first_instruction=False)
