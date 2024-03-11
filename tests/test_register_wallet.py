@@ -93,6 +93,24 @@ def test_register_wallet_reject_header(client: Client):
 
 
 @has_automation("automations/register_wallet_accept.json")
+def test_register_wallet_invalid_pubkey_version(client: Client):
+    # This is the same wallet policy as the test_register_wallet_accept_wit test,
+    # but the external pubkey has the wrong BIP32 version (mainnet xpub instead of testnet tpub).
+    # An older version of the app ignored the version for external pubkeys, while now it rejects it
+    # if the version is wrong, as a sanity check.
+    with pytest.raises(IncorrectDataError):
+        client.register_wallet(MultisigWallet(
+            name="Cold storage",
+            address_type=AddressType.WIT,
+            threshold=2,
+            keys_info=[
+                "[76223a6e/48'/1'/0'/2']xpub6DjjtjxALtJSP9dKRKuhejeTpZc711gUGZyS9nCM5GAtrNTDuMBZD2FcndJoHst6LYNbJktm4NmJyKqspLi5uRmtnDMAdcPAf2jiSj9gFTX",
+                "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            ],
+        ))
+
+
+@has_automation("automations/register_wallet_accept.json")
 def test_register_wallet_invalid_names(client: Client):
     too_long_name = "This wallet name is much too long since it requires 65 characters"
     assert len(too_long_name) == 65
