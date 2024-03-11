@@ -252,7 +252,7 @@ uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]);
 uint32_t crypto_get_master_key_fingerprint();
 
 /**
- * Computes the base58check-encoded extended pubkey at a given path.
+ * Computes extended pubkey at a given path, serialized as per BIP32.
  *
  * @param[in]  bip32_path
  *   Pointer to 32-bit array of BIP-32 derivation steps.
