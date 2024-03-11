@@ -21,7 +21,19 @@ endif
 
 include $(BOLOS_SDK)/Makefile.defines
 
-# TODO: compile with the right path restrictions
+# TODO: Compile with the right path restrictions
+#
+#       The right path restriction would be something like
+#         --path "*'/0'"
+#       for mainnet, and
+#         --path "*'/1'"
+#       for testnet.
+#
+#       That is, restrict the BIP-44 coin_type, but not the purpose.
+#       However, such wildcards are not currently supported by the OS.
+#
+#       Note that the app still requires explicit user approval before exporting
+#       any xpub outside of a small set of allowed standard paths.
 
 # Application allowed derivation curves.
 CURVE_APP_LOAD_PARAMS = secp256k1
