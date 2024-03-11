@@ -30,7 +30,7 @@ include $(BOLOS_SDK)/Makefile.defines
 #       for testnet.
 #
 #       That is, restrict the BIP-44 coin_type, but not the purpose.
-#       However, such wildcards are currently supported by the OS.
+#       However, such wildcards are not currently supported by the OS.
 #
 #       Note that the app still requires explicit user approval before exporting
 #       any xpub outside of a small set of allowed standard paths.
