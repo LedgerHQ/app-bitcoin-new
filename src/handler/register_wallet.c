@@ -159,6 +159,12 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
             return;
         }
 
+        if (read_u32_be(key_info.ext_pubkey.version, 0) != BIP32_PUBKEY_VERSION) {
+            PRINTF("Invalid pubkey version. Wrong network?\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return;
+        }
+
         // We refuse to register wallets without key origin information, or whose keys don't end
         // with the wildcard ('/**'). The key origin information is necessary when signing to
         // identify which one is our key. Using addresses without a wildcard could potentially be
@@ -188,10 +194,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
                 ++n_internal_keys;
             }
         }
-
-        // TODO: it would be sensible to validate the pubkey (at least syntactically + validate
-        // checksum)
-        //       Currently we are showing to the user whichever string is passed by the host.
 
         if (!ui_display_policy_map_cosigner_pubkey(dc,
                                                    (char *) next_pubkey_info,
