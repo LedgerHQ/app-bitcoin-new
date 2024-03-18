@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.2.1] - 18-03-2024
+
+### Fixed
+
+- Signing failure for certain taproot policies in versions 2.1.2, 2.1.3 and 2.2.0: returned tapleaf hashes (and corresponding signatures) are incorrect if the descriptor template has a derivation path not ending for `/**` or `/<0;1>/*` for that key.
+
 ## [2.2.0] - 29-01-2024
 
 ### Added

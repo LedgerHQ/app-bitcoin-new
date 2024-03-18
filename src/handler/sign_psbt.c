@@ -2354,10 +2354,6 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
                               const input_info_t *input,
                               const policy_node_t *tapleaf_ptr,
                               placeholder_info_t *placeholder_info) {
-    uint32_t change = input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                              : placeholder_info->placeholder.num_first;
-    uint32_t address_index = input->in_out.address_index;
-
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
@@ -2369,8 +2365,8 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
         &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
                                     .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
                                     .n_keys = st->wallet_header_n_keys,
-                                    .change = change,
-                                    .address_index = address_index},
+                                    .change = input->in_out.is_change,
+                                    .address_index = input->in_out.address_index},
         WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
         NULL);
     if (tapscript_len < 0) {
@@ -2389,8 +2385,8 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
             &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
                                         .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
                                         .n_keys = st->wallet_header_n_keys,
-                                        .change = change,
-                                        .address_index = address_index},
+                                        .change = input->in_out.is_change,
+                                        .address_index = input->in_out.address_index},
             WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
             &hash_context.header)) {
         return false;  // should never happen!
