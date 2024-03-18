@@ -75,7 +75,7 @@ def main():
             "",
             "tr(@0/**)",
             [
-                f"[{fpr}/86'/1'/0']{first_taproot_account_pubkey}/**"
+                f"[{fpr}/86'/1'/0']{first_taproot_account_pubkey}"
             ],
         )
         first_taproot_account_address = client.get_wallet_address(
@@ -91,7 +91,7 @@ def main():
         # ==> Register a multisig wallet named "Cold storage"
 
         our_pubkey = client.get_extended_pubkey("m/48'/1'/0'/2'")
-        other_key_info = "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF/**"
+        other_key_info = "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF"
 
         multisig_policy = MultisigWallet(
             name="Cold storage",
