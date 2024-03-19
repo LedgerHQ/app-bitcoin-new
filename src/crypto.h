@@ -344,6 +344,43 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
 void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, uint16_t tag_len);
 
 /**
+ * Implementation of the lift_x procedure as defined by BIP-0340.
+ *
+ * @param[in]  x
+ *   Pointer to a 32-byte array.
+ * @param[out]  out
+ *   Pointer to an array that will received the output as an uncompressed 65-bytes pubkey.
+ */
+int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]);
+
+/**
+ * A tagged hash as defined in BIP-0340.
+ *
+ * @param[in]  tag
+ *   Pointer to an array containing the tag of the tagged hash.
+ * @param[in]  tag_len
+ *   Length of the tag.
+ * @param[in]  data
+ *   Pointer to an array of data.
+ * @param[in]  data_len
+ *   Length of the array pointed by `data`.
+ * @param[in]  data2
+ *   If NULL, ignored. If not null, a pointer to an array of data; the tagged hash for the
+ * concatenation of `data` and `data2` is computed.
+ * @param[in]  data2_len
+ *   If `data2` is NULL, ignored. Otherwise, the length the array pointed by `data2`.
+ * @param[out]  out
+ *   Pointer to a 32-byte array that will receive the result.
+ */
+void crypto_tr_tagged_hash(const uint8_t *tag,
+                           uint16_t tag_len,
+                           const uint8_t *data,
+                           uint16_t data_len,
+                           const uint8_t *data2,
+                           uint16_t data2_len,
+                           uint8_t out[static CX_SHA256_SIZE]);
+
+/**
  * Initializes the "tagged" SHA256 hash with tag "TapLeaf", used for tapscript leaves.
  *
  * @param[out]  hash_context
