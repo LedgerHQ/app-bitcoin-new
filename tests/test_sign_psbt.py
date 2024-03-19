@@ -1022,3 +1022,42 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
     assert partial_sig0.signature[-1] == 1  # SIGHASH_ALL
 
     assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature[:64])
+
+
+@has_automation("automations/sign_with_wallet_accept.json")
+def test_sign_psbt_against_wrong_tapleaf_hash(client: Client):
+    # Versions 2.1.2, 2.1.3 and 2.2.0 incorrectly derived keys for policies with keys whose
+    # derivation doesn't end in /** or /<0;1>/*.
+    wallet = WalletPolicy(
+        name="Used to return a wrong tapleaf_hash",
+        descriptor_template="tr(@0/<0;1>/*,{and_v(v:multi_a(1,@1/<2;3>/*,@2/<2;3>/*),older(2)),multi_a(2,@1/<0;1>/*,@2/<0;1>/*)})",
+        keys_info=[
+            "tpubDD7LLJNCVTKQiB41FH3NyJPzMUNroRtzzY3WFAzKZDikrMpw9PJTi6A2Yes5Tamin4wsgJ4JLsj2AVUSvQqP2T6q3bztu7obRuU3Lrh4eTw",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "tpubDCczwGSwQAF9Z5gTqL3tjznCFC9De5kFBLGdJJuj3UogVyYXVG7HuFdNsvJ9oDtvn4waeawS8XvRpBfbAZaDv1pGRiZdc9qnQhLKTS8eWXH"
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "649d8ef6721d63046144f4f05d156655bc42fb0fe4a85020ac524cd79973c9d1")
+
+    psbt_b64 = "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"
+
+    result = client.sign_psbt(psbt_b64, wallet, wallet_hmac)
+
+    assert len(result) == 2
+
+    # This test assumes that keys are yielded in the same order as the internal placeholders
+
+    part_sig_1 = result[0][1]
+    assert part_sig_1.pubkey == bytes.fromhex(
+        "21176cb588d36748033a66214169e13cb7928311554fbf8fd836b9ace439a1f4")
+    # version 2.2.0 returned b2ee0699c6063e37ee778bd87774660b3f4c62b47473f28a0d32e6ff2bccd5db for part_sig_1.tapleaf_hash
+    assert part_sig_1.tapleaf_hash == bytes.fromhex(
+        "b1dd2a8bcd207330117ecaff279706fbcbcc339f1de98779a435b11284411575")
+
+    part_sig_2 = result[1][1]
+    assert part_sig_2.pubkey == bytes.fromhex(
+        "9e646fb9e0452460944e49f8869f9ab9da90820da5d53841af9e1271a3bcf9ce")
+    assert part_sig_2.tapleaf_hash == bytes.fromhex(
+        "5b82996fe6cf1bf43868511181c64c965b7bf5f16f007acec52dede5288f9225")
