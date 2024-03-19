@@ -24,54 +24,29 @@
 
 #include "merkle.h"
 
-#include "cx_ram.h"
 #include "debug-helpers/debug.h"
 
 #include "ledger_assert.h"
 
-void merkle_compute_element_hash(const uint8_t *in, size_t in_len, uint8_t out[static 32]) {
-    cx_sha256_t hash;
-    cx_sha256_init(&hash);
-
+void merkle_compute_element_hash(const uint8_t *in,
+                                 size_t in_len,
+                                 uint8_t out[static CX_SHA256_SIZE]) {
     // H(0x00 | in)
-    crypto_hash_update_u8(&hash.header, 0x00);
-    crypto_hash_update(&hash.header, in, in_len);
-
-    crypto_hash_digest(&hash.header, out, 32);
+    uint8_t data = 0x00;
+    cx_iovec_t iovec[2] = {{.iov_base = &data, .iov_len = 1}, {.iov_base = in, .iov_len = in_len}};
+    cx_sha256_hash_iovec(iovec, 2, out);
 }
 
-// void merkle_combine_hashes(const uint8_t left[static 32],
-//                            const uint8_t right[static 32],
-//                            uint8_t out[static 32]) {
-//     PRINT_STACK_POINTER();
-
-//     cx_sha256_t hash;
-//     cx_sha256_init(&hash);
-
-//     // H(0x01 | left | right)
-//     crypto_hash_update_u8(&hash.header, 0x01);
-//     crypto_hash_update(&hash.header, left, 32);
-//     crypto_hash_update(&hash.header, right, 32);
-
-//     crypto_hash_digest(&hash.header, out, 32);
-// }
-
-// implementation using the cxram section, in order to save ram
-void merkle_combine_hashes(const uint8_t left[static 32],
-                           const uint8_t right[static 32],
-                           uint8_t out[static 32]) {
+void merkle_combine_hashes(const uint8_t left[static CX_SHA256_SIZE],
+                           const uint8_t right[static CX_SHA256_SIZE],
+                           uint8_t out[static CX_SHA256_SIZE]) {
     PRINT_STACK_POINTER();
 
-    cx_sha256_init_no_throw(&G_cx.sha256);
-
     uint8_t prefix = 0x01;
-    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, &prefix, 1) == CX_OK, "It never fails");
-
-    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, left, 32) == CX_OK, "It never fails");
-    LEDGER_ASSERT(cx_sha256_update(&G_cx.sha256, right, 32) == CX_OK, "It never fails");
-
-    cx_sha256_final(&G_cx.sha256, out);
-    explicit_bzero(&G_cx.sha256, sizeof(cx_sha256_t));
+    cx_iovec_t iovec[3] = {{.iov_base = &prefix, .iov_len = 1},
+                           {.iov_base = left, .iov_len = CX_SHA256_SIZE},
+                           {.iov_base = right, .iov_len = CX_SHA256_SIZE}};
+    cx_sha256_hash_iovec(iovec, 3, out);
 }
 
 // TODO: make this O(log n), or possibly O(1). Currently O(log^2 n).

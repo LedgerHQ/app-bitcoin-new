@@ -2500,12 +2500,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     sign_psbt_state_t st;
     memset(&st, 0, sizeof(st));
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     st.protocol_version = protocol_version;
 
     // read APDU inputs, intialize global state and read global PSBT map

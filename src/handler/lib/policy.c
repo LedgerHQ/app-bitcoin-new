@@ -1723,13 +1723,16 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
 }
 
 int count_distinct_keys_info(const policy_node_t *policy) {
-    policy_node_key_placeholder_t placeholder;
-    int ret = -1, cur, n_placeholders;
+    int ret = -1;
 
-    for (cur = 0;
-         cur < (n_placeholders = get_key_placeholder_by_index(policy, cur, NULL, &placeholder));
-         ++cur) {
-        if (n_placeholders < 0) {
+    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL, NULL);
+    if (n_placeholders < 0) {
+        return -1;
+    }
+
+    for (int cur = 0; cur < n_placeholders; ++cur) {
+        policy_node_key_placeholder_t placeholder;
+        if (0 > get_key_placeholder_by_index(policy, cur, NULL, &placeholder)) {
             return -1;
         }
         ret = MAX(ret, placeholder.key_index + 1);

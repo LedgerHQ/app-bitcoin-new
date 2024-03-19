@@ -110,12 +110,6 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     uint8_t display;
     uint8_t bip32_path_len;
     if (!buffer_read_u8(&dc->read_buffer, &display) ||

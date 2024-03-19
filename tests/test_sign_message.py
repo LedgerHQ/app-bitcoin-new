@@ -45,3 +45,39 @@ def test_sign_message_accept_long(client: Client):
 def test_sign_message_reject(client: Client):
     with pytest.raises(DenyError):
         client.sign_message("Anything", "m/44'/1'/0'/0/0")
+
+
+@has_automation("automations/sign_message_accept.json")
+def test_sign_message_accept_non_ascii(client: Client):
+    # Test with a message that contains non ascii char
+
+    message = "Hello\nworld!"
+
+    res = client.sign_message(
+        message,
+        "m/84'/1'/0'/0/8"
+    )
+
+    assert res == 'IGGk2UM12aQGtigJ7XCLJEXQl3bdKgx0G3CIt0ADSWknfAHqs+9+9OPZSjGrjyp46GjztGzUAnCa/DDMrSIAfbg='
+
+
+@has_automation("automations/sign_message_accept.json")
+def test_sign_message_accept_too_long(client: Client):
+    # Test with a message that is too long to be displayed
+
+    message = "The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible. The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible. The root problem with conventional currency is all the trust that's required to make it work. The central bank must be trusted not to debase the currency, but the history of fiat currencies is full of breaches of that trust. Banks must be trusted to hold our money and transfer it electronically, but they lend it out in waves of credit bubbles with barely a fraction in reserve. We have to trust them with our privacy, trust them not to let identity thieves drain our accounts. Their massive overhead costs make micropayments impossible."
+
+    res = client.sign_message(
+        message,
+        "m/84'/1'/0'/0/8"
+    )
+
+    assert res == 'IDAl9RThAyunmYuol9DaDs/CScUpiol3FDSjIjyK9y0tc/x1HWrbT/ufdkPFY1Bmi+L9hc3ip1me2RmufprVuNk='
+
+
+@has_automation("automations/sign_message_reject.json")
+def test_sign_message_hash_reject(client: Client):
+    with pytest.raises(DenyError):
+        client.sign_message("Hello\nworld!", "m/44'/1'/0'/0/0")
+
+

@@ -16,6 +16,7 @@ typedef struct {
     nbgl_pageInfoLongPress_t infoLongPress;
     int extOutputCount;
     int currentOutput;
+    bool displayPrompt;
 } TransactionContext_t;
 
 enum {
@@ -24,6 +25,11 @@ enum {
     SILENT_CONFIRM_TOKEN,
     BACK_TOKEN_TRANSACTION,   // for most transactions
     BACK_TOKEN_SELFTRANSFER,  // special case when it's a self-transfer (no external outputs)
+    BACK_TOKEN_MESSAGE,
+    MESSAGE_DISPLAYABLE_TOKEN,
+    MESSAGE_NON_DISPLAYABLE_TOKEN,
+    MESSAGE_CANCEL_TOKEN,
+
 };
 
 extern bool G_was_processing_screen_shown;
@@ -69,13 +75,35 @@ static void confirm_cancel(void) {
                         status_cancel);
 }
 
-static void start_processing_callback(bool confirm) {
+static void confirm_message_cancel(void) {
+    nbgl_useCaseConfirm("Reject message?", "", "Yes, Reject", "Go back to message", status_cancel);
+}
+
+static void start_processing_callback_light(bool confirm) {
     if (confirm) {
         ux_flow_response_true();
         nbgl_useCaseSpinner("Processing");
     } else {
         ux_flow_response_false();
         nbgl_useCaseStatus(transactionContext.rejected_status, false, ui_menu_main);
+    }
+}
+
+static void start_processing_callback(bool confirm) {
+    if (confirm) {
+        ux_flow_response_true();
+        nbgl_useCaseSpinner("Processing");
+    } else {
+        confirm_cancel();
+    }
+}
+
+static void start_processing_message_callback(bool confirm) {
+    if (confirm) {
+        ux_flow_response_true();
+        nbgl_useCaseSpinner("Processing");
+    } else {
+        confirm_message_cancel();
     }
 }
 
@@ -97,6 +125,20 @@ static void transaction_confirm_callback(int token, uint8_t index) {
             break;
         case BACK_TOKEN_SELFTRANSFER:
             ui_accept_transaction_flow(true);
+            break;
+        case BACK_TOKEN_MESSAGE:
+            decrease_streaming_index();
+            ux_flow_response(true);
+            break;
+        case MESSAGE_DISPLAYABLE_TOKEN:
+            increase_streaming_index();
+            ux_flow_response(true);
+            break;
+        case MESSAGE_NON_DISPLAYABLE_TOKEN:
+            ui_sign_message_confirm_flow();
+            break;
+        case MESSAGE_CANCEL_TOKEN:
+            confirm_message_cancel();
             break;
         default:
             PRINTF("Unhandled token : %d", token);
@@ -131,7 +173,7 @@ static void continue_light_processing_callback(void) {
     nbgl_useCaseStaticReviewLight(&transactionContext.tagValueList,
                                   &transactionContext.infoLongPress,
                                   "Cancel",
-                                  start_processing_callback);
+                                  start_processing_callback_light);
 }
 
 static void continue_callback(void) {
@@ -147,6 +189,21 @@ static void continue_callback(void) {
                              &transactionContext.infoLongPress,
                              "Cancel",
                              start_processing_callback);
+}
+
+static void continue_message_callback(void) {
+    transactionContext.tagValueList.pairs = transactionContext.tagValuePair;
+
+    transactionContext.infoLongPress.icon = &C_Bitcoin_64px;
+    transactionContext.infoLongPress.longPressText = "Approve";
+    transactionContext.infoLongPress.longPressToken = CONFIRM_TOKEN;
+    transactionContext.infoLongPress.tuneId = TUNE_TAP_CASUAL;
+    transactionContext.infoLongPress.text = transactionContext.confirm;
+
+    nbgl_useCaseStaticReview(&transactionContext.tagValueList,
+                             &transactionContext.infoLongPress,
+                             "Cancel",
+                             start_processing_message_callback);
 }
 
 // Transaction flow
@@ -410,26 +467,96 @@ void ui_display_register_wallet_flow(void) {
                             ux_flow_response_false);
 }
 
-// Continue callback
-void ui_sign_message_flow(void) {
-    transactionContext.tagValuePair[0].item = "Path";
-    transactionContext.tagValuePair[0].value = g_ui_state.path_and_hash.bip32_path_str;
+static void ui_display_message_content_flow(bool displayable, uint8_t pageCount) {
+    uint8_t token;
+    if (displayable) {
+        token = MESSAGE_DISPLAYABLE_TOKEN;
+    } else {
+        token = MESSAGE_NON_DISPLAYABLE_TOKEN;
+    }
 
+    nbgl_pageNavigationInfo_t info = {
+        .activePage = get_streaming_index(),
+        .nbPages = pageCount + 1,
+        .navType = NAV_WITH_TAP,
+        .progressIndicator = true,
+        .navWithTap.backButton = displayable && get_streaming_index() != 0,
+        .navWithTap.backToken = BACK_TOKEN_MESSAGE,
+        .navWithTap.nextPageText = "Tap to continue",
+        .navWithTap.nextPageToken = token,
+        .navWithTap.quitText = "Reject message",
+        .quitToken = MESSAGE_CANCEL_TOKEN,
+        .tuneId = TUNE_TAP_CASUAL};
+
+    nbgl_pageContent_t content = {.type = TAG_VALUE_LIST,
+                                  .tagValueList.nbPairs = transactionContext.tagValueList.nbPairs,
+                                  .tagValueList.pairs = transactionContext.tagValuePair,
+                                  .tagValueList.wrapping = true};
+
+    transactionContext.tagValueList.nbPairs = 0;
+    nbgl_pageDrawGenericContent(&transaction_confirm_callback, &info, &content);
+    nbgl_refresh();
+}
+
+void ui_set_display_prompt(void) {
+    transactionContext.displayPrompt = true;
+}
+
+static void display_message_content(void) {
+    ui_display_message_content_flow(true, transactionContext.extOutputCount);
+}
+
+void ui_sign_message_content_flow(uint8_t pageCount) {
+    transactionContext.rejected_status = "Message rejected";
+
+    if (get_streaming_index() == 0) {
+        transactionContext.tagValuePair[0].item = "Path";
+        transactionContext.tagValuePair[0].value = g_ui_state.path_and_message.bip32_path_str;
+        transactionContext.tagValueList.nbPairs = 1;
+    }
+
+    transactionContext.tagValuePair[transactionContext.tagValueList.nbPairs].item =
+        "Message content";
+    transactionContext.tagValuePair[transactionContext.tagValueList.nbPairs].value =
+        g_ui_state.path_and_message.message;
+
+    transactionContext.tagValueList.nbPairs++;
+
+    transactionContext.extOutputCount = pageCount;
+
+    if (transactionContext.displayPrompt) {
+        nbgl_useCaseReviewStart(&C_Bitcoin_64px,
+                                "Review message",
+                                "",
+                                "Cancel",
+                                display_message_content,
+                                status_cancel);
+        transactionContext.displayPrompt = false;
+    } else {
+        display_message_content();
+    }
+}
+
+void ui_sign_message_path_hash_and_confirm_flow(void) {
+    transactionContext.rejected_status = "Message rejected";
+
+    transactionContext.tagValuePair[0].item = "Path";
+    transactionContext.tagValuePair[0].value = g_ui_state.path_and_message.bip32_path_str;
     transactionContext.tagValuePair[1].item = "Message hash";
-    transactionContext.tagValuePair[1].value = g_ui_state.path_and_hash.hash_hex;
+    transactionContext.tagValuePair[1].value = g_ui_state.path_and_message.message;
 
     transactionContext.tagValueList.nbPairs = 2;
 
+    ui_display_message_content_flow(false, 0);
+}
+
+void ui_sign_message_confirm_flow(void) {
+    transactionContext.tagValueList.nbPairs = 0;
     transactionContext.confirm = "Sign Message";
     transactionContext.confirmed_status = "MESSAGE\nSIGNED";
     transactionContext.rejected_status = "Message rejected";
 
-    nbgl_useCaseReviewStart(&C_Bitcoin_64px,
-                            "Confirm signature",
-                            "",
-                            "Cancel",
-                            continue_callback,
-                            ux_flow_response_false);
+    continue_message_callback();
 }
 
 void ui_display_spend_from_wallet_flow(void) {

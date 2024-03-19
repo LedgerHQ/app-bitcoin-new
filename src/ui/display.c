@@ -18,6 +18,7 @@ extern bool G_was_processing_screen_shown;
 
 static bool g_ux_flow_ended;
 static bool g_ux_flow_response;
+static int g_current_streaming_index;
 
 extern dispatcher_context_t G_dispatcher_context;
 
@@ -30,6 +31,27 @@ void send_deny_sw(dispatcher_context_t *dc) {
 void set_ux_flow_response(bool approved) {
     g_ux_flow_ended = true;
     g_ux_flow_response = approved;
+}
+
+uint8_t get_streaming_index(void) {
+    return g_current_streaming_index;
+}
+
+void reset_streaming_index(void) {
+    PRINTF("Reset streaming index\n");
+    g_current_streaming_index = 0;
+}
+
+void increase_streaming_index(void) {
+    PRINTF("Increase streaming index\n");
+    g_current_streaming_index += 1;
+}
+
+void decrease_streaming_index(void) {
+    PRINTF("Decrease streaming index\n");
+    if (g_current_streaming_index > 0) {
+        g_current_streaming_index -= 1;
+    }
 }
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
@@ -79,15 +101,34 @@ bool ui_display_pubkey(dispatcher_context_t *context,
     return io_ui_process(context, true);
 }
 
-bool ui_display_message_hash(dispatcher_context_t *context,
-                             const char *bip32_path_str,
-                             const char *message_hash) {
-    ui_path_and_hash_state_t *state = (ui_path_and_hash_state_t *) &g_ui_state;
+bool ui_display_path_and_message_content(dispatcher_context_t *context,
+                                         const char *path_str,
+                                         const char *message_content,
+                                         uint8_t pageCount) {
+    ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
+    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
+    strncpy(state->message, message_content, sizeof(state->message));
 
-    strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
-    strncpy(state->hash_hex, message_hash, sizeof(state->hash_hex));
+    ui_sign_message_content_flow(pageCount);
 
-    ui_sign_message_flow();
+    return io_ui_process(context, true);
+}
+
+bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
+                                              const char *path_str,
+                                              const char *message_hash) {
+    ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
+    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
+    strncpy(state->message, message_hash, sizeof(state->message));
+
+    ui_sign_message_path_hash_and_confirm_flow();
+
+    return io_ui_process(context, true);
+}
+
+bool ui_display_message_confirm(dispatcher_context_t *context) {
+    (void) context;
+    ui_sign_message_confirm_flow();
 
     return io_ui_process(context, true);
 }
@@ -247,6 +288,9 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     return true;
 }
 
+void ui_pre_processing_message(void) {
+    return;
+}
 #endif  // HAVE_BAGL
 
 #ifdef HAVE_NBGL
@@ -274,5 +318,9 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     ui_display_post_processing_confirm_message(success);
 
     return true;
+}
+
+void ui_pre_processing_message(void) {
+    ui_set_display_prompt();
 }
 #endif  // HAVE_NBGL

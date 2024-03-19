@@ -48,12 +48,6 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    // Device must be unlocked
-    if (os_global_pin_is_validated() != BOLOS_UX_OK) {
-        SEND_SW(dc, SW_SECURITY_STATUS_NOT_SATISFIED);
-        return;
-    }
-
     uint8_t display_address;
 
     uint32_t address_index;
