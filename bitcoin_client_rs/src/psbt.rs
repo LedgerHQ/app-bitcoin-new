@@ -411,13 +411,13 @@ impl PartialSignature {
                 .map_err(PartialSignatureError::XOnlyPubKey)?;
             let tap_leaf_hash =
                 TapLeafHash::from_slice(&slice[33..65]).map_err(PartialSignatureError::TapLeaf)?;
-            let sig = taproot::Signature::from_slice(&slice[65..])
+            let sig = taproot::Signature::from_slice(&slice[key_augment_len + 1..])
                 .map_err(PartialSignatureError::TaprootSig)?;
             Ok(Self::TapScriptSig(key, Some(tap_leaf_hash), sig))
         } else if key_augment_len == 32 {
             let key = XOnlyPublicKey::from_slice(&slice[1..33])
                 .map_err(PartialSignatureError::XOnlyPubKey)?;
-            let sig = taproot::Signature::from_slice(&slice[65..])
+            let sig = taproot::Signature::from_slice(&slice[key_augment_len + 1..])
                 .map_err(PartialSignatureError::TaprootSig)?;
             Ok(Self::TapScriptSig(key, None, sig))
         } else {
