@@ -2535,7 +2535,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      */
     if (!process_outputs(dc, &st)) return;
 
-    /** TANSACTION CONFIRMATION
+    /** TRANSACTION CONFIRMATION
      *
      *  Show summary info to the user (transaction fees), ask for final confirmation
      */

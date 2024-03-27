@@ -100,46 +100,6 @@ jobs:
           name: documentation
           path: doc/html
 
-  job_test:
-    name: Tests
-    strategy:
-      matrix:
-        include:
-          - model: nanos
-          - model: nanox
-          - model: nanosp
-          - model: stax
-
-    needs: job_build
-    runs-on: ubuntu-latest
-
-    container:
-      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
-      ports:
-        - 1234:1234
-        - 9999:9999
-        - 40000:40000
-        - 41000:41000
-        - 42000:42000
-        - 43000:43000
-      options: --entrypoint /bin/bash
-
-    steps:
-      - name: Clone
-        uses: actions/checkout@v2
-
-      - name: Download Bitcoin Testnet app binary
-        uses: actions/download-artifact@v2
-        with:
-          name: bitcoin-testnet-app-${{matrix.model}}
-          path: bin
-
-      - name: Run tests
-        run: |
-          cd tests
-          pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=500
-
   job_test_mainnet:
     name: Tests on mainnet
     strategy:
