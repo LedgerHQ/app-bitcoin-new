@@ -37,24 +37,25 @@ static void exit(void) {
     os_sched_exit(-1);
 }
 
-void ui_menu_main_flow_bitcoin(void) {
-    nbgl_useCaseHome("Bitcoin", &C_Bitcoin_64px, NULL, false, ui_menu_about, exit);
-}
-
-void ui_menu_main_flow_bitcoin_testnet(void) {
-    nbgl_useCaseHome("Bitcoin Test",
-                     &C_Bitcoin_64px,
-                     "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
-                     false,
-                     ui_menu_about,
-                     exit);
-}
-
 void ui_menu_about(void) {
     nbgl_useCaseSettings("Bitcoin", 0, 1, false, ui_menu_main, navigation_cb, NULL);
 }
 
 void ui_menu_about_testnet(void) {
-    nbgl_useCaseSettings("Bitcoin Test", 0, 1, false, ui_menu_main, navigation_cb, NULL);
+    nbgl_useCaseSettings("Bitcoin Testnet", 0, 1, false, ui_menu_main, navigation_cb, NULL);
 }
+
+void ui_menu_main_flow_bitcoin(void) {
+    nbgl_useCaseHome("Bitcoin", &C_Bitcoin_64px, NULL, false, ui_menu_about, exit);
+}
+
+void ui_menu_main_flow_bitcoin_testnet(void) {
+    nbgl_useCaseHome("Bitcoin Testnet",
+                     &C_Bitcoin_64px,
+                     "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+                     false,
+                     ui_menu_about_testnet,
+                     exit);
+}
+
 #endif  // HAVE_NBGL
