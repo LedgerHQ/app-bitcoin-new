@@ -24,17 +24,18 @@ Build the app as normal from the root folder. For convenience, you probably want
 DEBUG=1 make
 ```
 
-Then run all the tests from this folder with:
+Then run all the tests from this folder, specifying the device: nanos, nanox, nanosp, stax, or all:
 
 ```
-pytest
+pytest --device yourdevice
 ```
+You can enable the screen display with the option `--display`
 
-## Launch with your Nano S/X
+## Launch with your Nano S/X/SP or Stax
 
 Compile and install the app on your device as normal.
 
-To run the tests on your Ledger Nano S/X you also need to install an optional dependency
+To run the tests on your Ledger device you also need to install an optional dependency
 
 ```
 pip install ledgercomm[hid]
@@ -43,7 +44,5 @@ pip install ledgercomm[hid]
 Be sure to have you device connected through USB (without any other software interacting with it) and run
 
 ```
-pytest --hid
+pytest --device yourdevice --backend ledgercomm
 ```
-
-Please note that tests that require an automation file are meant for speculos, and will currently hang the test suite.
