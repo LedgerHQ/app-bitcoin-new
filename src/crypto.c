@@ -157,7 +157,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     int res = cx_ripemd160_hash(in, inlen, out);
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in ripemd160 computation");
+    LEDGER_ASSERT(res == CX_OK, "Unexpected error in ripemd160 computation. Returned: %d", res);
 }
 
 void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
@@ -165,7 +165,9 @@ void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
 
     uint8_t buffer[32];
     int res = cx_hash_sha256(in, inlen, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_SHA256_SIZE,
+                  "Unexpected error in sha256 computation. Returned: %d",
+                  res);
     crypto_ripemd160(buffer, 32, out);
 }
 
@@ -220,9 +222,13 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     uint8_t buffer[32];
     size_t res;
     res = cx_hash_sha256(in, in_len, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_SHA256_SIZE,
+                  "Unexpected error in sha256 computation. Returned: %d",
+                  res);
     res = cx_hash_sha256(buffer, 32, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_SHA256_SIZE,
+                  "Unexpected error in sha256 computation. Returned: %d",
+                  res);
     memmove(out, buffer, 4);
 }
 
@@ -412,15 +418,15 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
 
     uint8_t hashtag[32];
     res = crypto_hash_update(&hash_context->header, tag, tag_len);
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
     res = crypto_hash_digest(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
 
     cx_sha256_init(hash_context);
     res = crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
     res = crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation");
+    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
 }
 
 void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
