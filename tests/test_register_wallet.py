@@ -24,7 +24,8 @@ def run_register_test(navigator: Navigator, client: RaggerClient, speculos_globa
     assert wallet_policy_id == wallet_policy.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_policy_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_policy_id, sha256).digest(),
         wallet_hmac,
     )
 
@@ -105,7 +106,8 @@ def test_register_wallet_reject_header(navigator: Navigator, firmware: Firmware,
 
     with pytest.raises(ExceptionRAPDU) as e:
         client.register_wallet(wallet, navigator,
-                               instructions=register_wallet_instruction_reject(firmware),
+                               instructions=register_wallet_instruction_reject(
+                                   firmware),
                                testname=test_name)
 
     assert DeviceException.exc.get(e.value.status) == DenyError
@@ -224,7 +226,8 @@ def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmwar
         assert wallet_id == wallet.id
 
         assert hmac.compare_digest(
-            hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+            hmac.new(speculos_globals.wallet_registration_key,
+                     wallet_id, sha256).digest(),
             wallet_hmac,
         )
 
@@ -374,6 +377,25 @@ def test_register_wallet_tr_script_pk(navigator: Navigator, firmware: Firmware, 
         descriptor_template="tr(@0/**,pk(@1/**))",
         keys_info=[
             "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+        ],
+    ),
+        instructions=register_wallet_instruction_approve(firmware),
+        test_name=test_name)
+
+
+def test_register_wallet_tr_with_nums_keypath(navigator: Navigator, firmware: Firmware, client:
+                                              RaggerClient, test_name: str, speculos_globals):
+    # The taproot keypath is unspendable; the UX must explicitly mark it as a 'dummy' key.
+    # The tpub for @0 is obtained by using the NUMS (Nothing-Up-My-Sleeve) key defined in BIP-0341,
+    # and using 32 zero bytes as the chaincode.
+    # It is important that the app can detect and clearly communicate to the user that the key is
+    # a dummy one, therefore unusable for spending.
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Taproot unspendable keypath",
+        descriptor_template="tr(@0/**,pk(@1/**))",
+        keys_info=[
+            "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
             "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
         ],
     ),
