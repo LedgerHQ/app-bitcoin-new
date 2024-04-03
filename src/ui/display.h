@@ -116,11 +116,17 @@ bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
                                 const char *policy_descriptor);
 
+typedef enum {
+    PUBKEY_TYPE_INTERNAL = 0,    // a key controlled by the wallet policy
+    PUBKEY_TYPE_EXTERNAL = 1,    // a key not controlled by the wallet policy
+    PUBKEY_TYPE_UNSPENDABLE = 2  // the provably unspendable public key defined in BIP-341
+} key_type_e;
+
 bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
                                            const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
-                                           bool is_internal);
+                                           key_type_e key_type);
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,

@@ -152,7 +152,7 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
                                            const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
-                                           bool is_internal) {
+                                           key_type_e key_type) {
     (void) (n_keys);
 
     ui_cosigner_pubkey_and_index_state_t *state =
@@ -160,16 +160,20 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
 
     strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
 
-    if (is_internal) {
+    if (key_type == PUBKEY_TYPE_INTERNAL) {
+        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u, ours", cosigner_index);
+    } else if (key_type == PUBKEY_TYPE_EXTERNAL) {
         snprintf(state->signer_index,
                  sizeof(state->signer_index),
-                 "Key @%u <ours>",
+                 "Key @%u, theirs",
+                 cosigner_index);
+    } else if (key_type == PUBKEY_TYPE_UNSPENDABLE) {
+        snprintf(state->signer_index,
+                 sizeof(state->signer_index),
+                 "Key @%u, dummy",
                  cosigner_index);
     } else {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u <theirs>",
-                 cosigner_index);
+        LEDGER_ASSERT(false, "Unreachable code");
     }
     ui_display_policy_map_cosigner_pubkey_flow();
 
