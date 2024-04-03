@@ -6,24 +6,30 @@ import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from bitcoin_client.ledger_bitcoin import Client
-from bitcoin_client.ledger_bitcoin.client_base import TransportClient
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
-from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
+from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
+from ledger_bitcoin.exception.device_exception import DeviceException
+from ledger_bitcoin.psbt import PSBT
+from ledger_bitcoin.wallet import WalletPolicy
 
 from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
-from speculos.client import SpeculosClient
-from test_utils.speculos import automation
+from ragger_bitcoin import RaggerClient
+from ragger_bitcoin.ragger_instructions import Instructions
+from ragger.navigator import Navigator, NavInsID
+from ragger.firmware import Firmware
+from ragger.error import ExceptionRAPDU
+
+from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
 
 
-def run_test_e2e(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
-    with automation(comm, "automations/register_wallet_accept.json"):
-        wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
+def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, speculos_globals: SpeculosGlobals,
+                 instructions_register_wallet: Instructions,
+                 instructions_sign_psbt: Instructions, test_name: str):
+    wallet_id, wallet_hmac = client.register_wallet(wallet_policy, navigator,
+                                                    instructions=instructions_register_wallet, testname=f"{test_name}_register")
 
     assert wallet_id == wallet_policy.id
 
@@ -83,6 +89,9 @@ def run_test_e2e(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc:
     result = multisig_rpc.walletcreatefundedpsbt(
         outputs={
             out_address: Decimal("0.01")
+        },
+        options={
+            "changePosition": 1 # We need a fixed position to be able to know how to navigate in the flows
         }
     )
 
@@ -93,8 +102,9 @@ def run_test_e2e(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc:
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    with automation(comm, "automations/sign_with_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac)
+    hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
+                                instructions=instructions_sign_psbt,
+                                testname=f"{test_name}_sign")
 
     n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
@@ -121,17 +131,21 @@ def run_test_e2e(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc:
     rpc.sendrawtransaction(rawtx)
 
 
-def run_test_invalid(client: Client, descriptor_template: str, keys_info: List[str]):
+def run_test_invalid(client: RaggerClient, descriptor_template: str, keys_info: List[str]):
     wallet_policy = WalletPolicy(
         name="Invalid wallet",
         descriptor_template=descriptor_template,
         keys_info=keys_info)
 
-    with pytest.raises((IncorrectDataError, NotSupportedError)):
+    with pytest.raises(ExceptionRAPDU) as e:
         client.register_wallet(wallet_policy)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError or DeviceException.exc.get(
+        e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
 
 
-def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_one_of_two_1(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                     test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # One of two keys (equally likely)
     # or(pk(key_1),pk(key_2))
 
@@ -146,10 +160,12 @@ def test_e2e_miniscript_one_of_two_1(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}",
         ])
 
-    run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_one_of_two_2(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                                     test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # One of two keys (one likely, one unlikely)
     # or(99@pk(key_likely),pk(key_unlikely))
 
@@ -164,10 +180,12 @@ def test_e2e_miniscript_one_of_two_2(rpc, rpc_test_wallet, client: Client, specu
             f"{core_xpub_orig}",
         ])
 
-    run_test_e2e(wallet_policy, [_], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [_], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_2fa(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                            test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # A user and a 2FA service need to sign off, but after 90 days the user alone is enough
     # and(pk(key_user),or(99@pk(key_service),older(12960)))
 
@@ -182,10 +200,12 @@ def test_e2e_miniscript_2fa(rpc, rpc_test_wallet, client: Client, speculos_globa
             f"{core_xpub_orig}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_decaying_3of3(navigator: Navigator, firmware: Firmware, client:
+                                      RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # A 3-of-3 that becomes a 2-of-3 after 90 days
     # thresh(3,pk(key_1),pk(key_2),pk(key_3),older(12960))
 
@@ -202,11 +222,12 @@ def test_e2e_miniscript_decaying_3of3(rpc, rpc_test_wallet, client: Client, spec
             f"{core_xpub_orig2}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name1, core_wallet_name2],
-                 rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_bolt3_offered_htlc(navigator: Navigator, firmware: Firmware, client:
+                                           RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # The BOLT #3 offered HTLC policy
     # or(pk(key_revocation),and(pk(key_remote),or(pk(key_local),hash160(H))))
 
@@ -224,11 +245,12 @@ def test_e2e_miniscript_bolt3_offered_htlc(rpc, rpc_test_wallet, client: Client,
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name1, core_wallet_name2],
-                 rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_bolt3_received_htlc(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # The BOLT #3 received HTLC policy
     # andor(pk(key_remote),or_i(and_v(v:pkh(key_local),hash160(H)),older(1008)),pk(key_revocation))
 
@@ -246,11 +268,12 @@ def test_e2e_miniscript_bolt3_received_htlc(rpc, rpc_test_wallet, client: Client
             f"{core_xpub_orig2}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name1, core_wallet_name2],
-                 rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_me_or_3of5(navigator: Navigator, firmware: Firmware, client:
+                                   RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     path = "48'/1'/0'/2'"
     _, core_xpub_orig1 = create_new_wallet()
     _, core_xpub_orig2 = create_new_wallet()
@@ -272,11 +295,13 @@ def test_e2e_miniscript_me_or_3of5(rpc, rpc_test_wallet, client: Client, speculo
             f"{core_xpub_orig5}",
         ])
 
-    run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_me_large_vault(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model: str):
-    if (model == "nanos"):
+def test_e2e_miniscript_me_large_vault(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
+    if (firmware.name == "nanos"):
         pytest.skip("Not supported on Nano S due to memory limitations")
 
     path = "48'/1'/0'/2'"
@@ -302,10 +327,12 @@ def test_e2e_miniscript_me_large_vault(rpc, rpc_test_wallet, client: Client, spe
             f"{core_xpub_orig6}",
         ])
 
-    run_test_e2e(wallet_policy, [], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(navigator: Navigator, firmware: Firmware,
+                                                    client: RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # policy: or(and(pk(A1), pk(B)),and(pk(A2), pk(C)))
     # where A1 and A2 are both internal keys; therefore, two signatures per input must be returned
 
@@ -329,17 +356,19 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(rpc, rpc_test_wallet, client
             f"{core_xpub_orig2}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name1], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_nanos_large_policy(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], model: str):
+def test_e2e_miniscript_nanos_large_policy(navigator: Navigator, firmware: Firmware, client:
+                                           RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # Nano S has much tighter memory limits.
     # The policy in this test requires 304 bytes after is parsed, which is larger than the previous 276.
     # However, it is a kind of policy in the style of the Liana wallet, that it would be nice to support.
 
     # reported by pythcoiner
 
-    if model != "nanos":
+    if firmware.name != "nanos":
         pytest.skip("Test only for Nano S")
 
     core_wallet_name1, core_xpub_orig1 = create_new_wallet()
@@ -360,11 +389,13 @@ def test_e2e_miniscript_nanos_large_policy(rpc, rpc_test_wallet, client: Client,
             f"{core_xpub_orig3}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name1, core_wallet_name2, core_wallet_name3], rpc,
-                 rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2,
+                                                    core_wallet_name3], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_miniscript_policy_with_a(rpc, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_miniscript_policy_with_a(navigator: Navigator, firmware: Firmware, client:
+                                      RaggerClient, test_name: str,  rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # versions 2.1.0 and 2.1.1 of the app incorrectly compiled the 'a:' wrapper, producing incorrect addresses
 
     _, core_xpub_orig1 = create_new_wallet()
@@ -389,10 +420,12 @@ def test_e2e_miniscript_policy_with_a(rpc, rpc_test_wallet, client: Client, spec
             f"{core_xpub_orig5}",
         ])
 
-    run_test_e2e(wallet_policy, [core_wallet_name3], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name3], rpc, rpc_test_wallet, speculos_globals,
+                 e2e_register_wallet_instruction(firmware), e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_invalid_miniscript(rpc, client: Client, speculos_globals: SpeculosGlobals):
+def test_invalid_miniscript(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                            test_name: str, rpc, speculos_globals: SpeculosGlobals):
     path = "48'/1'/0'/2'"
     _, core_xpub_orig1 = create_new_wallet()
     _, core_xpub_orig2 = create_new_wallet()

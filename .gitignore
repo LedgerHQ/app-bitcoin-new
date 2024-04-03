@@ -34,3 +34,5 @@ __pycache__/
 # Doxygen
 doc/html
 doc/latex
+
+tests/snapshots-tmp

@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Tuple
 import re
 
-from bitcoin_client.ledger_bitcoin.exception import DeviceException
+from ledger_bitcoin.exception import DeviceException
 
 
 SW_RE = re.compile(r"""(?x)

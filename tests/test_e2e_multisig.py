@@ -6,23 +6,33 @@ import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from bitcoin_client.ledger_bitcoin import Client, MultisigWallet, AddressType
-from bitcoin_client.ledger_bitcoin.client_base import TransportClient
-from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
+from ledger_bitcoin import Client, MultisigWallet, AddressType
+from ledger_bitcoin.client_base import TransportClient
+from ledger_bitcoin.psbt import PSBT
+from ledger_bitcoin.wallet import WalletPolicy
 
 from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
 
 from speculos.client import SpeculosClient
-from test_utils.speculos import automation
+
+from ragger_bitcoin import RaggerClient
+from ragger_bitcoin.ragger_instructions import Instructions
+from ragger.navigator import Navigator, NavInsID
+from ragger.firmware import Firmware
+
+from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
 
 
-def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
-    with automation(comm, "automations/register_wallet_accept.json"):
-        wallet_id, wallet_hmac = client.register_wallet(wallet_policy)
+def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPolicy,
+             core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy,
+             speculos_globals: SpeculosGlobals, instructions_register_wallet: Instructions,
+             instructions_sign_psbt: Instructions, test_name: str = ""):
+
+    wallet_id, wallet_hmac = client.register_wallet(wallet_policy, navigator,
+                                                    instructions=instructions_register_wallet, testname=f"{test_name}_register")
 
     assert wallet_id == wallet_policy.id
 
@@ -82,6 +92,9 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     result = multisig_rpc.walletcreatefundedpsbt(
         outputs={
             out_address: Decimal("0.01")
+        },
+        options={
+            "changePosition": 1 # We need a fixed position to be able to know how to navigate in the flows
         }
     )
 
@@ -92,8 +105,9 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    with automation(comm, "automations/sign_with_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac)
+    hww_sigs = client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
+                                instructions=instructions_sign_psbt,
+                                testname=f"{test_name}_sign")
 
     n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
@@ -120,7 +134,8 @@ def run_test(wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: Aut
     rpc.sendrawtransaction(rawtx)
 
 
-def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_multisig_2_of_2(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals:
+                             SpeculosGlobals):
     path = "48'/1'/0'/2'"
     core_wallet_name, core_xpub_orig = create_new_wallet()
 
@@ -135,10 +150,13 @@ def test_e2e_multisig_2_of_2(rpc: AuthServiceProxy, rpc_test_wallet, client: Cli
         ],
     )
 
-    run_test(wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet,
+             speculos_globals, e2e_register_wallet_instruction(firmware),
+             e2e_sign_psbt_instruction(firmware), test_name)
 
 
-def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient]):
+def test_e2e_multisig_multiple_internal_keys(navigator: Navigator, firmware: Firmware, client:
+                                             RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # test an edge case of a multisig where the wallet controls more than one key
     # 3-of-5 multisig where 2 keys are internal
 
@@ -164,12 +182,14 @@ def test_e2e_multisig_multiple_internal_keys(rpc: AuthServiceProxy, rpc_test_wal
         ],
     )
 
-    run_test(wallet_policy, [core_wallet_name_3],
-             rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(navigator, client, wallet_policy, [core_wallet_name_3],
+             rpc, rpc_test_wallet, speculos_globals,
+             e2e_register_wallet_instruction(firmware),
+             e2e_sign_psbt_instruction(firmware), test_name)
 
 
 @pytest.mark.timeout(0)  # disable timeout
-def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: Client, speculos_globals: SpeculosGlobals, comm: Union[TransportClient, SpeculosClient], enable_slow_tests: bool):
+def test_e2e_multisig_16_of_16(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: bool):
     # Largest supported multisig with sortedmulti.
     # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
 
@@ -195,4 +215,6 @@ def test_e2e_multisig_16_of_16(rpc: AuthServiceProxy, rpc_test_wallet, client: C
         keys_info=core_xpub_origs + [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
     )
 
-    run_test(wallet_policy, core_wallet_names, rpc, rpc_test_wallet, client, speculos_globals, comm)
+    run_test(navigator, client, wallet_policy, core_wallet_names, rpc, rpc_test_wallet,
+             speculos_globals. e2e_register_wallet_instruction(firmware),
+             e2e_sign_psbt_instruction(firmware), test_name)

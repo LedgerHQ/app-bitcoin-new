@@ -1,0 +1,19 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel"
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 100
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "@abstractmethod",
+    "pragma: no cover"
+]

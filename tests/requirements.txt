@@ -6,3 +6,4 @@ typing-extensions>=3.7,<4.0
 embit>=0.7.0,<0.8.0
 mnemonic==0.20
 bip32>=3.4,<4.0
+ragger[speculos, ledgerwallet]>=1.6.0

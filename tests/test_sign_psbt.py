@@ -9,135 +9,27 @@ from typing import List
 
 from pathlib import Path
 
-from bitcoin_client.ledger_bitcoin import Client, WalletPolicy, MultisigWallet, AddressType, PartialSignature
-from bitcoin_client.ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
+from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType, PartialSignature
+from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
+from ledger_bitcoin.exception.device_exception import DeviceException
 
-from bitcoin_client.ledger_bitcoin.psbt import PSBT
-from bitcoin_client.ledger_bitcoin.wallet import AddressType
-from speculos.client import SpeculosClient
+from ledger_bitcoin.psbt import PSBT
+from ledger_bitcoin.wallet import AddressType
+from ragger.navigator import Navigator, NavInsID
+from ragger.error import ExceptionRAPDU
+from ragger.firmware import Firmware
 
-from test_utils import has_automation, bip0340, txmaker
+from test_utils import bip0340, txmaker
 
 from embit.script import Script
 from embit.networks import NETWORKS
+import requests
+import json
 
-from test_utils.speculos import automation
+from ragger_bitcoin import RaggerClient
+from .instructions import *
 
 tests_root: Path = Path(__file__).parent
-
-
-CURRENCY_TICKER = "TEST"
-
-
-def format_amount(ticker: str, amount: int) -> str:
-    """Formats an amounts in sats as shown in the app: divided by 10_000_000, with no trailing zeroes."""
-    assert amount >= 0
-    btc_amount = f"{(amount/100_000_000):.8f}".rstrip('0').rstrip('.')
-    return f"{ticker} {btc_amount}"
-
-
-def should_go_right(event: dict):
-    """Returns true if the current text event implies a "right" button press to proceed."""
-
-    if event["text"].startswith("Review"):
-        return True
-    elif event["text"].startswith("Amount"):
-        return True
-    elif event["text"].startswith("Address"):
-        return True
-    elif event["text"].startswith("Confirm"):
-        return True
-    elif event["text"].startswith("Fees"):
-        return True
-    return False
-
-
-def ux_thread_sign_psbt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
-    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
-
-    first_approve = True
-
-    while True:
-        event = speculos_client.get_next_event()
-        all_events.append(event)
-
-        if "Tap to continue" in event["text"]:
-            speculos_client.finger_touch(55, 550)
-
-        elif first_approve and "Hold to sign" in event["text"]:
-            first_approve = False
-            speculos_client.finger_touch(55, 550, 3)
-
-        elif "SIGNED" in event["text"]:
-            break
-
-
-def ux_thread_sign_psbt(speculos_client: SpeculosClient, all_events: List[dict]):
-    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
-
-    # press right until the last screen (will press the "right" button more times than needed)
-    while True:
-        event = speculos_client.get_next_event()
-        all_events.append(event)
-
-        if should_go_right(event):
-            speculos_client.press_and_release("right")
-        elif "Approve" in event["text"]:
-            speculos_client.press_and_release("both")
-        elif event["text"] == "Accept":
-            speculos_client.press_and_release("both")
-            break
-
-
-def parse_signing_events(events: List[dict]) -> dict:
-    ret = dict()
-
-    cur_output_index = -1
-
-    ret["addresses"] = []
-    ret["amounts"] = []
-    ret["fees"] = ""
-    next_step = ""
-    keywords = ("Amount", "Address", "Fees", "Accept", "Approve")
-
-    for ev in events:
-        if ev["text"].startswith("output #"):
-            idx_str = ev["text"][8:]
-
-            assert int(idx_str) - 1 == cur_output_index + 1  # should not skip outputs
-
-            cur_output_index = int(idx_str) - 1
-
-            ret["addresses"].append("")
-            ret["amounts"].append("")
-            next_step = ""
-
-        elif ev["text"].startswith("Tap"):
-            ret["addresses"].append("")
-            ret["amounts"].append("")
-            next_step = ""
-            continue
-
-        elif ev["text"].startswith(keywords):
-            next_step = ev["text"]
-            continue
-
-        if next_step.startswith("Address"):
-            if len(ret["addresses"]) == 0:
-                ret["addresses"].append("")
-
-            ret["addresses"][-1] += ev["text"].strip()
-
-        elif next_step.startswith("Fees"):
-            ret["fees"] += ev["text"].strip()
-
-        elif next_step.startswith("Amount"):
-            if len(ret["amounts"]) == 0:
-                ret["amounts"].append("")
-
-            ret["amounts"][-1] += ev["text"].strip()
-
-    return ret
 
 
 def open_psbt_from_file(filename: str) -> PSBT:
@@ -148,9 +40,7 @@ def open_psbt_from_file(filename: str) -> PSBT:
     return psbt
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_pkh_1to1(client: Client):
-
+def test_sign_psbt_singlesig_pkh_1to1(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # PSBT for a legacy 1-input 1-output spend (no change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
 
@@ -166,8 +56,20 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     # #0:
     #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
     #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
 
+    print(result)
+    print([(
+        0,
+        PartialSignature(
+            pubkey=bytes.fromhex("02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718"),
+            signature=bytes.fromhex(
+                "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
+            )
+        )
+    )])
     assert result == [(
         0,
         PartialSignature(
@@ -179,8 +81,7 @@ def test_sign_psbt_singlesig_pkh_1to1(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
+def test_sign_psbt_singlesig_sh_wpkh_1to2(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")
@@ -197,7 +98,9 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     # #0:
     #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              testname=test_name)
 
     assert result == [(
         0,
@@ -210,8 +113,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_accept_highfee.json")
-def test_sign_psbt_highfee(client: Client):
+def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Transactions with fees higher than 10% of total amount
     # An aditional warning is shown.
 
@@ -233,14 +135,15 @@ def test_sign_psbt_highfee(client: Client):
         ],
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_3(firmware),
+                              testname=test_name)
 
     assert len(result) == 1
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
-
+def test_sign_psbt_singlesig_wpkh_1to2(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
     # PSBT for a segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-1to2.psbt")
 
@@ -252,7 +155,9 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
         ],
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              testname=test_name)
 
     # expected sigs
     # #0:
@@ -270,8 +175,8 @@ def test_sign_psbt_singlesig_wpkh_1to2(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
+def test_sign_psbt_singlesig_wpkh_2to2(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
     # PSBT for a segwit 2-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/wpkh-2to2.psbt")
@@ -284,7 +189,9 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
         ],
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
 
     # expected sigs
     # #0:
@@ -313,8 +220,8 @@ def test_sign_psbt_singlesig_wpkh_2to2(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_missing_nonwitnessutxo_accept.json")
-def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
+def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(navigator: Navigator, firmware:
+                                                              Firmware, client: RaggerClient, test_name: str):
     # Same as the previous test, but the non-witness-utxo is missing.
     # The app should sign after a warning.
 
@@ -332,7 +239,9 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
         ],
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_4(firmware),
+                              testname=test_name)
 
     # expected sigs
     # #0:
@@ -361,8 +270,9 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_wpkh_selftransfer(client: Client):
+def test_sign_psbt_singlesig_wpkh_selftransfer(navigator: Navigator, firmware: Firmware, client:
+                                               RaggerClient, test_name: str):
+
     # The only output is a change output.
     # A "self-transfer" screen should be shown before the fees.
 
@@ -375,12 +285,14 @@ def test_sign_psbt_singlesig_wpkh_selftransfer(client: Client):
     )
 
     psbt = "cHNidP8BAHECAAAAAfcDVJxLN1tzz5vaIy2onFL/ht/OqwKm2jEWGwMNDE/cAQAAAAD9////As0qAAAAAAAAFgAUJfcXOL7SoYGoDC1n6egGa0OTD9/mtgEAAAAAABYAFDXG4N1tPISxa6iF3Kc6yGPQtZPsTTQlAAABAPYCAAAAAAEBCOcYS1aMP1uQcUKTMJbvlsZXsV4yNnVxynyMfxSX//UAAAAAFxYAFGEWho6AN6qeux0gU3BSWnK+Dw4D/f///wKfJwEAAAAAABepFG1IUtrzpUCfdyFtu46j1ZIxLX7ph0DiAQAAAAAAFgAU4e5IJz0XxNe96ANYDugMQ34E0/cCRzBEAiB1b84pX0QaOUrvCdDxKeB+idM6wYKTLGmqnUU/tL8/lQIgbSinpq4jBlo+SIGyh8XNVrWAeMlKBNmoLenKOBugKzcBIQKXsd8NwO+9naIfeI3nkgYjg6g3QZarGTRDs7SNVZfGPJBJJAABAR9A4gEAAAAAABYAFOHuSCc9F8TXvegDWA7oDEN+BNP3IgYCgffBheEUZI8iAFFfv7b+HNM7j4jolv6lj5/n3j68h3kY9azC/VQAAIABAACAAAAAgAAAAAAHAAAAACICAzQZjNnkwXFEhm1F6oC2nk1ADqH6t/RHBAOblLA4tV5BGPWswv1UAACAAQAAgAAAAIABAAAAEgAAAAAiAgJxtbd5rYcIOFh3l7z28MeuxavnanCdck9I0uJs+HTwoBj1rML9VAAAgAEAAIAAAACAAQAAAAAAAAAA"
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_5(firmware),
+                              testname=test_name)
 
     assert len(result) == 1
 
 
-# def test_sign_psbt_legacy(client: Client):
+# def test_sign_psbt_legacy(client: RaggerClient, test_name: str):
 #     # legacy address
 #     # PSBT for a legacy 1-input 1-output spend
 #     unsigned_raw_psbt_base64 = "cHNidP8BAFQCAAAAAbUlIwxFfIt0fsuFCNtL3dHKcOvUPQu2CNcqc8FrNtTyAAAAAAD+////AaDwGQAAAAAAGKkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrAAAAAAAAQD5AgAAAAABATfphYFskBaL7jbWIkU3K7RS5zKr5BvfNHjec1rNieTrAQAAABcWABTkjiMSrvGNi5KFtSy72CSJolzNDv7///8C/y8bAAAAAAAZdqkU2FZEFTTPb1ZpCw2Oa2sc/FxM59GIrDS2GJ0BAAAAF6kUnEFiBqwsbP0pWpazURx45PGdXkWHAkcwRAIgCxWs2+R6UcpQuD6QKydU0irJ7yNe++5eoOly5VgqrEsCIHUD6t4LNW0292vnP+heXZ6Walx8DRW2TB+IOazzDNcaASEDnQS6zdUebuNm7FuOdKonnlNmPPpUyN66w2CIsX5N+pUhIh4AAAA="
@@ -393,7 +305,7 @@ def test_sign_psbt_singlesig_wpkh_selftransfer(client: Client):
 #     print(result)
 
 
-# def test_sign_psbt_legacy_p2pkh(client: Client):
+# def test_sign_psbt_legacy_p2pkh(client: RaggerClient, test_name: str):
 #     # test from app-bitcoin
 
 #     # legacy address
@@ -410,8 +322,7 @@ def test_sign_psbt_singlesig_wpkh_selftransfer(client: Client):
 #     print(result)
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_multisig_wsh(client: Client):
+def test_sign_psbt_multisig_wsh(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -428,7 +339,9 @@ def test_sign_psbt_multisig_wsh(client: Client):
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
-    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_6(firmware),
+                              testname=test_name)
 
     assert result == [(
         0,
@@ -441,8 +354,7 @@ def test_sign_psbt_multisig_wsh(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_multisig_sh_wsh(client: Client):
+def test_sign_psbt_multisig_sh_wsh(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # wrapped segwit multisig ("sh(wsh(sortedmulti(...)))")
     wallet = MultisigWallet(
         name="Cold storage",
@@ -460,7 +372,9 @@ def test_sign_psbt_multisig_sh_wsh(client: Client):
     )
 
     psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEAigIAAAABAaNw+E0toKUlohxkK0YmapPS7uToo7RG7DA2YLrmoD8BAAAAFxYAFAppBymwQTPq8lpFfFWMuPRNdbTX/v///wI7rUIBAAAAABepFJMyNbbbdF4o3zxQhWSJ5ZXY5naHh60dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHbvokAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
-    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              testname=test_name)
 
     assert result == [(
         0,
@@ -473,8 +387,8 @@ def test_sign_psbt_multisig_sh_wsh(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_wallet_missing_nonwitnessutxo_accept.json")
-def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(client: Client):
+def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(navigator: Navigator, firmware: Firmware,
+                                                          client: RaggerClient, test_name: str):
     # A transaction spending a wrapped segwit address has a script that appears like a legacy UTXO, but uses
     # the segwit sighash algorithm.
     # Therefore, if the non-witness-utxo is missing, we should still sign it while giving the warning for unverified inputs,
@@ -496,7 +410,9 @@ def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(client: Client):
     )
 
     psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
-    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_8(firmware),
+                              testname=test_name)
 
     assert result == [(
         0,
@@ -509,8 +425,9 @@ def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(client: Client):
     )]
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
+def test_sign_psbt_taproot_1to2_sighash_all(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str):
+
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/tr-1to2-sighash-all.psbt")
@@ -523,7 +440,9 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
         ],
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
     assert len(result) == 1
 
     # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
@@ -548,8 +467,9 @@ def test_sign_psbt_taproot_1to2_sighash_all(client: Client):
     assert bip0340.schnorr_verify(sighash0, pubkey0_psbt, partial_sig0.signature[:-1])
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
+def test_sign_psbt_taproot_1to2_sighash_default(navigator: Navigator, firmware: Firmware, client:
+                                                RaggerClient, test_name: str):
+
     # PSBT for a p2tr 1-input 2-output spend (1 change address)
 
     # Test two times:
@@ -557,6 +477,7 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
     # - the second PSBT does not specify the sighash type.
     # The behavior for taproot transactions should be the same, producing 64-byte signatures
 
+    index = 0
     for psbt_file_name in ["tr-1to2-sighash-default", "tr-1to2-sighash-omitted"]:
         psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/{psbt_file_name}.psbt")
 
@@ -568,7 +489,10 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
             ],
         )
 
-        result = client.sign_psbt(psbt, wallet, None)
+        result = client.sign_psbt(psbt, wallet, None, navigator,
+                                  instructions=sign_psbt_instruction_approve(firmware),
+                                  testname=f"{test_name}_{index}")
+        index += 1
 
         # Unlike other transactions, Schnorr signatures are not deterministic (unless the randomness is removed)
         # Therefore, for this testcase we hard-code the sighash (which was validated with Bitcoin Core 22.0 when the
@@ -592,13 +516,10 @@ def test_sign_psbt_taproot_1to2_sighash_default(client: Client):
         assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature)
 
 
-def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_speculos: bool,
-                                       model: str):
+def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
     # PSBT for a segwit 4-input 3-output spend (1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
-
-    if not is_speculos:
-        pytest.skip("Requires speculos")
 
     wallet = WalletPolicy(
         "",
@@ -629,43 +550,16 @@ def test_sign_psbt_singlesig_wpkh_4to3(client: Client, comm: SpeculosClient, is_
 
     assert sum_out < sum_in
 
-    fees_amount = sum_in - sum_out
-
-    all_events: List[dict] = []
-
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
-    else:
-        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
-
-    x.start()
-    result = client.sign_psbt(psbt, wallet, None)
-    x.join()
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve_9(firmware),
+                              testname=test_name)
 
     assert len(result) == n_ins
 
-    parsed_events = parse_signing_events(all_events)
 
-    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
-
-    shown_out_idx = 0
-    for out_idx in range(n_outs):
-        if out_idx != change_index:
-            out_amt = psbt.tx.vout[out_idx].nValue
-            assert parsed_events["amounts"][shown_out_idx] == format_amount(CURRENCY_TICKER, out_amt)
-
-            out_addr = Script(psbt.tx.vout[out_idx].scriptPubKey).address(network=NETWORKS["test"])
-            assert parsed_events["addresses"][shown_out_idx] == out_addr
-
-            shown_out_idx += 1
-
-
-def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, is_speculos: bool,
-                                          model: str):
+def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmware, client:
+                                          RaggerClient, test_name: str):
     # Test with a transaction with an extremely large amount
-
-    if not is_speculos:
-        pytest.skip("Requires speculos")
 
     wallet = WalletPolicy(
         "",
@@ -685,31 +579,15 @@ def test_sign_psbt_singlesig_large_amount(client: Client, comm: SpeculosClient, 
 
     assert sum_out < sum_in
 
-    fees_amount = sum_in - sum_out
-
-    all_events: List[dict] = []
-
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_sign_psbt_stax, args=[comm, all_events])
-    else:
-        x = threading.Thread(target=ux_thread_sign_psbt, args=[comm, all_events])
-    x.start()
-    result = client.sign_psbt(psbt, wallet, None)
-    x.join()
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
 
     assert len(result) == 1
 
-    parsed_events = parse_signing_events(all_events)
 
-    assert parsed_events["fees"] == format_amount(CURRENCY_TICKER, fees_amount)
-
-    out_amt = psbt.tx.vout[0].nValue
-    assert parsed_events["amounts"][0] == format_amount(CURRENCY_TICKER, out_amt)
-
-
-@pytest.mark.timeout(0)  # disable timeout
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_tr_512to256(client: Client, enable_slow_tests: bool):
+def test_sign_psbt_singlesig_wpkh_512to256(navigator: Navigator, firmware: Firmware, client:
+                                           RaggerClient, test_name: str, enable_slow_tests: bool):
     # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
     # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
 
@@ -738,23 +616,14 @@ def test_sign_psbt_singlesig_tr_512to256(client: Client, enable_slow_tests: bool
         [i == 42 for i in range(n_outputs)]
     )
 
-    result = client.sign_psbt(psbt, wallet, None)
+    result = client.sign_psbt(psbt, wallet, None, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware),
+                              testname=test_name)
 
     assert len(result) == n_inputs
 
 
-def ux_thread_accept_prompt_stax(speculos_client: SpeculosClient, all_events: List[dict]):
-    """Completes the signing flow always going right and accepting at the appropriate time, while collecting all the events in all_events."""
-
-    while True:
-        event = speculos_client.get_next_event()
-        all_events.append(event)
-        if "Tap to continue" in event["text"]:
-            speculos_client.finger_touch(55, 550)
-            break
-
-
-def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: str):
+def test_sign_psbt_fail_11_changes(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # PSBT for transaction with 11 change addresses; the limit is 10, so it must fail with NotSupportedError
     # before any user interaction on nanos.
 
@@ -773,22 +642,19 @@ def test_sign_psbt_fail_11_changes(client: Client, comm: SpeculosClient, model: 
         [True] * 11,
     )
 
-    all_events: List[dict] = []
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, wallet, None, navigator,
+                         instructions=sign_psbt_instruction_tap(firmware),
+                         testname=test_name)
 
-    if model == "stax":
-        x = threading.Thread(target=ux_thread_accept_prompt_stax, args=[comm, all_events])
-
-        x.start()
-    with pytest.raises(NotSupportedError):
-        client.sign_psbt(psbt, wallet, None)
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
 
 
-def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool):
+def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: Firmware, client:
+                                               RaggerClient, test_name: str):
     # PSBT for transaction with the wrong non-witness utxo for an input.
     # It must fail with IncorrectDataError before any user interaction.
-
-    if not is_speculos:
-        pytest.skip("Requires speculos")
 
     wallet = WalletPolicy(
         "",
@@ -812,12 +678,16 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(client: Client, is_speculos: bool
     psbt.inputs[0].non_witness_utxo = wit
 
     client._no_clone_psbt = True
-    with pytest.raises(IncorrectDataError):
-        client.sign_psbt(psbt, wallet, None)
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, wallet, None, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware),
+                         testname=test_name)
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
     client._no_clone_psbt = False
 
 
-def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
@@ -830,13 +700,15 @@ def test_sign_psbt_with_opreturn(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet, None)
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve_2(firmware),
+                                testname=test_name)
 
     assert len(hww_sigs) == 1
 
 
-def test_sign_psbt_with_naked_opreturn(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_naked_opreturn(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
     wallet = WalletPolicy(
         "",
         "wpkh(@0/**)",
@@ -851,13 +723,14 @@ def test_sign_psbt_with_naked_opreturn(client: Client, comm: SpeculosClient):
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet, None)
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve_2(firmware),
+                                testname=test_name)
 
     assert len(hww_sigs) == 1
 
 
-def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_segwit_v16(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # This psbt contains an output with future psbt version 16 (corresponding to address
     # tb1sqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq4hu3px).
     # The app should accept it nonetheless.
@@ -874,13 +747,19 @@ def test_sign_psbt_with_segwit_v16(client: Client, comm: SpeculosClient):
         ],
     )
 
-    with automation(comm, "automations/sign_with_default_wallet_accept.json"):
-        hww_sigs = client.sign_psbt(psbt, wallet, None)
+    hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                instructions=sign_psbt_instruction_approve(firmware),
+                                testname=test_name)
 
     assert len(hww_sigs) == 1
 
 
-def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
+def test_sign_psbt_with_external_inputs(navigator: Navigator, firmware: Firmware, client:
+                                        RaggerClient, test_name: str):
+
+    instructions = [sign_psbt_instruction_approve_external_inputs(firmware),
+                    sign_psbt_instruction_approve_external_inputs_2(firmware),
+                    sign_psbt_instruction_approve_external_inputs_2(firmware)]
     # PSBT obtained by joining pkh-1to1.psbt, tr-1to2.psbt, wpkh-1to2.psbt.
     # We sign it with each of the respective wallets; therefore it must show the "external inputs" warning each time.
     psbt_b64 = "cHNidP8BAP0yAQIAAAADobgj0jNtaUtJNO+bblt94XoFUT2oop2wKi7Lx6mm/m0BAAAAAP3///9RIsLN5oI+VXVBdbksnFegqOGsg8OOF4f9Oh/zNI6VEwEAAAAA/f///3oqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////BaCGAQAAAAAAFgAUE5m4oJhHoDmwNS9Y0hLBgLqxf3dV/6cAAAAAACJRIAuOdIa8MGoK77enwArwQFVC2xrNc+7MqCdxzPX+XrYPeEEPAAAAAAAZdqkUE9fVgWaUbD7AIpNAZtjA0RHRu0GIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+Sguw0AAAAAABl2qRQ0Sg9IyhUOwrkDgXZgubaLE6ZwJoisAAAAAAABASunhqkAAAAAACJRINj08dGJltthuxyvVCPeJdih7unJUNN+b/oCMBLV5i4NIRYhLqKFalzxEOZqK+nXNTFHk/28s4iyuPE/K2remC569RkA9azC/VYAAIABAACAAAAAgAEAAAAAAAAAARcgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLIgYD7iw9mOsfk8Chqo5aQAm3Dre0Tq0V8WZvE2sBKtWNMGgY9azC/VQAAIABAACAAAAAgAEAAAAIAAAAAAABBSACkIHs5WFqocuZMZ/Eh07+5H8IzrpfYARjbIxDQJpfCiEHApCB7OVhaqHLmTGfxIdO/uR/CM66X2AEY2yMQ0CaXwoZAPWswv1WAACAAQAAgAAAAIABAAAAAgAAAAAAIgICKexHcnEx7SWIogxG7amrt9qm9J/VC6/nC5xappYcTswY9azC/VQAAIABAACAAAAAgAEAAAAKAAAAAAA="
@@ -911,15 +790,18 @@ def test_sign_psbt_with_external_inputs(client: Client, comm: SpeculosClient):
         )
     ]
 
-    for wallet in wallets:
-        with automation(comm, "automations/sign_with_wallet_external_inputs_accept.json"):
-            hww_sigs = client.sign_psbt(psbt, wallet, None)
+    index = 0
+    for wallet, text in zip(wallets, instructions):
+        hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
+                                    instructions=text,
+                                    testname=f"{test_name}_{index}")
+        index += 1
 
         assert len(hww_sigs) == 1
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
+def test_sign_psbt_miniscript_multikey(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
     # An earlier (unreleased) version of the app had issues in recognizing the internal key in
     # wallets with multiple internal keys. This caused the app not to recognize some inputs as
     # internal and refuse signing.
@@ -943,13 +825,15 @@ def test_sign_psbt_miniscript_multikey(client: Client, comm: SpeculosClient):
         "e139a96195e18bc61e8cda72d11b3f75d3084a5c893990ca74a152206064792d"
     )
 
-    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              testname=test_name)
 
     assert len(result) == 2
 
 
-@has_automation("automations/sign_with_default_wallet_accept.json")
-def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
+def test_sign_psbt_singlesig_pkh_1to1_other_encodings(navigator: Navigator, firmware: Firmware,
+                                                      client: RaggerClient, test_name: str):
     # same as test_sign_psbt_singlesig_pkh_1to1, but the psbt is passed as bytes or base64 string
 
     psbt_obj = open_psbt_from_file(f"{tests_root}/psbt/singlesig/pkh-1to1.psbt")
@@ -965,12 +849,17 @@ def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
     psbt_b64 = psbt_obj.serialize()
     psbt_bytes = base64.b64decode(psbt_b64)
 
+    index = 0
     for psbt in [psbt_b64, psbt_bytes]:
         # expected sigs:
         # #0:
         #  "pubkey" : "02ee8608207e21028426f69e76447d7e3d5e077049f5e683c3136c2314762a4718",
         #  "signature" : "3045022100e55b3ca788721aae8def2eadff710e524ffe8c9dec1764fdaa89584f9726e196022012a30fbcf9e1a24df31a1010356b794ab8de438b4250684757ed5772402540f401"
-        result = client.sign_psbt(psbt, wallet, None)
+
+        result = client.sign_psbt(psbt, wallet, None, navigator,
+                                  instructions=sign_psbt_instruction_approve(firmware),
+                                  testname=f"{test_name}_{index}")
+        index += 1
 
         assert result == [(
             0,
@@ -983,8 +872,8 @@ def test_sign_psbt_singlesig_pkh_1to1_other_encodings(client: Client):
         )]
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
+def test_sign_psbt_tr_script_pk_sighash_all(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str):
     # Transaction signed with SIGHASH_ALL, therefore producing a 65-byte signature
 
     wallet = WalletPolicy(
@@ -1002,7 +891,9 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
 
     psbt = PSBT()
     psbt.deserialize("cHNidP8BAFICAAAAAR/BzFdxy4OGDMVtlLz+2ThgjBf2NmJDW0HpxE/8/TFCAQAAAAD9////ATkFAAAAAAAAFgAUqo7zdMr638p2kC3bXPYcYLv9nYUAAAAAAAEBK0wGAAAAAAAAIlEg/AoQ0wjH5BtLvDZC+P2KwomFOxznVaDG0NSV8D2fLaQBAwQBAAAAIhXBUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUjIGsW6MH5efpMwPBbajAK//+UFFm28g3nfeVbAWDvjkysrMAhFlAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1HQB2IjpuMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIRZrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrD0BCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKT1rML9MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAARcgUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUBGCAJLtoDNhfiEO5/fQ43ikBK6hxItWqhAwIr7Pd0bkcApAAA")
-    result = client.sign_psbt(psbt, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              testname=test_name)
 
     assert len(result) == 1
 
@@ -1024,8 +915,8 @@ def test_sign_psbt_tr_script_pk_sighash_all(client: Client):
     assert bip0340.schnorr_verify(sighash0, partial_sig0.pubkey, partial_sig0.signature[:64])
 
 
-@has_automation("automations/sign_with_wallet_accept.json")
-def test_sign_psbt_against_wrong_tapleaf_hash(client: Client):
+def test_sign_psbt_against_wrong_tapleaf_hash(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str):
     # Versions 2.1.2, 2.1.3 and 2.2.0 incorrectly derived keys for policies with keys whose
     # derivation doesn't end in /** or /<0;1>/*.
     wallet = WalletPolicy(
@@ -1043,7 +934,9 @@ def test_sign_psbt_against_wrong_tapleaf_hash(client: Client):
 
     psbt_b64 = "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"
 
-    result = client.sign_psbt(psbt_b64, wallet, wallet_hmac)
+    result = client.sign_psbt(psbt_b64, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              testname=test_name)
 
     assert len(result) == 2
 
