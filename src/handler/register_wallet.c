@@ -46,6 +46,11 @@
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);
 
+static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1, 0xa0, 0x49, 0x54,
+                                              0xb7, 0x8b, 0x4b, 0x60, 0x35, 0xe9, 0x7a, 0x5e, 0x07,
+                                              0x8a, 0x5a, 0x0f, 0x28, 0xec, 0x96, 0xd5, 0x47, 0xbf,
+                                              0xee, 0x9a, 0xce, 0x80, 0x3a, 0xc0};
+
 /**
  * Validates the input, initializes the hash context and starts accumulating the wallet header in
  * it.
@@ -171,27 +176,37 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         // supported, but disabled for now (question to address: can only _some_ of the keys have a
         // wildcard?).
 
-        bool is_key_internal = false;
-        // if there is key origin information and the fingerprint matches, we make sure it's not a
-        // false positive (it could be wrong info, or a collision).
-        if (key_info.has_key_origin &&
-            read_u32_be(key_info.master_key_fingerprint, 0) == master_key_fingerprint) {
-            // we verify that we can actually generate the same pubkey
-            serialized_extended_pubkey_t pubkey_derived;
-            int serialized_pubkey_len =
-                get_extended_pubkey_at_path(key_info.master_key_derivation,
-                                            key_info.master_key_derivation_len,
-                                            BIP32_PUBKEY_VERSION,
-                                            &pubkey_derived);
-            if (serialized_pubkey_len == -1) {
-                SEND_SW(dc, SW_BAD_STATE);
-                ui_post_processing_confirm_wallet_registration(dc, false);
-                return;
-            }
+        key_type_e key_type;
 
-            if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
-                is_key_internal = true;
-                ++n_internal_keys;
+        if (memcmp(key_info.ext_pubkey.compressed_pubkey,
+                   BIP0341_NUMS_PUBKEY,
+                   sizeof(BIP0341_NUMS_PUBKEY)) == 0) {
+            // this public key is known to be unspendable
+            key_type = PUBKEY_TYPE_UNSPENDABLE;
+        } else {
+            key_type = PUBKEY_TYPE_EXTERNAL;
+
+            // if there is key origin information and the fingerprint matches, we make sure it's not
+            // a false positive (it could be wrong info, or a collision).
+            if (key_info.has_key_origin &&
+                read_u32_be(key_info.master_key_fingerprint, 0) == master_key_fingerprint) {
+                // we verify that we can actually generate the same pubkey
+                serialized_extended_pubkey_t pubkey_derived;
+                int serialized_pubkey_len =
+                    get_extended_pubkey_at_path(key_info.master_key_derivation,
+                                                key_info.master_key_derivation_len,
+                                                BIP32_PUBKEY_VERSION,
+                                                &pubkey_derived);
+                if (serialized_pubkey_len == -1) {
+                    SEND_SW(dc, SW_BAD_STATE);
+                    ui_post_processing_confirm_wallet_registration(dc, false);
+                    return;
+                }
+
+                if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
+                    key_type = PUBKEY_TYPE_INTERNAL;
+                    ++n_internal_keys;
+                }
             }
         }
 
@@ -199,7 +214,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
                                                    (char *) next_pubkey_info,
                                                    cosigner_index,  // 1-indexed for the UI
                                                    wallet_header.n_keys,
-                                                   is_key_internal)) {
+                                                   key_type)) {
             SEND_SW(dc, SW_DENY);
             return;
         }
