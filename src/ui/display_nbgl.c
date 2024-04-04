@@ -417,7 +417,7 @@ void ui_display_policy_map_cosigner_pubkey_flow(void) {
 }
 
 static void suspicious_pubkey_warning(void) {
-    nbgl_useCaseReviewStart(&C_round_warning_64px,
+    nbgl_useCaseReviewStart(&C_Important_Circle_64px,
                             "WARNING",
                             "The derivation path\nis unusual",
                             "Cancel",
@@ -597,7 +597,7 @@ void ui_display_default_wallet_address_flow(void) {
 
 // Warning Flows
 void ui_warn_high_fee_flow(void) {
-    nbgl_useCaseChoice(&C_round_warning_64px,
+    nbgl_useCaseChoice(&C_Important_Circle_64px,
                        "Warning",
                        "Fees are above 10%\n of total amount",
                        "Continue",
@@ -606,7 +606,7 @@ void ui_warn_high_fee_flow(void) {
 }
 
 void ui_display_warning_external_inputs_flow(void) {
-    nbgl_useCaseChoice(&C_round_warning_64px,
+    nbgl_useCaseChoice(&C_Important_Circle_64px,
                        "Warning",
                        "There are external inputs",
                        "Continue",
@@ -615,7 +615,7 @@ void ui_display_warning_external_inputs_flow(void) {
 }
 
 void ui_display_unverified_segwit_inputs_flows(void) {
-    nbgl_useCaseChoice(&C_round_warning_64px,
+    nbgl_useCaseChoice(&C_Important_Circle_64px,
                        "Warning",
                        "Unverified inputs\nUpdate Ledger Live or\nthird party wallet software",
                        "Continue",
@@ -624,7 +624,7 @@ void ui_display_unverified_segwit_inputs_flows(void) {
 }
 
 void ui_display_nondefault_sighash_flow(void) {
-    nbgl_useCaseChoice(&C_round_warning_64px,
+    nbgl_useCaseChoice(&C_Important_Circle_64px,
                        "Warning",
                        "Non-default sighash",
                        "Continue",
