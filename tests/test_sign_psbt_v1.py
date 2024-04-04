@@ -448,7 +448,7 @@ def test_sign_psbt_with_opreturn_v1(navigator: Navigator, firmware: Firmware, cl
     psbt.deserialize(psbt_b64)
 
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
-                                instructions=sign_psbt_instruction_approve_2(firmware),
+                                instructions=sign_psbt_instruction_approve_opreturn(firmware),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1

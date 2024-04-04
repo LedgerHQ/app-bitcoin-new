@@ -26,10 +26,7 @@ def message_instruction_approve_long(model: Firmware) -> Instructions:
         instructions.new_request("Processing")
         instructions.new_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_message(page_count=4)
         instructions.confirm_message()
     return instructions
 
@@ -146,7 +143,21 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     if model.name.startswith("nano"):
         return instructions
 
-    instructions.navigate_end_of_flow()
+    instructions.review_start()
+    return instructions
+
+
+def sign_psbt_instruction_approve_opreturn(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Continue")
+        instructions.new_request("Sign")
+    else:
+        instructions.review_start()
+        instructions.same_request("Address", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+        instructions.review_fees(fees_on_same_request=False)
+        instructions.confirm_transaction()
     return instructions
 
 
@@ -157,7 +168,8 @@ def sign_psbt_instruction_approve(model: Firmware) -> Instructions:
         instructions.new_request("Continue")
         instructions.same_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -169,8 +181,8 @@ def sign_psbt_instruction_approve_2(model: Firmware) -> Instructions:
         instructions.new_request("Continue")
         instructions.new_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees(fees_on_same_request=False)
         instructions.confirm_transaction()
     return instructions
 
@@ -183,10 +195,10 @@ def sign_psbt_instruction_approve_3(model: Firmware) -> Instructions:
         instructions.new_request("Continue")
         instructions.same_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
         instructions.warning_accept()
-        instructions.same_request_confirm_transaction()
+        instructions.review_fees()
+        instructions.confirm_transaction()
     return instructions
 
 
@@ -199,7 +211,8 @@ def sign_psbt_instruction_approve_4(model: Firmware) -> Instructions:
         instructions.same_request("Sign")
     else:
         instructions.warning_accept()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -210,7 +223,7 @@ def sign_psbt_instruction_approve_5(model: Firmware) -> Instructions:
     if model.name.startswith("nano"):
         instructions.new_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
         instructions.confirm_transaction()
     return instructions
 
@@ -224,8 +237,8 @@ def sign_psbt_instruction_approve_6(model: Firmware) -> Instructions:
         instructions.new_request("Sign")
     else:
         instructions.confirm_wallet()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees(fees_on_same_request=False)
         instructions.confirm_transaction()
     return instructions
 
@@ -239,7 +252,8 @@ def sign_psbt_instruction_approve_7(model: Firmware) -> Instructions:
         instructions.same_request("Sign")
     else:
         instructions.confirm_wallet()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -255,7 +269,8 @@ def sign_psbt_instruction_approve_8(model: Firmware) -> Instructions:
     else:
         instructions.confirm_wallet()
         instructions.warning_accept()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -268,8 +283,8 @@ def sign_psbt_instruction_approve_9(model: Firmware) -> Instructions:
         instructions.new_request("Continue")
         instructions.same_request("Sign")
     else:
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start(output_count=2)
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -287,11 +302,8 @@ def sign_psbt_instruction_approve_external_inputs(model: Firmware) -> Instructio
         instructions.same_request("Sign")
     else:
         instructions.warning_accept()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start(output_count=5)
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -308,10 +320,8 @@ def sign_psbt_instruction_approve_external_inputs_2(model: Firmware) -> Instruct
         instructions.same_request("Sign")
     else:
         instructions.warning_accept()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start(output_count=4)
+        instructions.review_fees()
         instructions.confirm_transaction()
     return instructions
 
@@ -325,8 +335,8 @@ def sign_psbt_instruction_approve_10(model: Firmware) -> Instructions:
         instructions.new_request("Sign")
     else:
         instructions.warning_accept()
-        instructions.navigate_end_of_flow()
-        instructions.navigate_end_of_flow()
+        instructions.review_start()
+        instructions.review_fees(fees_on_same_request=False)
         instructions.confirm_transaction()
     return instructions
 
@@ -339,6 +349,7 @@ def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
             instructions.new_request("Approve", save_screenshot=False)
     else:
         for _ in range(n_keys + 1):
+            instructions.choice_confirm(save_screenshot=False)
             instructions.choice_confirm(save_screenshot=False)
     return instructions
 

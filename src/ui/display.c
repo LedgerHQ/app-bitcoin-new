@@ -103,13 +103,12 @@ bool ui_display_pubkey(dispatcher_context_t *context,
 
 bool ui_display_path_and_message_content(dispatcher_context_t *context,
                                          const char *path_str,
-                                         const char *message_content,
-                                         uint8_t pageCount) {
+                                         const char *message_content) {
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
     strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
     strncpy(state->message, message_content, sizeof(state->message));
 
-    ui_sign_message_content_flow(pageCount);
+    ui_sign_message_content_flow();
 
     return io_ui_process(context, true);
 }
@@ -221,8 +220,8 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
     return io_ui_process(context, true);
 }
 
-bool ui_transaction_prompt(dispatcher_context_t *context, const int external_outputs_total_count) {
-    ui_display_transaction_prompt(external_outputs_total_count);
+bool ui_transaction_prompt(dispatcher_context_t *context) {
+    ui_display_transaction_prompt();
     return io_ui_process(context, true);
 }
 
@@ -274,12 +273,6 @@ bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *contex
     return true;
 }
 
-bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
-
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
     (void) context;
     (void) success;
@@ -300,26 +293,20 @@ void ui_pre_processing_message(void) {
 #ifdef HAVE_NBGL
 bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
     (void) context;
-    ui_display_post_processing_confirm_wallet_registation(success);
+    ui_display_post_processing(success);
 
     return true;
 }
 
-bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success) {
-    ui_display_post_processing_confirm_wallet_spend(success);
-
-    return io_ui_process(context, success);
-}
-
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
-    ui_display_post_processing_confirm_transaction(success);
+    ui_display_post_processing(success);
 
     return io_ui_process(context, success);
 }
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
     (void) context;
-    ui_display_post_processing_confirm_message(success);
+    ui_display_post_processing(success);
 
     return true;
 }
