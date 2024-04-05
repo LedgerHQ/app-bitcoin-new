@@ -115,7 +115,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(navigator: Navigator, firmware: Firmwa
 
 def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Transactions with fees higher than 10% of total amount
-    # An aditional warning is shown.
+    # An additional warning is shown.
 
     # PSBT for a wrapped segwit 1-input 2-output spend (1 change address)
     psbt = open_psbt_from_file(f"{tests_root}/psbt/singlesig/sh-wpkh-1to2.psbt")

@@ -37,11 +37,13 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
     assert wallet_id == wallet_policy.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
-    address_hww = client.get_wallet_address(wallet_policy, wallet_hmac, 0, 3, False)
+    address_hww = client.get_wallet_address(
+        wallet_policy, wallet_hmac, 0, 3, False)
 
     # ==> verify the address matches what bitcoin-core computes
     receive_descriptor = wallet_policy.get_descriptor(change=False)
@@ -94,7 +96,8 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
             out_address: Decimal("0.01")
         },
         options={
-            "changePosition": 1 # We need a fixed position to be able to know how to navigate in the flows
+            # We need a fixed position to be able to know how to navigate in the flows
+            "changePosition": 1
         }
     )
 
@@ -109,8 +112,10 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
-    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
+    n_internal_keys = count_internal_keys(
+        speculos_globals.seed, "test", wallet_policy)
+    # should be true as long as all inputs are internal
+    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)
 
     for i, part_sig in hww_sigs:
         psbt.inputs[i].partial_sigs[part_sig.pubkey] = part_sig.signature
@@ -121,7 +126,8 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
     partial_psbts = [signed_psbt_hww_b64]
 
     for core_wallet_name in core_wallet_names:
-        partial_psbts.append(get_wallet_rpc(core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"])
+        partial_psbts.append(get_wallet_rpc(
+            core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"])
 
     # ==> finalize the psbt, extract tx and broadcast
     combined_psbt = rpc.combinepsbt(partial_psbts)
@@ -151,7 +157,8 @@ def test_e2e_multisig_2_of_2(navigator: Navigator, firmware: Firmware, client: R
     )
 
     run_test(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet,
-             speculos_globals, e2e_register_wallet_instruction(firmware),
+             speculos_globals, e2e_register_wallet_instruction(
+                 firmware, wallet_policy.n_keys),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
@@ -184,7 +191,7 @@ def test_e2e_multisig_multiple_internal_keys(navigator: Navigator, firmware: Fir
 
     run_test(navigator, client, wallet_policy, [core_wallet_name_3],
              rpc, rpc_test_wallet, speculos_globals,
-             e2e_register_wallet_instruction(firmware),
+             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
              e2e_sign_psbt_instruction(firmware), test_name)
 
 
@@ -212,9 +219,11 @@ def test_e2e_multisig_16_of_16(navigator: Navigator, firmware: Firmware, client:
         address_type=AddressType.WIT,
         threshold=2,
         sorted=True,
-        keys_info=core_xpub_origs + [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
+        keys_info=core_xpub_origs +
+        [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
     )
 
     run_test(navigator, client, wallet_policy, core_wallet_names, rpc, rpc_test_wallet,
-             speculos_globals. e2e_register_wallet_instruction(firmware),
+             speculos_globals. e2e_register_wallet_instruction(
+                 firmware, wallet_policy.n_keys),
              e2e_sign_psbt_instruction(firmware), test_name)
