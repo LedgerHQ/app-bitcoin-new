@@ -1,6 +1,6 @@
 /*****************************************************************************
  *   Ledger App Bitcoin.
- *   (c) 2021 Ledger SAS.
+ *   (c) 2024 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@
 #include "menu.h"
 
 static const char* const infoTypes[] = {"Version", "Developer", "Copyright"};
-static const char* const infoContents[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
+static const char* const infoContents[] = {APPVERSION, "Ledger", "(c) 2024 Ledger"};
 
 static bool navigation_cb(uint8_t page, nbgl_pageContent_t* content) {
     UNUSED(page);
