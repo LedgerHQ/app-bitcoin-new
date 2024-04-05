@@ -186,7 +186,6 @@ UX_STEP_NOCB(ux_high_fee_step,
              });
 #endif
 
-UX_STEP_NOCB(ux_confirm_transaction_step, pnn, {&C_icon_eye, "Confirm", "transaction"});
 UX_STEP_NOCB(ux_confirm_selftransfer_step, pnn, {&C_icon_eye, "Confirm", "self-transfer"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
              bnnn_paging,
@@ -194,10 +193,10 @@ UX_STEP_NOCB(ux_confirm_transaction_fees_step,
                  .title = "Fees",
                  .text = g_ui_state.validate_transaction.fee,
              });
-UX_STEP_CB(ux_accept_and_send_step,
+UX_STEP_CB(ux_sign_transaction_step,
            pbb,
            set_ux_flow_response(true),
-           {&C_icon_validate_14, "Accept", "and send"});
+           {&C_icon_validate_14, "Sign", "transaction"});
 
 // Step with wallet icon and "Register wallet"
 UX_STEP_NOCB(ux_display_register_wallet_step,
@@ -379,12 +378,12 @@ UX_FLOW(ux_display_default_wallet_address_flow,
 // FLOW to display a registered wallet and authorize spending:
 // #1 screen: "Spend from known wallet"
 // #2 screen: wallet name
-// #3 screen: approve button
+// #3 screen: "Continue" button
 // #4 screen: reject button
 UX_FLOW(ux_display_spend_from_wallet_flow,
         &ux_display_spend_from_registered_wallet_step,
         &ux_display_wallet_name_step,
-        &ux_display_approve_step,
+        &ux_display_continue_step,
         &ux_display_reject_step);
 
 // FLOW to warn about external inputs
@@ -424,13 +423,13 @@ UX_FLOW(ux_display_nondefault_sighash_flow,
 // #1 screen: eye icon + "Review" + index of output to validate
 // #2 screen: output amount
 // #3 screen: output address (paginated)
-// #4 screen: approve button
+// #4 screen: "Continue" button
 // #5 screen: reject button
 UX_FLOW(ux_display_output_address_amount_flow,
         &ux_review_step,
         &ux_validate_amount_step,
         &ux_validate_address_step,
-        &ux_display_approve_step,
+        &ux_display_continue_step,
         &ux_display_reject_step);
 
 // Finalize see the transaction fees and finally accept signing
@@ -444,25 +443,23 @@ UX_FLOW(ux_warn_high_fee_flow,
         &ux_display_reject_step);
 
 // Finalize see the transaction fees and finally accept signing
-// #1 screen: eye icon + "Confirm transaction"
-// #2 screen: fee amount
-// #3 screen: "Accept and send", with approve button
-// #4 screen: reject button
+// #1 screen: fee amount
+// #2 screen: "Sign transaction", with approve button
+// #3 screen: reject button
 UX_FLOW(ux_accept_transaction_flow,
-        &ux_confirm_transaction_step,
         &ux_confirm_transaction_fees_step,
-        &ux_accept_and_send_step,
+        &ux_sign_transaction_step,
         &ux_display_reject_step);
 
 // Finalize see the transaction fees and finally accept signing
 // #1 screen: eye icon + "Confirm self-transfer"
 // #2 screen: fee amount
-// #3 screen: "Accept and send", with approve button
+// #3 screen: "Sign transaction", with approve button
 // #4 screen: reject button
 UX_FLOW(ux_accept_selftransfer_flow,
         &ux_confirm_selftransfer_step,
         &ux_confirm_transaction_fees_step,
-        &ux_accept_and_send_step,
+        &ux_sign_transaction_step,
         &ux_display_reject_step);
 
 void ui_display_pubkey_flow(void) {
