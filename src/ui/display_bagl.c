@@ -432,17 +432,16 @@ UX_FLOW(ux_display_output_address_amount_flow,
         &ux_display_continue_step,
         &ux_display_reject_step);
 
-// Finalize see the transaction fees and finally accept signing
-// #1 screen: eye icon + "Confirm transaction"
-// #2 screen: fee amount
-// #3 screen: "Continue", with approve button
-// #4 screen: reject button
+// FLOW to warn about fees above 10% of total
+// #1 screen: eye icon + fees too high message
+// #2 screen: "Continue", with approve button
+// #3 screen: reject button
 UX_FLOW(ux_warn_high_fee_flow,
         &ux_high_fee_step,
         &ux_display_continue_step,
         &ux_display_reject_step);
 
-// Finalize see the transaction fees and finally accept signing
+// Show transaction fees and finally accept signing
 // #1 screen: fee amount
 // #2 screen: "Sign transaction", with approve button
 // #3 screen: reject button
@@ -451,7 +450,9 @@ UX_FLOW(ux_accept_transaction_flow,
         &ux_sign_transaction_step,
         &ux_display_reject_step);
 
-// Finalize see the transaction fees and finally accept signing
+// Show transaction fees and finally accept signing, in case of self-transfer
+// Since there is no output to show, we add an initial screen to make sure
+// the user understands the nature of the transaction.
 // #1 screen: eye icon + "Confirm self-transfer"
 // #2 screen: fee amount
 // #3 screen: "Sign transaction", with approve button
