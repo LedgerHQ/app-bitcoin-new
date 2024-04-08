@@ -154,8 +154,8 @@ def sign_psbt_instruction_approve(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.navigate_end_of_flow()
         instructions.confirm_transaction()
@@ -166,8 +166,8 @@ def sign_psbt_instruction_approve_2(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
-        instructions.new_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Sign")
     else:
         instructions.navigate_end_of_flow()
         instructions.navigate_end_of_flow()
@@ -179,9 +179,9 @@ def sign_psbt_instruction_approve_3(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
         instructions.new_request("Continue")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.navigate_end_of_flow()
         instructions.navigate_end_of_flow()
@@ -195,8 +195,8 @@ def sign_psbt_instruction_approve_4(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.warning_accept()
         instructions.navigate_end_of_flow()
@@ -208,9 +208,7 @@ def sign_psbt_instruction_approve_5(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Accept")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Sign")
     else:
         instructions.navigate_end_of_flow()
         instructions.confirm_transaction()
@@ -221,9 +219,9 @@ def sign_psbt_instruction_approve_6(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Sign")
     else:
         instructions.confirm_wallet()
         instructions.navigate_end_of_flow()
@@ -236,9 +234,9 @@ def sign_psbt_instruction_approve_7(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.confirm_wallet()
         instructions.navigate_end_of_flow()
@@ -250,10 +248,10 @@ def sign_psbt_instruction_approve_8(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
         instructions.new_request("Continue")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.confirm_wallet()
         instructions.warning_accept()
@@ -266,9 +264,9 @@ def sign_psbt_instruction_approve_9(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.navigate_end_of_flow()
         instructions.navigate_end_of_flow()
@@ -281,12 +279,12 @@ def sign_psbt_instruction_approve_external_inputs(model: Firmware) -> Instructio
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.warning_accept()
         instructions.navigate_end_of_flow()
@@ -303,11 +301,11 @@ def sign_psbt_instruction_approve_external_inputs_2(model: Firmware) -> Instruct
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.same_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.new_request("Continue")
+        instructions.same_request("Sign")
     else:
         instructions.warning_accept()
         instructions.navigate_end_of_flow()
@@ -323,8 +321,8 @@ def sign_psbt_instruction_approve_10(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        instructions.new_request("Approve")
-        instructions.new_request("Accept")
+        instructions.new_request("Continue")
+        instructions.new_request("Sign")
     else:
         instructions.warning_accept()
         instructions.navigate_end_of_flow()
@@ -333,14 +331,14 @@ def sign_psbt_instruction_approve_10(model: Firmware) -> Instructions:
     return instructions
 
 
-def e2e_register_wallet_instruction(model: Firmware) -> Instructions:
+def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        for _ in range(23):
+        for _ in range(n_keys + 1):
             instructions.new_request("Approve", save_screenshot=False)
     else:
-        for _ in range(23):
+        for _ in range(n_keys + 1):
             instructions.choice_confirm(save_screenshot=False)
     return instructions
 
@@ -349,9 +347,9 @@ def e2e_sign_psbt_instruction(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve", save_screenshot=False)
-        instructions.new_request("Approve", save_screenshot=False)
-        instructions.new_request("Accept", save_screenshot=False)
+        instructions.new_request("Continue", save_screenshot=False)
+        instructions.new_request("Continue", save_screenshot=False)
+        instructions.new_request("Sign", save_screenshot=False)
     else:
         instructions.confirm_wallet(save_screenshot=False)
         instructions.navigate_end_of_flow(save_screenshot=False)
