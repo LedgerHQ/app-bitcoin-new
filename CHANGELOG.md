@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.2.2] - 08-04-2024
+
+### Added
+
+- During wallet policy registration, the app will recognize and explicitly label as `dummy` any extended public key whose compressed pubkey is `0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0`. This is useful especially for taproot miniscript policies which do not intend to use keypath spending.
+
+### Changed
+
+- Message signing: will now show the full text of the message, instead of its hash. If the message is too long (over 640 characters) or it contains non-printable characters (not in the range `0x20..0x70`, inclusive), then the SHA256 hash will be shown, as in previous versions of the app.
+- Transaction signing: changed the wording to make the ux slightly simpler and clearer.
+
 ## [2.2.1] - 18-03-2024
 
 ### Fixed
