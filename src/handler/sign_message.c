@@ -83,10 +83,7 @@ static bool display_message_content_and_confirm(dispatcher_context_t* dc,
             message_chunk[total_chunk_len] = '\0';
         }
 
-        if (!ui_display_path_and_message_content(dc,
-                                                 (char*) path_str,
-                                                 (char*) message_chunk,
-                                                 (n_chunks - 1) / MESSAGE_CHUNK_PER_DISPLAY)) {
+        if (!ui_display_path_and_message_content(dc, (char*) path_str, (char*) message_chunk)) {
             return false;
         }
     }
@@ -184,13 +181,11 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
                                                  n_chunks,
                                                  (uint8_t*) path_str)) {
             SEND_SW(dc, SW_DENY);
-            ui_post_processing_confirm_message(dc, false);
             return;
         }
     } else {
         if (!ui_display_message_path_hash_and_confirm(dc, path_str, message_hash_str)) {
             SEND_SW(dc, SW_DENY);
-            ui_post_processing_confirm_message(dc, false);
             return;
         }
     }
