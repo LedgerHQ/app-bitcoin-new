@@ -98,8 +98,7 @@ bool ui_display_pubkey(dispatcher_context_t *context,
 
 bool ui_display_path_and_message_content(dispatcher_context_t *context,
                                          const char *path_str,
-                                         const char *message_content,
-                                         uint8_t pageCount);
+                                         const char *message_content);
 
 bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
                                               const char *path_str,
@@ -164,7 +163,7 @@ void ui_display_pubkey_suspicious_flow(void);
 
 void ui_sign_message_path_hash_and_confirm_flow(void);
 
-void ui_sign_message_content_flow(uint8_t pageCount);
+void ui_sign_message_content_flow(void);
 
 void ui_sign_message_confirm_flow(void);
 
@@ -192,7 +191,7 @@ void ui_warn_high_fee_flow(void);
 
 void ui_accept_transaction_flow(bool is_self_transfer);
 
-void ui_display_transaction_prompt(const int external_outputs_total_count);
+void ui_display_transaction_prompt(void);
 
 bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success);
 
@@ -205,11 +204,10 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
 void ui_pre_processing_message(void);
 
 #ifdef HAVE_NBGL
-bool ui_transaction_prompt(dispatcher_context_t *context, const int external_outputs_total_count);
+bool ui_transaction_prompt(dispatcher_context_t *context);
 void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_wallet_registation(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
-void ui_display_post_processing_confirm_wallet_spend(bool success);
 void ui_set_display_prompt(void);
 #else
 #define ux_layout_custom_params_t ux_layout_paging_params_t

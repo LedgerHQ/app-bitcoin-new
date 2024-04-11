@@ -109,6 +109,7 @@ ICON_NANOS = icons/nanos_app_bitcoin.gif
 ICON_NANOX = icons/nanox_app_bitcoin.gif
 ICON_NANOSP = icons/nanox_app_bitcoin.gif
 ICON_STAX = icons/stax_app_bitcoin.gif
+ICON_FLEX = icons/flex_app_bitcoin.gif
 
 ########################################
 # Application communication interfaces #

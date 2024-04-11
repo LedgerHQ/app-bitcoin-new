@@ -690,15 +690,10 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
     if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
-        ui_post_processing_confirm_wallet_spend(dc, false);
         return false;
     }
 
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
-
-    if (!st->is_wallet_default) {
-        ui_post_processing_confirm_wallet_spend(dc, true);
-    }
     return true;
 }
 
@@ -1312,7 +1307,7 @@ process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     if (!read_outputs(dc, st, &placeholder_info, true)) return false;
 
-    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc, st->outputs.n_external)) {
+    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1370,7 +1365,6 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         if (10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000) {
             if (!ui_warn_high_fee(dc)) {
                 SEND_SW(dc, SW_DENY);
-                ui_post_processing_confirm_transaction(dc, false);
                 return false;
             }
         }
@@ -1379,7 +1373,6 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         bool is_self_transfer = st->outputs.n_external == 0;
         if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, is_self_transfer)) {
             SEND_SW(dc, SW_DENY);
-            ui_post_processing_confirm_transaction(dc, false);
             return false;
         }
     }
@@ -2474,10 +2467,6 @@ sign_transaction(dispatcher_context_t *dc,
                         return false;
 
                     if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
-                        if (!G_swap_state.called_from_swap) {
-                            ui_post_processing_confirm_transaction(dc, false);
-                        }
-
                         // we do not send a status word, since sign_transaction_input
                         // already does it on failure
                         return false;

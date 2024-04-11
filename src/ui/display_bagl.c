@@ -475,8 +475,7 @@ void ui_sign_message_path_hash_and_confirm_flow(void) {
     ux_flow_init(0, ux_sign_message_path_hash_and_confirm_flow, NULL);
 }
 
-void ui_sign_message_content_flow(uint8_t pageCount) {
-    (void) pageCount;
+void ui_sign_message_content_flow(void) {
     if (get_streaming_index() == 0) {
         ux_flow_init(0, ux_sign_message_path_and_content_flow, NULL);
     } else {
