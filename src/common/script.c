@@ -130,66 +130,58 @@ int format_opscript_script(const uint8_t script[],
     // However, signing such outputs is part of BIP-0322, and there's no danger in allowing them.
 
     if (script_len == 1) {
-        --out_ctr;  // remove extra space
-    } else {
-        // We parse the rest as a single push opcode.
-        // This supports a subset of the scripts that bitcoin-core considers standard.
+        out[out_ctr - 1] = '\0';  // remove extra space
+        return out_ctr;
+    }
 
-        uint8_t opcode = script[1];  // the push opcode
+    size_t offset = 1;  // start after OP_RETURN
+    int num_pushes = 0;
+    const char hex[] = "0123456789abcdef";
+
+    while (offset < script_len && num_pushes < 5) {
+        uint8_t opcode = script[offset++];
+        size_t hex_length = 0;  // Data length to process
+
         if (opcode > OP_16 || opcode == OP_RESERVED || opcode == OP_PUSHDATA2 ||
             opcode == OP_PUSHDATA4) {
             return -1;  // unsupported
         }
 
-        int hex_offset = 1;
-        size_t hex_length = 0;  // if non-zero, `hex_length` bytes starting from script[hex_offset]
-                                // must be hex-encoded
-
         if (opcode == OP_0) {
-            if (script_len != 1 + 1) return -1;
             out[out_ctr++] = '0';
         } else if (opcode >= 1 && opcode <= 75) {
-            hex_offset += 1;
             hex_length = opcode;
-
-            if (script_len != 1 + 1 + hex_length) return -1;
+            if (offset + hex_length > script_len) return -1;  // out of bounds
         } else if (opcode == OP_PUSHDATA1) {
-            // OP_RETURN OP_PUSHDATA1 <len:1-byte> <data:len bytes>
-            hex_offset += 2;
-            hex_length = script[2];
-
-            if (script_len != 1 + 1 + 1 + hex_length || hex_length > 80) return -1;
+            if (offset >= script_len) return -1;  // out of bounds for length byte
+            hex_length = script[offset++];
+            if (hex_length > 80 || offset + hex_length > script_len) return -1;
         } else if (opcode == OP_1NEGATE) {
-            if (script_len != 1 + 1) return -1;
-
             out[out_ctr++] = '-';
             out[out_ctr++] = '1';
         } else if (opcode >= OP_1 && opcode <= OP_16) {
-            if (script_len != 1 + 1) return -1;
-
-            // encode OP_1 to OP_16 as a decimal number
             uint8_t num = opcode - 0x50;
             if (num >= 10) {
                 out[out_ctr++] = '0' + (num / 10);
             }
             out[out_ctr++] = '0' + (num % 10);
-        } else {
-            return -1;  // can never happen
         }
 
         if (hex_length > 0) {
-            const char hex[] = "0123456789abcdef";
-
             out[out_ctr++] = '0';
             out[out_ctr++] = 'x';
             for (unsigned int i = 0; i < hex_length; i++) {
-                uint8_t data = script[hex_offset + i];
+                uint8_t data = script[offset + i];
                 out[out_ctr++] = hex[data / 16];
                 out[out_ctr++] = hex[data % 16];
             }
+            offset += hex_length;
         }
+
+        num_pushes++;
+        out[out_ctr++] = ' ';
     }
 
-    out[out_ctr++] = '\0';
+    out[out_ctr - 1] = '\0';
     return out_ctr;
 }
