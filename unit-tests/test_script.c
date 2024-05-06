@@ -236,8 +236,18 @@ static void test_format_opscript_script_valid(void **state) {
     uint8_t input22[] = {OP_RETURN, OP_1NEGATE};
     CHECK_VALID_TESTCASE(input22, "OP_RETURN -1");
 
-    uint8_t input_23[] = {OP_RETURN};
-    CHECK_VALID_TESTCASE(input_23, "OP_RETURN");
+    uint8_t input23[] = {OP_RETURN, OP_0, OP_1, OP_5, OP_7, OP_16};
+    CHECK_VALID_TESTCASE(input23, "OP_RETURN 0 1 5 7 16");
+
+    uint8_t input24[] = {
+        OP_RETURN, OP_8, OP_1NEGATE, OP_PUSHDATA1, 15,   1,    2,    3,   4,  5,    6,
+        7,         8,    9,          10,           11,   12,   13,   14,  15, OP_0, OP_PUSHDATA1,
+        7,         0x11, 0x22,       0x33,         0x44, 0x55, 0x66, 0x77};
+    CHECK_VALID_TESTCASE(input24,
+                         "OP_RETURN 8 -1 0x0102030405060708090a0b0c0d0e0f 0 0x11223344556677");
+
+    uint8_t input_25[] = {OP_RETURN};
+    CHECK_VALID_TESTCASE(input_25, "OP_RETURN");
 }
 
 static void test_format_opscript_script_invalid(void **state) {
@@ -263,11 +273,8 @@ static void test_format_opscript_script_invalid(void **state) {
         {OP_RETURN, OP_PUSHDATA4, 0x06, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     CHECK_INVALID_TESTCASE(input_pushdata4);
 
-    uint8_t input_extra_push[] = {OP_RETURN, OP_0, OP_0};
+    uint8_t input_extra_push[] = {OP_RETURN, 4, 1, 2, 3, 4, 42};
     CHECK_INVALID_TESTCASE(input_extra_push);
-
-    uint8_t input_extra_push2[] = {OP_RETURN, 4, 1, 2, 3, 4, 42};
-    CHECK_INVALID_TESTCASE(input_extra_push2);
 }
 
 int main() {
