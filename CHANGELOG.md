@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.2.3] - 06-05-2024
+
+### Added
+
+- Support for signing transactions with `OP_RETURN` outputs extended to up to 5 push opcodes, instead of a single one.
+
 ## [2.2.2] - 08-04-2024
 
 ### Added
