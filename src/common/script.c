@@ -123,6 +123,12 @@ int format_opscript_script(const uint8_t script[],
         return -1;
     }
 
+    if (script_len > 83) {
+        // a script that is more than 83 bytes violates the "max 80 bytes total data" rule
+        // (+ 3 bytes of opcodes) and is therefore not standard in Bitcoin Core.
+        return -1;
+    }
+
     strncpy(out, "OP_RETURN ", MAX_OPRETURN_OUTPUT_DESC_SIZE);
     int out_ctr = 10;
 
@@ -150,21 +156,43 @@ int format_opscript_script(const uint8_t script[],
         if (opcode == OP_0) {
             out[out_ctr++] = '0';
         } else if (opcode >= 1 && opcode <= 75) {
+            // opcodes between 1 and 75 indicate a data push of the corresponding length
             hex_length = opcode;
-            if (offset + hex_length > script_len) return -1;  // out of bounds
         } else if (opcode == OP_PUSHDATA1) {
-            if (offset >= script_len) return -1;  // out of bounds for length byte
+            // the next byte is the length
+            if (offset >= script_len) {
+                return -1;  // out of bounds for length byte
+            }
             hex_length = script[offset++];
-            if (hex_length > 80 || offset + hex_length > script_len) return -1;
+            if (hex_length <= 75) {
+                return -1;  // non-standard, should have used the minimal push opcode
+            }
         } else if (opcode == OP_1NEGATE) {
             out[out_ctr++] = '-';
             out[out_ctr++] = '1';
         } else if (opcode >= OP_1 && opcode <= OP_16) {
             uint8_t num = opcode - 0x50;
+            // num is a number between 1 and 16 (included)
             if (num >= 10) {
-                out[out_ctr++] = '0' + (num / 10);
+                out[out_ctr++] = '1';
+                num -= 10;
             }
-            out[out_ctr++] = '0' + (num % 10);
+            out[out_ctr++] = '0' + num;
+        } else {
+            // any other opcode is invalid or unsupported
+            return -1;
+        }
+
+        if (offset + hex_length > script_len) {
+            // overflow, not enough bytes to read in the script
+            return -1;
+        }
+
+        if (hex_length == 1) {
+            if (script[offset] == 0x81 || script[offset] <= 16) {
+                // non-standard, it should use OP_1NEGATE, or one of OP_0, ..., OP_16
+                return -1;
+            }
         }
 
         if (hex_length > 0) {
@@ -180,6 +208,12 @@ int format_opscript_script(const uint8_t script[],
 
         num_pushes++;
         out[out_ctr++] = ' ';
+    }
+
+    if (offset < script_len) {
+        // if there are still more opcodes left, we do not support this script
+        // (for example: more than 5 push opcodes)
+        return -1;
     }
 
     out[out_ctr - 1] = '\0';
