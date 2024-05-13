@@ -199,26 +199,36 @@ int get_script_address(const uint8_t script[], size_t script_len, char *out, siz
 
 #endif
 
-// the longest OP_RETURN description "OP_RETURN 0x" followed by 160 hexadecimal characters
-#define MAX_OPRETURN_OUTPUT_DESC_SIZE (12 + 80 * 2 + 1)
+// the longest OP_RETURN description is upper bounded by:
+// - 9 bytes for "OP_RETURN"
+// - 5 times 3 for the " 0x"
+// - up to 2 * 80 = 160 hexadecimal bytes
+// - the termination null character
+#define MAX_OPRETURN_OUTPUT_DESC_SIZE (9 + 5 * 3 + 2 * 80 + 1)
 
 /**
  * Formats a valid OP_RETURN script for user verification. The resulting string is "OP_RETURN
- * <data>", where <data> is written according to the rules below. Only scripts with a single push
- * opcode are supported, and OP_PUSHDATA2 and OP_PUSHDATA4 are not supported. OP_1NEGATE is
+ * <data>", where <data> is written according to the rules below. Only scripts with up to 5 push
+ * opcodes are supported, and OP_PUSHDATA2 and OP_PUSHDATA4 are not supported. OP_1NEGATE is
  * represented as "-1", and OP_0, OP_1, ..., OP_16 are represented in decimal ("0", "1", ..., "16").
  * For other push opcodes, the data is represented in hexadecimal, two characters per byte, with the
  * "0x" prefix.
+ *
+ * As a best-effort measure, this function returns an error if the transaction is non-standard
+ * according to the default rules of Bitcoin Core (maximum 80 bytes of data, only push
+ * instructions). Such transactions, even if valid, would not easily be relayed in the default
+ * mempool.
+ * An exception is an output script with a single OP_RETURN is accepted despite being non-standard,
+ * as such an output is used in BIP-0322.
  *
  * The string is written onto `out` and is 0-terminated. Its length is returned.
  *
  * @param script the script to parse and format.
  * @param script_len the length of the script.
- * @param out the output array, that must be at least MAX_OPRETURN_OUTPUT_DESC_SIZE bytes long. The
- * longest possible string is "OP_RETURN 0x" followed by 160 hexadecimal characters, plus the
- * terminating null character, for a total of 173 characters.
+ * @param out the output array, that must be at least MAX_OPRETURN_OUTPUT_DESC_SIZE bytes long.
  * @return The length of the string written into `out` (including the terminating 0) on success; -1
- * on error.
+ * on error, or if such an output would make the transaction be non-standard per the default relay
+ * rules of Bitcoin Core.
  */
 int format_opscript_script(const uint8_t script[],
                            size_t script_len,

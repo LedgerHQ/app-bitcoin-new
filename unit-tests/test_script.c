@@ -218,9 +218,6 @@ static void test_format_opscript_script_valid(void **state) {
         "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425"
         "262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a");
 
-    uint8_t input20[] = {OP_RETURN, OP_PUSHDATA1, 7, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
-    CHECK_VALID_TESTCASE(input20, "OP_RETURN 0x01020304050607");
-
     uint8_t input21[] = {OP_RETURN, OP_PUSHDATA1, 80, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
                          11,        12,           13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
                          25,        26,           27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
@@ -236,8 +233,17 @@ static void test_format_opscript_script_valid(void **state) {
     uint8_t input22[] = {OP_RETURN, OP_1NEGATE};
     CHECK_VALID_TESTCASE(input22, "OP_RETURN -1");
 
-    uint8_t input_23[] = {OP_RETURN};
-    CHECK_VALID_TESTCASE(input_23, "OP_RETURN");
+    uint8_t input23[] = {OP_RETURN, OP_0, OP_1, OP_5, OP_7, OP_16};
+    CHECK_VALID_TESTCASE(input23, "OP_RETURN 0 1 5 7 16");
+
+    uint8_t input24[] = {OP_RETURN, OP_8, OP_1NEGATE, 15,   1,    2,    3,    4,   5,  6,
+                         7,         8,    9,          10,   11,   12,   13,   14,  15, OP_0,
+                         7,         0x11, 0x22,       0x33, 0x44, 0x55, 0x66, 0x77};
+    CHECK_VALID_TESTCASE(input24,
+                         "OP_RETURN 8 -1 0x0102030405060708090a0b0c0d0e0f 0 0x11223344556677");
+
+    uint8_t input_25[] = {OP_RETURN};
+    CHECK_VALID_TESTCASE(input_25, "OP_RETURN");
 }
 
 static void test_format_opscript_script_invalid(void **state) {
@@ -263,11 +269,45 @@ static void test_format_opscript_script_invalid(void **state) {
         {OP_RETURN, OP_PUSHDATA4, 0x06, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
     CHECK_INVALID_TESTCASE(input_pushdata4);
 
-    uint8_t input_extra_push[] = {OP_RETURN, OP_0, OP_0};
+    uint8_t input_extra_push[] = {OP_RETURN, 4, 1, 2, 3, 4, 42};
     CHECK_INVALID_TESTCASE(input_extra_push);
 
-    uint8_t input_extra_push2[] = {OP_RETURN, 4, 1, 2, 3, 4, 42};
-    CHECK_INVALID_TESTCASE(input_extra_push2);
+    uint8_t input_6pushes[] = {OP_RETURN, OP_1, OP_2, OP_3, OP_4, OP_5, OP_6};
+    CHECK_INVALID_TESTCASE(input_6pushes);
+
+    // clang-format off
+    uint8_t input_too_long[] = {
+        OP_RETURN,
+        OP_PUSHDATA1, 81,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        81
+    };
+    // clang-format on
+    CHECK_INVALID_TESTCASE(input_too_long);
+
+    // not minimal push encodings
+    uint8_t input_pushdata_nonstandard[] =
+        {OP_RETURN, OP_PUSHDATA1, 7, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+    CHECK_INVALID_TESTCASE(input_pushdata_nonstandard);
+
+    uint8_t input_negative1_notminimal_1[] = {OP_RETURN, 1, 0x81};
+    CHECK_INVALID_TESTCASE(input_negative1_notminimal_1);
+    uint8_t input_negative1_notminimal_2[] = {OP_RETURN, OP_PUSHDATA1, 1, 0x81};
+    CHECK_INVALID_TESTCASE(input_negative1_notminimal_2);
+    for (uint8_t i = 0; i <= 16; i++) {
+        uint8_t input_negative1_notminimal_push_1[] = {OP_RETURN, 1, i};
+        CHECK_INVALID_TESTCASE(input_negative1_notminimal_push_1);
+        uint8_t input_negative1_notminimal_push_2[] = {OP_RETURN, OP_PUSHDATA1, 1, i};
+        CHECK_INVALID_TESTCASE(input_negative1_notminimal_push_2);
+    }
+
+    // transaction containing non-push opcodes are not standard
+    uint8_t input_non_push_opcode[] = {OP_RETURN, OP_3, OP_2, OP_ADD, OP_0};
+    CHECK_INVALID_TESTCASE(input_non_push_opcode);
 }
 
 int main() {
