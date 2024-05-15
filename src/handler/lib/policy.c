@@ -497,8 +497,9 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
     // we reuse the same memory of ext_pubkey
     bip32_CKDpub(&ext_pubkey,
                  wdi->change ? key_expr->num_second : key_expr->num_first,
-                 &ext_pubkey);
-    bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey);
+                 &ext_pubkey,
+                 NULL);
+    bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey, NULL);
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
 

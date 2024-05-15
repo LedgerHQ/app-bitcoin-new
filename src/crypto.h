@@ -36,18 +36,22 @@ typedef struct {
  *
  * @param[in]  parent
  *   Pointer to the extended serialized pubkey of the parent.
- * @param[out] index
+ * @param[in] index
  *   Index of the child to derive. It MUST be not hardened, that is, strictly less than 0x80000000.
  * @param[out] child
  *   Pointer to the output struct for the child's serialized pubkey. It can equal parent, which in
  * that case is overwritten.
+ * @param[out] tweak
+ *   If not NULL, pointer to a 32-byte array that will receive the 32-byte tweak used during the
+ * child key derivation.
  *
  * @return 0 if success, a negative number on failure.
  *
  */
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
-                 serialized_extended_pubkey_t *child);
+                 serialized_extended_pubkey_t *child,
+                 uint8_t *tweak);
 
 /**
  * Convenience wrapper for cx_hash_no_throw to add some data to an initialized hash context.
@@ -330,6 +334,11 @@ int crypto_ecdsa_sign_sha256_hash_with_key(const uint32_t bip32_path[],
                                            uint8_t *pubkey,
                                            uint8_t out[static MAX_DER_SIG_LEN],
                                            uint32_t *info);
+
+// Constants defined in BIP-0341
+extern const uint8_t BIP0341_taptweak_tag[8];
+extern const uint8_t BIP0341_tapbranch_tag[9];
+extern const uint8_t BIP0341_tapleaf_tag[7];
 
 /**
  * Initializes the "tagged" SHA256 hash with the given tag, as defined by BIP-0340.
