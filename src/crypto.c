@@ -43,9 +43,9 @@
 #include "secp256k1.h"
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
-static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
-static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
-static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
+const uint8_t BIP0341_taptweak_tag[8] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
+const uint8_t BIP0341_tapbranch_tag[9] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
+const uint8_t BIP0341_tapleaf_tag[7] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
 /**
  * Gets the point on the SECP256K1 that corresponds to kG, where G is the curve's generator point.
@@ -59,7 +59,8 @@ static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
-                 serialized_extended_pubkey_t *child) {
+                 serialized_extended_pubkey_t *child,
+                 uint8_t *tweak) {
     PRINT_STACK_POINTER();
 
     if (index >= BIP32_FIRST_HARDENED_CHILD) {
@@ -83,6 +84,10 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
+
+    if (tweak != NULL) {
+        memcpy(tweak, I_L, 32);
+    }
 
     // fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
     int diff;
