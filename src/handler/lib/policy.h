@@ -51,6 +51,29 @@ typedef struct {
 } wallet_derivation_info_t;
 
 /**
+ * Computes the a derived compressed pubkey for one of the key of the wallet policy,
+ * for a given change/address_index combination.
+ *
+ * This function computes the extended public key (xpub) based on the provided
+ * BIP32 derivation path. It supports both standard BIP32 derivation and
+ * the derivation of Musig (multi-signature) keys.
+ *
+ * @param[in] dispatcher_context Pointer to the dispatcher content
+ * @param[in] wdi Pointer to a `wallet_derivation_info_t` struct with the details of the
+ * necessary details of the wallet policy, and the desired change/address_index pair.
+ * @param[in] key_index Index of the pubkey in the vector of keys of the wallet policy.
+ * @param[out] out Pointer to a `serialized_extended_pubkey_t` that will contain the requested
+ * extended pubkey.
+ *
+ * @return -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard.
+ */
+__attribute__((warn_unused_result)) int get_extended_pubkey(
+    dispatcher_context_t *dispatcher_context,
+    const wallet_derivation_info_t *wdi,
+    int key_index,
+    serialized_extended_pubkey_t *out);
+
+/**
  * Computes the hash of a taptree, to be used as tweak for the internal key per BIP-0341;
  * The returned hash is the second value in the tuple returned by taproot_tree_helper in
  * BIP-0341, assuming leaf_version 0xC0.

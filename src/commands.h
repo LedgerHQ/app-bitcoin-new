@@ -11,3 +11,7 @@ typedef enum {
     GET_MASTER_FINGERPRINT = 0x05,
     SIGN_MESSAGE = 0x10,
 } command_e;
+
+// Tags used when yielding different objects with the YIELD client command.
+#define CCMD_YIELD_MUSIG_PUBNONCE_TAG         0xffffffff
+#define CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG 0xfffffffe
