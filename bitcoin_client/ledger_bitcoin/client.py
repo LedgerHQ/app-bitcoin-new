@@ -10,8 +10,8 @@ from .embit.networks import NETWORKS
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
-from .client_command import ClientCommandInterpreter
-from .client_base import Client, TransportClient, PartialSignature
+from .client_command import ClientCommandInterpreter, CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG, CCMD_YIELD_MUSIG_PUBNONCE_TAG
+from .client_base import Client, MusigPartialSignature, MusigPubNonce, SignPsbtYieldedObject, TransportClient, PartialSignature
 from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .errors import UnknownDeviceError
@@ -103,6 +103,60 @@ def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSign
             raise UnknownDeviceError(f"Invalid pubkey length returned: {len(pubkey_augm)}")
 
         return PartialSignature(signature=signature, pubkey=pubkey_augm)
+
+
+def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObject]:
+    res_buffer = BytesIO(res)
+    input_index_or_tag = read_varint(res_buffer)
+    if input_index_or_tag == CCMD_YIELD_MUSIG_PUBNONCE_TAG:
+        input_index = read_varint(res_buffer)
+        pubnonce = res_buffer.read(66)
+        participant_pk = res_buffer.read(33)
+        agg_xonlykey = res_buffer.read(32)
+        tapleaf_hash = res_buffer.read()
+        if len(tapleaf_hash) == 0:
+            tapleaf_hash = None
+
+        return (
+            input_index,
+            MusigPubNonce(
+                participant_pubkey=participant_pk,
+                agg_xonlykey=agg_xonlykey,
+                tapleaf_hash=tapleaf_hash,
+                pubnonce=pubnonce
+            )
+        )
+    elif input_index_or_tag == CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG:
+        input_index = read_varint(res_buffer)
+        partial_signature = res_buffer.read(32)
+        participant_pk = res_buffer.read(33)
+        agg_xonlykey = res_buffer.read(32)
+        tapleaf_hash = res_buffer.read()
+        if len(tapleaf_hash) == 0:
+            tapleaf_hash = None
+
+        return (
+            input_index,
+            MusigPartialSignature(
+                participant_pubkey=participant_pk,
+                agg_xonlykey=agg_xonlykey,
+                tapleaf_hash=tapleaf_hash,
+                partial_signature=partial_signature
+            )
+        )
+    else:
+        # other values follow an encoding without an explicit tag, where the
+        # first element is the input index. All the signature types are implemented
+        # by the PartialSignature type (not to be confused with the musig Partial Signature).
+        input_index = input_index_or_tag
+
+        pubkey_augm_len = read_uint(res_buffer, 8)
+        pubkey_augm = res_buffer.read(pubkey_augm_len)
+
+        signature = res_buffer.read()
+
+        return((input_index, _make_partial_signature(pubkey_augm, signature)))
+
 
 
 class NewClient(Client):
@@ -211,7 +265,7 @@ class NewClient(Client):
 
         return result
 
-    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, SignPsbtYieldedObject]]:
 
         psbt = normalize_psbt(psbt)
 
@@ -280,17 +334,10 @@ class NewClient(Client):
         if any(len(x) <= 1 for x in results):
             raise RuntimeError("Invalid response")
 
-        results_list: List[Tuple[int, PartialSignature]] = []
+        results_list: List[Tuple[int, SignPsbtYieldedObject]] = []
         for res in results:
-            res_buffer = BytesIO(res)
-            input_index = read_varint(res_buffer)
-
-            pubkey_augm_len = read_uint(res_buffer, 8)
-            pubkey_augm = res_buffer.read(pubkey_augm_len)
-
-            signature = res_buffer.read()
-
-            results_list.append((input_index, _make_partial_signature(pubkey_augm, signature)))
+            input_index, obj = _decode_signpsbt_yielded_value(res)
+            results_list.append((input_index, obj))
 
         return results_list
 

@@ -28,7 +28,8 @@ except ImportError:
 
 class TransportClient:
     def __init__(self, interface: Literal['hid', 'tcp'] = "tcp", *, server: str = "127.0.0.1", port: int = 9999, path: Optional[str] = None, hid: Optional[HID] = None, debug: bool = False):
-        self.transport = Transport('hid', path=path, hid=hid, debug=debug) if interface == 'hid' else Transport(interface, server=server, port=port, debug=debug)
+        self.transport = Transport('hid', path=path, hid=hid, debug=debug) if interface == 'hid' else Transport(
+            interface, server=server, port=port, debug=debug)
 
     def apdu_exchange(
         self, cla: int, ins: int, data: bytes = b"", p1: int = 0, p2: int = 0
@@ -67,16 +68,58 @@ def print_response(sw: int, data: bytes) -> None:
 
 @dataclass(frozen=True)
 class PartialSignature:
-    """Represents a partial signature returned by sign_psbt.
+    """Represents a partial signature returned by sign_psbt. Such objects can be added to the PSBT.
 
     It always contains a pubkey and a signature.
-    The pubkey
+    The pubkey is a compressed 33-byte for legacy and segwit Scripts, or 32-byte x-only key for taproot.
+    The signature is in the format it would be pushed on the scriptSig or the witness stack, therefore of
+    variable length, and possibly concatenated with the SIGHASH flag byte if appropriate.
 
-    The tapleaf_hash is also filled if signing a for a tapscript.
+    The tapleaf_hash is also filled if signing for a tapscript.
+
+    Note: not to be confused with 'partial signature' of protocols like MuSig2; 
     """
     pubkey: bytes
     signature: bytes
     tapleaf_hash: Optional[bytes] = None
+
+
+@dataclass(frozen=True)
+class MusigPubNonce:
+    """Represents a pubnonce returned by sign_psbt during the first round of a Musig2 signing session.
+
+    It always contains
+    - the participant_pubkey, a 33-byte compressed pubkey;
+    - agg_xonlykey, the 32-byte xonly key that is the aggregate and tweaked key present in the script;
+    - the 66-byte pubnonce.
+
+    The tapleaf_hash is also filled if signing for a tapscript; `None` otherwise.
+    """
+    participant_pubkey: bytes
+    agg_xonlykey: bytes
+    tapleaf_hash: Optional[bytes]
+    pubnonce: bytes
+
+
+@dataclass(frozen=True)
+class MusigPartialSignature:
+    """Represents a partial signature returned by sign_psbt during the second round of a Musig2 signing session.
+
+    It always contains
+    - the participant_pubkey, a 33-byte compressed pubkey;
+    - agg_xonlykey, the 32-byte xonly key that is the aggregate and tweaked key present in the script;
+    - the partial_signature, the 32-byte partial signature for this participant.
+
+    The tapleaf_hash is also filled if signing for a tapscript; `None` otherwise
+    """
+    participant_pubkey: bytes
+    agg_xonlykey: bytes
+    tapleaf_hash: Optional[bytes]
+    partial_signature: bytes
+
+
+SignPsbtYieldedObject = Union[PartialSignature,
+                              MusigPubNonce, MusigPartialSignature]
 
 
 class Client:
@@ -218,7 +261,7 @@ class Client:
 
         raise NotImplementedError
 
-    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, SignPsbtYieldedObject]]:
         """Signs a PSBT using a registered wallet (or a standard wallet that does not need registration).
 
         Signature requires explicit approval from the user.
