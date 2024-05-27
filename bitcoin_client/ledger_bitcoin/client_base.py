@@ -90,13 +90,14 @@ class MusigPubNonce:
 
     It always contains
     - the participant_pubkey, a 33-byte compressed pubkey;
-    - agg_xonlykey, the 32-byte xonly key that is the aggregate and tweaked key present in the script;
+    - aggregate_pubkey, the 33-byte compressed pubkey key that is the aggregate of all the participant
+      pubkeys, with the necessary tweaks; its x-only version is the key present in the Script;
     - the 66-byte pubnonce.
 
     The tapleaf_hash is also filled if signing for a tapscript; `None` otherwise.
     """
     participant_pubkey: bytes
-    agg_xonlykey: bytes
+    aggregate_pubkey: bytes
     tapleaf_hash: Optional[bytes]
     pubnonce: bytes
 
@@ -107,13 +108,14 @@ class MusigPartialSignature:
 
     It always contains
     - the participant_pubkey, a 33-byte compressed pubkey;
-    - agg_xonlykey, the 32-byte xonly key that is the aggregate and tweaked key present in the script;
+    - aggregate_pubkey, the 33-byte compressed pubkey key that is the aggregate of all the participant
+      pubkeys, with the necessary tweaks; its x-only version is the key present in the Script;
     - the partial_signature, the 32-byte partial signature for this participant.
 
     The tapleaf_hash is also filled if signing for a tapscript; `None` otherwise
     """
     participant_pubkey: bytes
-    agg_xonlykey: bytes
+    aggregate_pubkey: bytes
     tapleaf_hash: Optional[bytes]
     partial_signature: bytes
 

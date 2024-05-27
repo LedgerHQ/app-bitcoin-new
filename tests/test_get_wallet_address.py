@@ -317,7 +317,7 @@ def test_get_wallet_address_tr_musig_keypath(client: RaggerClient):
         "05b7b4bccd3188effc24de8fd67e83231d8486772800884db0d81bad19f2be3e")
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
-    assert res == "tb1p7j9azx5xwt5fp3t99wnj4885yfcqynhz645ntflxr9dxr2g8ndnq32xa2m"
+    assert res == "tb1pc87la0ksvw4pfq6qc3gn9en33kx7s9rx4c4epy578kfjsdjv6mks7u7dgn"
 
 
 def test_get_wallet_address_tr_musig_scriptpath(client: RaggerClient):
@@ -335,7 +335,7 @@ def test_get_wallet_address_tr_musig_scriptpath(client: RaggerClient):
         "b22397b717949ede59c3c9f31c987acda098471211f754b6633c87054c1efb51")
 
     res = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
-    assert res == "tb1pmx5syrz67lwdy8dsmvlta5h5ahfn6k9pg8qw3y0jn698xj0duxpq3k94zq"
+    assert res == "tb1pa423acwcjc8jgt36muavyun8e2hz3t5qwptsr3wr8afmdfk3wchswf9ntp"
 
 
 def test_get_wallet_address_large_addr_index(client: RaggerClient):
