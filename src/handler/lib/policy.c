@@ -479,6 +479,18 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
             memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
         }
 
+        // sort the keys in ascending order using bubble sort
+        for (int i = 0; i < musig_info->n; i++) {
+            for (int j = 0; j < musig_info->n - 1; j++) {
+                if (memcmp(keys[j], keys[j + 1], sizeof(plain_pk_t)) > 0) {
+                    uint8_t tmp[sizeof(plain_pk_t)];
+                    memcpy(tmp, keys[j], sizeof(plain_pk_t));
+                    memcpy(keys[j], keys[j + 1], sizeof(plain_pk_t));
+                    memcpy(keys[j + 1], tmp, sizeof(plain_pk_t));
+                }
+            }
+        }
+
         musig_keyagg_context_t musig_ctx;
         musig_key_agg(keys, musig_info->n, &musig_ctx);
 

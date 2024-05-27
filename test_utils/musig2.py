@@ -32,7 +32,7 @@ import base58
 
 from test_utils.taproot_sighash import SIGHASH_DEFAULT, TaprootSignatureHash
 
-from . import bip0327, bip0340, sha256
+from . import bip0327, bip0340, hash160, sha256
 from . import taproot
 
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
@@ -104,9 +104,9 @@ def extract_placeholders(desc_tmpl: str) -> List[KeyPlaceholder]:
     return [parse_placeholder(match[0]) for match in sorted_matches]
 
 
-def musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
+def unsorted_musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
     """
-    Constructs the musig2 aggregated extended public key from a list of
+    Constructs the musig2 aggregated extended public key from an unsorted list of
     compressed public keys, and the version bytes.
     """
 
@@ -126,6 +126,15 @@ def musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.
     ext_pubkey = version_bytes + depth + fingerprint + \
         child_number + chaincode + compressed_pubkey
     return base58.b58encode_check(ext_pubkey).decode(), key_agg_ctx
+
+
+def musig(pubkeys: Iterable[bytes], version_bytes: bytes) -> Tuple[str, bip0327.KeyAggContext]:
+    """
+    Constructs the musig2 aggregated extended public key from a list of compressed public keys,
+    and the version bytes. The keys are sorted, as required by the `the musig()` key expression
+    in descriptors.
+    """
+    return unsorted_musig(sorted(pubkeys), version_bytes)
 
 
 def aggregate_musig_pubkey(keys_info: Iterable[str]) -> Tuple[str, bip0327.KeyAggContext]:
@@ -422,12 +431,14 @@ class PsbtMusig2Cosigner(ABC):
 def find_change_and_addr_index_for_musig(input_psbt: PartiallySignedInput, placeholder: Musig2KeyPlaceholder, agg_xpub: ExtendedKey):
     num1, num2 = placeholder.num1, placeholder.num2
 
+    agg_xpub_fingerprint = hash160(agg_xpub.pubkey)[0:4]
+
     # Iterate through tap key origins in the input
     # TODO: this might be made more precise (e.g. use the leaf_hash from the tap_bip32_paths items)
     for xonly, (_, key_origin) in input_psbt.tap_bip32_paths.items():
         der_path = key_origin.path
         # Check if the fingerprint matches the expected pattern and the derivation path has the correct structure
-        if key_origin.fingerprint == b'\x00\x00\x00\x00' and len(der_path) == 2 and der_path[0] < HARDENED_INDEX and der_path[1] < HARDENED_INDEX and (der_path[0] == num1 or der_path[0] == num2):
+        if key_origin.fingerprint == agg_xpub_fingerprint and len(der_path) == 2 and der_path[0] < HARDENED_INDEX and der_path[1] < HARDENED_INDEX and (der_path[0] == num1 or der_path[0] == num2):
             if xonly != agg_xpub.derive_pub_path(der_path).pubkey[1:]:
                 continue
 
@@ -684,6 +695,10 @@ class HotMusig2Cosigner(PsbtMusig2Cosigner):
                 if my_key_index_in_musig is None:
                     raise ValueError("No internal key found in musig")
 
+                # sort the keys in ascending order
+                pubkeys_in_musig = list(
+                    sorted(pubkeys_in_musig, key=lambda x: x.pubkey))
+
                 nonces: List[bytes] = []
                 for participant_key in pubkeys_in_musig:
                     participant_pubnonce_identifier = (
@@ -793,6 +808,10 @@ def run_musig2_test(wallet_policy: WalletPolicy, psbt: PSBT, cosigners: List[Psb
                 k_i = wallet_policy.keys_info[i]
                 xpub_i = k_i[k_i.find(']') + 1:]
                 pubkeys_in_musig.append(ExtendedKey.deserialize(xpub_i))
+
+            # sort the keys in ascending order
+            pubkeys_in_musig = list(
+                sorted(pubkeys_in_musig, key=lambda x: x.pubkey))
 
             nonces: List[bytes] = []
             for participant_key in pubkeys_in_musig:

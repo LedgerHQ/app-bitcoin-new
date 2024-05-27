@@ -44,7 +44,8 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
 def aggr_xpub(pubkeys: List[bytes], chain: Chain) -> str:
     BIP_MUSIG_CHAINCODE = bytes.fromhex(
         "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
-    ctx = key_agg(pubkeys)
+    # sort the pubkeys prior to aggregation
+    ctx = key_agg(list(sorted(pubkeys)))
     compressed_pubkey = cbytes(ctx.Q)
 
     # Serialize according to BIP-32
@@ -112,7 +113,7 @@ def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObje
         input_index = read_varint(res_buffer)
         pubnonce = res_buffer.read(66)
         participant_pk = res_buffer.read(33)
-        agg_xonlykey = res_buffer.read(32)
+        aggregate_pubkey = res_buffer.read(33)
         tapleaf_hash = res_buffer.read()
         if len(tapleaf_hash) == 0:
             tapleaf_hash = None
@@ -121,7 +122,7 @@ def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObje
             input_index,
             MusigPubNonce(
                 participant_pubkey=participant_pk,
-                agg_xonlykey=agg_xonlykey,
+                aggregate_pubkey=aggregate_pubkey,
                 tapleaf_hash=tapleaf_hash,
                 pubnonce=pubnonce
             )
@@ -130,7 +131,7 @@ def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObje
         input_index = read_varint(res_buffer)
         partial_signature = res_buffer.read(32)
         participant_pk = res_buffer.read(33)
-        agg_xonlykey = res_buffer.read(32)
+        aggregate_pubkey = res_buffer.read(33)
         tapleaf_hash = res_buffer.read()
         if len(tapleaf_hash) == 0:
             tapleaf_hash = None
@@ -139,7 +140,7 @@ def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObje
             input_index,
             MusigPartialSignature(
                 participant_pubkey=participant_pk,
-                agg_xonlykey=agg_xonlykey,
+                aggregate_pubkey=aggregate_pubkey,
                 tapleaf_hash=tapleaf_hash,
                 partial_signature=partial_signature
             )
