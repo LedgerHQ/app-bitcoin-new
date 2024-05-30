@@ -5,8 +5,15 @@
 #include "musig_sessions.h"
 #include "../crypto.h"
 
-// TODO: persist in NVRAM instead
-musig_psbt_session_t musig_sessions[MAX_N_MUSIG_SESSIONS];
+typedef struct {
+    // Aligning by 4 is necessary due to platform limitations.
+    // Aligning by 64 further guarantees that each session occupies exactly
+    // a single NVRAM page, minimizing the number of writes.
+    __attribute__((aligned(64))) musig_psbt_session_t sessions[MAX_N_MUSIG_SESSIONS];
+} musig_persistent_storage_t;
+
+const musig_persistent_storage_t N_musig_storage_real;
+#define N_musig_storage (*(const volatile musig_persistent_storage_t *) PIC(&N_musig_storage_real))
 
 static bool is_all_zeros(const uint8_t *array, size_t size) {
     for (size_t i = 0; i < size; ++i) {
@@ -19,11 +26,17 @@ static bool is_all_zeros(const uint8_t *array, size_t size) {
 
 static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psbt_session_t *out) {
     for (int i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
-        if (memcmp(psbt_session_id, musig_sessions[i]._id, 32) == 0) {
+        if (memcmp(psbt_session_id, (const void *) N_musig_storage.sessions[i]._id, 32) == 0) {
             if (out != NULL) {
-                memcpy(out, &musig_sessions[i], sizeof(musig_psbt_session_t));
+                memcpy(out,
+                       (const void *) &N_musig_storage.sessions[i],
+                       sizeof(musig_psbt_session_t));
             }
-            explicit_bzero(&musig_sessions[i], sizeof(musig_psbt_session_t));
+            uint8_t zeros[sizeof(musig_psbt_session_t)] = {0};
+            nvm_write((void *) &N_musig_storage.sessions[i],
+                      (void *) zeros,
+                      sizeof(musig_psbt_session_t));
+
             return true;
         }
     }
@@ -31,6 +44,8 @@ static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psb
 }
 
 static void musigsession_init_randomness(musig_psbt_session_t *session) {
+    // it is extremely important that the randomness is initialized with a cryptographically strong
+    // random number generator
     cx_get_random_bytes(session->_rand_root, 32);
 }
 
@@ -41,7 +56,7 @@ static void musigsession_store(const uint8_t psbt_session_id[static 32],
 
     int i;
     for (i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
-        if (is_all_zeros((uint8_t *) &musig_sessions[i], sizeof(musig_psbt_session_t))) {
+        if (is_all_zeros((uint8_t *) &N_musig_storage.sessions[i], sizeof(musig_psbt_session_t))) {
             break;
         }
     }
@@ -50,9 +65,10 @@ static void musigsession_store(const uint8_t psbt_session_id[static 32],
         // TODO: should we use a LIFO structure? Could add a counter to musig_psbt_session_t
         i = 0;
     }
-    // no free slot; replace the first slot
-    explicit_bzero(&musig_sessions[i], sizeof(musig_psbt_session_t));
-    memcpy(&musig_sessions[i], session, sizeof(musig_psbt_session_t));
+    // replace the chosen slot
+    nvm_write((void *) &N_musig_storage.sessions[i],
+              (void *) session,
+              sizeof(musig_psbt_session_t));
 }
 
 void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
