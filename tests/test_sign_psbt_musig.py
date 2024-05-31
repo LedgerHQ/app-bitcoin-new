@@ -3,6 +3,7 @@ from pathlib import Path
 
 from hashlib import sha256
 import hmac
+from typing import Optional
 
 
 from ledger_bitcoin.client_base import Client, MusigPartialSignature, MusigPubNonce
@@ -26,12 +27,17 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
     Implements a PsbtMusig2Cosigner that uses a BitcoinClient
     """
 
-    def __init__(self, client: Client, wallet_policy: WalletPolicy, wallet_hmac: bytes) -> None:
+    def __init__(self, client: Client, wallet_policy: WalletPolicy, wallet_hmac: bytes, *, navigator: Optional[Navigator] = None,
+                 testname: str = "", instructions: Instructions = None) -> None:
         super().__init__()
 
         self.client = client
         self.wallet_policy = wallet_policy
         self.wallet_hmac = wallet_hmac
+
+        self.navigator = navigator
+        self.testname = testname
+        self.instructions = instructions
 
         self.fingerprint = client.get_master_fingerprint()
 
@@ -61,7 +67,8 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
 
     def generate_public_nonces(self, psbt: PSBT) -> None:
         print("PSBT before nonce generation:", psbt.serialize())
-        res = self.client.sign_psbt(psbt, self.wallet_policy, self.wallet_hmac)
+        res = self.client.sign_psbt(
+            psbt, self.wallet_policy, self.wallet_hmac, navigator=self.navigator, testname=self.testname, instructions=self.instructions)
         print("Pubnonces:", res)
         for (input_index, yielded) in res:
             if isinstance(yielded, MusigPubNonce):
@@ -80,7 +87,8 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
 
     def generate_partial_signatures(self, psbt: PSBT) -> None:
         print("PSBT before partial signature generation:", psbt.serialize())
-        res = self.client.sign_psbt(psbt, self.wallet_policy, self.wallet_hmac)
+        res = self.client.sign_psbt(
+            psbt, self.wallet_policy, self.wallet_hmac, navigator=self.navigator, testname=self.testname, instructions=self.instructions)
         print("Ledger result of second round:", res)
         for (input_index, yielded) in res:
             if isinstance(yielded, MusigPartialSignature):
@@ -99,7 +107,7 @@ class LedgerMusig2Cosigner(PsbtMusig2Cosigner):
                 raise ValueError("Expected partial signatures, got a pubnonce")
 
 
-def test_sign_psbt_musig2_keypath(client: RaggerClient, speculos_globals: SpeculosGlobals):
+def test_sign_psbt_musig2_keypath(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
     cosigner_1_xpub = "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
 
     cosigner_2_xpriv = "tprv8gFWbQBTLFhbX3EK3cS7LmenwE3JjXbD9kN9yXfq7LcBm81RSf8vPGPqGPjZSeX41LX9ZN14St3z8YxW48aq5Yhr9pQZVAyuBthfi6quTCf"
@@ -122,13 +130,14 @@ def test_sign_psbt_musig2_keypath(client: RaggerClient, speculos_globals: Specul
             "a3aeecb6c236b4a7e72c95fa138250d449b97a75c573f8ab612356279ff64046")
     ]
 
-    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True, has_feewarning=True), testname=test_name)
     signer_2 = HotMusig2Cosigner(wallet_policy, cosigner_2_xpriv)
 
     run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], sighashes)
 
 
-def test_sign_psbt_musig2_scriptpath(client: RaggerClient, speculos_globals: SpeculosGlobals):
+def test_sign_psbt_musig2_scriptpath(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
     cosigner_1_xpub = "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
 
     cosigner_2_xpriv = "tprv8gFWbQBTLFhbX3EK3cS7LmenwE3JjXbD9kN9yXfq7LcBm81RSf8vPGPqGPjZSeX41LX9ZN14St3z8YxW48aq5Yhr9pQZVAyuBthfi6quTCf"
@@ -156,7 +165,8 @@ def test_sign_psbt_musig2_scriptpath(client: RaggerClient, speculos_globals: Spe
             "28f86cd95c144ed4a877701ae7166867e8805b654c43d9f44da45d7b0070c313")
     ]
 
-    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
+    signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac,
+                                    navigator=navigator, instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False, has_spend_from_wallet=True), testname=test_name)
     signer_2 = HotMusig2Cosigner(wallet_policy, cosigner_2_xpriv)
 
     run_musig2_test(wallet_policy, psbt, [signer_1, signer_2], sighashes)
