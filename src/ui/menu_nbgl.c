@@ -21,41 +21,41 @@
 #include "../globals.h"
 #include "menu.h"
 
-static const char* const infoTypes[] = {"Version", "Developer", "Copyright"};
-static const char* const infoContents[] = {APPVERSION, "Ledger", "(c) 2024 Ledger"};
+#define SETTING_INFO_NB 3
+static const char* const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer", "Copyright"};
+static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Ledger", "(c) 2024 Ledger"};
 
-static bool navigation_cb(uint8_t page, nbgl_pageContent_t* content) {
-    UNUSED(page);
-    content->type = INFOS_LIST;
-    content->infosList.nbInfos = 3;
-    content->infosList.infoTypes = (const char**) infoTypes;
-    content->infosList.infoContents = (const char**) infoContents;
-    return true;
-}
+static const nbgl_contentInfoList_t infoList = {
+    .nbInfos = SETTING_INFO_NB,
+    .infoTypes = INFO_TYPES,
+    .infoContents = INFO_CONTENTS,
+};
 
 static void exit(void) {
     os_sched_exit(-1);
 }
 
-void ui_menu_about(void) {
-    nbgl_useCaseSettings("Bitcoin", 0, 1, false, ui_menu_main, navigation_cb, NULL);
-}
-
-void ui_menu_about_testnet(void) {
-    nbgl_useCaseSettings("Bitcoin Testnet", 0, 1, false, ui_menu_main, navigation_cb, NULL);
-}
-
 void ui_menu_main_flow_bitcoin(void) {
-    nbgl_useCaseHome("Bitcoin", &C_Bitcoin_64px, NULL, false, ui_menu_about, exit);
+    nbgl_useCaseHomeAndSettings(APPNAME,
+                                &C_Bitcoin_64px,
+                                NULL,
+                                INIT_HOME_PAGE,
+                                NULL,
+                                &infoList,
+                                NULL,
+                                exit);
 }
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
-    nbgl_useCaseHome("Bitcoin Testnet",
-                     &C_Bitcoin_64px,
-                     "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
-                     false,
-                     ui_menu_about_testnet,
-                     exit);
+    nbgl_useCaseHomeAndSettings(
+        "Bitcoin Testnet",
+        &C_Bitcoin_64px,
+        "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+        INIT_HOME_PAGE,
+        NULL,
+        &infoList,
+        NULL,
+        exit);
 }
 
 #endif  // HAVE_NBGL
