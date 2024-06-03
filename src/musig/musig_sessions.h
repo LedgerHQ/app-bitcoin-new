@@ -3,6 +3,11 @@
 #include <stdbool.h>
 #include "musig.h"
 
+/**
+ * This module encapsulates the logic to manage the psbt-level MuSig2 sessions. See the
+ * documentation in docs/musig.md for more information.
+ */
+
 // the maximum number of musig sessions that are stored in permanent memory
 #define MAX_N_MUSIG_SESSIONS 8
 
