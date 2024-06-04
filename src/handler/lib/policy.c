@@ -468,8 +468,8 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
             return -1;
         }
     } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
-        musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
-        uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+        const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+        const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
         plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
         for (int i = 0; i < musig_info->n; i++) {
             // we use ext_pubkey as a temporary variable; will overwrite later
@@ -1768,9 +1768,9 @@ int count_distinct_keys_info(const policy_node_t *policy) {
         if (key_expression_ptr->type == KEY_EXPRESSION_NORMAL) {
             ret = MAX(ret, key_expression_ptr->k.key_index + 1);
         } else if (key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
-            musig_aggr_key_info_t *musig_info =
+            const musig_aggr_key_info_t *musig_info =
                 r_musig_aggr_key_info(&key_expression_ptr->m.musig_info);
-            uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+            const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
             for (int i = 0; i < musig_info->n; i++) {
                 ret = MAX(ret, key_indexes[i] + 1);
             }
@@ -1977,8 +1977,8 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             return WITH_ERROR(-1, "Unexpected error retrieving key expressions from the policy");
         }
         if (kp_i->type == KEY_EXPRESSION_MUSIG) {
-            musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
-            uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+            const musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
+            const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
 
             uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
             memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
@@ -2025,10 +2025,12 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                     }
                 }
             } else if (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_MUSIG) {
-                musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
-                uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
-                musig_aggr_key_info_t *musig_info_j = r_musig_aggr_key_info(&kp_j->m.musig_info);
-                uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
+                const musig_aggr_key_info_t *musig_info_i =
+                    r_musig_aggr_key_info(&kp_i->m.musig_info);
+                const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+                const musig_aggr_key_info_t *musig_info_j =
+                    r_musig_aggr_key_info(&kp_j->m.musig_info);
+                const uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
                 // if two musigs have exactly the same set of keys, then the derivation options must
                 // be disjoint
 
