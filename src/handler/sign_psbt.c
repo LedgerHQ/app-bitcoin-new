@@ -394,7 +394,7 @@ static int get_amount_scriptpubkey_from_psbt(
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
 static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
-    keyexpr_info_t *keyexpr_info,
+    const keyexpr_info_t *keyexpr_info,
     in_out_info_t *in_out,
     int psbt_key_type,
     buffer_t *data,
@@ -755,14 +755,17 @@ static bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
         return result;
     } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
         // iterate through the keys of the musig() placeholder to find if a key is internal
-        musig_aggr_key_info_t *musig_info =
+        const musig_aggr_key_info_t *musig_info =
             r_musig_aggr_key_info(&keyexpr_info->key_expression_ptr->m.musig_info);
-        uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+        const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
 
         bool has_internal_key = false;
 
         // collect the keys of the musig, and fill the info related to the internal key (if any)
         uint8_t keys[MAX_PUBKEYS_PER_MUSIG][33];
+
+        LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig placeholder");
+
         for (int idx_in_musig = 0; idx_in_musig < musig_info->n; idx_in_musig++) {
             if (get_and_verify_key_info(dc, st, key_indexes[idx_in_musig], &tmp_keyexpr_info)) {
                 memcpy(keyexpr_info->key_derivation,
@@ -1776,7 +1779,7 @@ static bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_
 
 static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc,
                                                                sign_psbt_state_t *st,
-                                                               tx_hashes_t *hashes,
+                                                               const tx_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
                                                                uint8_t sighash[static 32]) {
@@ -1961,10 +1964,10 @@ static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_contex
 
 static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc,
                                                                sign_psbt_state_t *st,
-                                                               tx_hashes_t *hashes,
+                                                               const tx_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
-                                                               keyexpr_info_t *keyexpr_info,
+                                                               const keyexpr_info_t *keyexpr_info,
                                                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -2137,12 +2140,13 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     return true;
 }
 
-static bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
-                                                                   sign_psbt_state_t *st,
-                                                                   keyexpr_info_t *keyexpr_info,
-                                                                   input_info_t *input,
-                                                                   unsigned int cur_input_index,
-                                                                   uint8_t sighash[static 32]) {
+static bool __attribute__((noinline))
+sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
+                             sign_psbt_state_t *st,
+                             const keyexpr_info_t *keyexpr_info,
+                             input_info_t *input,
+                             unsigned int cur_input_index,
+                             uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
@@ -2396,13 +2400,14 @@ static bool yield_musig_partial_signature(dispatcher_context_t *dc,
                             tapleaf_hash);
 }
 
-static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t *dc,
-                                                                   sign_psbt_state_t *st,
-                                                                   signing_state_t *signing_state,
-                                                                   keyexpr_info_t *keyexpr_info,
-                                                                   input_info_t *input,
-                                                                   unsigned int cur_input_index,
-                                                                   uint8_t sighash[static 32]) {
+static bool __attribute__((noinline))
+sign_sighash_musig_and_yield(dispatcher_context_t *dc,
+                             sign_psbt_state_t *st,
+                             signing_state_t *signing_state,
+                             const keyexpr_info_t *keyexpr_info,
+                             const input_info_t *input,
+                             unsigned int cur_input_index,
+                             uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     if (st->wallet_policy_map->type != TOKEN_TR) {
@@ -2436,9 +2441,11 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
     serialized_extended_pubkey_t ext_pubkey;
 
     const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
-    musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
-    uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+    const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
     plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
+
+    LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig key expression");
     for (int i = 0; i < musig_info->n; i++) {
         // we use ext_pubkey as a temporary variable; will overwrite later
         if (0 > get_extended_pubkey(dc, &wdi, key_indexes[i], &ext_pubkey)) {
