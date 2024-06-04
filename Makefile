@@ -46,9 +46,9 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 2
-APPVERSION_P = 3
-APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
+APPVERSION_N = 3
+APPVERSION_P = 0
+APPVERSION_SUFFIX = alpha # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
@@ -58,7 +58,7 @@ endif
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
-VARIANT_VALUES = bitcoin_testnet bitcoin
+VARIANT_VALUES = bitcoin_testnet
 
 # simplify for tests
 ifndef COIN
@@ -83,23 +83,11 @@ DEFINES   += COIN_P2SH_VERSION=196
 DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
 DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-APPNAME = "Bitcoin Test"
-
-else ifeq ($(COIN),bitcoin)
-
-# Bitcoin mainnet, no legacy support
-DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
-DEFINES   += BIP44_COIN_TYPE=0
-DEFINES   += COIN_P2PKH_VERSION=0
-DEFINES   += COIN_P2SH_VERSION=5
-DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
-DEFINES   += COIN_COINID_SHORT=\"BTC\"
-
-APPNAME = "Bitcoin"
+APPNAME = "Bitcoin Test Musig"
 
 else
 ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin)
+$(error Unsupported COIN - use bitcoin_testnet_musig, bitcoin)
 endif
 endif
 
@@ -139,6 +127,12 @@ DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=72
 DEFINES       += HAVE_WALLET_ID_SDK
 else
 DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
+endif
+
+$(warning Target: $(TARGET_NAME))
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+$(error This version is not supported on Nano S)
 endif
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
