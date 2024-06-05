@@ -46,7 +46,7 @@ def getScriptPubkeyFromWallet(wallet: WalletPolicy, change: bool, address_index:
     # Iterate in reverse order, as strings identifying a small-index key (like @1) can be a
     # prefix of substrings identifying a large-index key (like @12), but not the other way around
     # A more structural parsing would be more robust
-    for i, key_info_str in enumerate(reversed(wallet.keys_info)):
+    for i, key_info_str in reversed(list(enumerate(wallet.keys_info))):
         if wallet.version == WalletType.WALLET_POLICY_V1 and key_info_str[-3:] != "/**":
             raise ValueError("All the keys must have wildcard (/**)")
 
