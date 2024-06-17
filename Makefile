@@ -56,6 +56,13 @@ else
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-$(strip $(APPVERSION_SUFFIX))"
 endif
 
+# If set, the app will automatically approve all requests without user interaction. Useful for performance tests.
+# It is critical that no such app is ever deployed in production.
+AUTOAPPROVE_FOR_PERF_TESTS ?= 0
+ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+    DEFINES += HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+endif
+
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
 VARIANT_VALUES = bitcoin_testnet bitcoin
@@ -74,33 +81,36 @@ HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
 HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ifeq ($(COIN),bitcoin_testnet)
+    # Bitcoin testnet, no legacy support
+    DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
+    DEFINES   += BIP44_COIN_TYPE=1
+    DEFINES   += COIN_P2PKH_VERSION=111
+    DEFINES   += COIN_P2SH_VERSION=196
+    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
+    DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-# Bitcoin testnet, no legacy support
-DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
-DEFINES   += BIP44_COIN_TYPE=1
-DEFINES   += COIN_P2PKH_VERSION=111
-DEFINES   += COIN_P2SH_VERSION=196
-DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
-DEFINES   += COIN_COINID_SHORT=\"TEST\"
-
-APPNAME = "Bitcoin Test"
-
+    APPNAME = "Bitcoin Test"
 else ifeq ($(COIN),bitcoin)
+    # the version for performance tests automatically approves all requests
+    # there is no reason to ever compile the mainnet app with this flag
+    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+        $(error Use testnet app for performance tests)
+    endif
 
-# Bitcoin mainnet, no legacy support
-DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
-DEFINES   += BIP44_COIN_TYPE=0
-DEFINES   += COIN_P2PKH_VERSION=0
-DEFINES   += COIN_P2SH_VERSION=5
-DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
-DEFINES   += COIN_COINID_SHORT=\"BTC\"
+    # Bitcoin mainnet, no legacy support
+    DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
+    DEFINES   += BIP44_COIN_TYPE=0
+    DEFINES   += COIN_P2PKH_VERSION=0
+    DEFINES   += COIN_P2SH_VERSION=5
+    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
+    DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-APPNAME = "Bitcoin"
+    APPNAME = "Bitcoin"
 
 else
-ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin)
-endif
+    ifeq ($(filter clean,$(MAKECMDGOALS)),)
+        $(error Unsupported COIN - use bitcoin_testnet, bitcoin)
+    endif
 endif
 
 # Application icons following guidelines:

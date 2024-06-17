@@ -93,6 +93,10 @@ bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *bip32_path_str,
                        bool is_path_suspicious,
                        const char *pubkey) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_path_and_pubkey_state_t *state = (ui_path_and_pubkey_state_t *) &g_ui_state;
 
     strncpy(state->bip32_path_str, bip32_path_str, sizeof(state->bip32_path_str));
@@ -110,6 +114,10 @@ bool ui_display_pubkey(dispatcher_context_t *context,
 bool ui_display_path_and_message_content(dispatcher_context_t *context,
                                          const char *path_str,
                                          const char *message_content) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
     strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
     strncpy(state->message, message_content, sizeof(state->message));
@@ -122,6 +130,10 @@ bool ui_display_path_and_message_content(dispatcher_context_t *context,
 bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
                                               const char *path_str,
                                               const char *message_hash) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
     strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
     strncpy(state->message, message_hash, sizeof(state->message));
@@ -132,6 +144,10 @@ bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
 }
 
 bool ui_display_message_confirm(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     (void) context;
     ui_sign_message_confirm_flow();
 
@@ -141,6 +157,10 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
 bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
                                 const char *policy_descriptor) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
     strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
@@ -158,6 +178,10 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
                                            key_type_e key_type) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     (void) (n_keys);
 
     ui_cosigner_pubkey_and_index_state_t *state =
@@ -190,6 +214,10 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *address) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     strncpy(state->address, address, sizeof(state->address));
 
     if (wallet_name == NULL) {
@@ -205,6 +233,10 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
     ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
 
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
     ui_display_spend_from_wallet_flow();
 
@@ -212,21 +244,37 @@ bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_display_warning_external_inputs_flow();
     return io_ui_process(context, SET_UX_DIRTY);
 }
 
 bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_display_unverified_segwit_inputs_flows();
     return io_ui_process(context, SET_UX_DIRTY);
 }
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_display_nondefault_sighash_flow();
     return io_ui_process(context, SET_UX_DIRTY);
 }
 
 bool ui_transaction_prompt(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_display_transaction_prompt();
     return io_ui_process(context, SET_UX_DIRTY);
 }
@@ -237,6 +285,10 @@ bool ui_validate_output(dispatcher_context_t *context,
                         const char *address_or_description,
                         const char *coin_name,
                         uint64_t amount) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_validate_output_state_t *state = (ui_validate_output_state_t *) &g_ui_state;
 
     strncpy(state->address_or_description,
@@ -254,6 +306,10 @@ bool ui_validate_output(dispatcher_context_t *context,
 }
 
 bool ui_warn_high_fee(dispatcher_context_t *context) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_warn_high_fee_flow();
 
     return io_ui_process(context, SET_UX_DIRTY);
@@ -263,6 +319,10 @@ bool ui_validate_transaction(dispatcher_context_t *context,
                              const char *coin_name,
                              uint64_t fee,
                              bool is_self_transfer) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     format_sats_amount(coin_name, fee, state->fee);
@@ -298,6 +358,10 @@ void ui_pre_processing_message(void) {
 
 #ifdef HAVE_NBGL
 bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     (void) context;
     ui_display_post_processing_confirm_wallet_registation(success);
 
@@ -305,6 +369,10 @@ bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *contex
 }
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     (void) context;
     ui_display_post_processing_confirm_transaction(success);
 
@@ -312,6 +380,10 @@ bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool 
 }
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
     (void) context;
     ui_display_post_processing_confirm_message(success);
 

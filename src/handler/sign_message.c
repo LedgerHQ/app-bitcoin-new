@@ -174,6 +174,7 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
         snprintf(message_hash_str + 2 * i, 3, "%02X", message_hash[i]);
     }
 
+#ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     ui_pre_processing_message();
     if (printable) {
         if (!display_message_content_and_confirm(dc,
@@ -189,6 +190,7 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
             return;
         }
     }
+#endif
     uint8_t sig[MAX_DER_SIG_LEN];
 
     uint32_t info;
