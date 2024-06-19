@@ -551,7 +551,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_9(firmware),
+                              instructions=sign_psbt_instruction_approve_9(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_ins
@@ -569,18 +569,11 @@ def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmwa
         ],
     )
 
-    in_amounts = [21_000_000*100_000_000]
-    out_amounts = [21_000_000*100_000_000 - 100_000]
-
-    psbt = txmaker.createPsbt(wallet, in_amounts, out_amounts, [False])
-
-    sum_in = sum(in_amounts)
-    sum_out = sum(out_amounts)
-
-    assert sum_out < sum_in
+    psbt = "cHNidP8BAF4BAAAAAdPD2ZYMl89dk/YzXHTZhrjEqcvlBkVYNrcVY7772qITAAAAAAAAAAAAAWC5BVrwdQcAIlEgxg2/6wYrgIO8mjVxHIi7Ulp5V3e27qVz+FL9IxOy09oAAAAAAAEA/TIEAgAAAAclqfEztd6haPTihR8HL8wA/Kp8piBhcXpI5S4po/o3mhEAAABQlT+qaJPjLsWie5ReYF8QhfMjLUJMEynIjXhu1ozm/LYqpjv5q2F8CIo7cL5XqtofM0pwFyUNP2A9yC69OxILY14/9WsfC9kzhSNxJJqz31wAAAAAH+8UM8hmhbfwVmgdUVKvgDziWQbx0Z+2xoBOBuooqxcRAAAAUI9Feva0k7dDnsbUKQBiq1F6cuXB1BDN1hdU5CCEUOT5ABP9pp/vGdRgKkIHzdWhAW0HATJhPGWaj10z88spC4znO4NEsTpPjgkVFGmEobsVAAAAAP3q3r5basCVBEZNiqqsvC+tEhWKU0yUuMpCljr0ehidBQAAAFAkms6omdQ3MvbyrK8/9Tv+2hOaq09VwCwhK2VxH8UEMsmU5fpv2Cq8cIVV3GK3OiAO52c8/suDahVuSjVl6sG5TTX5S8/Y/aX//2dwBK6ipAAAAAASS4NPwpbwISsUIXNCFJkH5alSTOu+wxEuJ9pplNX2xhMAAABQdwoAXZqCqiH8hpvQxMQfU0F6kqscEvbVSPspTbTSEu7F6hgz8U0KEEOlNbFjxPs4Hu+sP5dBxpY+YBPI475h6bYmFhT4gg1udS/XnDpK2tgAAAAAKzXUIDLUTw/k3NUP/qaBKLQkPrcPsLJbBXa7JElqAWgDAAAAUAOWvAx3SF/oOfSwhEIOarmr8pWXp14pNJ1QwEtAcqF8eV6VvtYXQwrJJyVD15nVSNiYtSt/470dwNEE1aThaL6W8S5eN405TuTMXtfdWX7oAAAAAK5Itews92iWAOXsA2+YOppP2fEv/nbPjws9ihQAg8vKDgAAAFA0gbWRZCsSJIacrjx/UyLUlJBEazXSzo6V4r5GUD89w83vR5m18tRv9Pqi/B7jmUn9Gm4NtfHIBSIpygO4FTsBipV0SJNhNd7rqcRWqdfeSwAAAADlS6FCal/jssfa+8dwZOBoGcYRdytfuh1Yd5gskbTS6gEAAABQ3Oj6gvNurIgVFhpTswGUA0cg23HLcehirTQro6XppoIOFmG8KWuxYGeAmp/EgvawehacJQTr/eAY0/zr4TwrKXsyTtNt4SfayRRcf/pwQY4AAAAABwBAB1rwdQcAFgAU0+7eJu+wC1UvKNIxz4CFDRczm/I4L20CAAAAABYAFPNyGL5lUjRibFPLi01BEjsLwASNM8SqBAAAAAAWABSuAZ+UnYYxIwc3Aj30hZG6rKwna4g7HQEAAAAAFgAUKKpV9FUdnX0XjRKi5566B7GilM6hNsIAAAAAABYAFPUxxs1RBp+b5Rgv3WHXHbJgLZ/uWTGkBQAAAAAWABRFAR8Q58ACMpSpRHc+W/AYljP3EW9EygAAAAAAFgAU25qB3Gwdk2er+8rT9SF8FAc+bfEAAAAAAQEfAEAHWvB1BwAWABTT7t4m77ALVS8o0jHPgIUNFzOb8iIGA5NNbsxZ4ylv9Q0vs4yPSxu05hJFFW48jPoNtiyScnRJGPWswv1UAACAAQAAgAAAAIABAAAAuCAAAAAA"
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(
+                                  firmware),
                               testname=test_name)
 
     assert len(result) == 1
@@ -617,7 +610,7 @@ def test_sign_psbt_singlesig_wpkh_512to256(navigator: Navigator, firmware: Firmw
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_inputs
@@ -680,7 +673,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     client._no_clone_psbt = True
     with pytest.raises(ExceptionRAPDU) as e:
         client.sign_psbt(psbt, wallet, None, navigator,
-                         instructions=sign_psbt_instruction_approve(firmware),
+                         instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
     assert len(e.value.data) == 0

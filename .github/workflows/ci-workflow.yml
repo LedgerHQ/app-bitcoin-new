@@ -53,6 +53,28 @@ jobs:
           name: bitcoin-testnet-app-${{ matrix.model }}
           path: bitcoin-testnet-bin
 
+  job_build_app_perftest:
+    name: Compile the UX-less version of the app on Nano S+ for performance tests
+
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder:latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: |
+          make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK="$NANOSP_SDK" AUTOAPPROVE_FOR_PERF_TESTS=1
+
+      - name: Upload Bitcoin Testnet app binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: bitcoin-testnet-perftest-app-nanosp
+          path: bin
+
   job_unit_test:
     name: Unit test
     needs: job_build
@@ -166,6 +188,43 @@ jobs:
           pip install -r requirements.txt
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300
 
+  job_perftests:
+    name: Performance report
+
+    needs: job_build_app_perftest
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin:latest
+      ports:
+        - 1234:1234
+        - 9999:9999
+        - 40000:40000
+        - 41000:41000
+        - 42000:42000
+        - 43000:43000
+      options: --entrypoint /bin/bash
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+
+      - name: Download Bitcoin app binary for perftests
+        uses: actions/download-artifact@v2
+        with:
+          name: bitcoin-testnet-perftest-app-nanosp
+          path: bin
+
+      - name: Run tests
+        run: |
+          cd tests_perf
+          pip install -r requirements.txt
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
+      - name: Upload benchmarks summary
+        uses: actions/upload-artifact@v2
+        with:
+          name: benchmarks-log
+          path: tests_perf/benchmarks.json
 
   job_test_js_lib:
     name: Tests with the JS library
