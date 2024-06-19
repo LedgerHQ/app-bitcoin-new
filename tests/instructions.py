@@ -148,7 +148,7 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     if model.name.startswith("nano"):
         return instructions
 
-    instructions.review_start()
+    instructions.review_start(save_screenshot=False)
     return instructions
 
 
@@ -166,16 +166,16 @@ def sign_psbt_instruction_approve_opreturn(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve(model: Firmware) -> Instructions:
+def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
+        instructions.new_request("Continue", save_screenshot=save_screenshot)
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
     else:
-        instructions.review_start()
-        instructions.review_fees()
-        instructions.confirm_transaction()
+        instructions.review_start(save_screenshot=save_screenshot)
+        instructions.review_fees(save_screenshot=save_screenshot)
+        instructions.confirm_transaction(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -280,17 +280,17 @@ def sign_psbt_instruction_approve_8(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve_9(model: Firmware) -> Instructions:
+def sign_psbt_instruction_approve_9(model: Firmware, save_screenshot: bool = True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
+        instructions.new_request("Continue", save_screenshot=save_screenshot)
+        instructions.new_request("Continue", save_screenshot=save_screenshot)
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
     else:
-        instructions.review_start(output_count=2)
-        instructions.review_fees()
-        instructions.confirm_transaction()
+        instructions.review_start(output_count=2, save_screenshot=save_screenshot)
+        instructions.review_fees(save_screenshot=save_screenshot)
+        instructions.confirm_transaction(save_screenshot=save_screenshot)
     return instructions
 
 

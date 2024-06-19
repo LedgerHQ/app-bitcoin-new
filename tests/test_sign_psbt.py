@@ -551,7 +551,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_9(firmware),
+                              instructions=sign_psbt_instruction_approve_9(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_ins
@@ -580,7 +580,7 @@ def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmwa
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == 1
@@ -617,7 +617,7 @@ def test_sign_psbt_singlesig_wpkh_512to256(navigator: Navigator, firmware: Firmw
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_inputs
@@ -680,7 +680,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     client._no_clone_psbt = True
     with pytest.raises(ExceptionRAPDU) as e:
         client.sign_psbt(psbt, wallet, None, navigator,
-                         instructions=sign_psbt_instruction_approve(firmware),
+                         instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
     assert len(e.value.data) == 0
