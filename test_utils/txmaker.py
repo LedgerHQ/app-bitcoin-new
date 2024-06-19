@@ -7,6 +7,7 @@
 
 from io import BytesIO
 from random import randint
+import re
 
 from typing import List, Tuple, Optional, Union
 from bitcoin_client.ledger_bitcoin import WalletPolicy, WalletType
@@ -77,6 +78,11 @@ def getScriptPubkeyFromWallet(wallet: WalletPolicy, change: bool, address_index:
 
     # by doing the text substitution of '/**' at the end, this works for either V1 or V2
     descriptor_str = descriptor_str.replace("/**", f"/{1 if change else 0}/*")
+
+    # Substitute '<NUM1;NUM2>/*' with either `NUM1/*` (not change) or `NUM2/*` (change)
+    pattern = re.compile(r'<(\d+);(\d+)>(/\*)')
+    descriptor_str = pattern.sub(lambda m: (
+        m.group(2) if change else m.group(1)) + m.group(3), descriptor_str)
 
     return Descriptor.from_string(descriptor_str).derive(address_index).script_pubkey()
 
