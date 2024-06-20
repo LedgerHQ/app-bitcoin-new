@@ -35,7 +35,6 @@
 #include "common/read.h"
 #include "common/write.h"
 
-#include "cxram_stash.h"
 #include "debug-helpers/debug.h"
 
 #include "crypto.h"
