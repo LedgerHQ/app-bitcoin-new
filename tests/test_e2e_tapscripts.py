@@ -262,8 +262,7 @@ def test_e2e_tapscript_multi_a_2of2(navigator: Navigator, firmware: Firmware, cl
 def test_e2e_tapscript_maxdepth(navigator: Navigator, firmware: Firmware, client: RaggerClient,
                                 test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
     # A taproot tree with maximum supported depth, where the internal key is in the deepest script
-
-    MAX_TAPTREE_POLICY_DEPTH = 4 if firmware.name == "nanos" else 9
+    MAX_TAPTREE_POLICY_DEPTH = 9
 
     # Make the most unbalanced tree where each script is a simple pk()
     parts = [f"pk(@{i}/**)" for i in range(1, MAX_TAPTREE_POLICY_DEPTH)]
@@ -293,10 +292,6 @@ def test_e2e_tapscript_large(navigator: Navigator, firmware: Firmware, client: R
                              test_name: str, rpc, rpc_test_wallet, speculos_globals:
                              SpeculosGlobals):
     # A quite large tapscript with 8 tapleaves and 22 keys in total.
-
-    # Takes more memory than Nano S can handle
-    if (firmware.name == "nanos"):
-        pytest.skip("Not supported on Nano S due to memory limitations")
 
     keys_info = []
 

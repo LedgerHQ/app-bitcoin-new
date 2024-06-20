@@ -168,15 +168,6 @@ UX_STEP_NOCB(ux_validate_address_step,
              });
 
 // Step with eye icon and a "high fees" warning
-#ifdef TARGET_NANOS
-UX_STEP_NOCB(ux_high_fee_step,
-             pnn,
-             {
-                 &C_icon_eye,
-                 "Fees over 10%",
-                 "of total value!",
-             });
-#else
 UX_STEP_NOCB(ux_high_fee_step,
              pnn,
              {
@@ -184,7 +175,6 @@ UX_STEP_NOCB(ux_high_fee_step,
                  "Fees are above 10%",
                  "of total amount!",
              });
-#endif
 
 UX_STEP_NOCB(ux_confirm_selftransfer_step, pnn, {&C_icon_eye, "Confirm", "self-transfer"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
