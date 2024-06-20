@@ -113,9 +113,12 @@ else
     endif
 endif
 
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+$(error This repository is not compatible with the Nano S. Look for the 'nanos' branch for the latest code for Nano S.)
+endif
+
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOS = icons/nanos_app_bitcoin.gif
 ICON_NANOX = icons/nanox_app_bitcoin.gif
 ICON_NANOSP = icons/nanox_app_bitcoin.gif
 ICON_STAX = icons/stax_app_bitcoin.gif
@@ -144,19 +147,7 @@ DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=72
-DEFINES       += HAVE_WALLET_ID_SDK
-else
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
-endif
-
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-    # enables optimizations using the shared 1K CXRAM region
-    DEFINES   += USE_CXRAM_SECTION
-    # enables usage of the NVRAM to free up some RAM
-    DEFINES   += USE_NVRAM_STASH
-endif
+DEFINES   += IO_SEPROXYHAL_BUFFER_SIZE_B=300
 
 # debugging helper functions and macros
 CFLAGS    += -include debug-helpers/debug.h
