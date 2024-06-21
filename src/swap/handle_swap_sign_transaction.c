@@ -53,6 +53,30 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
     memcpy(G_swap_state.destination_address,
            destination_address,
            sizeof(G_swap_state.destination_address));
+
+    // if destination_address_extra_id is given, we use the first byte to determine if we use the
+    // normal swap protocol, or the one for cross-chain swaps
+    if (sign_transaction_params->destination_address_extra_id == NULL ||
+        sign_transaction_params->destination_address_extra_id[0] == 0) {
+        G_swap_state.mode = SWAP_MODE_STANDARD;
+
+        // we don't use the payin_extra_id field in this mode
+        explicit_bzero(G_swap_state.payin_extra_id, sizeof(G_swap_state.payin_extra_id));
+    } else if (sign_transaction_params->destination_address_extra_id[0] == 2) {
+        G_swap_state.mode = SWAP_MODE_CROSSCHAIN;
+
+        // we expect exactly 33 bytes. Guard against future protocol changes, as the following
+        // code might need to be revised in that case
+        LEDGER_ASSERT(sizeof(G_swap_state.payin_extra_id) == 33, "Unexpected payin_extra_id size");
+
+        memcpy(G_swap_state.payin_extra_id,
+               sign_transaction_params->destination_address_extra_id,
+               sizeof(G_swap_state.payin_extra_id));
+    } else {
+        PRINTF("Invalid or unknown swap protocol\n");
+        return false;
+    }
+
     return true;
 }
 
