@@ -1256,6 +1256,69 @@ static bool read_outputs(dispatcher_context_t *dc,
 
         output.in_out.scriptPubKey_len = result_len;
 
+        if (!dry_run && G_swap_state.called_from_swap &&
+            G_swap_state.mode == SWAP_MODE_CROSSCHAIN) {
+            // the first output's Script must be
+            //     OP_RETURN <data>
+            // where 2 <= len(data) <= 80, SHA256(data) == payin_extra_id and
+            // the output's value must be 0
+            if (cur_output_index == 0) {
+                if (output.in_out.scriptPubKey_len < 4 ||
+                    output.in_out.scriptPubKey[0] != OP_RETURN) {
+                    PRINTF("The first output must be OP_RETURN <data> for a cross-chain swap\n");
+                    SEND_SW(dc, SW_FAIL_SWAP);
+                    finalize_exchange_sign_transaction(false);
+                }
+
+                uint8_t second_byte = output.in_out.scriptPubKey[1];
+                size_t push_opcode_size;  // the length of the push opcode (1 or 2 bytes)
+                size_t data_size;  // the length of the actual data embedded in the OP_RETURN output
+                if (2 <= second_byte && second_byte <= 75) {
+                    push_opcode_size = 1;
+                    data_size = second_byte;
+                } else if (second_byte == OP_PUSHDATA1) {
+                    // pushing more than 75 bytes requires using OP_PUSHDATA1 <len>
+                    // insted of a single-byte opcode
+                    push_opcode_size = 2;
+                    data_size = output.in_out.scriptPubKey[2];
+                } else {
+                    // there are other valid OP_RETURN Scripts that we never expect here,
+                    // so we don't bother parsing.
+                    PRINTF("Unsupported or invalid OP_RETURN Script in cross-chain swap\n");
+                    SEND_SW(dc, SW_FAIL_SWAP);
+                    finalize_exchange_sign_transaction(false);
+                }
+
+                // Make sure there is a singla data push
+                if (output.in_out.scriptPubKey_len != 1 + push_opcode_size + data_size) {
+                    PRINTF("Invalid OP_RETURN Script length in cross-chain swap\n");
+                    SEND_SW(dc, SW_FAIL_SWAP);
+                    finalize_exchange_sign_transaction(false);
+                }
+
+                // Make sure the output's value is 0
+                if (output.value != 0) {
+                    PRINTF("OP_RETURN with non-zero value during cross-chain swap\n");
+                    SEND_SW(dc, SW_FAIL_SWAP);
+                    finalize_exchange_sign_transaction(false);
+                }
+
+                // verify the hash is the data payload is the expected one
+                uint8_t expected_payin_hash[32];
+                cx_hash_sha256(&output.in_out.scriptPubKey[1 + push_opcode_size],
+                               data_size,
+                               expected_payin_hash,
+                               32);
+                if (memcmp(G_swap_state.payin_extra_id + 1,
+                           expected_payin_hash,
+                           sizeof(expected_payin_hash)) != 0) {
+                    PRINTF("Mismatching payin hash in cross-chain swap\n");
+                    SEND_SW(dc, SW_FAIL_SWAP);
+                    finalize_exchange_sign_transaction(false);
+                }
+            }
+        }
+
         int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
 
         if (is_internal < 0) {
