@@ -1176,6 +1176,16 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
                 0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
                 // address did not match
                 PRINTF("Mismatching address for swap\n");
+                PRINTF("Expected: ");
+                for (int i = 0; i < swap_addr_len; i++) {
+                    PRINTF("%c", G_swap_state.destination_address[i]);
+                }
+                PRINTF("\n");
+                PRINTF("Found: ");
+                for (int i = 0; i < address_len; i++) {
+                    PRINTF("%c", output_address[i]);
+                }
+                PRINTF("\n");
                 SEND_SW(dc, SW_FAIL_SWAP);
                 finalize_exchange_sign_transaction(false);
             }
