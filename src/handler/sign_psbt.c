@@ -1160,16 +1160,25 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
     }
 
     if (G_swap_state.called_from_swap) {
-        // Swap feature: do not show the address to the user, but double check it matches
-        // the request from app-exchange; it must be the only external output (checked
-        // elsewhere).
-        int swap_addr_len = strlen(G_swap_state.destination_address);
-        if (swap_addr_len != address_len ||
-            0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
-            // address did not match
-            PRINTF("Mismatching address for swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
-            finalize_exchange_sign_transaction(false);
+        // here, it's a valid op_return for cross-chain swaps if and only if address_len < 0
+        // it's the first output, and it's a cross-chain swap
+        bool is_opreturn_to_skip =
+            address_len < 0 && cur_output_index == 0 && G_swap_state.mode == SWAP_MODE_CROSSCHAIN;
+
+        if (is_opreturn_to_skip) {
+            // nothing to do:
+        } else {
+            // Swap feature: do not show the address to the user, but double check it matches
+            // the request from app-exchange; it must be the only external output (checked
+            // elsewhere).
+            int swap_addr_len = strlen(G_swap_state.destination_address);
+            if (swap_addr_len != address_len ||
+                0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
+                // address did not match
+                PRINTF("Mismatching address for swap\n");
+                SEND_SW(dc, SW_FAIL_SWAP);
+                finalize_exchange_sign_transaction(false);
+            }
         }
     } else {
         // Show address to the user
@@ -1404,9 +1413,16 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
 
     if (G_swap_state.called_from_swap) {
-        // Swap feature: there must be only one external output
-        if (st->outputs.n_external != 1) {
-            PRINTF("Swap transaction must have exactly 1 external output\n");
+        // Swap feature: there must be only one external output for standard swaps
+        if (G_swap_state.mode == SWAP_MODE_STANDARD && st->outputs.n_external != 1) {
+            PRINTF("Standard swap transaction must have exactly 1 external output\n");
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
+        }
+        // For cross-chain swaps, there is also an additional OP_RETURN output, which is also
+        // counted as external
+        if (G_swap_state.mode == SWAP_MODE_CROSSCHAIN && st->outputs.n_external != 2) {
+            PRINTF("Cross-chain swap transaction must have exactly 2 external output\n");
             SEND_SW(dc, SW_FAIL_SWAP);
             finalize_exchange_sign_transaction(false);
         }
