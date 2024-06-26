@@ -115,7 +115,7 @@ endif
 
 ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
   ifeq ($(TARGET_NAME),TARGET_NANOS)
-    $(error This repository is not compatible with the Nano S. Look for the 'nanos' branch for the latest code for Nano S.)
+    $(error This branch is not compatible with the Nano S device. Checkout the 'nanos' branch for the latest code for Nano S.)
   endif
 endif
 
