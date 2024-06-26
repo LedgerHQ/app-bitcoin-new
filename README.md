@@ -1,5 +1,7 @@
 # Ledger Bitcoin Application
 
+This repository contains the Ledger Bitcoin application for Ledger Nano S+, X and Stax. The latest Nano S version is in the [nanos](https://github.com/LedgerHQ/app-bitcoin-new/tree/nanos) branch.
+
 ## Prerequisite
 
 Be sure to have your environment correctly set up (see [Getting Started](https://developers.ledger.com/docs/nano-app/introduction/)) and [ledgerblue](https://pypi.org/project/ledgerblue/) installed.
