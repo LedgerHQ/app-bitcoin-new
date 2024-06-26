@@ -123,20 +123,6 @@ typedef struct {
     uint8_t sha_outputs[32];
 } segwit_hashes_t;
 
-#ifdef USE_NVRAM_STASH
-
-typedef struct {
-    // Aligning by 4 is necessary due to platform limitations.
-    // Aligning by 64 further guarantees that most policies will fit in a single
-    // NVRAM page boundary, which minimizes the amount of writes.
-    __attribute__((aligned(64))) uint8_t wallet_policy_bytes[MAX_WALLET_POLICY_BYTES];
-} nvram_stash_t;
-
-const nvram_stash_t N_nvram_stash_real;
-#define N_nvram_stash (*(const volatile nvram_stash_t *) PIC(&N_nvram_stash_real))
-
-#endif
-
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
@@ -161,9 +147,7 @@ typedef struct {
 
     uint8_t protocol_version;
 
-#ifndef USE_NVRAM_STASH
     __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
-#endif
     policy_node_t *wallet_policy_map;
 
     int wallet_header_version;
@@ -626,19 +610,12 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             buffer_create(serialized_wallet_policy, serialized_wallet_policy_len);
 
         uint8_t policy_map_descriptor[MAX_DESCRIPTOR_TEMPLATE_LENGTH];
-#ifdef USE_NVRAM_STASH
-        // we need a temporary array to store the parsed policy in RAM before
-        // storing it in the NVRAM stash
-        uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
-#else
-        uint8_t *wallet_policy_map_bytes = st->wallet_policy_map_bytes;
-#endif
 
         int desc_temp_len = read_and_parse_wallet_policy(dc,
                                                          &serialized_wallet_policy_buf,
                                                          &wallet_header,
                                                          policy_map_descriptor,
-                                                         wallet_policy_map_bytes,
+                                                         st->wallet_policy_map_bytes,
                                                          MAX_WALLET_POLICY_BYTES);
         if (desc_temp_len < 0) {
             PRINTF("Failed to read or parse wallet policy");
@@ -646,14 +623,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             return false;
         }
 
-#ifdef USE_NVRAM_STASH
-        nvm_write((void *) N_nvram_stash.wallet_policy_bytes,
-                  (void *) wallet_policy_map_bytes,
-                  desc_temp_len);
-        st->wallet_policy_map = (policy_node_t *) N_nvram_stash.wallet_policy_bytes;
-#else
         st->wallet_policy_map = (policy_node_t *) st->wallet_policy_map_bytes;
-#endif
 
         st->wallet_header_version = wallet_header.version;
         memcpy(st->wallet_header_keys_info_merkle_root,

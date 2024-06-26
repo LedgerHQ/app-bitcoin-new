@@ -13,19 +13,19 @@ on:
 
 jobs:
   job_build:
-    name: Compilation for NanoS, X, S+, and Stax
+    name: Compilation for X, S+, Stax and Flex
 
     strategy:
       matrix:
         include:
-          - model: nanos
-            SDK: "$NANOS_SDK"
           - model: nanox
             SDK: "$NANOX_SDK"
           - model: nanosp
             SDK: "$NANOSP_SDK"
           - model: stax
             SDK: "$STAX_SDK"
+          - model: flex
+            SDK: "$FLEX_SDK"
 
     runs-on: ubuntu-latest
 
@@ -127,10 +127,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - model: nanos
           - model: nanox
           - model: nanosp
           - model: stax
+          - model: flex
 
     needs: job_build
     runs-on: ubuntu-latest
@@ -186,7 +186,7 @@ jobs:
         run: |
           cd bitcoin_client/tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
 
   job_perftests:
     name: Performance report
@@ -258,7 +258,7 @@ jobs:
       - name: Download Bitcoin Testnet app binary
         uses: actions/download-artifact@v2
         with:
-          name: bitcoin-testnet-app-nanos
+          name: bitcoin-testnet-app-nanosp
           path: bin
 
       - name: Run tests

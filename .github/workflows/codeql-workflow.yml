@@ -17,8 +17,6 @@ jobs:
     strategy: 
       matrix:
         include:
-          - SDK: "$NANOS_SDK"
-            artifact: boilerplate-app-nanoS
           - SDK: "$NANOX_SDK"
             artifact: boilerplate-app-nanoX
           - SDK: "$NANOSP_SDK"
