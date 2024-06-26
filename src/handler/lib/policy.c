@@ -5,6 +5,7 @@
 #include "../lib/get_merkle_leaf_element.h"
 #include "../lib/get_preimage.h"
 #include "../../crypto.h"
+#include "../../musig/musig.h"
 #include "../../common/base58.h"
 #include "../../common/bitvector.h"
 #include "../../common/read.h"
@@ -419,7 +420,7 @@ execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, 
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
-__attribute__((noinline, warn_unused_result)) static int get_extended_pubkey(
+__attribute__((noinline, warn_unused_result)) int get_extended_pubkey(
     dispatcher_context_t *dispatcher_context,
     const wallet_derivation_info_t *wdi,
     int key_index,
@@ -456,23 +457,61 @@ __attribute__((noinline, warn_unused_result)) static int get_extended_pubkey(
 __attribute__((warn_unused_result)) static int get_derived_pubkey(
     dispatcher_context_t *dispatcher_context,
     const wallet_derivation_info_t *wdi,
-    const policy_node_key_placeholder_t *key_placeholder,
+    const policy_node_keyexpr_t *key_expr,
     uint8_t out[static 33]) {
     PRINT_STACK_POINTER();
 
     serialized_extended_pubkey_t ext_pubkey;
 
-    int ret = get_extended_pubkey(dispatcher_context, wdi, key_placeholder->key_index, &ext_pubkey);
-    if (ret < 0) {
-        return -1;
+    if (key_expr->type == KEY_EXPRESSION_NORMAL) {
+        if (0 > get_extended_pubkey(dispatcher_context, wdi, key_expr->k.key_index, &ext_pubkey)) {
+            return -1;
+        }
+    } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
+        const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+        const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+        plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
+        for (int i = 0; i < musig_info->n; i++) {
+            // we use ext_pubkey as a temporary variable; will overwrite later
+            if (0 > get_extended_pubkey(dispatcher_context, wdi, key_indexes[i], &ext_pubkey)) {
+                return -1;
+            }
+            memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
+        }
+
+        // sort the keys in ascending order using bubble sort
+        for (int i = 0; i < musig_info->n; i++) {
+            for (int j = 0; j < musig_info->n - 1; j++) {
+                if (memcmp(keys[j], keys[j + 1], sizeof(plain_pk_t)) > 0) {
+                    uint8_t tmp[sizeof(plain_pk_t)];
+                    memcpy(tmp, keys[j], sizeof(plain_pk_t));
+                    memcpy(keys[j], keys[j + 1], sizeof(plain_pk_t));
+                    memcpy(keys[j + 1], tmp, sizeof(plain_pk_t));
+                }
+            }
+        }
+
+        musig_keyagg_context_t musig_ctx;
+        musig_key_agg(keys, musig_info->n, &musig_ctx);
+
+        // compute the aggregated extended pubkey
+        memset(&ext_pubkey, 0, sizeof(ext_pubkey));
+        write_u32_be(ext_pubkey.version, 0, BIP32_PUBKEY_VERSION);
+
+        ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
+        memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
+        memcpy(&ext_pubkey.chain_code, BIP_MUSIG_CHAINCODE, sizeof(BIP_MUSIG_CHAINCODE));
+    } else {
+        LEDGER_ASSERT(false, "Unreachable code");
     }
 
     // we derive the /<change>/<address_index> child of this pubkey
     // we reuse the same memory of ext_pubkey
     bip32_CKDpub(&ext_pubkey,
-                 wdi->change ? key_placeholder->num_second : key_placeholder->num_first,
-                 &ext_pubkey);
-    bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey);
+                 wdi->change ? key_expr->num_second : key_expr->num_first,
+                 &ext_pubkey,
+                 NULL);
+    bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey, NULL);
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
 
@@ -569,11 +608,10 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 ==
-                    get_derived_pubkey(state->dispatcher_context,
-                                       state->wdi,
-                                       r_policy_node_key_placeholder(&policy->key_placeholder),
-                                       compressed_pubkey)) {
+                if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                             state->wdi,
+                                             r_policy_node_keyexpr(&policy->key),
+                                             compressed_pubkey)) {
                     return -1;
                 }
 
@@ -591,11 +629,10 @@ __attribute__((warn_unused_result)) static int process_generic_node(policy_parse
                 const policy_node_with_key_t *policy =
                     (const policy_node_with_key_t *) node->policy_node;
                 uint8_t compressed_pubkey[33];
-                if (-1 ==
-                    get_derived_pubkey(state->dispatcher_context,
-                                       state->wdi,
-                                       r_policy_node_key_placeholder(&policy->key_placeholder),
-                                       compressed_pubkey)) {
+                if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                             state->wdi,
+                                             r_policy_node_keyexpr(&policy->key),
+                                             compressed_pubkey)) {
                     return -1;
                 }
                 if (!state->is_taproot) {
@@ -684,7 +721,7 @@ __attribute__((warn_unused_result)) static int process_pkh_wpkh_node(policy_pars
 
     if (-1 == get_derived_pubkey(state->dispatcher_context,
                                  state->wdi,
-                                 r_policy_node_key_placeholder(&policy->key_placeholder),
+                                 r_policy_node_keyexpr(&policy->key),
                                  compressed_pubkey)) {
         return -1;
     } else if (policy->base.type == TOKEN_PKH) {
@@ -811,11 +848,10 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
         uint8_t compressed_pubkey[33];
 
         if (policy->base.type == TOKEN_MULTI) {
-            if (-1 ==
-                get_derived_pubkey(state->dispatcher_context,
-                                   state->wdi,
-                                   &r_policy_node_key_placeholder(&policy->key_placeholders)[i],
-                                   compressed_pubkey)) {
+            if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                         state->wdi,
+                                         &r_policy_node_keyexpr(&policy->keys)[i],
+                                         compressed_pubkey)) {
                 return -1;
             }
         } else {
@@ -837,11 +873,10 @@ __attribute__((warn_unused_result)) static int process_multi_sortedmulti_node(
             for (int j = 0; j < policy->n; j++) {
                 if (!bitvector_get(used, j)) {
                     uint8_t cur_pubkey[33];
-                    if (-1 == get_derived_pubkey(
-                                  state->dispatcher_context,
-                                  state->wdi,
-                                  &r_policy_node_key_placeholder(&policy->key_placeholders)[j],
-                                  cur_pubkey)) {
+                    if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                                 state->wdi,
+                                                 &r_policy_node_keyexpr(&policy->keys)[j],
+                                                 cur_pubkey)) {
                         return -1;
                     }
 
@@ -889,11 +924,10 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
         uint8_t compressed_pubkey[33];
 
         if (policy->base.type == TOKEN_MULTI_A) {
-            if (-1 ==
-                get_derived_pubkey(state->dispatcher_context,
-                                   state->wdi,
-                                   &r_policy_node_key_placeholder(&policy->key_placeholders)[i],
-                                   compressed_pubkey)) {
+            if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                         state->wdi,
+                                         &r_policy_node_keyexpr(&policy->keys)[i],
+                                         compressed_pubkey)) {
                 return -1;
             }
         } else {
@@ -905,11 +939,10 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
             for (int j = 0; j < policy->n; j++) {
                 if (!bitvector_get(used, j)) {
                     uint8_t cur_pubkey[33];
-                    if (-1 == get_derived_pubkey(
-                                  state->dispatcher_context,
-                                  state->wdi,
-                                  &r_policy_node_key_placeholder(&policy->key_placeholders)[j],
-                                  cur_pubkey)) {
+                    if (-1 == get_derived_pubkey(state->dispatcher_context,
+                                                 state->wdi,
+                                                 &r_policy_node_keyexpr(&policy->keys)[j],
+                                                 cur_pubkey)) {
                         return -1;
                     }
 
@@ -1018,7 +1051,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *pkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   r_policy_node_key_placeholder(&pkh_policy->key_placeholder),
+                                   r_policy_node_keyexpr(&pkh_policy->key),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1037,7 +1070,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         policy_node_with_key_t *wpkh_policy = (policy_node_with_key_t *) policy;
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   r_policy_node_key_placeholder(&wpkh_policy->key_placeholder),
+                                   r_policy_node_keyexpr(&wpkh_policy->key),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1116,7 +1149,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
 
         if (0 > get_derived_pubkey(dispatcher_context,
                                    wdi,
-                                   r_policy_node_key_placeholder(&tr_policy->key_placeholder),
+                                   r_policy_node_keyexpr(&tr_policy->key),
                                    compressed_pubkey)) {
             return -1;
         }
@@ -1344,17 +1377,17 @@ __attribute__((noinline)) int get_wallet_internal_script_hash(
 // For a standard descriptor template, return the corresponding BIP44 purpose
 // Otherwise, returns -1.
 static int get_bip44_purpose(const policy_node_t *descriptor_template) {
-    const policy_node_key_placeholder_t *kp = NULL;
+    const policy_node_keyexpr_t *kp = NULL;
     int purpose = -1;
     switch (descriptor_template->type) {
         case TOKEN_PKH:
-            kp = r_policy_node_key_placeholder(
-                &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
+            kp =
+                r_policy_node_keyexpr(&((const policy_node_with_key_t *) descriptor_template)->key);
             purpose = 44;  // legacy
             break;
         case TOKEN_WPKH:
-            kp = r_policy_node_key_placeholder(
-                &((const policy_node_with_key_t *) descriptor_template)->key_placeholder);
+            kp =
+                r_policy_node_keyexpr(&((const policy_node_with_key_t *) descriptor_template)->key);
             purpose = 84;  // native segwit
             break;
         case TOKEN_SH: {
@@ -1364,8 +1397,7 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 return -1;
             }
 
-            kp = r_policy_node_key_placeholder(
-                &((const policy_node_with_key_t *) inner)->key_placeholder);
+            kp = r_policy_node_keyexpr(&((const policy_node_with_key_t *) inner)->key);
             purpose = 49;  // nested segwit
             break;
         }
@@ -1375,8 +1407,7 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
                 return -1;
             }
 
-            kp = r_policy_node_key_placeholder(
-                &((const policy_node_tr_t *) descriptor_template)->key_placeholder);
+            kp = r_policy_node_keyexpr(&((const policy_node_tr_t *) descriptor_template)->key);
             purpose = 86;  // standard single-key P2TR
             break;
         }
@@ -1384,7 +1415,12 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
             return -1;
     }
 
-    if (kp->key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
+    if (kp->type != KEY_EXPRESSION_NORMAL) {
+        // any key expression that is not a play xpub is not BIP-44 compliant
+        return -1;
+    }
+
+    if (kp->k.key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
         return -1;
     }
 
@@ -1513,44 +1549,43 @@ end:
 // make sure that the compiler gives an error if any PolicyNodeType is missed
 #pragma GCC diagnostic error "-Wswitch-enum"
 
-static int get_key_placeholder_by_index_in_tree(const policy_node_tree_t *tree,
-                                                unsigned int i,
-                                                const policy_node_t **out_tapleaf_ptr,
-                                                policy_node_key_placeholder_t *out_placeholder) {
+static int get_keyexpr_by_index_in_tree(const policy_node_tree_t *tree,
+                                        unsigned int i,
+                                        const policy_node_t **out_tapleaf_ptr,
+                                        policy_node_keyexpr_t **out_keyexpr) {
     if (tree->is_leaf) {
-        int ret =
-            get_key_placeholder_by_index(r_policy_node(&tree->script), i, NULL, out_placeholder);
+        int ret = get_keyexpr_by_index(r_policy_node(&tree->script), i, NULL, out_keyexpr);
         if (ret >= 0 && out_tapleaf_ptr != NULL && i < (unsigned) ret) {
             *out_tapleaf_ptr = r_policy_node(&tree->script);
         }
         return ret;
     } else {
-        int ret1 = get_key_placeholder_by_index_in_tree(r_policy_node_tree(&tree->left_tree),
-                                                        i,
-                                                        out_tapleaf_ptr,
-                                                        out_placeholder);
+        int ret1 = get_keyexpr_by_index_in_tree(r_policy_node_tree(&tree->left_tree),
+                                                i,
+                                                out_tapleaf_ptr,
+                                                out_keyexpr);
         if (ret1 < 0) return -1;
 
         bool found = i < (unsigned int) ret1;
 
-        int ret2 = get_key_placeholder_by_index_in_tree(r_policy_node_tree(&tree->right_tree),
-                                                        found ? 0 : i - ret1,
-                                                        found ? NULL : out_tapleaf_ptr,
-                                                        found ? NULL : out_placeholder);
+        int ret2 = get_keyexpr_by_index_in_tree(r_policy_node_tree(&tree->right_tree),
+                                                found ? 0 : i - ret1,
+                                                found ? NULL : out_tapleaf_ptr,
+                                                found ? NULL : out_keyexpr);
         if (ret2 < 0) return -1;
 
         return ret1 + ret2;
     }
 }
 
-int get_key_placeholder_by_index(const policy_node_t *policy,
-                                 unsigned int i,
-                                 const policy_node_t **out_tapleaf_ptr,
-                                 policy_node_key_placeholder_t *out_placeholder) {
-    // make sure that out_placeholder is a valid pointer, if the output is not needed
-    policy_node_key_placeholder_t tmp;
-    if (out_placeholder == NULL) {
-        out_placeholder = &tmp;
+int get_keyexpr_by_index(const policy_node_t *policy,
+                         unsigned int i,
+                         const policy_node_t **out_tapleaf_ptr,
+                         policy_node_keyexpr_t **out_keyexpr) {
+    // make sure that out_keyexpr is a valid pointer, if the output is not needed
+    policy_node_keyexpr_t *tmp;
+    if (out_keyexpr == NULL) {
+        out_keyexpr = &tmp;
     }
 
     switch (policy->type) {
@@ -1573,26 +1608,22 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_WPKH: {
             if (i == 0) {
                 policy_node_with_key_t *wpkh = (policy_node_with_key_t *) policy;
-                memcpy(out_placeholder,
-                       r_policy_node_key_placeholder(&wpkh->key_placeholder),
-                       sizeof(policy_node_key_placeholder_t));
+                *out_keyexpr = r_policy_node_keyexpr(&wpkh->key);
             }
             return 1;
         }
         case TOKEN_TR: {
             policy_node_tr_t *tr = (policy_node_tr_t *) policy;
             if (i == 0) {
-                memcpy(out_placeholder,
-                       r_policy_node_key_placeholder(&tr->key_placeholder),
-                       sizeof(policy_node_key_placeholder_t));
+                *out_keyexpr = r_policy_node_keyexpr(&tr->key);
             }
             if (!isnull_policy_node_tree(&tr->tree)) {
-                int ret_tree = get_key_placeholder_by_index_in_tree(
+                int ret_tree = get_keyexpr_by_index_in_tree(
                     r_policy_node_tree(&tr->tree),
                     i == 0 ? 0 : i - 1,
                     i == 0 ? NULL : out_tapleaf_ptr,
-                    i == 0 ? NULL : out_placeholder);  // if i == 0, we already found it; so we
-                                                       // recur with out_placeholder set to NULL
+                    i == 0 ? NULL : out_keyexpr);  // if i == 0, we already found it; so we
+                                                   // recur with out_keyexpr set to NULL
                 if (ret_tree < 0) {
                     return -1;
                 }
@@ -1610,9 +1641,8 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
             const policy_node_multisig_t *node = (const policy_node_multisig_t *) policy;
 
             if (i < (unsigned int) node->n) {
-                policy_node_key_placeholder_t *placeholders =
-                    r_policy_node_key_placeholder(&node->key_placeholders);
-                memcpy(out_placeholder, &placeholders[i], sizeof(policy_node_key_placeholder_t));
+                policy_node_keyexpr_t *key_expressions = r_policy_node_keyexpr(&node->keys);
+                *out_keyexpr = &key_expressions[i];
             }
 
             return node->n;
@@ -1631,11 +1661,11 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_N:
         case TOKEN_L:
         case TOKEN_U: {
-            return get_key_placeholder_by_index(
+            return get_keyexpr_by_index(
                 r_policy_node(&((const policy_node_with_script_t *) policy)->script),
                 i,
                 out_tapleaf_ptr,
-                out_placeholder);
+                out_keyexpr);
         }
 
         // nodes with exactly two child scripts
@@ -1647,17 +1677,17 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         case TOKEN_OR_D:
         case TOKEN_OR_I: {
             const policy_node_with_script2_t *node = (const policy_node_with_script2_t *) policy;
-            int ret1 = get_key_placeholder_by_index(r_policy_node(&node->scripts[0]),
-                                                    i,
-                                                    out_tapleaf_ptr,
-                                                    out_placeholder);
+            int ret1 = get_keyexpr_by_index(r_policy_node(&node->scripts[0]),
+                                            i,
+                                            out_tapleaf_ptr,
+                                            out_keyexpr);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(r_policy_node(&node->scripts[1]),
-                                                    found ? 0 : i - ret1,
-                                                    found ? NULL : out_tapleaf_ptr,
-                                                    found ? NULL : out_placeholder);
+            int ret2 = get_keyexpr_by_index(r_policy_node(&node->scripts[1]),
+                                            found ? 0 : i - ret1,
+                                            found ? NULL : out_tapleaf_ptr,
+                                            found ? NULL : out_keyexpr);
             if (ret2 < 0) return -1;
 
             return ret1 + ret2;
@@ -1666,24 +1696,24 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
         // nodes with exactly three child scripts
         case TOKEN_ANDOR: {
             const policy_node_with_script3_t *node = (const policy_node_with_script3_t *) policy;
-            int ret1 = get_key_placeholder_by_index(r_policy_node(&node->scripts[0]),
-                                                    i,
-                                                    out_tapleaf_ptr,
-                                                    out_placeholder);
+            int ret1 = get_keyexpr_by_index(r_policy_node(&node->scripts[0]),
+                                            i,
+                                            out_tapleaf_ptr,
+                                            out_keyexpr);
             if (ret1 < 0) return -1;
 
             bool found = i < (unsigned int) ret1;
-            int ret2 = get_key_placeholder_by_index(r_policy_node(&node->scripts[1]),
-                                                    found ? 0 : i - ret1,
-                                                    found ? NULL : out_tapleaf_ptr,
-                                                    found ? NULL : out_placeholder);
+            int ret2 = get_keyexpr_by_index(r_policy_node(&node->scripts[1]),
+                                            found ? 0 : i - ret1,
+                                            found ? NULL : out_tapleaf_ptr,
+                                            found ? NULL : out_keyexpr);
             if (ret2 < 0) return -1;
 
             found = i < (unsigned int) (ret1 + ret2);
-            int ret3 = get_key_placeholder_by_index(r_policy_node(&node->scripts[2]),
-                                                    found ? 0 : i - ret1 - ret2,
-                                                    found ? NULL : out_tapleaf_ptr,
-                                                    found ? NULL : out_placeholder);
+            int ret3 = get_keyexpr_by_index(r_policy_node(&node->scripts[2]),
+                                            found ? 0 : i - ret1 - ret2,
+                                            found ? NULL : out_tapleaf_ptr,
+                                            found ? NULL : out_keyexpr);
             if (ret3 < 0) return -1;
             return ret1 + ret2 + ret3;
         }
@@ -1699,10 +1729,10 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
                               "The script should always have exactly n child scripts");
 
                 found = i < (unsigned int) ret;
-                int ret_partial = get_key_placeholder_by_index(r_policy_node(&cur_child->script),
-                                                               found ? 0 : i - ret,
-                                                               found ? NULL : out_tapleaf_ptr,
-                                                               found ? NULL : out_placeholder);
+                int ret_partial = get_keyexpr_by_index(r_policy_node(&cur_child->script),
+                                                       found ? 0 : i - ret,
+                                                       found ? NULL : out_tapleaf_ptr,
+                                                       found ? NULL : out_keyexpr);
                 if (ret_partial < 0) return -1;
 
                 ret += ret_partial;
@@ -1724,18 +1754,29 @@ int get_key_placeholder_by_index(const policy_node_t *policy,
 
 int count_distinct_keys_info(const policy_node_t *policy) {
     int ret = -1;
+    policy_node_keyexpr_t *key_expression_ptr;
 
-    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL, NULL);
-    if (n_placeholders < 0) {
+    int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
+    if (n_key_expressions < 0) {
         return -1;
     }
 
-    for (int cur = 0; cur < n_placeholders; ++cur) {
-        policy_node_key_placeholder_t placeholder;
-        if (0 > get_key_placeholder_by_index(policy, cur, NULL, &placeholder)) {
+    for (int cur = 0; cur < n_key_expressions; ++cur) {
+        if (0 > get_keyexpr_by_index(policy, cur, NULL, &key_expression_ptr)) {
             return -1;
         }
-        ret = MAX(ret, placeholder.key_index + 1);
+        if (key_expression_ptr->type == KEY_EXPRESSION_NORMAL) {
+            ret = MAX(ret, key_expression_ptr->k.key_index + 1);
+        } else if (key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
+            const musig_aggr_key_info_t *musig_info =
+                r_musig_aggr_key_info(&key_expression_ptr->m.musig_info);
+            const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+            for (int i = 0; i < musig_info->n; i++) {
+                ret = MAX(ret, key_indexes[i] + 1);
+            }
+        } else {
+            LEDGER_ASSERT(false, "Unknown key expression type");
+        }
     }
     return ret;
 }
@@ -1852,6 +1893,19 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
     return 0;
 }
 
+// sort an array of uint16_t in place using bubble sort
+static void sort_uint16_array(uint16_t *array, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++) {
+            if (array[i] > array[j]) {
+                uint16_t tmp = array[i];
+                array[i] = array[j];
+                array[j] = tmp;
+            }
+        }
+    }
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -1909,36 +1963,108 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
         }
     }
 
-    // check that all the key placeholders for the same xpub do indeed have different
+    // check that all the key expressions for the same xpub do indeed have different
     // derivations
-    int n_placeholders = get_key_placeholder_by_index(policy, 0, NULL, NULL);
-    if (n_placeholders < 0) {
-        return WITH_ERROR(-1, "Unexpected error while counting placeholders");
+    int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
+    if (n_key_expressions < 0) {
+        return WITH_ERROR(-1, "Unexpected error while counting key expressions");
     }
 
-    // The following loop computationally very inefficient (quadratic in the number of
-    // placeholders), but more efficient solutions likely require a substantial amount of RAM
-    // (proportional to the number of key placeholders). Instead, this only requires stack depth
-    // proportional to the depth of the wallet policy's abstract syntax tree.
-    for (int i = 0; i < n_placeholders - 1;
-         i++) {  // no point in running this for the last placeholder
-        policy_node_key_placeholder_t kp_i;
-        if (0 > get_key_placeholder_by_index(policy, i, NULL, &kp_i)) {
-            return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
+    // for each MuSig key expression, checks that the key indices are all distinct
+    for (int i = 0; i < n_key_expressions; i++) {
+        policy_node_keyexpr_t *kp_i;
+        if (0 > get_keyexpr_by_index(policy, i, NULL, &kp_i)) {
+            return WITH_ERROR(-1, "Unexpected error retrieving key expressions from the policy");
         }
-        for (int j = i + 1; j < n_placeholders; j++) {
-            policy_node_key_placeholder_t kp_j;
-            if (0 > get_key_placeholder_by_index(policy, j, NULL, &kp_j)) {
-                return WITH_ERROR(-1, "Unexpected error retrieving placeholders from the policy");
+        if (kp_i->type == KEY_EXPRESSION_MUSIG) {
+            const musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
+            const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+
+            uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
+            memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
+
+            // sort the arrays
+            sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+            for (int j = 0; j < musig_info_i->n - 1; j++) {
+                if (key_indexes_i_sorted[j] == key_indexes_i_sorted[j + 1]) {
+                    return WITH_ERROR(-1, "Repeated key in musig key expression");
+                }
+            }
+        }
+    }
+    // The following loop is computationally very inefficient (quadratic in the number of
+    // key expressions), but more efficient solutions likely require a substantial amount of RAM
+    // (proportional to the number of key expressions). Instead, this only requires stack depth
+    // proportional to the depth of the wallet policy's abstract syntax tree.
+    for (int i = 0; i < n_key_expressions - 1;
+         i++) {  // no point in running this for the last key expression
+        policy_node_keyexpr_t *kp_i;
+        if (0 > get_keyexpr_by_index(policy, i, NULL, &kp_i)) {
+            return WITH_ERROR(-1, "Unexpected error retrieving key expressions from the policy");
+        }
+        for (int j = i + 1; j < n_key_expressions; j++) {
+            policy_node_keyexpr_t *kp_j;
+            if (0 > get_keyexpr_by_index(policy, j, NULL, &kp_j)) {
+                return WITH_ERROR(-1,
+                                  "Unexpected error retrieving key expressions from the policy");
             }
 
-            // placeholders for the same key must have disjoint derivation options
-            if (kp_i.key_index == kp_j.key_index) {
-                if (kp_i.num_first == kp_j.num_first || kp_i.num_first == kp_j.num_second ||
-                    kp_i.num_second == kp_j.num_first || kp_i.num_second == kp_j.num_second) {
-                    return WITH_ERROR(-1,
-                                      "Key placeholders with repeated derivations in miniscript");
+            if ((kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_MUSIG) ||
+                (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_NORMAL)) {
+                // if one is a key and the other is a musig, there's nothing else to check
+                continue;
+            } else if (kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_NORMAL) {
+                // key expressions for the same key must have disjoint derivation options
+                if (kp_i->k.key_index == kp_j->k.key_index) {
+                    if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
+                        kp_i->num_second == kp_j->num_first ||
+                        kp_i->num_second == kp_j->num_second) {
+                        return WITH_ERROR(
+                            -1,
+                            "Key expressions with repeated derivations in miniscript");
+                    }
                 }
+            } else if (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_MUSIG) {
+                const musig_aggr_key_info_t *musig_info_i =
+                    r_musig_aggr_key_info(&kp_i->m.musig_info);
+                const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+                const musig_aggr_key_info_t *musig_info_j =
+                    r_musig_aggr_key_info(&kp_j->m.musig_info);
+                const uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
+                // if two musigs have exactly the same set of keys, then the derivation options must
+                // be disjoint
+
+                // make sure that there is no repeated key in the first musig
+
+                if (musig_info_i->n != musig_info_j->n) {
+                    continue;  // cannot be the same set if the size is different
+                }
+
+                uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
+                uint16_t key_indexes_j_sorted[MAX_PUBKEYS_PER_MUSIG];
+                memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
+                memcpy(key_indexes_j_sorted, key_indexes_j, musig_info_j->n * sizeof(uint16_t));
+
+                // sort the arrays
+                sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+                sort_uint16_array(key_indexes_j_sorted, musig_info_j->n);
+
+                if (memcmp(key_indexes_i_sorted,
+                           key_indexes_j_sorted,
+                           musig_info_i->n * sizeof(uint16_t)) != 0) {
+                    continue;  // different set of keys
+                }
+
+                // same set of keys; therefore, we need to check that the derivation options are
+                // disjoint
+                if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
+                    kp_i->num_second == kp_j->num_first || kp_i->num_second == kp_j->num_second) {
+                    return WITH_ERROR(-1,
+                                      "Key expressions with repeated derivations in miniscript");
+                }
+
+            } else {
+                LEDGER_ASSERT(false, "Unexpected key expression type");
             }
         }
     }
