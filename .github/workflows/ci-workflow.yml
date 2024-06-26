@@ -186,7 +186,7 @@ jobs:
         run: |
           cd bitcoin_client/tests
           pip install -r requirements.txt
-          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300
+          PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
 
   job_perftests:
     name: Performance report
