@@ -113,8 +113,10 @@ else
     endif
 endif
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-$(error This repository is not compatible with the Nano S. Look for the 'nanos' branch for the latest code for Nano S.)
+ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
+  ifeq ($(TARGET_NAME),TARGET_NANOS)
+    $(error This repository is not compatible with the Nano S. Look for the 'nanos' branch for the latest code for Nano S.)
+  endif
 endif
 
 # Application icons following guidelines:
