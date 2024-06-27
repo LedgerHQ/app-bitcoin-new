@@ -680,11 +680,20 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     }
 
-    // Swap feature: check that wallet policy is a default one
-    if (G_swap_state.called_from_swap && !st->is_wallet_default) {
-        PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
-        finalize_exchange_sign_transaction(false);
+    if (G_swap_state.called_from_swap) {
+        if (G_swap_state.mode == SWAP_MODE_ERROR) {
+            // Refuse to proceed further, we have received an erroneous extra data
+            PRINTF("Invalid parameters for swap feature\n");
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
+        }
+
+        if (!st->is_wallet_default) {
+            // Swap feature: check that wallet policy is a default one
+            PRINTF("Must be a default wallet policy for swap feature\n");
+            SEND_SW(dc, SW_FAIL_SWAP);
+            finalize_exchange_sign_transaction(false);
+        }
     }
 
     // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
