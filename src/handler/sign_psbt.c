@@ -1011,6 +1011,149 @@ preprocess_inputs(dispatcher_context_t *dc,
     return true;
 }
 
+typedef struct {
+    placeholder_info_t *placeholder_info;
+    output_info_t *output;
+} output_keys_callback_data_t;
+
+/**
+ * Callback to process all the keys of the current input map.
+ * Keeps track if the current input has a witness_utxo and/or a redeemScript.
+ */
+static void output_keys_callback(dispatcher_context_t *dc,
+                                 output_keys_callback_data_t *callback_data,
+                                 const merkleized_map_commitment_t *map_commitment,
+                                 int i,
+                                 buffer_t *data) {
+    size_t data_len = data->size - data->offset;
+    if (data_len >= 1) {
+        uint8_t key_type;
+        buffer_read_u8(data, &key_type);
+
+        if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
+            !callback_data->output->in_out.placeholder_found) {
+            if (0 >
+                read_change_and_index_from_psbt_bip32_derivation(dc,
+                                                                 callback_data->placeholder_info,
+                                                                 &callback_data->output->in_out,
+                                                                 key_type,
+                                                                 data,
+                                                                 map_commitment,
+                                                                 i)) {
+                callback_data->output->in_out.unexpected_pubkey_error = true;
+            }
+        }
+    }
+}
+
+static bool __attribute__((noinline))
+preprocess_outputs(dispatcher_context_t *dc,
+                   sign_psbt_state_t *st,
+                   uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
+    /** OUTPUTS VERIFICATION FLOW
+     *
+     *  For each output, check if it's internal (that is, a change address).
+     *  Also computes the total amount of change outputs, and the total of all outputs.
+     */
+
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    placeholder_info_t placeholder_info;
+    memset(&placeholder_info, 0, sizeof(placeholder_info));
+
+    if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
+
+    memset(&st->outputs, 0, sizeof(st->outputs));
+
+    // the counter used when showing outputs to the user, which ignores change outputs
+    // (0-indexed here, although the UX starts with 1)
+    int external_outputs_count = 0;
+
+    for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
+        output_info_t output;
+        memset(&output, 0, sizeof(output));
+
+        output_keys_callback_data_t callback_data = {.output = &output,
+                                                     .placeholder_info = &placeholder_info};
+        int res = call_get_merkleized_map_with_callback(
+            dc,
+            (void *) &callback_data,
+            st->outputs_root,
+            st->n_outputs,
+            cur_output_index,
+            (merkle_tree_elements_callback_t) output_keys_callback,
+            &output.in_out.map);
+
+        if (res < 0) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        if (output.in_out.unexpected_pubkey_error) {
+            PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        // Read output amount
+        uint8_t raw_result[8];
+
+        // Read the output's amount
+        int result_len = call_get_merkleized_map_value(dc,
+                                                       &output.in_out.map,
+                                                       (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                       1,
+                                                       raw_result,
+                                                       sizeof(raw_result));
+        if (result_len != 8) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+        uint64_t value = read_u64_le(raw_result, 0);
+
+        output.value = value;
+        st->outputs.total_amount += value;
+
+        // Read the output's scriptPubKey
+        result_len = call_get_merkleized_map_value(dc,
+                                                   &output.in_out.map,
+                                                   (uint8_t[]){PSBT_OUT_SCRIPT},
+                                                   1,
+                                                   output.in_out.scriptPubKey,
+                                                   sizeof(output.in_out.scriptPubKey));
+
+        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        output.in_out.scriptPubKey_len = result_len;
+
+        int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
+
+        if (is_internal < 0) {
+            PRINTF("Error checking if output %d is internal\n", cur_output_index);
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        } else if (is_internal == 0) {
+            // external output, user needs to validate
+            ++external_outputs_count;
+
+        } else {
+            // valid change address, nothing to show to the user
+
+            bitvector_set(internal_outputs, cur_output_index, 1);
+
+            st->outputs.change_total_amount += output.value;
+            ++st->outputs.n_change;
+        }
+    }
+
+    st->outputs.n_external = external_outputs_count;
+
+    return true;
+}
+
 static bool __attribute__((noinline))
 show_alerts(dispatcher_context_t *dc,
             sign_psbt_state_t *st,
@@ -1061,41 +1204,6 @@ show_alerts(dispatcher_context_t *dc,
     }
 
     return true;
-}
-
-typedef struct {
-    placeholder_info_t *placeholder_info;
-    output_info_t *output;
-} output_keys_callback_data_t;
-
-/**
- * Callback to process all the keys of the current input map.
- * Keeps track if the current input has a witness_utxo and/or a redeemScript.
- */
-static void output_keys_callback(dispatcher_context_t *dc,
-                                 output_keys_callback_data_t *callback_data,
-                                 const merkleized_map_commitment_t *map_commitment,
-                                 int i,
-                                 buffer_t *data) {
-    size_t data_len = data->size - data->offset;
-    if (data_len >= 1) {
-        uint8_t key_type;
-        buffer_read_u8(data, &key_type);
-
-        if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
-            !callback_data->output->in_out.placeholder_found) {
-            if (0 >
-                read_change_and_index_from_psbt_bip32_derivation(dc,
-                                                                 callback_data->placeholder_info,
-                                                                 &callback_data->output->in_out,
-                                                                 key_type,
-                                                                 data,
-                                                                 map_commitment,
-                                                                 i)) {
-                callback_data->output->in_out.unexpected_pubkey_error = true;
-            }
-        }
-    }
 }
 
 static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
@@ -1156,10 +1264,16 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
     return true;
 }
 
-static bool read_outputs(dispatcher_context_t *dc,
-                         sign_psbt_state_t *st,
-                         placeholder_info_t *placeholder_info,
-                         bool dry_run) {
+static bool __attribute__((noinline)) display_external_outputs(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
+    /**
+     *  Display all the non-change outputs
+     */
+
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
     // the counter used when showing outputs to the user, which ignores change outputs
     // (0-indexed here, although the UX starts with 1)
     int external_outputs_count = 0;
@@ -1168,56 +1282,41 @@ static bool read_outputs(dispatcher_context_t *dc,
         output_info_t output;
         memset(&output, 0, sizeof(output));
 
-        output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .placeholder_info = placeholder_info};
-        int res = call_get_merkleized_map_with_callback(
-            dc,
-            (void *) &callback_data,
-            st->outputs_root,
-            st->n_outputs,
-            cur_output_index,
-            (merkle_tree_elements_callback_t) output_keys_callback,
-            &output.in_out.map);
+        int res = call_get_merkleized_map(dc,
+                                          st->outputs_root,
+                                          st->n_outputs,
+                                          cur_output_index,
+                                          &output.in_out.map);
 
         if (res < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
-        if (output.in_out.unexpected_pubkey_error) {
-            PRINTF("Unexpected pubkey length\n");  // only compressed pubkeys are supported
+        // Read output amount
+        uint8_t raw_result[8];
+
+        // Read the output's amount
+        int result_len = call_get_merkleized_map_value(dc,
+                                                       &output.in_out.map,
+                                                       (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                       1,
+                                                       raw_result,
+                                                       sizeof(raw_result));
+        if (result_len != 8) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
-
-        if (!dry_run) {
-            // Read output amount
-            uint8_t raw_result[8];
-
-            // Read the output's amount
-            int result_len = call_get_merkleized_map_value(dc,
-                                                           &output.in_out.map,
-                                                           (uint8_t[]){PSBT_OUT_AMOUNT},
-                                                           1,
-                                                           raw_result,
-                                                           sizeof(raw_result));
-            if (result_len != 8) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
-            }
-            uint64_t value = read_u64_le(raw_result, 0);
-
-            output.value = value;
-            st->outputs.total_amount += value;
-        }
+        uint64_t value = read_u64_le(raw_result, 0);
+        output.value = value;
 
         // Read the output's scriptPubKey
-        int result_len = call_get_merkleized_map_value(dc,
-                                                       &output.in_out.map,
-                                                       (uint8_t[]){PSBT_OUT_SCRIPT},
-                                                       1,
-                                                       output.in_out.scriptPubKey,
-                                                       sizeof(output.in_out.scriptPubKey));
+        result_len = call_get_merkleized_map_value(dc,
+                                                   &output.in_out.map,
+                                                   (uint8_t[]){PSBT_OUT_SCRIPT},
+                                                   1,
+                                                   output.in_out.scriptPubKey,
+                                                   sizeof(output.in_out.scriptPubKey));
 
         if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1226,64 +1325,16 @@ static bool read_outputs(dispatcher_context_t *dc,
 
         output.in_out.scriptPubKey_len = result_len;
 
-        int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
-
-        if (is_internal < 0) {
-            PRINTF("Error checking if output %d is internal\n", cur_output_index);
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        } else if (is_internal == 0) {
+        if (!bitvector_get(internal_outputs, cur_output_index)) {
             // external output, user needs to validate
             ++external_outputs_count;
 
-            if (!dry_run &&
-                !display_output(dc, st, cur_output_index, external_outputs_count, &output))
+            // displays the output. It fails if the output is invalid or not supported
+            if (!display_output(dc, st, cur_output_index, external_outputs_count, &output)) {
                 return false;
-        } else if (!dry_run) {
-            // valid change address, nothing to show to the user
-
-            st->outputs.change_total_amount += output.value;
-            ++st->outputs.n_change;
+            }
         }
     }
-
-    st->outputs.n_external = external_outputs_count;
-
-    return true;
-}
-
-static bool __attribute__((noinline))
-process_outputs(dispatcher_context_t *dc, sign_psbt_state_t *st) {
-    /** OUTPUTS VERIFICATION FLOW
-     *
-     *  For each output, check if it's a change address.
-     *  Show each output that is not a change address to the user for verification.
-     */
-
-    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
-
-    placeholder_info_t placeholder_info;
-    memset(&placeholder_info, 0, sizeof(placeholder_info));
-
-    if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
-
-    memset(&st->outputs, 0, sizeof(st->outputs));
-
-#ifdef HAVE_NBGL
-    // Only on Stax, we need to preprocess all the outputs in order to
-    // compute the total number of non-change outputs.
-    // As it's a time-consuming operation, we use avoid doing this useless
-    // work on other models.
-
-    if (!read_outputs(dc, st, &placeholder_info, true)) return false;
-
-    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-#endif
-
-    if (!read_outputs(dc, st, &placeholder_info, false)) return false;
 
     return true;
 }
@@ -2468,6 +2519,10 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
     memset(internal_inputs, 0, sizeof(internal_inputs));
 
+    // bitmap to keep track of which inputs are internal
+    uint8_t internal_outputs[BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)];
+    memset(internal_outputs, 0, sizeof(internal_outputs));
+
     /** Inputs verification flow
      *
      *  Go though all the inputs:
@@ -2477,6 +2532,13 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      * sighashes
      */
     if (!preprocess_inputs(dc, &st, internal_inputs)) return;
+
+    /** OUTPUTS VERIFICATION FLOW
+     *
+     *  For each output, check if it's a change address.
+     *  Check if it's an acceptable output.
+     */
+    if (!preprocess_outputs(dc, &st, internal_outputs)) return;
 
     /** INPUT VERIFICATION ALERTS
      *
@@ -2489,10 +2551,9 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
     /** OUTPUTS VERIFICATION FLOW
      *
-     *  For each output, check if it's a change address.
-     *  Show each output that is not a change address to the user for verification.
+     *  Display each non-change output.
      */
-    if (!process_outputs(dc, &st)) return;
+    if (!display_external_outputs(dc, &st, internal_outputs)) return;
 
     /** TRANSACTION CONFIRMATION
      *
