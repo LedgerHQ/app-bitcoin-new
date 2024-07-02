@@ -332,6 +332,31 @@ bool ui_validate_transaction(dispatcher_context_t *context,
     return io_ui_process(context, SET_UX_DIRTY);
 }
 
+#ifdef HAVE_NBGL
+bool ui_validate_transaction_simplified(dispatcher_context_t *context,
+                                        const char *coin_name,
+                                        uint64_t amount,
+                                        const char *address_or_description,
+                                        uint64_t fee) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
+
+    format_sats_amount(coin_name, amount, state->amount);
+    strncpy(state->address_or_description,
+            address_or_description,
+            sizeof(state->address_or_description));
+    format_sats_amount(coin_name, fee, state->fee);
+
+    ui_accept_transaction_simplified_flow();
+
+    return io_ui_process(context, SET_UX_DIRTY);
+}
+#endif
+
 #ifdef HAVE_BAGL
 bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
     (void) context;

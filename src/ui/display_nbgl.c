@@ -158,6 +158,25 @@ void ui_accept_transaction_flow(bool is_self_transfer) {
     nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
 }
 
+void ui_accept_transaction_simplified_flow(void) {
+    // Setup list
+    pairList.nbMaxLinesForValue = 0;
+    pairList.pairs = pairs;
+
+    pairs[0].item = "Amount";
+    pairs[0].value = g_ui_state.validate_transaction_simplified.amount;
+
+    pairs[1].item = "To";
+    pairs[1].value = g_ui_state.validate_transaction_simplified.address_or_description;
+
+    pairs[2].item = "Fees";
+    pairs[2].value = g_ui_state.validate_transaction_simplified.fee;
+
+    pairList.nbPairs = 3;
+
+    nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
+}
+
 void ui_display_transaction_prompt(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
                                      &C_Bitcoin_64px,

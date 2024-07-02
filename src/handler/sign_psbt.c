@@ -1206,36 +1206,26 @@ show_alerts(dispatcher_context_t *dc,
     return true;
 }
 
-static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
-                                                     sign_psbt_state_t *st,
-                                                     int cur_output_index,
-                                                     int external_outputs_count,
-                                                     const output_info_t *output) {
+static bool __attribute__((noinline))
+display_output(dispatcher_context_t *dc,
+               sign_psbt_state_t *st,
+               int cur_output_index,
+               int external_outputs_count,
+               const uint8_t out_scriptPubKey[static MAX_OUTPUT_SCRIPTPUBKEY_LEN],
+               size_t out_scriptPubKey_len,
+               uint64_t out_amount) {
     (void) cur_output_index;
 
     // show this output's address
-    char output_address[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    int address_len = get_script_address(output->in_out.scriptPubKey,
-                                         output->in_out.scriptPubKey_len,
-                                         output_address,
-                                         sizeof(output_address));
-    if (address_len < 0) {
-        // script does not have an address; check if OP_RETURN
-        if (is_opreturn(output->in_out.scriptPubKey, output->in_out.scriptPubKey_len)) {
-            int res = format_opscript_script(output->in_out.scriptPubKey,
-                                             output->in_out.scriptPubKey_len,
-                                             output_address);
-            if (res == -1) {
-                PRINTF("Invalid or unsupported OP_RETURN for output %d\n", cur_output_index);
-                SEND_SW(dc, SW_NOT_SUPPORTED);
-                return false;
-            }
-        } else {
-            PRINTF("Unknown or unsupported script type for output %d\n", cur_output_index);
-            SEND_SW(dc, SW_NOT_SUPPORTED);
-            return false;
-        }
+    char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+
+    if (!format_script(out_scriptPubKey, out_scriptPubKey_len, output_description)) {
+        PRINTF("Invalid or unsupported script for output %d\n", cur_output_index);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
     }
+
+    int address_len = strlen(output_description);
 
     if (G_swap_state.called_from_swap) {
         // Swap feature: do not show the address to the user, but double check it matches
@@ -1243,7 +1233,7 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
         // elsewhere).
         int swap_addr_len = strlen(G_swap_state.destination_address);
         if (swap_addr_len != address_len ||
-            0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
+            0 != strncmp(G_swap_state.destination_address, output_description, address_len)) {
             // address did not match
             PRINTF("Mismatching address for swap\n");
             SEND_SW(dc, SW_FAIL_SWAP);
@@ -1254,13 +1244,71 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
         if (!ui_validate_output(dc,
                                 external_outputs_count,
                                 st->outputs.n_external,
-                                output_address,
+                                output_description,
                                 COIN_COINID_SHORT,
-                                output->value)) {
+                                out_amount)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
     }
+    return true;
+}
+
+static bool get_output_script_and_amount(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    size_t output_index,
+    uint8_t out_scriptPubKey[static MAX_OUTPUT_SCRIPTPUBKEY_LEN],
+    size_t *out_scriptPubKey_len,
+    uint64_t *out_amount) {
+    if (out_scriptPubKey == NULL || out_amount == NULL) {
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+
+    merkleized_map_commitment_t map;
+
+    // TODO: This might be too slow, as it checks the integrity of the map;
+    //       Refactor so that the map key ordering is checked all at the beginning of sign_psbt.
+    int res = call_get_merkleized_map(dc, st->outputs_root, st->n_outputs, output_index, &map);
+
+    if (res < 0) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
+    // Read output amount
+    uint8_t raw_result[8];
+
+    // Read the output's amount
+    int result_len = call_get_merkleized_map_value(dc,
+                                                   &map,
+                                                   (uint8_t[]){PSBT_OUT_AMOUNT},
+                                                   1,
+                                                   raw_result,
+                                                   sizeof(raw_result));
+    if (result_len != 8) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+    uint64_t value = read_u64_le(raw_result, 0);
+    *out_amount = value;
+
+    // Read the output's scriptPubKey
+    result_len = call_get_merkleized_map_value(dc,
+                                               &map,
+                                               (uint8_t[]){PSBT_OUT_SCRIPT},
+                                               1,
+                                               out_scriptPubKey,
+                                               MAX_OUTPUT_SCRIPTPUBKEY_LEN);
+
+    if (result_len == -1 || result_len > MAX_OUTPUT_SCRIPTPUBKEY_LEN) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
+    *out_scriptPubKey_len = result_len;
+
     return true;
 }
 
@@ -1279,58 +1327,31 @@ static bool __attribute__((noinline)) display_external_outputs(
     int external_outputs_count = 0;
 
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
-        output_info_t output;
-        memset(&output, 0, sizeof(output));
-
-        int res = call_get_merkleized_map(dc,
-                                          st->outputs_root,
-                                          st->n_outputs,
-                                          cur_output_index,
-                                          &output.in_out.map);
-
-        if (res < 0) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        // Read output amount
-        uint8_t raw_result[8];
-
-        // Read the output's amount
-        int result_len = call_get_merkleized_map_value(dc,
-                                                       &output.in_out.map,
-                                                       (uint8_t[]){PSBT_OUT_AMOUNT},
-                                                       1,
-                                                       raw_result,
-                                                       sizeof(raw_result));
-        if (result_len != 8) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-        uint64_t value = read_u64_le(raw_result, 0);
-        output.value = value;
-
-        // Read the output's scriptPubKey
-        result_len = call_get_merkleized_map_value(dc,
-                                                   &output.in_out.map,
-                                                   (uint8_t[]){PSBT_OUT_SCRIPT},
-                                                   1,
-                                                   output.in_out.scriptPubKey,
-                                                   sizeof(output.in_out.scriptPubKey));
-
-        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        }
-
-        output.in_out.scriptPubKey_len = result_len;
-
         if (!bitvector_get(internal_outputs, cur_output_index)) {
             // external output, user needs to validate
             ++external_outputs_count;
 
+            uint8_t out_scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
+            size_t out_scriptPubKey_len;
+            uint64_t out_amount;
+
+            if (!get_output_script_and_amount(dc,
+                                              st,
+                                              cur_output_index,
+                                              out_scriptPubKey,
+                                              &out_scriptPubKey_len,
+                                              &out_amount)) {
+                return false;
+            }
+
             // displays the output. It fails if the output is invalid or not supported
-            if (!display_output(dc, st, cur_output_index, external_outputs_count, &output)) {
+            if (!display_output(dc,
+                                st,
+                                cur_output_index,
+                                external_outputs_count,
+                                out_scriptPubKey,
+                                out_scriptPubKey_len,
+                                out_amount)) {
                 return false;
             }
         }
@@ -1339,8 +1360,10 @@ static bool __attribute__((noinline)) display_external_outputs(
     return true;
 }
 
-static bool __attribute__((noinline))
-confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+static bool __attribute__((noinline)) display_transaction(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     if (st->inputs_total_amount < st->outputs.total_amount) {
@@ -1352,8 +1375,8 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     if (st->outputs.n_change > 10) {
         // As the information regarding change outputs is aggregated, we want to prevent the user
-        // from unknowingly signing a transaction that sends the change to too many (possibly
-        // unspendable) outputs.
+        // from unknowingly signing a transaction that sends the change to too many outputs
+        // (possibly economically not worth spending).
         PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
         SEND_SW(dc, SW_NOT_SUPPORTED);
         return false;
@@ -1381,18 +1404,133 @@ confirm_transaction(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             SEND_SW(dc, SW_FAIL_SWAP);
             finalize_exchange_sign_transaction(false);
         }
-    } else {
-        // if the value of fees is 10% or more of the amount, and it's more than 10000
-        if (10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000) {
-            if (!ui_warn_high_fee(dc)) {
+    }
+
+#ifdef HAVE_NBGL
+    // On NBGL devices, show the pre-approval screen
+    // "Review transaction to send Bitcoin"
+    // Skip during swaps.
+    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+#endif
+
+    // if the value of fees is 10% or more of the amount, and it's more than 10000
+    bool show_high_fee_warning =
+        10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000;
+
+    if (st->outputs.n_external == 0) {
+        // self-transfer: all the outputs are going to change addresses.
+        // No output to show, the user only needs to validate the fees.
+
+        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+
+        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, true)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+    }
+#ifdef HAVE_NBGL
+    else if (st->outputs.n_external == 1) {
+        // A simplified flow for most transactions: show everything in a single screen if there is
+        // exactly 1 external output to show to the user
+
+        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+
+        // find script and amount of the only external output
+        uint8_t out_scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
+        size_t out_scriptPubKey_len;
+        uint64_t out_amount;
+
+        bool external_output_found = false;
+        for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs;
+             cur_output_index++) {
+            if (!bitvector_get(internal_outputs, cur_output_index)) {
+                if (!get_output_script_and_amount(dc,
+                                                  st,
+                                                  cur_output_index,
+                                                  out_scriptPubKey,
+                                                  &out_scriptPubKey_len,
+                                                  &out_amount)) {
+                    return false;
+                }
+
+                external_output_found = true;
+                break;  // we know there is only one external output
+            }
+        }
+
+        if (!external_output_found) {
+            // this can never happen: we know there is exactly one external output
+            SEND_SW(dc, SW_BAD_STATE);
+            return false;
+        }
+
+        // show this output's address
+        char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+
+        if (!format_script(out_scriptPubKey, out_scriptPubKey_len, output_description)) {
+            PRINTF("Invalid or unsupported script for external output");
+            SEND_SW(dc, SW_NOT_SUPPORTED);
+            return false;
+        }
+
+        if (G_swap_state.called_from_swap) {
+            // Swap feature: do not show the address to the user, but double check it matches
+            // the request from app-exchange; it must be the only external output (checked
+            // elsewhere).
+            int swap_addr_len = strlen(G_swap_state.destination_address);
+            int output_address_len = strlen(output_description);
+            if (swap_addr_len != output_address_len ||
+                0 != strncmp(G_swap_state.destination_address,
+                             output_description,
+                             output_address_len)) {
+                // address did not match
+                PRINTF("Mismatching address for swap\n");
+                SEND_SW(dc, SW_FAIL_SWAP);
+                finalize_exchange_sign_transaction(false);
+            }
+        } else {
+            /** TRANSACTION CONFIRMATION
+             *
+             *  Show transaction amount, destination and fees, ask for final confirmation
+             */
+            if (!ui_validate_transaction_simplified(dc,
+                                                    COIN_COINID_SHORT,
+                                                    out_amount,
+                                                    output_description,
+                                                    fee)) {
                 SEND_SW(dc, SW_DENY);
                 return false;
             }
         }
+    }
+#endif
+    else {
+        /** OUTPUTS CONFIRMATION
+         *
+         *  Display each non-change output, and transaction fees, and acquire user confirmation,
+         */
+        if (!display_external_outputs(dc, st, internal_outputs)) return false;
 
+        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+
+        /** TRANSACTION CONFIRMATION
+         *
+         *  Show summary info to the user (transaction fees), ask for final confirmation
+         */
         // Show final user validation UI
-        bool is_self_transfer = st->outputs.n_external == 0;
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, is_self_transfer)) {
+        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -2549,17 +2687,11 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      */
     if (!show_alerts(dc, &st, internal_inputs)) return;
 
-    /** OUTPUTS VERIFICATION FLOW
-     *
-     *  Display each non-change output.
-     */
-    if (!display_external_outputs(dc, &st, internal_outputs)) return;
-
     /** TRANSACTION CONFIRMATION
      *
-     *  Show summary info to the user (transaction fees), ask for final confirmation
+     *  Display each non-change output, and transaction fees, and acquire user confirmation,
      */
-    if (!confirm_transaction(dc, &st)) return;
+    if (!display_transaction(dc, &st, internal_outputs)) return;
 
     /** SIGNING FLOW
      *

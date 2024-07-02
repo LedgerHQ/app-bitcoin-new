@@ -67,6 +67,12 @@ typedef struct {
     char fee[MAX_AMOUNT_LENGTH + 1];
 } ui_validate_transaction_state_t;
 
+typedef struct {
+    char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
+    char amount[MAX_AMOUNT_LENGTH + 1];
+    char fee[MAX_AMOUNT_LENGTH + 1];
+} ui_validate_transaction_simplified_state_t;
+
 /**
  * Union of all the states for each of the UI screens, in order to save memory.
  */
@@ -78,6 +84,7 @@ typedef union {
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
     ui_validate_transaction_state_t validate_transaction;
+    ui_validate_transaction_simplified_state_t validate_transaction_simplified;
 } ui_state_t;
 extern ui_state_t g_ui_state;
 
@@ -155,6 +162,14 @@ bool ui_validate_transaction(dispatcher_context_t *context,
                              uint64_t fee,
                              bool is_self_transfer);
 
+#ifdef HAVE_NBGL
+bool ui_validate_transaction_simplified(dispatcher_context_t *context,
+                                        const char *coin_name,
+                                        uint64_t amount,
+                                        const char *address_or_description,
+                                        uint64_t fee);
+#endif
+
 void set_ux_flow_response(bool approved);
 
 void ui_display_pubkey_flow(void);
@@ -190,6 +205,10 @@ void ui_display_output_address_amount_no_index_flow(int index);
 void ui_warn_high_fee_flow(void);
 
 void ui_accept_transaction_flow(bool is_self_transfer);
+
+#ifdef HAVE_NBGL
+void ui_accept_transaction_simplified_flow(void);
+#endif
 
 void ui_display_transaction_prompt(void);
 
