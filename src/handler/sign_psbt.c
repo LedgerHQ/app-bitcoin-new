@@ -123,6 +123,11 @@ typedef struct {
     uint8_t sha_outputs[32];
 } segwit_hashes_t;
 
+// We cache the first 2 external outputs; that's needed for the swap checks
+// Moreover, this helps the code for the simplified UX for transactions that
+// have a single external output.
+#define N_CACHED_EXTERNAL_OUTPUTS 2
+
 typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
@@ -135,12 +140,17 @@ typedef struct {
 
     uint64_t inputs_total_amount;
 
+    unsigned int n_external_inputs;
+    unsigned int n_external_outputs;
+
     // aggregate info on outputs
     struct {
         uint64_t total_amount;         // amount of all the outputs (external + change)
         uint64_t change_total_amount;  // total amount of all change outputs
         int n_change;                  // count of outputs compatible with change outputs
-        int n_external;                // count of external outputs
+        size_t output_script_lengths[N_CACHED_EXTERNAL_OUTPUTS];
+        uint8_t output_scripts[N_CACHED_EXTERNAL_OUTPUTS][MAX_OUTPUT_SCRIPTPUBKEY_LEN];
+        uint64_t output_amounts[N_CACHED_EXTERNAL_OUTPUTS];
     } outputs;
 
     bool is_wallet_default;
@@ -650,13 +660,6 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     }
 
-    // Swap feature: check that wallet policy is a default one
-    if (G_swap_state.called_from_swap && !st->is_wallet_default) {
-        PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
-        finalize_exchange_sign_transaction(false);
-    }
-
     // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
     if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
@@ -930,6 +933,8 @@ preprocess_inputs(dispatcher_context_t *dc,
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         } else if (is_internal == 0) {
+            ++st->n_external_inputs;
+
             PRINTF("INPUT %d is external\n", cur_input_index);
             continue;
         }
@@ -1006,6 +1011,13 @@ preprocess_inputs(dispatcher_context_t *dc,
             SEND_SW(dc, SW_NOT_SUPPORTED);
             return false;
         }
+    }
+
+    if (st->n_external_inputs == st->n_inputs) {
+        // no internal inputs, nothing to sign
+        PRINTF("No internal inputs. Aborting\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
 
     return true;
@@ -1137,8 +1149,19 @@ preprocess_outputs(dispatcher_context_t *dc,
             return false;
         } else if (is_internal == 0) {
             // external output, user needs to validate
-            ++external_outputs_count;
+            bitvector_set(internal_outputs, cur_output_index, 0);
 
+            // cache external output scripts
+            if (external_outputs_count < N_CACHED_EXTERNAL_OUTPUTS) {
+                st->outputs.output_script_lengths[external_outputs_count] =
+                    output.in_out.scriptPubKey_len;
+                memcpy(st->outputs.output_scripts[external_outputs_count],
+                       output.in_out.scriptPubKey,
+                       output.in_out.scriptPubKey_len);
+                st->outputs.output_amounts[external_outputs_count] = value;
+            }
+
+            ++external_outputs_count;
         } else {
             // valid change address, nothing to show to the user
 
@@ -1149,44 +1172,112 @@ preprocess_outputs(dispatcher_context_t *dc,
         }
     }
 
-    st->outputs.n_external = external_outputs_count;
+    st->n_external_outputs = external_outputs_count;
+
+    if (st->inputs_total_amount < st->outputs.total_amount) {
+        PRINTF("Negative fee is invalid\n");
+        // negative fee transaction is invalid
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
+    }
+
+    if (st->outputs.n_change > 10) {
+        // As the information regarding change outputs is aggregated, we want to prevent the user
+        // from unknowingly signing a transaction that sends the change to too many outputs
+        // (possibly economically not worth spending).
+        PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return false;
+    }
 
     return true;
 }
 
 static bool __attribute__((noinline))
-show_alerts(dispatcher_context_t *dc,
-            sign_psbt_state_t *st,
-            const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    size_t count_external_inputs = 0;
-    for (unsigned int i = 0; i < st->n_inputs; i++) {
-        if (!bitvector_get(internal_inputs, i)) {
-            ++count_external_inputs;
-        }
+    // Swap feature: check that wallet policy is a default one
+    if (!st->is_wallet_default) {
+        PRINTF("Must be a default wallet policy for swap feature\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
     }
 
-    // If there are external inputs, it is unsafe to sign, therefore we warn the user
-    if (count_external_inputs > 0) {
-        if (count_external_inputs == st->n_inputs) {
-            // no internal inputs, nothing to sign
-            PRINTF("No internal inputs. Aborting\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
-            return false;
-        } else {
-            // Swap feature: no external inputs allowed
-            if (G_swap_state.called_from_swap) {
-                PRINTF("External inputs not allowed in swap transactions\n");
-                SEND_SW(dc, SW_FAIL_SWAP);
-                finalize_exchange_sign_transaction(false);
-            }
+    // No external inputs allowed
+    if (st->n_external_inputs > 0) {
+        PRINTF("External inputs not allowed in swap transactions\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
 
-            // some internal and some external inputs, warn the user first
-            if (!ui_warn_external_inputs(dc)) {
-                SEND_SW(dc, SW_DENY);
-                return false;
-            }
+    if (st->show_missing_nonwitnessutxo_warning || st->show_nondefault_sighash_warning) {
+        // Do not allow transactions with missing non-witness utxos or non-default sighash flags
+        PRINTF(
+            "Missing non-witness utxo or non-default sighash flags are not allowed during swaps\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
+
+    // There must be only one external output
+    if (st->n_external_outputs != 1) {
+        PRINTF("Swap transaction must have exactly 1 external output\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    // Check that total amount and fees are as expected
+    if (fee != G_swap_state.fees) {
+        PRINTF("Mismatching fee for swap\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
+    if (spent_amount != G_swap_state.amount) {
+        PRINTF("Mismatching spent amount for swap\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    // Compute this output's address
+    char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+
+    if (!format_script(st->outputs.output_scripts[0],
+                       st->outputs.output_script_lengths[0],
+                       output_description)) {
+        PRINTF("Invalid or unsupported script for external output\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    char output_description_len = strlen(output_description);
+
+    // Check that the external output's address matches the request from app-exchange
+    int swap_addr_len = strlen(G_swap_state.destination_address);
+    if (swap_addr_len != output_description_len ||
+        0 !=
+            strncmp(G_swap_state.destination_address, output_description, output_description_len)) {
+        // address did not match
+        PRINTF("Mismatching address for swap\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
+    }
+
+    return true;
+}
+
+static bool __attribute__((noinline)) show_alerts(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    // If there are external inputs, it is unsafe to sign, therefore we warn the user
+    if (st->n_external_inputs > 0) {
+        // some internal and some external inputs, warn the user first
+        if (!ui_warn_external_inputs(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
         }
     }
 
@@ -1225,31 +1316,15 @@ display_output(dispatcher_context_t *dc,
         return false;
     }
 
-    int address_len = strlen(output_description);
-
-    if (G_swap_state.called_from_swap) {
-        // Swap feature: do not show the address to the user, but double check it matches
-        // the request from app-exchange; it must be the only external output (checked
-        // elsewhere).
-        int swap_addr_len = strlen(G_swap_state.destination_address);
-        if (swap_addr_len != address_len ||
-            0 != strncmp(G_swap_state.destination_address, output_description, address_len)) {
-            // address did not match
-            PRINTF("Mismatching address for swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
-            finalize_exchange_sign_transaction(false);
-        }
-    } else {
-        // Show address to the user
-        if (!ui_validate_output(dc,
-                                external_outputs_count,
-                                st->outputs.n_external,
-                                output_description,
-                                COIN_COINID_SHORT,
-                                out_amount)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
+    // Show address to the user
+    if (!ui_validate_output(dc,
+                            external_outputs_count,
+                            st->n_external_outputs,
+                            output_description,
+                            COIN_COINID_SHORT,
+                            out_amount)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
     }
     return true;
 }
@@ -1366,51 +1441,12 @@ static bool __attribute__((noinline)) display_transaction(
     const uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->inputs_total_amount < st->outputs.total_amount) {
-        PRINTF("Negative fee is invalid\n");
-        // negative fee transaction is invalid
-        SEND_SW(dc, SW_INCORRECT_DATA);
-        return false;
-    }
-
-    if (st->outputs.n_change > 10) {
-        // As the information regarding change outputs is aggregated, we want to prevent the user
-        // from unknowingly signing a transaction that sends the change to too many outputs
-        // (possibly economically not worth spending).
-        PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
-        return false;
-    }
-
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
-
-    if (G_swap_state.called_from_swap) {
-        // Swap feature: there must be only one external output
-        if (st->outputs.n_external != 1) {
-            PRINTF("Swap transaction must have exactly 1 external output\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
-            finalize_exchange_sign_transaction(false);
-        }
-
-        // Swap feature: check total amount and fees are as expected
-        if (fee != G_swap_state.fees) {
-            PRINTF("Mismatching fee for swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
-            finalize_exchange_sign_transaction(false);
-        }
-        uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
-        if (spent_amount != G_swap_state.amount) {
-            PRINTF("Mismatching spent amount for swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
-            finalize_exchange_sign_transaction(false);
-        }
-    }
 
 #ifdef HAVE_NBGL
     // On NBGL devices, show the pre-approval screen
     // "Review transaction to send Bitcoin"
-    // Skip during swaps.
-    if (!G_swap_state.called_from_swap && !ui_transaction_prompt(dc)) {
+    if (!ui_transaction_prompt(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1420,7 +1456,7 @@ static bool __attribute__((noinline)) display_transaction(
     bool show_high_fee_warning =
         10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000;
 
-    if (st->outputs.n_external == 0) {
+    if (st->n_external_outputs == 0) {
         // self-transfer: all the outputs are going to change addresses.
         // No output to show, the user only needs to validate the fees.
 
@@ -1435,7 +1471,7 @@ static bool __attribute__((noinline)) display_transaction(
         }
     }
 #ifdef HAVE_NBGL
-    else if (st->outputs.n_external == 1) {
+    else if (st->n_external_outputs == 1) {
         // A simplified flow for most transactions: show everything in a single screen if there is
         // exactly 1 external output to show to the user
 
@@ -1444,72 +1480,28 @@ static bool __attribute__((noinline)) display_transaction(
             return false;
         }
 
-        // find script and amount of the only external output
-        uint8_t out_scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
-        size_t out_scriptPubKey_len;
-        uint64_t out_amount;
-
-        bool external_output_found = false;
-        for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs;
-             cur_output_index++) {
-            if (!bitvector_get(internal_outputs, cur_output_index)) {
-                if (!get_output_script_and_amount(dc,
-                                                  st,
-                                                  cur_output_index,
-                                                  out_scriptPubKey,
-                                                  &out_scriptPubKey_len,
-                                                  &out_amount)) {
-                    return false;
-                }
-
-                external_output_found = true;
-                break;  // we know there is only one external output
-            }
-        }
-
-        if (!external_output_found) {
-            // this can never happen: we know there is exactly one external output
-            SEND_SW(dc, SW_BAD_STATE);
-            return false;
-        }
-
         // show this output's address
         char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
 
-        if (!format_script(out_scriptPubKey, out_scriptPubKey_len, output_description)) {
-            PRINTF("Invalid or unsupported script for external output");
+        if (!format_script(st->outputs.output_scripts[0],
+                           st->outputs.output_script_lengths[0],
+                           output_description)) {
+            PRINTF("Invalid or unsupported script for external output\n");
             SEND_SW(dc, SW_NOT_SUPPORTED);
             return false;
         }
 
-        if (G_swap_state.called_from_swap) {
-            // Swap feature: do not show the address to the user, but double check it matches
-            // the request from app-exchange; it must be the only external output (checked
-            // elsewhere).
-            int swap_addr_len = strlen(G_swap_state.destination_address);
-            int output_address_len = strlen(output_description);
-            if (swap_addr_len != output_address_len ||
-                0 != strncmp(G_swap_state.destination_address,
-                             output_description,
-                             output_address_len)) {
-                // address did not match
-                PRINTF("Mismatching address for swap\n");
-                SEND_SW(dc, SW_FAIL_SWAP);
-                finalize_exchange_sign_transaction(false);
-            }
-        } else {
-            /** TRANSACTION CONFIRMATION
-             *
-             *  Show transaction amount, destination and fees, ask for final confirmation
-             */
-            if (!ui_validate_transaction_simplified(dc,
-                                                    COIN_COINID_SHORT,
-                                                    out_amount,
-                                                    output_description,
-                                                    fee)) {
-                SEND_SW(dc, SW_DENY);
-                return false;
-            }
+        /** TRANSACTION CONFIRMATION
+         *
+         *  Show transaction amount, destination and fees, ask for final confirmation
+         */
+        if (!ui_validate_transaction_simplified(dc,
+                                                COIN_COINID_SHORT,
+                                                st->outputs.output_amounts[0],
+                                                output_description,
+                                                fee)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
         }
     }
 #endif
@@ -2561,7 +2553,10 @@ sign_transaction(dispatcher_context_t *dc,
     // compute all the tx-wide hashes
     // while this is redundant for legacy transactions, we do it here in order to
     // avoid doing it in places that have more stack limitations
-    if (!compute_segwit_hashes(dc, st, &hashes)) return false;
+    if (!compute_segwit_hashes(dc, st, &hashes)) {
+        // we do not send a status word, since compute_segwit_hashes already does it on failure
+        return false;
+    }
 
     // Iterate over all the placeholders that correspond to keys owned by us
     while (true) {
@@ -2576,9 +2571,6 @@ sign_transaction(dispatcher_context_t *dc,
 
         if (n_key_placeholders < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            if (!G_swap_state.called_from_swap) {
-                ui_post_processing_confirm_transaction(dc, false);
-            }
             return false;
         }
 
@@ -2612,9 +2604,6 @@ sign_transaction(dispatcher_context_t *dc,
                         &input.in_out.map);
                     if (res < 0) {
                         SEND_SW(dc, SW_INCORRECT_DATA);
-                        if (!G_swap_state.called_from_swap) {
-                            ui_post_processing_confirm_transaction(dc, false);
-                        }
                         return false;
                     }
 
@@ -2636,9 +2625,6 @@ sign_transaction(dispatcher_context_t *dc,
         ++placeholder_index;
     }
 
-    if (!G_swap_state.called_from_swap) {
-        ui_post_processing_confirm_transaction(dc, true);
-    }
     return true;
 }
 
@@ -2678,27 +2664,45 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      */
     if (!preprocess_outputs(dc, &st, internal_outputs)) return;
 
-    /** INPUT VERIFICATION ALERTS
-     *
-     * Show warnings and allow users to abort in any of the following conditions:
-     * - pre-taproot transaction with unverified inputs (missing non-witness-utxo)
-     * - external inputs
-     * - non-default sighash types
-     */
-    if (!show_alerts(dc, &st, internal_inputs)) return;
+    if (G_swap_state.called_from_swap) {
+        /** SWAP CHECKS
+         *
+         *  If called from the exchange app, perform the necessary additional checks.
+         */
 
-    /** TRANSACTION CONFIRMATION
-     *
-     *  Display each non-change output, and transaction fees, and acquire user confirmation,
-     */
-    if (!display_transaction(dc, &st, internal_outputs)) return;
+        // During swaps, the user approval was already obtained in the exchange app
+        if (!execute_swap_checks(dc, &st)) return;
+    } else {
+        /** INPUT VERIFICATION ALERTS
+         *
+         * Show warnings and allow users to abort in any of the following conditions:
+         * - pre-taproot transaction with unverified inputs (missing non-witness-utxo)
+         * - external inputs
+         * - non-default sighash types
+         */
+        if (!show_alerts(dc, &st)) return;
+
+        /** TRANSACTION CONFIRMATION
+         *
+         *  Display each non-change output, and transaction fees, and acquire user confirmation,
+         */
+        if (!display_transaction(dc, &st, internal_outputs)) return;
+    }
 
     /** SIGNING FLOW
      *
      * For each internal placeholder, and for each internal input, sign using the
      * appropriate algorithm.
      */
-    if (!sign_transaction(dc, &st, internal_inputs)) return;
+    int sign_result = sign_transaction(dc, &st, internal_inputs);
+
+    if (!G_swap_state.called_from_swap) {
+        ui_post_processing_confirm_transaction(dc, sign_result);
+    }
+
+    if (!sign_result) {
+        return;
+    }
 
     // Only if called from swap, the app should terminate after sending the response
     if (G_swap_state.called_from_swap) {
