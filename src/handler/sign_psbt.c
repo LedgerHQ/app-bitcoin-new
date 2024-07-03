@@ -140,6 +140,8 @@ typedef struct {
 
     uint64_t inputs_total_amount;
 
+    policy_map_wallet_header_t wallet_header;
+
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
 
@@ -159,10 +161,6 @@ typedef struct {
 
     __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
     policy_node_t *wallet_policy_map;
-
-    int wallet_header_version;
-    uint8_t wallet_header_keys_info_merkle_root[32];
-    size_t wallet_header_n_keys;
 
     // if any segwitv0 input is missing the non-witness-utxo, we show a warning
     bool show_missing_nonwitnessutxo_warning;
@@ -485,9 +483,9 @@ static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
                                          in_out_info->is_change,
                                          in_out_info->address_index,
                                          state->wallet_policy_map,
-                                         state->wallet_header_version,
-                                         state->wallet_header_keys_info_merkle_root,
-                                         state->wallet_header_n_keys,
+                                         state->wallet_header.version,
+                                         state->wallet_header.keys_info_merkle_root,
+                                         state->wallet_header.n_keys,
                                          in_out_info->scriptPubKey,
                                          in_out_info->scriptPubKey_len);
 }
@@ -531,8 +529,6 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         return false;
     }
     st->n_outputs = (unsigned int) n_outputs_u64;
-
-    policy_map_wallet_header_t wallet_header;
 
     uint8_t wallet_hmac[32];
     uint8_t wallet_id[32];
@@ -623,7 +619,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         int desc_temp_len = read_and_parse_wallet_policy(dc,
                                                          &serialized_wallet_policy_buf,
-                                                         &wallet_header,
+                                                         &st->wallet_header,
                                                          policy_map_descriptor,
                                                          st->wallet_policy_map_bytes,
                                                          MAX_WALLET_POLICY_BYTES);
@@ -635,21 +631,15 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         st->wallet_policy_map = (policy_node_t *) st->wallet_policy_map_bytes;
 
-        st->wallet_header_version = wallet_header.version;
-        memcpy(st->wallet_header_keys_info_merkle_root,
-               wallet_header.keys_info_merkle_root,
-               sizeof(wallet_header.keys_info_merkle_root));
-        st->wallet_header_n_keys = wallet_header.n_keys;
-
         if (st->is_wallet_default) {
             // No hmac, verify that the policy is indeed a default one
-            if (!is_wallet_policy_standard(dc, &wallet_header, st->wallet_policy_map)) {
+            if (!is_wallet_policy_standard(dc, &st->wallet_header, st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
 
-            if (wallet_header.name_len != 0) {
+            if (st->wallet_header.name_len != 0) {
                 PRINTF("Name must be zero-length for a standard wallet policy\n");
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
@@ -661,7 +651,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     }
 
     // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
-    if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, wallet_header.name)) {
+    if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -678,8 +668,8 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
     {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
         int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        st->wallet_header_keys_info_merkle_root,
-                                                        st->wallet_header_n_keys,
+                                                        st->wallet_header.keys_info_merkle_root,
+                                                        st->wallet_header.n_keys,
                                                         placeholder_info->placeholder.key_index,
                                                         key_info_str,
                                                         sizeof(key_info_str));
@@ -692,7 +682,7 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
         // Make a sub-buffer for the pubkey info
         buffer_t key_info_buffer = buffer_create(key_info_str, key_info_len);
 
-        if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header_version) ==
+        if (parse_policy_map_key_info(&key_info_buffer, &key_info, st->wallet_header.version) ==
             -1) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
@@ -2473,9 +2463,9 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                             &(wallet_derivation_info_t){
                                 .address_index = input->in_out.address_index,
                                 .change = input->in_out.is_change ? 1 : 0,
-                                .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
-                                .n_keys = st->wallet_header_n_keys,
-                                .wallet_version = st->wallet_header_version},
+                                .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
+                                .n_keys = st->wallet_header.n_keys,
+                                .wallet_version = st->wallet_header.version},
                             r_policy_node_tree(&policy->tree),
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
@@ -2514,9 +2504,9 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
     int tapscript_len = get_wallet_internal_script_hash(
         dc,
         tapleaf_ptr,
-        &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
-                                    .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
-                                    .n_keys = st->wallet_header_n_keys,
+        &(wallet_derivation_info_t){.wallet_version = st->wallet_header.version,
+                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
+                                    .n_keys = st->wallet_header.n_keys,
                                     .change = input->in_out.is_change,
                                     .address_index = input->in_out.address_index},
         WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
@@ -2534,9 +2524,9 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
         get_wallet_internal_script_hash(
             dc,
             tapleaf_ptr,
-            &(wallet_derivation_info_t){.wallet_version = st->wallet_header_version,
-                                        .keys_merkle_root = st->wallet_header_keys_info_merkle_root,
-                                        .n_keys = st->wallet_header_n_keys,
+            &(wallet_derivation_info_t){.wallet_version = st->wallet_header.version,
+                                        .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
+                                        .n_keys = st->wallet_header.n_keys,
                                         .change = input->in_out.is_change,
                                         .address_index = input->in_out.address_index},
             WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
