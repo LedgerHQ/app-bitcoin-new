@@ -1404,20 +1404,28 @@ static bool __attribute__((noinline)) display_external_outputs(
     for (unsigned int cur_output_index = 0; cur_output_index < st->n_outputs; cur_output_index++) {
         if (!bitvector_get(internal_outputs, cur_output_index)) {
             // external output, user needs to validate
-            ++external_outputs_count;
-
             uint8_t out_scriptPubKey[MAX_OUTPUT_SCRIPTPUBKEY_LEN];
             size_t out_scriptPubKey_len;
             uint64_t out_amount;
 
-            if (!get_output_script_and_amount(dc,
-                                              st,
-                                              cur_output_index,
-                                              out_scriptPubKey,
-                                              &out_scriptPubKey_len,
-                                              &out_amount)) {
+            if (external_outputs_count < N_CACHED_EXTERNAL_OUTPUTS) {
+                // we have the output cached, no need to fetch it again
+                out_scriptPubKey_len = st->outputs.output_script_lengths[external_outputs_count];
+                memcpy(out_scriptPubKey,
+                       st->outputs.output_scripts[external_outputs_count],
+                       out_scriptPubKey_len);
+                out_amount = st->outputs.output_amounts[external_outputs_count];
+            } else if (!get_output_script_and_amount(dc,
+                                                     st,
+                                                     cur_output_index,
+                                                     out_scriptPubKey,
+                                                     &out_scriptPubKey_len,
+                                                     &out_amount)) {
+                SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }
+
+            ++external_outputs_count;
 
             // displays the output. It fails if the output is invalid or not supported
             if (!display_output(dc,
