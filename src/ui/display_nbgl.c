@@ -13,7 +13,7 @@ static const char *confirmed_status;  // text displayed in confirmation page (af
 static const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
 static bool show_message_start_page;
 
-static nbgl_layoutTagValue_t pairs[3];
+static nbgl_layoutTagValue_t pairs[8];
 static nbgl_layoutTagValueList_t pairList;
 
 static nbgl_genericContents_t genericContent;
@@ -163,18 +163,69 @@ void ui_accept_transaction_simplified_flow(void) {
     pairList.nbMaxLinesForValue = 0;
     pairList.pairs = pairs;
 
-    pairs[0].item = "Amount";
-    pairs[0].value = g_ui_state.validate_transaction_simplified.amount;
+    int n_pairs = 0;
 
-    pairs[1].item = "To";
-    pairs[1].value = g_ui_state.validate_transaction_simplified.address_or_description;
+    // Add warning screens for unverified inputs, external inputs or non-default sighash
+    if (g_ui_state.validate_transaction_simplified.warnings.missing_nonwitnessutxo) {
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){
+            .centeredInfo = true,
+            .item = "Unverified inputs\nUpdate Ledger Live or\nthird party wallet software",
+            .value = "",
+            .valueIcon = &C_Important_Circle_64px};
+    }
+    if (g_ui_state.validate_transaction_simplified.warnings.external_inputs) {
+        pairs[n_pairs++] =
+            (nbgl_contentTagValue_t){.centeredInfo = true,
+                                     .item = "There are external inputs\nReject if not sure",
+                                     .value = "",
+                                     .valueIcon = &C_Important_Circle_64px};
+    }
+    if (g_ui_state.validate_transaction_simplified.warnings.non_default_sighash) {
+        pairs[n_pairs++] =
+            (nbgl_contentTagValue_t){.centeredInfo = true,
+                                     .item = "Non-default sighash\nReject if not sure",
+                                     .value = "",
+                                     .valueIcon = &C_Important_Circle_64px};
+    }
 
-    pairs[2].item = "Fees";
-    pairs[2].value = g_ui_state.validate_transaction_simplified.fee;
+    if (g_ui_state.validate_transaction_simplified.has_wallet_policy) {
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "From",
+            .value = g_ui_state.validate_transaction_simplified.wallet_policy_name,
+        };
+    }
 
-    pairList.nbPairs = 3;
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "Amount",
+        .value = g_ui_state.validate_transaction_simplified.amount,
+    };
 
-    nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "To",
+        .value = g_ui_state.validate_transaction_simplified.address_or_description,
+    };
+
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "Fees",
+        .value = g_ui_state.validate_transaction_simplified.fee,
+    };
+
+    if (g_ui_state.validate_transaction_simplified.warnings.high_fee) {
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){.centeredInfo = true,
+                                                    .item = "Fees are above 10%\n of total amount",
+                                                    .value = "",
+                                                    .valueIcon = &C_Important_Circle_64px};
+    }
+
+    pairList.nbPairs = n_pairs;
+
+    nbgl_useCaseReview(TYPE_TRANSACTION,
+                       &pairList,
+                       &C_Bitcoin_64px,
+                       "Review transaction\nto send Bitcoin",
+                       NULL,
+                       "Sign transaction",
+                       start_transaction_callback);
 }
 
 void ui_display_transaction_prompt(void) {

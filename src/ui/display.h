@@ -20,6 +20,13 @@
 #define MESSAGE_MAX_DISPLAY_SIZE \
     (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
 
+typedef struct tx_ux_warning_s {
+    bool missing_nonwitnessutxo : 1;
+    bool non_default_sighash : 1;
+    bool external_inputs : 1;
+    bool high_fee : 1;
+} tx_ux_warning_t;
+
 // TODO: hard to keep track of what globals are used in the same flows
 //       (especially since the same flow step can be shared in different flows)
 
@@ -68,9 +75,12 @@ typedef struct {
 } ui_validate_transaction_state_t;
 
 typedef struct {
+    bool has_wallet_policy;
+    char wallet_policy_name[MAX_WALLET_NAME_LENGTH + 1];
     char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_AMOUNT_LENGTH + 1];
     char fee[MAX_AMOUNT_LENGTH + 1];
+    tx_ux_warning_t warnings;
 } ui_validate_transaction_simplified_state_t;
 
 /**
@@ -165,8 +175,10 @@ bool ui_validate_transaction(dispatcher_context_t *context,
 #ifdef HAVE_NBGL
 bool ui_validate_transaction_simplified(dispatcher_context_t *context,
                                         const char *coin_name,
+                                        const char *wallet_policy_name,  // can be NULL
                                         uint64_t amount,
                                         const char *address_or_description,
+                                        tx_ux_warning_t warnings,
                                         uint64_t fee);
 #endif
 

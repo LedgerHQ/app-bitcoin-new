@@ -162,11 +162,8 @@ typedef struct {
     __attribute__((aligned(4))) uint8_t wallet_policy_map_bytes[MAX_WALLET_POLICY_BYTES];
     policy_node_t *wallet_policy_map;
 
-    // if any segwitv0 input is missing the non-witness-utxo, we show a warning
-    bool show_missing_nonwitnessutxo_warning;
+    tx_ux_warning_t warnings;
 
-    // if any of the internal inputs has non-default sighash, we show a warning
-    bool show_nondefault_sighash_warning;
 } sign_psbt_state_t;
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
@@ -650,12 +647,6 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     }
 
-    // If it's not a default wallet policy, ask the user for confirmation, and abort if they deny
-    if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-
     st->master_key_fingerprint = crypto_get_master_key_fingerprint();
     return true;
 }
@@ -948,7 +939,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // to the user otherwise, but we continue nonetheless on approval
         if (segwit_version == 0 && !input.has_nonWitnessUtxo) {
             PRINTF("Non-witness utxo missing for segwitv0 input. Will show a warning.\n");
-            st->show_missing_nonwitnessutxo_warning = true;
+            st->warnings.missing_nonwitnessutxo = true;
         }
 
         // For all segwit transactions, the witness utxo must be present
@@ -988,7 +979,7 @@ preprocess_inputs(dispatcher_context_t *dc,
                     (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_NONE)) ||
                     (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_SINGLE)))) {
             PRINTF("Sighash type is non-default, will show a warning.\n");
-            st->show_nondefault_sighash_warning = true;
+            st->warnings.non_default_sighash = true;
         } else {
             PRINTF("Unsupported sighash\n");
             SEND_SW(dc, SW_NOT_SUPPORTED);
@@ -1201,7 +1192,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         finalize_exchange_sign_transaction(false);
     }
 
-    if (st->show_missing_nonwitnessutxo_warning || st->show_nondefault_sighash_warning) {
+    if (st->warnings.missing_nonwitnessutxo || st->warnings.non_default_sighash) {
         // Do not allow transactions with missing non-witness utxos or non-default sighash flags
         PRINTF(
             "Missing non-witness utxo or non-default sighash flags are not allowed during swaps\n");
@@ -1254,34 +1245,6 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         PRINTF("Mismatching address for swap\n");
         SEND_SW(dc, SW_FAIL_SWAP);
         finalize_exchange_sign_transaction(false);
-    }
-
-    return true;
-}
-
-static bool __attribute__((noinline)) show_alerts(dispatcher_context_t *dc, sign_psbt_state_t *st) {
-    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
-
-    // If there are external inputs, it is unsafe to sign, therefore we warn the user
-    if (st->n_external_inputs > 0) {
-        // some internal and some external inputs, warn the user first
-        if (!ui_warn_external_inputs(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-    }
-
-    // If any segwitv0 input is missing the non-witness-utxo, we warn the user and ask for
-    // confirmation
-    if (st->show_missing_nonwitnessutxo_warning && !ui_warn_unverified_segwit_inputs(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-
-    // If any input has non-default sighash, we warn the user
-    if (st->show_nondefault_sighash_warning && !ui_warn_nondefault_sighash(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
     }
 
     return true;
@@ -1433,6 +1396,30 @@ static bool __attribute__((noinline)) display_external_outputs(
     return true;
 }
 
+static bool __attribute__((noinline))
+display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    // If there are external inputs, it is unsafe to sign, therefore we warn the user
+    if (st->n_external_inputs > 0 && !ui_warn_external_inputs(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+
+    // If any segwitv0 input is missing the non-witness-utxo, we warn the user and ask for
+    // confirmation
+    if (st->warnings.missing_nonwitnessutxo && !ui_warn_unverified_segwit_inputs(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+
+    // If any input has non-default sighash, we warn the user
+    if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+
+    return true;
+}
+
 static bool __attribute__((noinline)) display_transaction(
     dispatcher_context_t *dc,
     sign_psbt_state_t *st,
@@ -1441,24 +1428,35 @@ static bool __attribute__((noinline)) display_transaction(
 
     uint64_t fee = st->inputs_total_amount - st->outputs.total_amount;
 
-#ifdef HAVE_NBGL
-    // On NBGL devices, show the pre-approval screen
-    // "Review transaction to send Bitcoin"
-    if (!ui_transaction_prompt(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-#endif
+    /** INPUT VERIFICATION ALERTS
+     *
+     * Show warnings and allow users to abort in any of the following conditions:
+     * - pre-taproot transaction with unverified inputs (missing non-witness-utxo)
+     * - external inputs
+     * - non-default sighash types
+     */
 
     // if the value of fees is 10% or more of the amount, and it's more than 10000
-    bool show_high_fee_warning =
-        10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000;
+    st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000;
 
     if (st->n_external_outputs == 0) {
         // self-transfer: all the outputs are going to change addresses.
         // No output to show, the user only needs to validate the fees.
 
-        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
+#ifdef HAVE_NBGL
+        // On NBGL devices, show the pre-approval screen
+        // "Review transaction to send Bitcoin"
+        if (!ui_transaction_prompt(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+#endif
+
+        if (!display_warnings(dc, st)) {
+            return false;
+        }
+
+        if (st->warnings.high_fee && !ui_warn_high_fee(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -1472,11 +1470,6 @@ static bool __attribute__((noinline)) display_transaction(
     else if (st->n_external_outputs == 1) {
         // A simplified flow for most transactions: show everything in a single screen if there is
         // exactly 1 external output to show to the user
-
-        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
 
         // show this output's address
         char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
@@ -1493,24 +1486,49 @@ static bool __attribute__((noinline)) display_transaction(
          *
          *  Show transaction amount, destination and fees, ask for final confirmation
          */
-        if (!ui_validate_transaction_simplified(dc,
-                                                COIN_COINID_SHORT,
-                                                st->outputs.output_amounts[0],
-                                                output_description,
-                                                fee)) {
+        if (!ui_validate_transaction_simplified(
+                dc,
+                COIN_COINID_SHORT,
+                st->is_wallet_default ? NULL : st->wallet_header.name,
+                st->outputs.output_amounts[0],
+                output_description,
+                st->warnings,
+                fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
     }
 #endif
     else {
+        // Transactions with more than one external output; show one output per page,
+        // using the streaming NBGL API.
+
+#ifdef HAVE_NBGL
+        // On NBGL devices, show the pre-approval screen
+        // "Review transaction to send Bitcoin"
+        if (!ui_transaction_prompt(dc)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+#endif
+        // If it's not a default wallet policy, ask the user for confirmation, and abort if they
+        // deny
+        if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {
+            SEND_SW(dc, SW_DENY);
+            return false;
+        }
+
+        if (!display_warnings(dc, st)) {
+            return false;
+        }
+
         /** OUTPUTS CONFIRMATION
          *
          *  Display each non-change output, and transaction fees, and acquire user confirmation,
          */
         if (!display_external_outputs(dc, st, internal_outputs)) return false;
 
-        if (show_high_fee_warning && !ui_warn_high_fee(dc)) {
+        if (st->warnings.high_fee && !ui_warn_high_fee(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -2671,15 +2689,6 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         // During swaps, the user approval was already obtained in the exchange app
         if (!execute_swap_checks(dc, &st)) return;
     } else {
-        /** INPUT VERIFICATION ALERTS
-         *
-         * Show warnings and allow users to abort in any of the following conditions:
-         * - pre-taproot transaction with unverified inputs (missing non-witness-utxo)
-         * - external inputs
-         * - non-default sighash types
-         */
-        if (!show_alerts(dc, &st)) return;
-
         /** TRANSACTION CONFIRMATION
          *
          *  Display each non-change output, and transaction fees, and acquire user confirmation,
