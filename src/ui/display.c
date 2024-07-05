@@ -347,17 +347,22 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
     ui_validate_transaction_simplified_state_t *state =
         (ui_validate_transaction_simplified_state_t *) &g_ui_state;
 
+    memset(state, 0, sizeof(ui_validate_transaction_simplified_state_t));
+
     if (wallet_policy_name != NULL) {
         strncpy(state->wallet_policy_name, wallet_policy_name, sizeof(state->wallet_policy_name));
         state->has_wallet_policy = true;
     } else {
         memset(state->wallet_policy_name, 0, sizeof(state->wallet_policy_name));
-        state->has_wallet_policy = false;
     }
     format_sats_amount(coin_name, amount, state->amount);
-    strncpy(state->address_or_description,
-            address_or_description,
-            sizeof(state->address_or_description));
+    if (address_or_description == NULL) {
+        state->is_self_transfer = true;
+    } else {
+        strncpy(state->address_or_description,
+                address_or_description,
+                sizeof(state->address_or_description));
+    }
     state->warnings = warnings;
     format_sats_amount(coin_name, fee, state->fee);
 

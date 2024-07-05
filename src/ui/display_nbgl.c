@@ -158,6 +158,11 @@ void ui_accept_transaction_flow(bool is_self_transfer) {
     nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
 }
 
+#define COMBINE(a, b) a b
+
+// create the string "0 <coind_id> (self-transfer)"
+#define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
+
 void ui_accept_transaction_simplified_flow(void) {
     // Setup list
     pairList.nbMaxLinesForValue = 0;
@@ -195,15 +200,20 @@ void ui_accept_transaction_simplified_flow(void) {
         };
     }
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
-        .item = "Amount",
-        .value = g_ui_state.validate_transaction_simplified.amount,
-    };
+    if (!g_ui_state.validate_transaction_simplified.is_self_transfer) {
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "Amount",
+            .value = g_ui_state.validate_transaction_simplified.amount,
+        };
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
-        .item = "To",
-        .value = g_ui_state.validate_transaction_simplified.address_or_description,
-    };
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "To",
+            .value = g_ui_state.validate_transaction_simplified.address_or_description,
+        };
+    } else {
+        pairs[n_pairs++] =
+            (nbgl_layoutTagValue_t){.item = "Amount", .value = SELF_TRANSFER_DESCRIPTION};
+    }
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t){
         .item = "Fees",

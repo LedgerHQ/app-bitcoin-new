@@ -76,6 +76,7 @@ typedef struct {
 
 typedef struct {
     bool has_wallet_policy;
+    bool is_self_transfer;
     char wallet_policy_name[MAX_WALLET_NAME_LENGTH + 1];
     char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_AMOUNT_LENGTH + 1];

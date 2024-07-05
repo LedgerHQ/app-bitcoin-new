@@ -1439,18 +1439,46 @@ static bool __attribute__((noinline)) display_transaction(
     // if the value of fees is 10% or more of the amount, and it's more than 10000
     st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 10000;
 
-    if (st->n_external_outputs == 0) {
-        // self-transfer: all the outputs are going to change addresses.
-        // No output to show, the user only needs to validate the fees.
-
 #ifdef HAVE_NBGL
-        // On NBGL devices, show the pre-approval screen
-        // "Review transaction to send Bitcoin"
-        if (!ui_transaction_prompt(dc)) {
+    if (st->n_external_outputs == 0 || st->n_external_outputs == 1) {
+        // A simplified flow for most transactions: show everything in a single screen if there is
+        // exactly 0 (self-transfer) or 1 external output to show to the user
+
+        bool is_self_transfer = st->n_external_outputs == 0;
+
+        // show this output's address
+        char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+
+        if (!is_self_transfer) {
+            if (!format_script(st->outputs.output_scripts[0],
+                               st->outputs.output_script_lengths[0],
+                               output_description)) {
+                PRINTF("Invalid or unsupported script for external output\n");
+                SEND_SW(dc, SW_NOT_SUPPORTED);
+                return false;
+            }
+        }
+
+        /** TRANSACTION CONFIRMATION
+         *
+         *  Show transaction amount, destination and fees, ask for final confirmation
+         */
+        if (!ui_validate_transaction_simplified(
+                dc,
+                COIN_COINID_SHORT,
+                st->is_wallet_default ? NULL : st->wallet_header.name,
+                is_self_transfer ? 0 : st->outputs.output_amounts[0],
+                is_self_transfer ? NULL : output_description,
+                st->warnings,
+                fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
-#endif
+    }
+#else
+    if (st->n_external_outputs == 0) {
+        // self-transfer: all the outputs are going to change addresses.
+        // No output to show, the user only needs to validate the fees.
 
         if (!display_warnings(dc, st)) {
             return false;
@@ -1462,38 +1490,6 @@ static bool __attribute__((noinline)) display_transaction(
         }
 
         if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, true)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-    }
-#ifdef HAVE_NBGL
-    else if (st->n_external_outputs == 1) {
-        // A simplified flow for most transactions: show everything in a single screen if there is
-        // exactly 1 external output to show to the user
-
-        // show this output's address
-        char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
-
-        if (!format_script(st->outputs.output_scripts[0],
-                           st->outputs.output_script_lengths[0],
-                           output_description)) {
-            PRINTF("Invalid or unsupported script for external output\n");
-            SEND_SW(dc, SW_NOT_SUPPORTED);
-            return false;
-        }
-
-        /** TRANSACTION CONFIRMATION
-         *
-         *  Show transaction amount, destination and fees, ask for final confirmation
-         */
-        if (!ui_validate_transaction_simplified(
-                dc,
-                COIN_COINID_SHORT,
-                st->is_wallet_default ? NULL : st->wallet_header.name,
-                st->outputs.output_amounts[0],
-                output_description,
-                st->warnings,
-                fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
