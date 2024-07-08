@@ -234,7 +234,7 @@ void ui_accept_transaction_simplified_flow(void) {
                        &C_Bitcoin_64px,
                        "Review transaction\nto send Bitcoin",
                        NULL,
-                       "Sign transaction",
+                       "Sign transaction\nto send Bitcoin?",
                        start_transaction_callback);
 }
 
