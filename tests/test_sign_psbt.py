@@ -113,8 +113,8 @@ def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: Rag
     for out in psbt.tx.vout:
         out.nValue = int(out.nValue * 0.9)
 
-    # the test is only interesting if the total amount is at least 10000 sats
-    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 10000
+    # the test is only interesting if the total amount is at least 100000 sats
+    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 100000
 
     wallet = WalletPolicy(
         "",
