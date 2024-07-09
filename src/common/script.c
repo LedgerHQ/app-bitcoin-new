@@ -189,8 +189,8 @@ int format_opscript_script(const uint8_t script[],
         }
 
         if (hex_length == 1) {
-            if (script[offset] == 0x81 || script[offset] <= 16) {
-                // non-standard, it should use OP_1NEGATE, or one of OP_0, ..., OP_16
+            if (script[offset] == 0x81 || (1 <= script[offset] && script[offset] <= 16)) {
+                // non-standard, it should use OP_1NEGATE, or one of OP_1, ..., OP_16
                 return -1;
             }
         }
