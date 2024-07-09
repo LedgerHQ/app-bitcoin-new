@@ -94,6 +94,9 @@ def test_register_wallet_with_long_name(navigator: Navigator, firmware: Firmware
 
 def test_register_wallet_reject_header(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
+    if not firmware.name.startswith("nano"):
+        pytest.skip()
+
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,

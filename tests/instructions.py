@@ -93,8 +93,8 @@ def register_wallet_instruction_approve(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -107,9 +107,9 @@ def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -123,7 +123,7 @@ def register_wallet_instruction_approve_unusual(model: Firmware) -> Instructions
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -245,8 +245,9 @@ def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        for _ in range(n_keys + 1):
-            instructions.new_request("Approve", save_screenshot=False)
+        instructions.new_request("Approve", save_screenshot=False)
+        for _ in range(n_keys):
+            instructions.same_request("Approve", save_screenshot=False)
     else:
         for _ in range(n_keys + 1):
             instructions.choice_confirm(save_screenshot=False)
