@@ -2,7 +2,7 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Register account|Wallet name|Wallet policy|Key",
+      "regexp": "Register account|Account name|Wallet policy|Key",
       "actions": [
         ["button", 2, true],
         ["button", 2, false],

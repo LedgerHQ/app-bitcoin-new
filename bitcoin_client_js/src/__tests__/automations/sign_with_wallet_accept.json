@@ -2,7 +2,7 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Spend from|Wallet name|Review|Amount|Address|Fees",
+      "regexp": "Spend from|Account name|Review|Amount|Address|Fees",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]
