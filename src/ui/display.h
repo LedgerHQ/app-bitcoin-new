@@ -27,6 +27,12 @@ typedef struct tx_ux_warning_s {
     bool high_fee : 1;
 } tx_ux_warning_t;
 
+typedef enum {
+    PUBKEY_TYPE_INTERNAL = 0,    // a key controlled by the wallet policy
+    PUBKEY_TYPE_EXTERNAL = 1,    // a key not controlled by the wallet policy
+    PUBKEY_TYPE_UNSPENDABLE = 2  // the provably unspendable public key defined in BIP-341
+} key_type_e;
+
 // TODO: hard to keep track of what globals are used in the same flows
 //       (especially since the same flow step can be shared in different flows)
 
@@ -58,6 +64,17 @@ typedef struct {
         char address[MAX_ADDRESS_LENGTH_STR + 1];
     };
 } ui_wallet_state_t;
+
+// maximum length of the description of a cosigner in a wallet policy
+#define MAX_KEY_LABEL_LENGTH sizeof("Key @999, unspendable")
+
+typedef struct {
+    const char *wallet_name;
+    const char *descriptor_template;
+    size_t n_keys;
+    char keys_label[MAX_N_KEYS_IN_WALLET_POLICY][MAX_KEY_LABEL_LENGTH];
+    const char *keys_info[MAX_N_KEYS_IN_WALLET_POLICY];
+} ui_register_wallet_policy_state_t;
 
 typedef struct {
     char pubkey[MAX_POLICY_KEY_INFO_LEN + 1];
@@ -95,7 +112,10 @@ typedef union {
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
     ui_validate_transaction_state_t validate_transaction;
+#ifdef HAVE_NBGL
+    ui_register_wallet_policy_state_t register_wallet_policy;
     ui_validate_transaction_simplified_state_t validate_transaction_simplified;
+#endif
 } ui_state_t;
 extern ui_state_t g_ui_state;
 
@@ -129,21 +149,26 @@ bool ui_display_address(dispatcher_context_t *dispatcher_context,
                         bool is_path_suspicious,
                         const char *bip32_path_str);
 
+#ifdef HAVE_BAGL
 bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
                                 const char *policy_descriptor);
-
-typedef enum {
-    PUBKEY_TYPE_INTERNAL = 0,    // a key controlled by the wallet policy
-    PUBKEY_TYPE_EXTERNAL = 1,    // a key not controlled by the wallet policy
-    PUBKEY_TYPE_UNSPENDABLE = 2  // the provably unspendable public key defined in BIP-341
-} key_type_e;
 
 bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
                                            const char *pubkey,
                                            uint8_t cosigner_index,
                                            uint8_t n_keys,
                                            key_type_e key_type);
+#endif
+
+#ifdef HAVE_NBGL
+bool ui_display_register_wallet_policy(
+    dispatcher_context_t *context,
+    const policy_map_wallet_header_t *wallet_header,
+    const char *descriptor_template,
+    const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
+    const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]);
+#endif
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
@@ -195,9 +220,11 @@ void ui_sign_message_content_flow(void);
 
 void ui_sign_message_confirm_flow(void);
 
+#ifdef HAVE_BAGL
 void ui_display_register_wallet_flow(void);
 
 void ui_display_policy_map_cosigner_pubkey_flow(void);
+#endif
 
 void ui_display_receive_in_wallet_flow(void);
 
@@ -220,12 +247,11 @@ void ui_warn_high_fee_flow(void);
 void ui_accept_transaction_flow(bool is_self_transfer);
 
 #ifdef HAVE_NBGL
+void ui_display_register_wallet_policy_flow(void);
 void ui_accept_transaction_simplified_flow(void);
 #endif
 
 void ui_display_transaction_prompt(void);
-
-bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success);
 
 bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool success);
 
@@ -238,7 +264,6 @@ void ui_pre_processing_message(void);
 #ifdef HAVE_NBGL
 bool ui_transaction_prompt(dispatcher_context_t *context);
 void ui_display_post_processing_confirm_message(bool success);
-void ui_display_post_processing_confirm_wallet_registation(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
 void ui_set_display_prompt(void);
 #else

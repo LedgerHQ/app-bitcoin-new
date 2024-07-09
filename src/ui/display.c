@@ -154,6 +154,7 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
     return io_ui_process(context, SET_UX_DIRTY);
 }
 
+#ifdef HAVE_BAGL
 bool ui_display_register_wallet(dispatcher_context_t *context,
                                 const policy_map_wallet_header_t *wallet_header,
                                 const char *policy_descriptor) {
@@ -208,6 +209,59 @@ bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
 
     return io_ui_process(context, SET_UX_DIRTY);
 }
+#endif
+
+#ifdef HAVE_NBGL
+bool ui_display_register_wallet_policy(
+    dispatcher_context_t *context,
+    const policy_map_wallet_header_t *wallet_header,
+    const char *descriptor_template,
+    const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
+    const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
+    LEDGER_ASSERT(wallet_header->n_keys <= MAX_N_KEYS_IN_WALLET_POLICY, "Too many keys");
+
+    ui_register_wallet_policy_state_t *state = (ui_register_wallet_policy_state_t *) &g_ui_state;
+
+    memset(state, 0, sizeof(ui_register_wallet_policy_state_t));
+    state->n_keys = wallet_header->n_keys;
+    state->wallet_name = wallet_header->name;
+    state->descriptor_template = descriptor_template;
+    for (size_t i = 0; i < wallet_header->n_keys; i++) {
+        state->keys_info[i] = (*keys_info)[i];
+        switch ((*keys_type)[i]) {
+            case PUBKEY_TYPE_INTERNAL:
+                snprintf(state->keys_label[i],
+                         sizeof(state->keys_label[i]),
+                         "Key @%u, internal",
+                         i);
+                break;
+            case PUBKEY_TYPE_EXTERNAL:
+                snprintf(state->keys_label[i],
+                         sizeof(state->keys_label[i]),
+                         "Key @%u, external",
+                         i);
+                break;
+            case PUBKEY_TYPE_UNSPENDABLE:
+                snprintf(state->keys_label[i],
+                         sizeof(state->keys_label[i]),
+                         "Key @%u, unspendable",
+                         i);
+                break;
+            default:
+                LEDGER_ASSERT(false, "Unreachable code");
+        }
+    }
+
+    ui_display_register_wallet_policy_flow();
+
+    return io_ui_process(context, SET_UX_DIRTY);
+}
+
+#endif  // HAVE_NBGL
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
@@ -370,14 +424,9 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
 
     return io_ui_process(context, SET_UX_DIRTY);
 }
-#endif
+#endif  // HAVE_NBGL
 
 #ifdef HAVE_BAGL
-bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
     (void) context;
@@ -397,16 +446,6 @@ void ui_pre_processing_message(void) {
 #endif  // HAVE_BAGL
 
 #ifdef HAVE_NBGL
-bool ui_post_processing_confirm_wallet_registration(dispatcher_context_t *context, bool success) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    (void) context;
-    ui_display_post_processing_confirm_wallet_registation(success);
-
-    return true;
-}
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
