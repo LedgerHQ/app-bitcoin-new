@@ -291,15 +291,15 @@ def test_e2e_tapscript_maxdepth(navigator: Navigator, firmware: Firmware, client
 def test_e2e_tapscript_large(navigator: Navigator, firmware: Firmware, client: RaggerClient,
                              test_name: str, rpc, rpc_test_wallet, speculos_globals:
                              SpeculosGlobals):
-    # A quite large tapscript with 8 tapleaves and 22 keys in total.
+    # A quite large tapscript with 8 tapleaves and 10 keys in total.
 
     keys_info = []
 
     core_wallet_name = None
-    for i in range(21):
+    for i in range(10 - 1):
         core_wallet_name_i, core_xpub_orig = create_new_wallet()
-        if i == 9:
-            # sign with bitcoin-core using the ninth external key (it will be key @10 in the policy)
+        if i == 6:
+            # sign with bitcoin-core using the seventh external key (it will be key @6 in the policy)
             core_wallet_name = core_wallet_name_i
         keys_info.append(core_xpub_orig)
 
@@ -311,7 +311,7 @@ def test_e2e_tapscript_large(navigator: Navigator, firmware: Firmware, client: R
 
     wallet_policy = WalletPolicy(
         name="Tapzilla",
-        descriptor_template="tr(@0/**,{{{sortedmulti_a(1,@1/**,@2/**,@3/**,@4/**,@5/**),multi_a(2,@6/**,@7/**,@8/**)},{multi_a(2,@9/**,@10/**,@11/**,@12/**),pk(@13/**)}},{{multi_a(2,@14/**,@15/**),multi_a(3,@16/**,@17/**,@18/**)},{multi_a(2,@19/**,@20/**),pk(@21/**)}}})",
+        descriptor_template="tr(@0/**,{{{sortedmulti_a(1,@1/**,@2/**,@3/**,@4/**,@5/**),multi_a(2,@6/<2;3>/*,@7/**,@8/**)},{multi_a(2,@9/**,@6/**,@0/<2;3>/*,@1/<2;3>/*),pk(@2/<2;3>/*)}},{{multi_a(2,@3/<2;3>/*,@4/<2;3>/*),multi_a(3,@5/<2;3>/*,@7/<2;3>/*,@8/<2;3>/*)},{multi_a(2,@9/<2;3>/*,@0/<4;5>/*),pk(@1/<4;5>/*)}}})",
         keys_info=keys_info)
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
