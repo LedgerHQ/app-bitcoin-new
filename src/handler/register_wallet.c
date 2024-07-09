@@ -134,6 +134,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
 
     char keys_info[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1];
     key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    memset(keys_type, 0, sizeof(keys_type));
 
     for (size_t cosigner_index = 0; cosigner_index < wallet_header.n_keys; cosigner_index++) {
         /**
