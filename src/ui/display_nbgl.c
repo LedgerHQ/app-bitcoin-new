@@ -302,24 +302,20 @@ void ui_display_pubkey_flow(void) {
 
 void ui_display_receive_in_wallet_flow(void) {
     // Setup list
-    pairs[0].item = "Wallet name";
+    pairs[0].item = "Account name";
     pairs[0].value = g_ui_state.wallet.wallet_name;
-
-    pairs[1].item = "Wallet Address";
-    pairs[1].value = g_ui_state.wallet.address;
 
     // Setup list
     pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
+    pairList.nbPairs = 1;
     pairList.pairs = pairs;
 
-    nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            &pairList,
-                            &C_Bitcoin_64px,
-                            "Receive\nin known wallet",
-                            NULL,
-                            "Confirm address",
-                            status_address_callback);
+    nbgl_useCaseAddressReview(g_ui_state.wallet.address,
+                              &pairList,
+                              &C_Bitcoin_64px,
+                              "Verify Bitcoin\naddress",
+                              NULL,
+                              status_address_callback);
 }
 
 #ifdef HAVE_NBGL
@@ -508,11 +504,11 @@ void ui_set_display_prompt(void) {
 }
 
 void ui_display_spend_from_wallet_flow(void) {
-    confirmed_status = "Wallet name\nconfirmed";
-    rejected_status = "Wallet name rejected";
+    confirmed_status = "Account name\nconfirmed";
+    rejected_status = "Account name rejected";
 
     // Setup data to display
-    pairs[0].item = "Wallet name";
+    pairs[0].item = "Account name";
     pairs[0].value = g_ui_state.wallet.wallet_name;
 
     // Setup list
@@ -523,9 +519,9 @@ void ui_display_spend_from_wallet_flow(void) {
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
                             &C_Bitcoin_64px,
-                            "Spend from\nknown wallet",
+                            "Spend from\nknown account",
                             NULL,
-                            "Confirm wallet name",
+                            "Confirm account name",
                             status_operation_callback);
 }
 
