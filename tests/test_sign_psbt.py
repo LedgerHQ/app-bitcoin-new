@@ -328,8 +328,11 @@ def test_sign_psbt_multisig_wsh(navigator: Navigator, firmware: Firmware, client
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert result == [(
@@ -682,8 +685,11 @@ def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, clien
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
+    # to and amount fit on the same page on stax, but not on flex
+    to_on_next_page = firmware.name == 'flex'
+
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
-                                instructions=sign_psbt_instruction_approve(firmware, to_on_next_page=True, fees_on_next_page=True),
+                                instructions=sign_psbt_instruction_approve(firmware, to_on_next_page=to_on_next_page, fees_on_next_page=True),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1
@@ -873,8 +879,12 @@ def test_sign_psbt_tr_script_pk_sighash_all(navigator: Navigator, firmware: Firm
 
     psbt = PSBT()
     psbt.deserialize("cHNidP8BAFICAAAAAR/BzFdxy4OGDMVtlLz+2ThgjBf2NmJDW0HpxE/8/TFCAQAAAAD9////ATkFAAAAAAAAFgAUqo7zdMr638p2kC3bXPYcYLv9nYUAAAAAAAEBK0wGAAAAAAAAIlEg/AoQ0wjH5BtLvDZC+P2KwomFOxznVaDG0NSV8D2fLaQBAwQBAAAAIhXBUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUjIGsW6MH5efpMwPBbajAK//+UFFm28g3nfeVbAWDvjkysrMAhFlAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1HQB2IjpuMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIRZrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrD0BCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKT1rML9MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAARcgUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUBGCAJLtoDNhfiEO5/fQ43ikBK6hxItWqhAwIr7Pd0bkcApAAA")
+
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert len(result) == 1
@@ -916,8 +926,11 @@ def test_sign_psbt_against_wrong_tapleaf_hash(navigator: Navigator, firmware: Fi
 
     psbt_b64 = "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"
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt_b64, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=True),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert len(result) == 2

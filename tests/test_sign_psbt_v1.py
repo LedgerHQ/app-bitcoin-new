@@ -202,9 +202,12 @@ def test_sign_psbt_multisig_wsh_v1(navigator: Navigator, firmware: Firmware, cli
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
                               instructions=sign_psbt_instruction_approve(
-                                  firmware, has_spend_from_wallet=True, fees_on_next_page=True),
+                                  firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert result == [(
@@ -277,9 +280,12 @@ def test_sign_psbt_with_opreturn_v1(navigator: Navigator, firmware: Firmware, cl
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
+    # to and amount fit on the same page on stax, but not on flex
+    to_on_next_page = firmware.name == 'flex'
+
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
                                 instructions=sign_psbt_instruction_approve(
-                                    firmware, to_on_next_page=True, fees_on_next_page=True),
+                                    firmware, to_on_next_page=to_on_next_page, fees_on_next_page=True),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1
