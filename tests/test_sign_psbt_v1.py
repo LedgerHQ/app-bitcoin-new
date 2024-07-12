@@ -10,7 +10,6 @@ from ledger_bitcoin.wallet import AddressType
 
 from test_utils import bip0340
 
-from embit.networks import NETWORKS
 from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 
@@ -84,7 +83,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2_v1(navigator: Navigator, firmware: Fir
     #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_2(
+                              instructions=sign_psbt_instruction_approve(
                                   firmware),
                               testname=test_name)
 
@@ -115,7 +114,7 @@ def test_sign_psbt_singlesig_wpkh_1to2_v1(navigator: Navigator, firmware: Firmwa
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_2(
+                              instructions=sign_psbt_instruction_approve(
                                   firmware),
                               testname=test_name)
 
@@ -203,9 +202,12 @@ def test_sign_psbt_multisig_wsh_v1(navigator: Navigator, firmware: Firmware, cli
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_6(
-                                  firmware),
+                              instructions=sign_psbt_instruction_approve(
+                                  firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert result == [(
@@ -278,9 +280,12 @@ def test_sign_psbt_with_opreturn_v1(navigator: Navigator, firmware: Firmware, cl
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
+    # to and amount fit on the same page on stax, but not on flex
+    to_on_next_page = firmware.name == 'flex'
+
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
-                                instructions=sign_psbt_instruction_approve_opreturn(
-                                    firmware),
+                                instructions=sign_psbt_instruction_approve(
+                                    firmware, to_on_next_page=to_on_next_page, fees_on_next_page=True),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1

@@ -93,8 +93,8 @@ def register_wallet_instruction_approve(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -107,9 +107,9 @@ def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -123,7 +123,7 @@ def register_wallet_instruction_approve_unusual(model: Firmware) -> Instructions
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.new_request("Approve")
+        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -152,196 +152,91 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve_opreturn(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Sign")
-    else:
-        instructions.review_start()
-        instructions.same_request("Address", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
-        instructions.review_fees(fees_on_same_request=False)
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True) -> Instructions:
+def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue", save_screenshot=save_screenshot)
+        for has_step in [has_spend_from_wallet, has_unverifiedwarning, has_sighashwarning, has_feewarning]:
+            if has_step:
+                instructions.same_request(
+                    "Continue", save_screenshot=save_screenshot)
+
         instructions.same_request("Sign", save_screenshot=save_screenshot)
     else:
-        instructions.review_start(save_screenshot=save_screenshot)
+        instructions.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                 save_screenshot=save_screenshot)
+        if has_sighashwarning:
+            instructions.same_request(
+                "Non-default sighash", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+
+        if has_unverifiedwarning:
+            instructions.same_request(
+                "Unverified inputs", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+
+        instructions.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                  save_screenshot=save_screenshot)
+        if to_on_next_page:
+            instructions.same_request("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                      save_screenshot=save_screenshot)
+        if fees_on_next_page:
+            instructions.same_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                      save_screenshot=save_screenshot)
+
+        if has_feewarning:
+            instructions.same_request(
+                "Fees are above", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+        instructions.confirm_transaction(save_screenshot=save_screenshot)
+    return instructions
+
+
+def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Sign")
+    else:
+        instructions.new_request(
+            "Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+        instructions.same_request(
+            "Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+        instructions.confirm_transaction()
+    return instructions
+
+
+def sign_psbt_instruction_approve_streaming(model: Firmware, output_count: int, save_screenshot: bool = True) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Continue")  # first output
+        for output_index in range(1, output_count):
+            if output_index < 2:
+                instructions.same_request("Continue")
+            else:
+                instructions.new_request("Continue")
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
+    else:
+        instructions.review_start(
+            output_count=output_count, save_screenshot=save_screenshot)
         instructions.review_fees(save_screenshot=save_screenshot)
         instructions.confirm_transaction(save_screenshot=save_screenshot)
     return instructions
 
 
-def sign_psbt_instruction_approve_2(model: Firmware) -> Instructions:
+def sign_psbt_instruction_approve_external_inputs(model: Firmware, output_count) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        instructions.new_request("Sign")
-    else:
-        instructions.review_start()
-        instructions.review_fees(fees_on_same_request=False)
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_3(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
+        for output_index in range(output_count):
+            if output_index < 2:
+                instructions.same_request("Continue")
+            else:
+                instructions.new_request("Continue")
         instructions.same_request("Sign")
     else:
-        instructions.review_start()
-        instructions.warning_accept()
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_4(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
-    else:
-        instructions.warning_accept()
-        instructions.review_start()
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_5(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Sign")
-    else:
-        instructions.review_start()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_6(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Sign")
-    else:
-        instructions.confirm_wallet()
-        instructions.review_start()
-        instructions.review_fees(fees_on_same_request=False)
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_7(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
-    else:
-        instructions.confirm_wallet()
-        instructions.review_start()
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_8(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
-    else:
-        instructions.confirm_wallet()
-        instructions.warning_accept()
-        instructions.review_start()
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_9(model: Firmware, save_screenshot: bool = True) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue", save_screenshot=save_screenshot)
-        instructions.new_request("Continue", save_screenshot=save_screenshot)
-        instructions.same_request("Sign", save_screenshot=save_screenshot)
-    else:
-        instructions.review_start(output_count=2, save_screenshot=save_screenshot)
-        instructions.review_fees(save_screenshot=save_screenshot)
-        instructions.confirm_transaction(save_screenshot=save_screenshot)
-    return instructions
-
-
-def sign_psbt_instruction_approve_external_inputs(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
-    else:
-        instructions.warning_accept()
-        instructions.review_start(output_count=5)
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_external_inputs_2(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.same_request("Sign")
-    else:
-        instructions.warning_accept()
-        instructions.review_start(output_count=4)
-        instructions.review_fees()
-        instructions.confirm_transaction()
-    return instructions
-
-
-def sign_psbt_instruction_approve_10(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        instructions.new_request("Continue")
-        instructions.new_request("Sign")
-    else:
-        instructions.warning_accept()
-        instructions.review_start()
-        instructions.review_fees(fees_on_same_request=False)
+        instructions.review_start(output_count=output_count, has_warning=True)
+        instructions.review_fees(fees_on_same_request=True)
         instructions.confirm_transaction()
     return instructions
 
@@ -350,8 +245,9 @@ def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        for _ in range(n_keys + 1):
-            instructions.new_request("Approve", save_screenshot=False)
+        instructions.new_request("Approve", save_screenshot=False)
+        for _ in range(n_keys):
+            instructions.same_request("Approve", save_screenshot=False)
     else:
         for _ in range(n_keys + 1):
             instructions.choice_confirm(save_screenshot=False)
@@ -360,15 +256,4 @@ def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
 
 
 def e2e_sign_psbt_instruction(model: Firmware) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue", save_screenshot=False)
-        instructions.new_request("Continue", save_screenshot=False)
-        instructions.new_request("Sign", save_screenshot=False)
-    else:
-        instructions.confirm_wallet(save_screenshot=False)
-        instructions.review_start(save_screenshot=False)
-        instructions.review_fees(fees_on_same_request=False, save_screenshot=False)
-        instructions.confirm_transaction(save_screenshot=False)
-    return instructions
+    return sign_psbt_instruction_approve(model, save_screenshot=False, has_spend_from_wallet=True)

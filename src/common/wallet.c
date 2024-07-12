@@ -1969,8 +1969,6 @@ static int16_t maxcheck(int16_t a, int16_t b) {
 // Maximum supported value for n in a thresh miniscript operator (technical limitation)
 #define MAX_N_IN_THRESH 128
 
-// Separated from the main function as it is stack-intensive, therefore we allocate large buffers
-// into the CXRAM section. There is some repeated work ()
 static int compute_thresh_ops(const policy_node_thresh_t *node,
                               miniscript_ops_t *out,
                               MiniscriptContext ctx) {
@@ -2010,8 +2008,6 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
     return 0;
 }
 
-// Separated from the main function as it is stack-intensive, therefore we allocate large buffers
-// into the CXRAM section. There is some repeated work ()
 static int compute_thresh_stacksize(const policy_node_thresh_t *node,
                                     miniscript_stacksize_t *out,
                                     MiniscriptContext ctx) {

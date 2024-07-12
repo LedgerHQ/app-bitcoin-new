@@ -7,13 +7,17 @@
 #include "./menu.h"
 #include "io.h"
 
+#include <assert.h>
+
 #define REVIEW_CONFIRM FIRST_USER_TOKEN + 1
 
 static const char *confirmed_status;  // text displayed in confirmation page (after long press)
 static const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
 static bool show_message_start_page;
 
-static nbgl_layoutTagValue_t pairs[3];
+#define N_UX_PAIRS 13
+
+static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static nbgl_layoutTagValueList_t pairList;
 
 static nbgl_genericContents_t genericContent;
@@ -60,14 +64,6 @@ static void status_operation_callback(bool confirm) {
     }
 }
 
-static void status_operation_silent_confirmation_callback(bool confirm) {
-    if (confirm) {
-        ux_flow_response_true();
-    } else {
-        status_operation_cancel();
-    }
-}
-
 static void status_address_callback(bool confirm) {
     if (confirm) {
         ux_flow_response_true();
@@ -77,15 +73,6 @@ static void status_address_callback(bool confirm) {
     }
 }
 
-static void start_processing_operation_callback(bool confirm) {
-    if (confirm) {
-        G_was_processing_screen_shown = true;
-        nbgl_useCaseSpinner("Processing");
-        ux_flow_response_true();
-    } else {
-        status_transaction_cancel();
-    }
-}
 static void start_processing_transaction_callback(bool confirm) {
     if (confirm) {
         G_was_processing_screen_shown = true;
@@ -156,6 +143,88 @@ void ui_accept_transaction_flow(bool is_self_transfer) {
     }
 
     nbgl_useCaseReviewStreamingContinue(&pairList, finish_transaction_flow);
+}
+
+#define COMBINE(a, b) a b
+
+// create the string "0 <coind_id> (self-transfer)"
+#define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
+
+void ui_accept_transaction_simplified_flow(void) {
+    _Static_assert(N_UX_PAIRS >= 9, "Insufficient pairs for this flow");
+
+    // Setup list
+    pairList.nbMaxLinesForValue = 0;
+    pairList.pairs = pairs;
+
+    int n_pairs = 0;
+
+    // Add warning screens for unverified inputs, external inputs or non-default sighash
+    if (g_ui_state.validate_transaction_simplified.warnings.missing_nonwitnessutxo) {
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){
+            .centeredInfo = true,
+            .item = "Unverified inputs\nUpdate Ledger Live or\nthird party wallet software",
+            .value = "",
+            .valueIcon = &C_Important_Circle_64px};
+    }
+    if (g_ui_state.validate_transaction_simplified.warnings.external_inputs) {
+        pairs[n_pairs++] =
+            (nbgl_contentTagValue_t){.centeredInfo = true,
+                                     .item = "There are external inputs\nReject if not sure",
+                                     .value = "",
+                                     .valueIcon = &C_Important_Circle_64px};
+    }
+    if (g_ui_state.validate_transaction_simplified.warnings.non_default_sighash) {
+        pairs[n_pairs++] =
+            (nbgl_contentTagValue_t){.centeredInfo = true,
+                                     .item = "Non-default sighash\nReject if not sure",
+                                     .value = "",
+                                     .valueIcon = &C_Important_Circle_64px};
+    }
+
+    if (g_ui_state.validate_transaction_simplified.has_wallet_policy) {
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "From",
+            .value = g_ui_state.validate_transaction_simplified.wallet_policy_name,
+        };
+    }
+
+    if (!g_ui_state.validate_transaction_simplified.is_self_transfer) {
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "Amount",
+            .value = g_ui_state.validate_transaction_simplified.amount,
+        };
+
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+            .item = "To",
+            .value = g_ui_state.validate_transaction_simplified.address_or_description,
+        };
+    } else {
+        pairs[n_pairs++] =
+            (nbgl_layoutTagValue_t){.item = "Amount", .value = SELF_TRANSFER_DESCRIPTION};
+    }
+
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "Fees",
+        .value = g_ui_state.validate_transaction_simplified.fee,
+    };
+
+    if (g_ui_state.validate_transaction_simplified.warnings.high_fee) {
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){.centeredInfo = true,
+                                                    .item = "Fees are above 10%\n of total amount",
+                                                    .value = "",
+                                                    .valueIcon = &C_Important_Circle_64px};
+    }
+
+    pairList.nbPairs = n_pairs;
+
+    nbgl_useCaseReview(TYPE_TRANSACTION,
+                       &pairList,
+                       &C_Bitcoin_64px,
+                       "Review transaction\nto send Bitcoin",
+                       NULL,
+                       "Sign transaction\nto send Bitcoin?",
+                       start_transaction_callback);
 }
 
 void ui_display_transaction_prompt(void) {
@@ -233,48 +302,68 @@ void ui_display_pubkey_flow(void) {
 
 void ui_display_receive_in_wallet_flow(void) {
     // Setup list
-    pairs[0].item = "Wallet name";
+    pairs[0].item = "Account name";
     pairs[0].value = g_ui_state.wallet.wallet_name;
 
-    pairs[1].item = "Wallet Address";
-    pairs[1].value = g_ui_state.wallet.address;
-
     // Setup list
     pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
+    pairList.nbPairs = 1;
     pairList.pairs = pairs;
+
+    nbgl_useCaseAddressReview(g_ui_state.wallet.address,
+                              &pairList,
+                              &C_Bitcoin_64px,
+                              "Verify Bitcoin\naddress",
+                              NULL,
+                              status_address_callback);
+}
+
+#ifdef HAVE_NBGL
+
+void ui_display_register_wallet_policy_flow(void) {
+    _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY,
+                   "Insufficient pairs for this flow");
+
+    confirmed_status = "Account registered";
+    rejected_status = "Account rejected";
+
+    int n_pairs = 0;
+
+    pairList.nbMaxLinesForValue = 0;
+    pairList.pairs = pairs;
+
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "Account name",
+        .value = g_ui_state.register_wallet_policy.wallet_name,
+    };
+
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+        .item = "Descriptor template",
+        .value = g_ui_state.register_wallet_policy.descriptor_template,
+    };
+
+    pairs[n_pairs++] = (nbgl_contentTagValue_t){.centeredInfo = true,
+                                                .item = "Review co-signer\npublic keys",
+                                                .value = ""};
+
+    for (size_t i = 0; i < g_ui_state.register_wallet_policy.n_keys; i++) {
+        pairs[n_pairs++] =
+            (nbgl_layoutTagValue_t){.item = g_ui_state.register_wallet_policy.keys_label[i],
+                                    .value = g_ui_state.register_wallet_policy.keys_info[i]};
+    }
+
+    pairList.nbPairs = n_pairs;
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
                             &C_Bitcoin_64px,
-                            "Receive\nin known wallet",
+                            "Review account\nto register",
                             NULL,
-                            "Confirm address",
-                            status_address_callback);
+                            "Register account?",
+                            status_operation_callback);
 }
 
-void ui_display_policy_map_cosigner_pubkey_flow(void) {
-    rejected_status = "Cosigner rejected";
-
-    pairs[0].item = "Index";
-    pairs[0].value = g_ui_state.cosigner_pubkey_and_index.signer_index;
-
-    pairs[1].item = "Public key";
-    pairs[1].value = g_ui_state.cosigner_pubkey_and_index.pubkey;
-
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
-    pairList.pairs = pairs;
-
-    nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            &pairList,
-                            &C_Bitcoin_64px,
-                            "Register cosigner",
-                            NULL,
-                            "Confirm cosigner",
-                            status_operation_silent_confirmation_callback);
-}
+#endif  // HAVE_NBGL
 
 void ui_display_pubkey_suspicious_flow(void) {
     confirmed_status = "Public key\napproved";
@@ -326,31 +415,6 @@ void ui_display_pubkey_suspicious_flow(void) {
     genericContent.nbContents = 4;
 
     nbgl_useCaseGenericReview(&genericContent, "Cancel", status_operation_cancel);
-}
-
-// Continue light processing callback
-void ui_display_register_wallet_flow(void) {
-    confirmed_status = "Wallet\nregistered";
-    rejected_status = "Wallet rejected";
-
-    pairs[0].item = "Name";
-    pairs[0].value = g_ui_state.wallet.wallet_name;
-
-    pairs[1].item = "Policy map";
-    pairs[1].value = g_ui_state.wallet.descriptor_template;
-
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
-    pairList.pairs = pairs;
-
-    nbgl_useCaseReviewLight(TYPE_OPERATION,
-                            &pairList,
-                            &C_Bitcoin_64px,
-                            "Register wallet",
-                            NULL,
-                            "Register wallet",
-                            start_processing_operation_callback);
 }
 
 static void message_finish_callback(bool confirm) {
@@ -440,11 +504,11 @@ void ui_set_display_prompt(void) {
 }
 
 void ui_display_spend_from_wallet_flow(void) {
-    confirmed_status = "Wallet name\nconfirmed";
-    rejected_status = "Wallet name rejected";
+    confirmed_status = "Account name\nconfirmed";
+    rejected_status = "Account name rejected";
 
     // Setup data to display
-    pairs[0].item = "Wallet name";
+    pairs[0].item = "Account name";
     pairs[0].value = g_ui_state.wallet.wallet_name;
 
     // Setup list
@@ -455,9 +519,9 @@ void ui_display_spend_from_wallet_flow(void) {
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
                             &C_Bitcoin_64px,
-                            "Spend from\nknown wallet",
+                            "Spend from\nknown account",
                             NULL,
-                            "Confirm wallet name",
+                            "Confirm account name",
                             status_operation_callback);
 }
 
@@ -516,16 +580,6 @@ void ui_display_post_processing_confirm_message(bool success) {
     } else {
         ux_flow_response_false();
         nbgl_useCaseReviewStatus(STATUS_TYPE_MESSAGE_REJECTED, ui_menu_main);
-    }
-}
-
-void ui_display_post_processing_confirm_wallet_registation(bool success) {
-    if (success) {
-        ux_flow_response_true();
-        nbgl_useCaseStatus("Wallet\nregistered", true, ui_menu_main);
-    } else {
-        ux_flow_response_false();
-        nbgl_useCaseStatus("Wallet rejected", false, ui_menu_main);
     }
 }
 

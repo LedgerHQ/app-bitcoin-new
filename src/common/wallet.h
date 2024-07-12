@@ -37,6 +37,10 @@
 // longest supported policy in V1 is "sh(wsh(sortedmulti(5,@0,@1,@2,@3,@4)))", 38 bytes
 #define MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1 40
 
+// Maximum number of keys supported for a wallet policy. It is a technical limit to
+// bound the total memory occupation of a wallet policy, and could be increased if necessary.
+#define MAX_N_KEYS_IN_WALLET_POLICY 10
+
 // This amount should be enough for many useful policies
 // We do not expect these limits to be reached in practice any time soon, but they can
 // be further increased if necessary.

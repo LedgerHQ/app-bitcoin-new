@@ -43,14 +43,8 @@ char const BASE58_ALPHABET[] = {
 };
 
 int base58_decode(const char *in, size_t in_len, uint8_t *out, size_t out_len) {
-#ifdef USE_CXRAM_SECTION
-    // allocate buffers inside the cxram section; safe as there are no syscalls here
-    uint8_t *tmp = get_cxram_buffer();                          // MAX_DEC_INPUT_SIZE bytes buffer
-    uint8_t *buffer = get_cxram_buffer() + MAX_DEC_INPUT_SIZE;  // MAX_DEC_INPUT_SIZE bytes buffer
-#else
     uint8_t tmp[MAX_DEC_INPUT_SIZE] = {0};
     uint8_t buffer[MAX_DEC_INPUT_SIZE] = {0};
-#endif
 
     memset(tmp, 0, MAX_DEC_INPUT_SIZE);
     memset(buffer, 0, MAX_DEC_INPUT_SIZE);
