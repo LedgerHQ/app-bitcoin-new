@@ -135,14 +135,20 @@ typedef struct {
     uint8_t tapleaf_hash[32];  // only used for tapscripts
 } keyexpr_info_t;
 
-// Cache for partial hashes during segwit signing (avoid quadratic hashing for segwit transactions)
-typedef struct {
+// Cache for partial hashes during signing (avoid quadratic hashing for segwit transactions)
+typedef struct tx_hashes_s {
     uint8_t sha_prevouts[32];
     uint8_t sha_amounts[32];
     uint8_t sha_scriptpubkeys[32];
     uint8_t sha_sequences[32];
     uint8_t sha_outputs[32];
-} segwit_hashes_t;
+} tx_hashes_t;
+
+// the signing state for the current transaction; it does not contain any per-input state
+typedef struct signing_state_s {
+    tx_hashes_t tx_hashes;
+    musig_signing_state_t musig;
+} signing_state_t;
 
 // We cache the first 2 external outputs; that's needed for the swap checks
 // Moreover, this helps the code for the simplified UX for transactions that
@@ -1893,7 +1899,7 @@ static bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_
 
 static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc,
                                                                sign_psbt_state_t *st,
-                                                               segwit_hashes_t *hashes,
+                                                               tx_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
                                                                uint8_t sighash[static 32]) {
@@ -2078,7 +2084,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_contex
 
 static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc,
                                                                sign_psbt_state_t *st,
-                                                               segwit_hashes_t *hashes,
+                                                               tx_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
                                                                keyexpr_info_t *keyexpr_info,
@@ -2515,6 +2521,7 @@ static bool yield_musig_partial_signature(dispatcher_context_t *dc,
 
 static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t *dc,
                                                                    sign_psbt_state_t *st,
+                                                                   signing_state_t *signing_state,
                                                                    keyexpr_info_t *keyexpr_info,
                                                                    input_info_t *input,
                                                                    unsigned int cur_input_index,
@@ -2663,14 +2670,23 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
         memcpy(musig_my_psbt_id + 33 + 33, keyexpr_info->tapleaf_hash, 32);
     }
 
-    // compute psbt session id
+    // The psbt_session_id identifies the musig signing session for the entire (psbt, wallet_policy)
+    // pair, in both rounds 1 and 2 of the protocol; it is the same for all the musig placeholders
+    // in the policy (if more than one), and it is the same for all the inputs in the psbt. By
+    // making the hash depend on both the wallet policy and the transaction hashes, we make sure
+    // that an accidental collision is impossible, allowing for independent, parallel MuSig2 signing
+    // sessions for different transactions or wallet policies.
+    // Malicious collisions are not a concern, as they would only result in a signing failure (since
+    // the nonces would be incorrectly regenerated during round 2 of MuSig2).
     uint8_t psbt_session_id[32];
-    // TODO: for now we use simply a hash that depends on the keys of the wallet policy; this is not
-    // good enough. It should be a hash that depends on:
-    // - the wallet policy id
-    // - the tx being signed
-    // - the input index
-    // - the index of the placeholder we're signing for
+    crypto_tr_tagged_hash(
+        (uint8_t[]){'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
+        13,
+        st->wallet_header.keys_info_merkle_root,  // TODO: wallet policy id would be more precise
+        32,
+        (uint8_t *) &signing_state->tx_hashes,
+        sizeof(signing_state->tx_hashes),
+        psbt_session_id);
     memcpy(psbt_session_id, st->wallet_header.keys_info_merkle_root, sizeof(psbt_session_id));
 
     // 4) check if my pubnonce is in the psbt
@@ -2692,15 +2708,14 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
             PRINTF("Session with the same id already existing\n");
         }
 
-        musig_session_t psbt_session;
-        memcpy(psbt_session.id, psbt_session_id, sizeof(psbt_session_id));
-
-        // TODO: the "session" should be initialized once for all the (inputs, placeholder) pairs;
-        // this is wrong!
-        musigsession_init_randomness(&psbt_session);
+        if (memcmp(signing_state->musig.round1.id, psbt_session_id, sizeof(psbt_session_id)) != 0) {
+            // first input/placeholder pair using this session: initialize the session
+            memcpy(signing_state->musig.round1.id, psbt_session_id, sizeof(psbt_session_id));
+            musigsession_init_randomness(&signing_state->musig.round1);
+        }
 
         uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session.rand_root,
+        compute_rand_i_j(signing_state->musig.round1.rand_root,
                          cur_input_index,
                          keyexpr_info->cur_index,
                          rand_i_j);
@@ -2728,20 +2743,19 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
         }
-
-        // TODO: wrong if we have multiple inputs!
-        musigsession_store(psbt_session_id, &psbt_session);
     } else {
         // 6) generate and yield partial signature
-        musig_session_t psbt_session;
-        // get and delete the musig session from permanent storage
-        if (!musigsession_pop(psbt_session_id, &psbt_session)) {
-            // The PSBT contains a partial nonce, but we do not have the corresponding psbt session
-            // in storage. Either it was deleted, or the pubnonces were not real. Either way, we
-            // cannot continue.
-            PRINTF("Missing MuSig2 session\n");
-            SEND_SW(dc, SW_BAD_STATE);
-            return false;
+        // If the session is not already initialized, we pop it from persistent storage
+        if (memcmp(signing_state->musig.round2.id, psbt_session_id, sizeof(psbt_session_id)) != 0) {
+            // get and delete the musig session from permanent storage
+            if (!musigsession_pop(psbt_session_id, &signing_state->musig.round2)) {
+                // The PSBT contains a partial nonce, but we do not have the corresponding psbt
+                // session in storage. Either it was deleted, or the pubnonces were not real. Either
+                // way, we cannot continue.
+                PRINTF("Missing MuSig2 session\n");
+                SEND_SW(dc, SW_BAD_STATE);
+                return false;
+            }
         }
 
         musig_pubnonce_t nonces[MAX_PUBKEYS_PER_MUSIG];
@@ -2777,7 +2791,7 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
 
         // recompute secnonce from psbt_session randomness
         uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session.rand_root,
+        compute_rand_i_j(signing_state->musig.round2.rand_root,
                          cur_input_index,
                          keyexpr_info->cur_index,
                          rand_i_j);
@@ -2861,7 +2875,7 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
 }
 
 static bool __attribute__((noinline))
-compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_hashes_t *hashes) {
+compute_tx_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, tx_hashes_t *hashes) {
     {
         // compute sha_prevouts and sha_sequences
         cx_sha256_t sha_prevouts_context, sha_sequences_context;
@@ -2990,7 +3004,7 @@ compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_ha
 static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_t *dc,
                                                              sign_psbt_state_t *st,
                                                              sign_psbt_cache_t *sign_psbt_cache,
-                                                             segwit_hashes_t *hashes,
+                                                             signing_state_t *signing_state,
                                                              keyexpr_info_t *keyexpr_info,
                                                              input_info_t *input,
                                                              unsigned int cur_input_index) {
@@ -3103,7 +3117,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 input->sighash_type = SIGHASH_ALL;
             }
 
-            if (!compute_sighash_segwitv0(dc, st, hashes, input, cur_input_index, sighash))
+            if (!compute_sighash_segwitv0(dc,
+                                          st,
+                                          &signing_state->tx_hashes,
+                                          input,
+                                          cur_input_index,
+                                          sighash))
                 return false;
 
             if (!sign_sighash_ecdsa_and_yield(dc,
@@ -3121,7 +3140,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             if (!compute_sighash_segwitv1(dc,
                                           st,
-                                          hashes,
+                                          &signing_state->tx_hashes,
                                           input,
                                           cur_input_index,
                                           keyexpr_info,
@@ -3160,6 +3179,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
                 if (!sign_sighash_musig_and_yield(dc,
                                                   st,
+                                                  signing_state,
                                                   keyexpr_info,
                                                   input,
                                                   cur_input_index,
@@ -3228,13 +3248,13 @@ sign_transaction(dispatcher_context_t *dc,
 
     int key_expression_index = 0;
 
-    segwit_hashes_t hashes;
+    signing_state_t signing_state;
 
     // compute all the tx-wide hashes
     // while this is redundant for legacy transactions, we do it here in order to
     // avoid doing it in places that have more stack limitations
-    if (!compute_segwit_hashes(dc, st, &hashes)) {
-        // we do not send a status word, since compute_segwit_hashes already does it on failure
+    if (!compute_tx_hashes(dc, st, &signing_state.tx_hashes)) {
+        // we do not send a status word, since compute_tx_hashes already does it on failure
         return false;
     }
 
@@ -3298,7 +3318,7 @@ sign_transaction(dispatcher_context_t *dc,
                     if (!sign_transaction_input(dc,
                                                 st,
                                                 sign_psbt_cache,
-                                                &hashes,
+                                                &signing_state,
                                                 &keyexpr_info,
                                                 &input,
                                                 i)) {
@@ -3310,6 +3330,16 @@ sign_transaction(dispatcher_context_t *dc,
         }
 
         ++key_expression_index;
+    }
+
+    // MuSig2: if there is an active session at the end of round 1, we move it to persistent
+    // storage. It is important that this is only done at the very end of the signing process.
+    uint8_t acc = 0;
+    for (size_t i = 0; i < sizeof(signing_state.musig.round1); i++) {
+        acc |= signing_state.musig.round1.id[i];
+    }
+    if (acc != 0) {
+        musigsession_store(signing_state.musig.round1.id, &signing_state.musig.round1);
     }
 
     return true;
