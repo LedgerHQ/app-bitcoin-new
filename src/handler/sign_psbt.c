@@ -1321,6 +1321,16 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             strncmp(G_swap_state.destination_address, output_description, output_description_len)) {
         // address did not match
         PRINTF("Mismatching address for swap\n");
+        PRINTF("Expected: ");
+        for (int i = 0; i < swap_addr_len; i++) {
+            PRINTF("%c", G_swap_state.destination_address[i]);
+        }
+        PRINTF("\n");
+        PRINTF("Found: ");
+        for (int i = 0; i < output_description_len; i++) {
+            PRINTF("%c", output_description[i]);
+        }
+        PRINTF("\n");
         SEND_SW(dc, SW_FAIL_SWAP);
         finalize_exchange_sign_transaction(false);
     }
