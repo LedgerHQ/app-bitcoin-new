@@ -6,20 +6,7 @@
 #include "../crypto.h"
 
 // TODO: persist in NVRAM instead
-musig_session_t musig_sessions[MAX_N_MUSIG_SESSIONS];
-
-bool musigsession_pop(uint8_t psbt_session_id[static 32], musig_session_t *out) {
-    for (int i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
-        if (memcmp(psbt_session_id, musig_sessions[i].id, 32) == 0) {
-            if (out != NULL) {
-                memcpy(out, &musig_sessions[i], sizeof(musig_session_t));
-            }
-            explicit_bzero(&musig_sessions[i], sizeof(musig_session_t));
-            return true;
-        }
-    }
-    return false;
-}
+musig_psbt_session_t musig_sessions[MAX_N_MUSIG_SESSIONS];
 
 static bool is_all_zeros(const uint8_t *array, size_t size) {
     for (size_t i = 0; i < size; ++i) {
@@ -30,35 +17,100 @@ static bool is_all_zeros(const uint8_t *array, size_t size) {
     return true;
 }
 
-void musigsession_init_randomness(musig_session_t *session) {
-    cx_get_random_bytes(session->rand_root, 32);
+static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psbt_session_t *out) {
+    for (int i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
+        if (memcmp(psbt_session_id, musig_sessions[i]._id, 32) == 0) {
+            if (out != NULL) {
+                memcpy(out, &musig_sessions[i], sizeof(musig_psbt_session_t));
+            }
+            explicit_bzero(&musig_sessions[i], sizeof(musig_psbt_session_t));
+            return true;
+        }
+    }
+    return false;
 }
 
-void musigsession_store(uint8_t psbt_session_id[static 32], const musig_session_t *session) {
+static void musigsession_init_randomness(musig_psbt_session_t *session) {
+    cx_get_random_bytes(session->_rand_root, 32);
+}
+
+static void musigsession_store(const uint8_t psbt_session_id[static 32],
+                               const musig_psbt_session_t *session) {
     // make sure that no session with the same id exists; delete it otherwise
     musigsession_pop(psbt_session_id, NULL);
 
     int i;
     for (i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
-        if (is_all_zeros((uint8_t *) &musig_sessions[i], sizeof(musig_session_t))) {
+        if (is_all_zeros((uint8_t *) &musig_sessions[i], sizeof(musig_psbt_session_t))) {
             break;
         }
     }
     if (i >= MAX_N_MUSIG_SESSIONS) {
         // no free slot found, delete the first by default
-        // TODO: should we use a LIFO structure? Could add a counter to musig_session_t
+        // TODO: should we use a LIFO structure? Could add a counter to musig_psbt_session_t
         i = 0;
     }
     // no free slot; replace the first slot
-    explicit_bzero(&musig_sessions[i], sizeof(musig_session_t));
-    memcpy(&musig_sessions[i], session, sizeof(musig_session_t));
+    explicit_bzero(&musig_sessions[i], sizeof(musig_psbt_session_t));
+    memcpy(&musig_sessions[i], session, sizeof(musig_psbt_session_t));
 }
 
-void compute_rand_i_j(const uint8_t rand_root[static 32], int i, int j, uint8_t out[static 32]) {
+void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
+                      int i,
+                      int j,
+                      uint8_t out[static 32]) {
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
-    crypto_hash_update(&hash_context.header, rand_root, CX_SHA256_SIZE);
+    crypto_hash_update(&hash_context.header, psbt_session->_rand_root, CX_SHA256_SIZE);
     crypto_hash_update_u32(&hash_context.header, (uint32_t) i);
     crypto_hash_update_u32(&hash_context.header, (uint32_t) j);
     crypto_hash_digest(&hash_context.header, out, 32);
+}
+
+const musig_psbt_session_t *musigsession_round1_initialize(
+    uint8_t psbt_session_id[static 32],
+    musig_signing_state_t *musig_signing_state) {
+    // if an existing session for psbt_session_id exists, delete it
+    if (musigsession_pop(psbt_session_id, NULL)) {
+        // We wouldn't expect this: probably the client sent the same psbt for
+        // round 1 twice, without adding the pubnonces to the psbt after the first round.
+        // We delete the old session and start a fresh one, but we print a
+        // warning if in debug mode.
+        PRINTF("Session with the same id already existing\n");
+    }
+
+    if (memcmp(musig_signing_state->_round1._id, psbt_session_id, 32) != 0) {
+        // first input/placeholder pair using this session: initialize the session
+        memcpy(musig_signing_state->_round1._id, psbt_session_id, 32);
+        musigsession_init_randomness(&musig_signing_state->_round1);
+    }
+
+    return &musig_signing_state->_round1;
+}
+
+const musig_psbt_session_t *musigsession_round2_initialize(
+    uint8_t psbt_session_id[static 32],
+    musig_signing_state_t *musig_signing_state) {
+    if (memcmp(musig_signing_state->_round2._id, psbt_session_id, 32) != 0) {
+        // get and delete the musig session from permanent storage
+        if (!musigsession_pop(psbt_session_id, &musig_signing_state->_round2)) {
+            // The PSBT contains a partial nonce, but we do not have the corresponding psbt
+            // session in storage. Either it was deleted, or the pubnonces were not real. Either
+            // way, we cannot continue.
+            PRINTF("Missing MuSig2 session\n");
+            return NULL;
+        }
+    }
+
+    return &musig_signing_state->_round2;
+}
+
+void musigsession_commit(musig_signing_state_t *musig_signing_state) {
+    uint8_t acc = 0;
+    for (size_t i = 0; i < sizeof(musig_signing_state->_round1); i++) {
+        acc |= musig_signing_state->_round1._id[i];
+    }
+    if (acc != 0) {
+        musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
+    }
 }
