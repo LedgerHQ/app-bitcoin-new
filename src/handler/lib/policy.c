@@ -1897,6 +1897,19 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
     return 0;
 }
 
+// sort an array of uint16_t in place using bubble sort
+static void sort_uint16_array(uint16_t *array, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++) {
+            if (array[i] > array[j]) {
+                uint16_t tmp = array[i];
+                array[i] = array[j];
+                array[j] = tmp;
+            }
+        }
+    }
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -1961,7 +1974,30 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
         return WITH_ERROR(-1, "Unexpected error while counting key expressions");
     }
 
-    // The following loop computationally very inefficient (quadratic in the number of
+    // for each MuSig key expression, checks that the key indices are all distinct
+    for (int i = 0; i < n_key_expressions; i++) {
+        policy_node_keyexpr_t *kp_i;
+        if (0 > get_keyexpr_by_index(policy, i, NULL, &kp_i)) {
+            return WITH_ERROR(-1, "Unexpected error retrieving key expressions from the policy");
+        }
+        if (kp_i->type == KEY_EXPRESSION_MUSIG) {
+            musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
+            uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+
+            uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
+            memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
+
+            // sort the arrays
+            sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+            for (int j = 0; j < musig_info_i->n - 1; j++) {
+                if (key_indexes_i_sorted[j] == key_indexes_i_sorted[j + 1]) {
+                    return WITH_ERROR(-1, "Repeated key in musig key expression");
+                }
+            }
+        }
+    }
+
+    // The following loop is computationally very inefficient (quadratic in the number of
     // key expressions), but more efficient solutions likely require a substantial amount of RAM
     // (proportional to the number of key expressions). Instead, this only requires stack depth
     // proportional to the depth of the wallet policy's abstract syntax tree.
@@ -1978,13 +2014,60 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                                   "Unexpected error retrieving key expressions from the policy");
             }
 
-            // key expressions for the same key must have disjoint derivation options
-            if (kp_i->k.key_index == kp_j->k.key_index) {
+            if ((kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_MUSIG) ||
+                (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_NORMAL)) {
+                // if one is a key and the other is a musig, there's nothing else to check
+                continue;
+            } else if (kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_NORMAL) {
+                // key expressions for the same key must have disjoint derivation options
+                if (kp_i->k.key_index == kp_j->k.key_index) {
+                    if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
+                        kp_i->num_second == kp_j->num_first ||
+                        kp_i->num_second == kp_j->num_second) {
+                        return WITH_ERROR(
+                            -1,
+                            "Key expressions with repeated derivations in miniscript");
+                    }
+                }
+            } else if (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_MUSIG) {
+                musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp_i->m.musig_info);
+                uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+                musig_aggr_key_info_t *musig_info_j = r_musig_aggr_key_info(&kp_j->m.musig_info);
+                uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
+                // if two musigs have exactly the same set of keys, then the derivation options must
+                // be disjoint
+
+                // make sure that there is no repeated key in the first musig
+
+                if (musig_info_i->n != musig_info_j->n) {
+                    continue;  // cannot be the same set if the size is different
+                }
+
+                uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
+                uint16_t key_indexes_j_sorted[MAX_PUBKEYS_PER_MUSIG];
+                memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
+                memcpy(key_indexes_j_sorted, key_indexes_j, musig_info_j->n * sizeof(uint16_t));
+
+                // sort the arrays
+                sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+                sort_uint16_array(key_indexes_j_sorted, musig_info_j->n);
+
+                if (memcmp(key_indexes_i_sorted,
+                           key_indexes_j_sorted,
+                           musig_info_i->n * sizeof(uint16_t)) != 0) {
+                    continue;  // different set of keys
+                }
+
+                // same set of keys; therefore, we need to check that the derivation options are
+                // disjoint
                 if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
                     kp_i->num_second == kp_j->num_first || kp_i->num_second == kp_j->num_second) {
                     return WITH_ERROR(-1,
                                       "Key expressions with repeated derivations in miniscript");
                 }
+
+            } else {
+                LEDGER_ASSERT(false, "Unexpected key expression type");
             }
         }
     }
