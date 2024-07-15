@@ -2574,28 +2574,23 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
                                                                   1 + psbt_id_len,
                                                                   my_pubnonce.raw,
                                                                   sizeof(musig_pubnonce_t))) {
+        /**
+         * Round 1 of the MuSig2 protocol
+         **/
+
+        const musig_psbt_session_t *psbt_session =
+            musigsession_round1_initialize(psbt_session_id, &signing_state->musig);
+        if (psbt_session == NULL) {
+            // This should never happen
+            PRINTF("Unexpected: failed to initialize MuSig2 round 1\n");
+            SEND_SW(dc, SW_BAD_STATE);
+            return false;
+        }
+
         // 5) generate and yield pubnonce
 
-        // if an existing session for psbt_session_id exists, delete it
-        if (musigsession_pop(psbt_session_id, NULL)) {
-            // We wouldn't expect this: probably the client sent the same psbt for
-            // round 1 twice, without adding the pubnonces to the psbt after the first round.
-            // We delete the old session and start a fresh one, but we print a
-            // warning if in debug mode.
-            PRINTF("Session with the same id already existing\n");
-        }
-
-        if (memcmp(signing_state->musig.round1.id, psbt_session_id, sizeof(psbt_session_id)) != 0) {
-            // first input/placeholder pair using this session: initialize the session
-            memcpy(signing_state->musig.round1.id, psbt_session_id, sizeof(psbt_session_id));
-            musigsession_init_randomness(&signing_state->musig.round1);
-        }
-
         uint8_t rand_i_j[32];
-        compute_rand_i_j(signing_state->musig.round1.rand_root,
-                         cur_input_index,
-                         keyexpr_info->cur_index,
-                         rand_i_j);
+        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->cur_index, rand_i_j);
 
         musig_secnonce_t secnonce;
         musig_pubnonce_t pubnonce;
@@ -2621,19 +2616,23 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
             return false;
         }
     } else {
-        // 6) generate and yield partial signature
-        // If the session is not already initialized, we pop it from persistent storage
-        if (memcmp(signing_state->musig.round2.id, psbt_session_id, sizeof(psbt_session_id)) != 0) {
-            // get and delete the musig session from permanent storage
-            if (!musigsession_pop(psbt_session_id, &signing_state->musig.round2)) {
-                // The PSBT contains a partial nonce, but we do not have the corresponding psbt
-                // session in storage. Either it was deleted, or the pubnonces were not real. Either
-                // way, we cannot continue.
-                PRINTF("Missing MuSig2 session\n");
-                SEND_SW(dc, SW_BAD_STATE);
-                return false;
-            }
+        /**
+         * Round 2 of the MuSig2 protocol
+         **/
+
+        const musig_psbt_session_t *psbt_session =
+            musigsession_round2_initialize(psbt_session_id, &signing_state->musig);
+
+        if (psbt_session == NULL) {
+            // The PSBT contains a partial nonce, but we do not have the corresponding psbt
+            // session in storage. Either it was deleted, or the pubnonces were not real. Either
+            // way, we cannot continue.
+            PRINTF("Missing MuSig2 session\n");
+            SEND_SW(dc, SW_BAD_STATE);
+            return false;
         }
+
+        // 6) generate and yield partial signature
 
         musig_pubnonce_t nonces[MAX_PUBKEYS_PER_MUSIG];
 
@@ -2668,10 +2667,7 @@ static bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_co
 
         // recompute secnonce from psbt_session randomness
         uint8_t rand_i_j[32];
-        compute_rand_i_j(signing_state->musig.round2.rand_root,
-                         cur_input_index,
-                         keyexpr_info->cur_index,
-                         rand_i_j);
+        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->cur_index, rand_i_j);
 
         musig_secnonce_t secnonce;
         musig_pubnonce_t pubnonce;
@@ -3204,13 +3200,7 @@ sign_transaction(dispatcher_context_t *dc,
 
     // MuSig2: if there is an active session at the end of round 1, we move it to persistent
     // storage. It is important that this is only done at the very end of the signing process.
-    uint8_t acc = 0;
-    for (size_t i = 0; i < sizeof(signing_state.musig.round1); i++) {
-        acc |= signing_state.musig.round1.id[i];
-    }
-    if (acc != 0) {
-        musigsession_store(signing_state.musig.round1.id, &signing_state.musig.round1);
-    }
+    musigsession_commit(&signing_state.musig);
 
     return true;
 }
