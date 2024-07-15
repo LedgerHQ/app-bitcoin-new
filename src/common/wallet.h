@@ -288,19 +288,6 @@ typedef struct policy_node_ext_info_s {
     unsigned int x : 1;  // the last opcode is not EQUAL, CHECKSIG, or CHECKMULTISIG
 } policy_node_ext_info_t;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcomment"
-// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
-
-/** Structure representing a key placeholder.
- * In V1, it's the index of a key expression in the key informations array, which includes the final
- * / ** step.
- * In V2, it's the index of a key expression in the key informations array, plus the two
- * numbers a, b in the /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations
- * array don't have extra derivation steps.
- */
-#pragma GCC diagnostic pop
-
 DEFINE_REL_PTR(uint16, uint16_t)
 
 typedef struct {
@@ -311,9 +298,23 @@ typedef struct {
 DEFINE_REL_PTR(musig_aggr_key_info, musig_aggr_key_info_t)
 
 typedef enum {
-    KEY_EXPRESSION_NORMAL = 0,  // a key expression with a single key placeholder
+    KEY_EXPRESSION_NORMAL = 0,  // a key expression with a single key
     KEY_EXPRESSION_MUSIG = 1    // a key expression containing a musig()
 } KeyExpressionType;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcomment"
+// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
+
+/** Structure representing a key expression.
+ * In V1, it's the index of a key expression in the key informations array, which includes the final
+ * / ** step.
+ * In V2, it's the index of a key expression in the key informations array, plus the two
+ * numbers a, b in the /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations
+ * array don't have extra derivation steps.
+ * In V2, musig() key expressions are also represented in this struct.
+ */
+#pragma GCC diagnostic pop
 
 // 12 bytes
 typedef struct {
@@ -361,7 +362,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    rptr_policy_node_keyexpr_t key_placeholder;
+    rptr_policy_node_keyexpr_t key;
 } policy_node_with_key_t;
 
 // 8 bytes
@@ -372,10 +373,10 @@ typedef struct {
 
 // 12 bytes
 typedef struct {
-    struct policy_node_s base;                    // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
-    int16_t k;                                    // threshold
-    int16_t n;                                    // number of keys
-    rptr_policy_node_keyexpr_t key_placeholders;  // pointer to array of exactly n key placeholders
+    struct policy_node_s base;        // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
+    int16_t k;                        // threshold
+    int16_t n;                        // number of keys
+    rptr_policy_node_keyexpr_t keys;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
 // 8 bytes
@@ -425,7 +426,7 @@ typedef struct policy_node_tree_s {
 
 typedef struct {
     struct policy_node_s base;
-    rptr_policy_node_keyexpr_t key_placeholder;
+    rptr_policy_node_keyexpr_t key;
     rptr_policy_node_tree_t tree;  // NULL if tr(KP)
 } policy_node_tr_t;
 
