@@ -325,9 +325,13 @@ typedef struct {
     KeyExpressionType type;
     union {
         // type == 0
-        int16_t key_index;  // index of the key (common between V1 and V2)
+        struct {
+            int16_t key_index;  // index of the key (common between V1 and V2)
+        } k;
         // type == 1
-        rptr_musig_aggr_key_info_t musig_info;
+        struct {
+            rptr_musig_aggr_key_info_t musig_info;
+        } m;
     };
 } policy_node_keyexpr_t;
 
