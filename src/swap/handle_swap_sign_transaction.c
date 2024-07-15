@@ -80,8 +80,9 @@ bool copy_transaction_parameters(create_transaction_parameters_t* sign_transacti
                destination_address_extra_data,
                sizeof(G_swap_state.payin_extra_id));
     } else {
-        PRINTF("Invalid or unknown swap protocol\n");
-        return false;
+        // Since we cannot return an error status word here, we mark the swap state as invalid
+        // and will return an error later, once an attempt is made to sign.
+        G_swap_state.mode = SWAP_MODE_ERROR;
     }
 
     return true;

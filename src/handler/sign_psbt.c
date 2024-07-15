@@ -1278,6 +1278,12 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             SEND_SW(dc, SW_FAIL_SWAP);
             finalize_exchange_sign_transaction(false);
         }
+    } else if (G_swap_state.mode == SWAP_MODE_ERROR) {
+        // an error was detected in handle_swap_sign_transaction.c::copy_transaction_parameters
+        // special case only to improve error reporting in debug mode
+        PRINTF("Invalid parameters for swap feature\n");
+        SEND_SW(dc, SW_FAIL_SWAP);
+        finalize_exchange_sign_transaction(false);
     } else {
         PRINTF("Unknown swap mode: %d\n", G_swap_state.mode);
         SEND_SW(dc, SW_FAIL_SWAP);

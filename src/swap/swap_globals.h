@@ -5,6 +5,7 @@
 enum {
     SWAP_MODE_STANDARD = 0,
     SWAP_MODE_CROSSCHAIN = 1,
+    SWAP_MODE_ERROR = 0xFF,
 };
 
 typedef struct swap_globals_s {
