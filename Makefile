@@ -46,9 +46,9 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
 APPVERSION_M = 2
-APPVERSION_N = 2
-APPVERSION_P = 4
-APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
+APPVERSION_N = 3
+APPVERSION_P = 0
+APPVERSION_SUFFIX = alpha2 # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
@@ -65,7 +65,7 @@ endif
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
-VARIANT_VALUES = bitcoin_testnet bitcoin
+VARIANT_VALUES = bitcoin_testnet
 
 # simplify for tests
 ifndef COIN
@@ -89,24 +89,7 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-    APPNAME = "Bitcoin Test"
-else ifeq ($(COIN),bitcoin)
-    # the version for performance tests automatically approves all requests
-    # there is no reason to ever compile the mainnet app with this flag
-    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
-        $(error Use testnet app for performance tests)
-    endif
-
-    # Bitcoin mainnet, no legacy support
-    DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
-    DEFINES   += BIP44_COIN_TYPE=0
-    DEFINES   += COIN_P2PKH_VERSION=0
-    DEFINES   += COIN_P2SH_VERSION=5
-    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
-    DEFINES   += COIN_COINID_SHORT=\"BTC\"
-
-    APPNAME = "Bitcoin"
-
+    APPNAME = "Bitcoin Test Musig"
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
         $(error Unsupported COIN - use bitcoin_testnet, bitcoin)
