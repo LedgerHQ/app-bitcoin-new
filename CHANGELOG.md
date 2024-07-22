@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.2.4] - 09-07-2024
+
+### Changed
+
+- Major revamp of the UI for transaction signing and wallet policy registration on Stax. Changed "wallet policy" with the simpler wording "account".
+- Slight performance improvements in the signing flow.
+- Added a technical limit of at most 10 distinct cosigners in a wallet policy.
+
+### Fixed
+
+- OP_RETURN outputs with a `0x00` data push were incorrectly rejected.
+
 ## [2.2.3] - 06-05-2024
 
 ### Added

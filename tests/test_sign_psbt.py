@@ -1,12 +1,6 @@
 import base64
 import pytest
 
-import threading
-
-from decimal import Decimal
-
-from typing import List
-
 from pathlib import Path
 
 from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType, PartialSignature
@@ -15,16 +9,11 @@ from ledger_bitcoin.exception.device_exception import DeviceException
 
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import AddressType
-from ragger.navigator import Navigator, NavInsID
+from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
 
 from test_utils import bip0340, txmaker
-
-from embit.script import Script
-from embit.networks import NETWORKS
-import requests
-import json
 
 from ragger_bitcoin import RaggerClient
 from .instructions import *
@@ -99,7 +88,7 @@ def test_sign_psbt_singlesig_sh_wpkh_1to2(navigator: Navigator, firmware: Firmwa
     #  "pubkey" : "024ba3b77d933de9fa3f9583348c40f3caaf2effad5b6e244ece8abbfcc7244f67",
     #  "signature" : "30440220720722b08489c2a50d10edea8e21880086c8e8f22889a16815e306daeea4665b02203fcf453fa490b76cf4f929714065fc90a519b7b97ab18914f9451b5a4b45241201"
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware),
                               testname=test_name)
 
     assert result == [(
@@ -124,8 +113,8 @@ def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: Rag
     for out in psbt.tx.vout:
         out.nValue = int(out.nValue * 0.9)
 
-    # the test is only interesting if the total amount is at least 10000 sats
-    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 10000
+    # the test is only interesting if the total amount is at least 100000 sats
+    assert sum(input.witness_utxo.nValue for input in psbt.inputs) >= 100000
 
     wallet = WalletPolicy(
         "",
@@ -136,7 +125,7 @@ def test_sign_psbt_highfee(navigator: Navigator, firmware: Firmware, client: Rag
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_3(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_feewarning=True),
                               testname=test_name)
 
     assert len(result) == 1
@@ -156,7 +145,7 @@ def test_sign_psbt_singlesig_wpkh_1to2(navigator: Navigator, firmware: Firmware,
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_2(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware),
                               testname=test_name)
 
     # expected sigs
@@ -240,7 +229,7 @@ def test_sign_psbt_singlesig_wpkh_2to2_missing_nonwitnessutxo(navigator: Navigat
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_4(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_unverifiedwarning=True),
                               testname=test_name)
 
     # expected sigs
@@ -286,7 +275,7 @@ def test_sign_psbt_singlesig_wpkh_selftransfer(navigator: Navigator, firmware: F
 
     psbt = "cHNidP8BAHECAAAAAfcDVJxLN1tzz5vaIy2onFL/ht/OqwKm2jEWGwMNDE/cAQAAAAD9////As0qAAAAAAAAFgAUJfcXOL7SoYGoDC1n6egGa0OTD9/mtgEAAAAAABYAFDXG4N1tPISxa6iF3Kc6yGPQtZPsTTQlAAABAPYCAAAAAAEBCOcYS1aMP1uQcUKTMJbvlsZXsV4yNnVxynyMfxSX//UAAAAAFxYAFGEWho6AN6qeux0gU3BSWnK+Dw4D/f///wKfJwEAAAAAABepFG1IUtrzpUCfdyFtu46j1ZIxLX7ph0DiAQAAAAAAFgAU4e5IJz0XxNe96ANYDugMQ34E0/cCRzBEAiB1b84pX0QaOUrvCdDxKeB+idM6wYKTLGmqnUU/tL8/lQIgbSinpq4jBlo+SIGyh8XNVrWAeMlKBNmoLenKOBugKzcBIQKXsd8NwO+9naIfeI3nkgYjg6g3QZarGTRDs7SNVZfGPJBJJAABAR9A4gEAAAAAABYAFOHuSCc9F8TXvegDWA7oDEN+BNP3IgYCgffBheEUZI8iAFFfv7b+HNM7j4jolv6lj5/n3j68h3kY9azC/VQAAIABAACAAAAAgAAAAAAHAAAAACICAzQZjNnkwXFEhm1F6oC2nk1ADqH6t/RHBAOblLA4tV5BGPWswv1UAACAAQAAgAAAAIABAAAAEgAAAAAiAgJxtbd5rYcIOFh3l7z28MeuxavnanCdck9I0uJs+HTwoBj1rML9VAAAgAEAAIAAAACAAQAAAAAAAAAA"
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_5(firmware),
+                              instructions=sign_psbt_instruction_approve_selftransfer(firmware),
                               testname=test_name)
 
     assert len(result) == 1
@@ -339,8 +328,11 @@ def test_sign_psbt_multisig_wsh(navigator: Navigator, firmware: Firmware, client
 
     psbt = open_psbt_from_file(f"{tests_root}/psbt/multisig/wsh-2of2.psbt")
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_6(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert result == [(
@@ -373,7 +365,7 @@ def test_sign_psbt_multisig_sh_wsh(navigator: Navigator, firmware: Firmware, cli
 
     psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEAigIAAAABAaNw+E0toKUlohxkK0YmapPS7uToo7RG7DA2YLrmoD8BAAAAFxYAFAppBymwQTPq8lpFfFWMuPRNdbTX/v///wI7rUIBAAAAABepFJMyNbbbdF4o3zxQhWSJ5ZXY5naHh60dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHbvokAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True),
                               testname=test_name)
 
     assert result == [(
@@ -411,7 +403,7 @@ def test_sign_psbt_multisig_sh_wsh_missing_nonwitnessutxo(navigator: Navigator, 
 
     psbt = "cHNidP8BAFUCAAAAAS60cHn6kIlm2wk314ZKiOok2xj++cPoa/K5TXzNk4s6AQAAAAD9////AescAAAAAAAAGXapFFnK2lAxTIKeGfWneG+O4NSYf0KdiKwhlRUAAAEBIK0dAAAAAAAAF6kU9wt/XvakFsqnsR6xlBxP5N9MyyqHAQQiACAyIOGl/sIPCRep2F4Bude0ME17U2m2dPAiK96XdDCf7wEFR1IhA0fxhNV0BDkMTLzQjBSpKxSeh39pMEcQ+reqlD2a/D20IQPlOZCX7JMMMjUxBLMNtzR+gcVKZaL4J4sf/VRbo03NfFKuIgYDR/GE1XQEOQxMvNCMFKkrFJ6Hf2kwRxD6t6qUPZr8PbQc4kJDtDAAAIABAACAAAAAgAEAAIAAAAAAAAAAACIGA+U5kJfskwwyNTEEsw23NH6BxUplovgnix/9VFujTc18HPWswv0wAACAAQAAgAAAAIABAACAAAAAAAAAAAAAAA=="
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_8(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, has_unverifiedwarning=True),
                               testname=test_name)
 
     assert result == [(
@@ -551,7 +543,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_9(firmware),
+                              instructions=sign_psbt_instruction_approve_streaming(firmware, output_count=2, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_ins
@@ -569,18 +561,11 @@ def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmwa
         ],
     )
 
-    in_amounts = [21_000_000*100_000_000]
-    out_amounts = [21_000_000*100_000_000 - 100_000]
-
-    psbt = txmaker.createPsbt(wallet, in_amounts, out_amounts, [False])
-
-    sum_in = sum(in_amounts)
-    sum_out = sum(out_amounts)
-
-    assert sum_out < sum_in
+    psbt = "cHNidP8BAF4BAAAAAdPD2ZYMl89dk/YzXHTZhrjEqcvlBkVYNrcVY7772qITAAAAAAAAAAAAAWC5BVrwdQcAIlEgxg2/6wYrgIO8mjVxHIi7Ulp5V3e27qVz+FL9IxOy09oAAAAAAAEA/TIEAgAAAAclqfEztd6haPTihR8HL8wA/Kp8piBhcXpI5S4po/o3mhEAAABQlT+qaJPjLsWie5ReYF8QhfMjLUJMEynIjXhu1ozm/LYqpjv5q2F8CIo7cL5XqtofM0pwFyUNP2A9yC69OxILY14/9WsfC9kzhSNxJJqz31wAAAAAH+8UM8hmhbfwVmgdUVKvgDziWQbx0Z+2xoBOBuooqxcRAAAAUI9Feva0k7dDnsbUKQBiq1F6cuXB1BDN1hdU5CCEUOT5ABP9pp/vGdRgKkIHzdWhAW0HATJhPGWaj10z88spC4znO4NEsTpPjgkVFGmEobsVAAAAAP3q3r5basCVBEZNiqqsvC+tEhWKU0yUuMpCljr0ehidBQAAAFAkms6omdQ3MvbyrK8/9Tv+2hOaq09VwCwhK2VxH8UEMsmU5fpv2Cq8cIVV3GK3OiAO52c8/suDahVuSjVl6sG5TTX5S8/Y/aX//2dwBK6ipAAAAAASS4NPwpbwISsUIXNCFJkH5alSTOu+wxEuJ9pplNX2xhMAAABQdwoAXZqCqiH8hpvQxMQfU0F6kqscEvbVSPspTbTSEu7F6hgz8U0KEEOlNbFjxPs4Hu+sP5dBxpY+YBPI475h6bYmFhT4gg1udS/XnDpK2tgAAAAAKzXUIDLUTw/k3NUP/qaBKLQkPrcPsLJbBXa7JElqAWgDAAAAUAOWvAx3SF/oOfSwhEIOarmr8pWXp14pNJ1QwEtAcqF8eV6VvtYXQwrJJyVD15nVSNiYtSt/470dwNEE1aThaL6W8S5eN405TuTMXtfdWX7oAAAAAK5Itews92iWAOXsA2+YOppP2fEv/nbPjws9ihQAg8vKDgAAAFA0gbWRZCsSJIacrjx/UyLUlJBEazXSzo6V4r5GUD89w83vR5m18tRv9Pqi/B7jmUn9Gm4NtfHIBSIpygO4FTsBipV0SJNhNd7rqcRWqdfeSwAAAADlS6FCal/jssfa+8dwZOBoGcYRdytfuh1Yd5gskbTS6gEAAABQ3Oj6gvNurIgVFhpTswGUA0cg23HLcehirTQro6XppoIOFmG8KWuxYGeAmp/EgvawehacJQTr/eAY0/zr4TwrKXsyTtNt4SfayRRcf/pwQY4AAAAABwBAB1rwdQcAFgAU0+7eJu+wC1UvKNIxz4CFDRczm/I4L20CAAAAABYAFPNyGL5lUjRibFPLi01BEjsLwASNM8SqBAAAAAAWABSuAZ+UnYYxIwc3Aj30hZG6rKwna4g7HQEAAAAAFgAUKKpV9FUdnX0XjRKi5566B7GilM6hNsIAAAAAABYAFPUxxs1RBp+b5Rgv3WHXHbJgLZ/uWTGkBQAAAAAWABRFAR8Q58ACMpSpRHc+W/AYljP3EW9EygAAAAAAFgAU25qB3Gwdk2er+8rT9SF8FAc+bfEAAAAAAQEfAEAHWvB1BwAWABTT7t4m77ALVS8o0jHPgIUNFzOb8iIGA5NNbsxZ4ylv9Q0vs4yPSxu05hJFFW48jPoNtiyScnRJGPWswv1UAACAAQAAgAAAAIABAAAAuCAAAAAA"
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(
+                                  firmware),
                               testname=test_name)
 
     assert len(result) == 1
@@ -617,7 +602,7 @@ def test_sign_psbt_singlesig_wpkh_512to256(navigator: Navigator, firmware: Firmw
     )
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_inputs
@@ -680,7 +665,7 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     client._no_clone_psbt = True
     with pytest.raises(ExceptionRAPDU) as e:
         client.sign_psbt(psbt, wallet, None, navigator,
-                         instructions=sign_psbt_instruction_approve(firmware),
+                         instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == IncorrectDataError
     assert len(e.value.data) == 0
@@ -700,8 +685,11 @@ def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, clien
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
+    # to and amount fit on the same page on stax, but not on flex
+    to_on_next_page = firmware.name == 'flex'
+
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
-                                instructions=sign_psbt_instruction_approve_2(firmware),
+                                instructions=sign_psbt_instruction_approve(firmware, to_on_next_page=to_on_next_page, fees_on_next_page=True),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1
@@ -724,7 +712,7 @@ def test_sign_psbt_with_naked_opreturn(navigator: Navigator, firmware: Firmware,
     psbt.deserialize(psbt_b64)
 
     hww_sigs = client.sign_psbt(psbt, wallet, None, navigator,
-                                instructions=sign_psbt_instruction_approve_2(firmware),
+                                instructions=sign_psbt_instruction_approve(firmware),
                                 testname=test_name)
 
     assert len(hww_sigs) == 1
@@ -757,9 +745,9 @@ def test_sign_psbt_with_segwit_v16(navigator: Navigator, firmware: Firmware, cli
 def test_sign_psbt_with_external_inputs(navigator: Navigator, firmware: Firmware, client:
                                         RaggerClient, test_name: str):
 
-    instructions = [sign_psbt_instruction_approve_external_inputs(firmware),
-                    sign_psbt_instruction_approve_external_inputs_2(firmware),
-                    sign_psbt_instruction_approve_external_inputs_2(firmware)]
+    instructions = [sign_psbt_instruction_approve_external_inputs(firmware, output_count=5),
+                    sign_psbt_instruction_approve_external_inputs(firmware, output_count=4),
+                    sign_psbt_instruction_approve_external_inputs(firmware, output_count=4)]
     # PSBT obtained by joining pkh-1to1.psbt, tr-1to2.psbt, wpkh-1to2.psbt.
     # We sign it with each of the respective wallets; therefore it must show the "external inputs" warning each time.
     psbt_b64 = "cHNidP8BAP0yAQIAAAADobgj0jNtaUtJNO+bblt94XoFUT2oop2wKi7Lx6mm/m0BAAAAAP3///9RIsLN5oI+VXVBdbksnFegqOGsg8OOF4f9Oh/zNI6VEwEAAAAA/f///3oqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////BaCGAQAAAAAAFgAUE5m4oJhHoDmwNS9Y0hLBgLqxf3dV/6cAAAAAACJRIAuOdIa8MGoK77enwArwQFVC2xrNc+7MqCdxzPX+XrYPeEEPAAAAAAAZdqkUE9fVgWaUbD7AIpNAZtjA0RHRu0GIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+Sguw0AAAAAABl2qRQ0Sg9IyhUOwrkDgXZgubaLE6ZwJoisAAAAAAABASunhqkAAAAAACJRINj08dGJltthuxyvVCPeJdih7unJUNN+b/oCMBLV5i4NIRYhLqKFalzxEOZqK+nXNTFHk/28s4iyuPE/K2remC569RkA9azC/VYAAIABAACAAAAAgAEAAAAAAAAAARcgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLIgYD7iw9mOsfk8Chqo5aQAm3Dre0Tq0V8WZvE2sBKtWNMGgY9azC/VQAAIABAACAAAAAgAEAAAAIAAAAAAABBSACkIHs5WFqocuZMZ/Eh07+5H8IzrpfYARjbIxDQJpfCiEHApCB7OVhaqHLmTGfxIdO/uR/CM66X2AEY2yMQ0CaXwoZAPWswv1WAACAAQAAgAAAAIABAAAAAgAAAAAAIgICKexHcnEx7SWIogxG7amrt9qm9J/VC6/nC5xappYcTswY9azC/VQAAIABAACAAAAAgAEAAAAKAAAAAAA="
@@ -826,7 +814,7 @@ def test_sign_psbt_miniscript_multikey(navigator: Navigator, firmware: Firmware,
     )
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True),
                               testname=test_name)
 
     assert len(result) == 2
@@ -891,8 +879,12 @@ def test_sign_psbt_tr_script_pk_sighash_all(navigator: Navigator, firmware: Firm
 
     psbt = PSBT()
     psbt.deserialize("cHNidP8BAFICAAAAAR/BzFdxy4OGDMVtlLz+2ThgjBf2NmJDW0HpxE/8/TFCAQAAAAD9////ATkFAAAAAAAAFgAUqo7zdMr638p2kC3bXPYcYLv9nYUAAAAAAAEBK0wGAAAAAAAAIlEg/AoQ0wjH5BtLvDZC+P2KwomFOxznVaDG0NSV8D2fLaQBAwQBAAAAIhXBUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUjIGsW6MH5efpMwPBbajAK//+UFFm28g3nfeVbAWDvjkysrMAhFlAXEIvs6o3txTALsiOGs6swNnrCYvnOXlgybrg+OiL1HQB2IjpuMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIRZrFujB+Xn6TMDwW2owCv//lBRZtvIN533lWwFg745MrD0BCS7aAzYX4hDuf30ON4pASuocSLVqoQMCK+z3dG5HAKT1rML9MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAARcgUBcQi+zqje3FMAuyI4azqzA2esJi+c5eWDJuuD46IvUBGCAJLtoDNhfiEO5/fQ43ikBK6hxItWqhAwIr7Pd0bkcApAAA")
+
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert len(result) == 1
@@ -934,8 +926,11 @@ def test_sign_psbt_against_wrong_tapleaf_hash(navigator: Navigator, firmware: Fi
 
     psbt_b64 = "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"
 
+    # fees don't fit in the same page on 'flex', but they fit on 'stax'
+    fees_on_next_page = firmware.name == 'flex'
+
     result = client.sign_psbt(psbt_b64, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_7(firmware),
+                              instructions=sign_psbt_instruction_approve(firmware, has_spend_from_wallet=True, fees_on_next_page=fees_on_next_page),
                               testname=test_name)
 
     assert len(result) == 2

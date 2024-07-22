@@ -9,8 +9,6 @@
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"
 
-#include "../cxram_stash.h"
-
 #include "../boilerplate/sw.h"
 
 #include "../debug-helpers/debug.h"
@@ -1971,20 +1969,11 @@ static int16_t maxcheck(int16_t a, int16_t b) {
 // Maximum supported value for n in a thresh miniscript operator (technical limitation)
 #define MAX_N_IN_THRESH 128
 
-// Separated from the main function as it is stack-intensive, therefore we allocate large buffers
-// into the CXRAM section. There is some repeated work ()
 static int compute_thresh_ops(const policy_node_thresh_t *node,
                               miniscript_ops_t *out,
                               MiniscriptContext ctx) {
-#ifdef USE_CXRAM_SECTION
-    // allocate buffers inside the cxram section; safe as there are no syscalls here
-    uint16_t *sats = (uint16_t *) get_cxram_buffer();
-    uint16_t *next_sats =
-        (uint16_t *) (get_cxram_buffer() + sizeof(uint16_t) * (MAX_N_IN_THRESH + 1 + 1));
-#else
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
-#endif
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 
@@ -2019,20 +2008,11 @@ static int compute_thresh_ops(const policy_node_thresh_t *node,
     return 0;
 }
 
-// Separated from the main function as it is stack-intensive, therefore we allocate large buffers
-// into the CXRAM section. There is some repeated work ()
 static int compute_thresh_stacksize(const policy_node_thresh_t *node,
                                     miniscript_stacksize_t *out,
                                     MiniscriptContext ctx) {
-#ifdef USE_CXRAM_SECTION
-    // allocate buffers inside the cxram section; safe as there are no syscalls here
-    uint16_t *sats = (uint16_t *) get_cxram_buffer();
-    uint16_t *next_sats =
-        (uint16_t *) (get_cxram_buffer() + sizeof(uint16_t) * (MAX_N_IN_THRESH + 1 + 1));
-#else
     uint16_t sats[MAX_N_IN_THRESH + 1 + 1] = {0};
     uint16_t next_sats[MAX_N_IN_THRESH + 1 + 1] = {0};  // it temporarily uses an extra element
-#endif
 
     if (node->n > MAX_N_IN_THRESH) return -1;
 

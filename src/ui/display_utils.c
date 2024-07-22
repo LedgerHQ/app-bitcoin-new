@@ -4,46 +4,12 @@
 
 #include "./display_utils.h"
 
-// Division and modulus operators over uint64_t causes the inclusion of the __udivmoddi4 and other
-// library functions that occupy more than 400 bytes. Since performance is not critical and division
-// by 10 is sufficient, we avoid it with a binary search instead.
-static uint64_t div10(uint64_t n) {
-    if (n < 10) return 0;  // special case needed to make sure that n - 10 is safe
-
-    // Since low, mid and high are always <= UINT64_MAX / 10, there is no risk of overflow
-    uint64_t low = 0;
-    uint64_t high = UINT64_MAX / 10;
-
-    while (true) {
-        uint64_t mid = (low + high) / 2;
-
-        // the result equals mid if and only if mid * 10 <= n < mid * 10 + 10
-        // care is taken to make sure overflows and underflows are impossible
-        if (mid * 10 > n - 10 && n >= mid * 10) {
-            return mid;
-        } else if (n < mid * 10) {
-            high = mid - 1;
-        } else /* n >= 10 * mid + 10 */ {
-            low = mid + 1;
-        }
-    }
-}
-
-static uint64_t div100000000(uint64_t n) {
-    uint64_t res = n;
-    for (int i = 0; i < 8; i++) res = div10(res);
-    return res;
-}
-
 static size_t n_digits(uint64_t number) {
     size_t count = 0;
     do {
         count++;
 
-        // HACK: avoid __udivmoddi4
-        // number /= 10;
-
-        number = div10(number);
+        number /= 10;
     } while (number != 0);
     return count;
 }
@@ -51,42 +17,44 @@ static size_t n_digits(uint64_t number) {
 void format_sats_amount(const char *coin_name,
                         uint64_t amount,
                         char out[static MAX_AMOUNT_LENGTH + 1]) {
-    size_t coin_name_len = strlen(coin_name);
-    strncpy(out, coin_name, MAX_AMOUNT_LENGTH + 1);
-    out[coin_name_len] = ' ';
+    uint64_t integral_part = amount / 100000000;
+    uint32_t fractional_part = (uint32_t) (amount % 100000000);
 
-    char *amount_str = out + coin_name_len + 1;
+    // Compute the fractional part string (exactly 8 digits, possibly with trailing zeros)
+    char fractional_str[9];
+    snprintf(fractional_str, 9, "%08u", fractional_part);
+    // Drop trailing zeros
+    for (int i = 7; i > 0 && fractional_str[i] == '0'; i--) {
+        fractional_str[i] = '\0';
+    }
 
-    // HACK: avoid __udivmoddi4
-    // uint64_t integral_part = amount / 100000000;
-    // uint32_t fractional_part = (uint32_t) (amount % 100000000);
-    uint64_t integral_part = div100000000(amount);
-    uint32_t fractional_part = (uint32_t) (amount - integral_part * 100000000);
-
-    // format the integral part, starting from the least significant digit
+    // the integral part is at most 2^64 / 10^8 = 184467440737
+    char integral_str[12 + 1];
     size_t integral_part_digit_count = n_digits(integral_part);
     for (unsigned int i = 0; i < integral_part_digit_count; i++) {
-        // HACK: avoid __udivmoddi4
-        // amount_str[integral_part_digit_count - 1 - i] = '0' + (integral_part % 10);
-        // integral_part /= 10;
-
-        uint64_t tmp_quotient = div10(integral_part);
-        char tmp_remainder = (char) (integral_part - 10 * tmp_quotient);
-        amount_str[integral_part_digit_count - 1 - i] = '0' + tmp_remainder;
-        integral_part = tmp_quotient;
+        integral_str[integral_part_digit_count - 1 - i] = '0' + (integral_part % 10);
+        integral_part /= 10;
     }
+    integral_str[integral_part_digit_count] = '\0';
 
-    if (fractional_part == 0) {
-        amount_str[integral_part_digit_count] = '\0';
-    } else {
-        // format the fractional part (exactly 8 digits, possibly with trailing zeros)
-        amount_str[integral_part_digit_count] = '.';
-        char *fract_part_str = amount_str + integral_part_digit_count + 1;
-        snprintf(fract_part_str, 8 + 1, "%08u", fractional_part);
+#ifdef SCREEN_SIZE_WALLET
+    // on large screens, format as "<amount> TICKER"
+    snprintf(out,
+             MAX_AMOUNT_LENGTH + 1,
+             "%s%s%s %s",
+             integral_str,
+             fractional_part ? "." : "",
+             fractional_part ? fractional_str : "",
+             coin_name);
 
-        // drop trailing zeros
-        for (int i = 7; i > 0 && fract_part_str[i] == '0'; i--) {
-            fract_part_str[i] = '\0';
-        }
-    }
+#else
+    // on nanos, format as "TICKER <amount>"
+    snprintf(out,
+             MAX_AMOUNT_LENGTH + 1,
+             "%s %s%s%s",
+             coin_name,
+             integral_str,
+             fractional_part ? "." : "",
+             fractional_part ? fractional_str : "");
+#endif
 }

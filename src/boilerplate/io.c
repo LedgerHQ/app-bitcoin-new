@@ -85,6 +85,20 @@ void io_reset_timeouts() {
     G_was_processing_screen_shown = false;
 }
 
+void io_show_processing_screen() {
+    if (!G_was_processing_screen_shown) {
+        G_was_processing_screen_shown = true;
+        if (!G_swap_state.called_from_swap) {
+#ifdef HAVE_BAGL
+            ux_flow_init(0, ux_processing_flow, NULL);
+#endif  // HAVE_BAGL
+#ifdef HAVE_NBGL
+            nbgl_useCaseSpinner("Processing");
+#endif  // HAVE_NBGL
+        }
+    }
+}
+
 uint8_t io_event(uint8_t channel) {
     (void) channel;
 
@@ -121,18 +135,7 @@ uint8_t io_event(uint8_t channel) {
                 G_ticks - G_processing_timeout_start_tick >= PROCESSING_TIMEOUT_TICKS) {
                 io_clear_processing_timeout();
 
-                if (!G_was_processing_screen_shown) {
-                    G_was_processing_screen_shown = true;
-#ifdef HAVE_BAGL
-                    ux_flow_init(0, ux_processing_flow, NULL);
-#endif  // HAVE_BAGL
-#ifdef HAVE_NBGL
-
-                    if (!G_swap_state.called_from_swap) {
-                        nbgl_useCaseSpinner("Processing");
-                    }
-#endif  // HAVE_NBGL
-                }
+                io_show_processing_screen();
             }
 
             if (G_is_timeout_active.interruption &&

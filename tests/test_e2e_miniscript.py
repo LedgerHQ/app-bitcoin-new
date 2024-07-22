@@ -301,9 +301,6 @@ def test_e2e_miniscript_me_or_3of5(navigator: Navigator, firmware: Firmware, cli
 
 def test_e2e_miniscript_me_large_vault(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
-    if (firmware.name == "nanos"):
-        pytest.skip("Not supported on Nano S due to memory limitations")
-
     path = "48'/1'/0'/2'"
     _, core_xpub_orig1 = create_new_wallet()
     _, core_xpub_orig2 = create_new_wallet()
@@ -357,40 +354,6 @@ def test_e2e_miniscript_me_and_bob_or_me_and_carl_1(navigator: Navigator, firmwa
         ])
 
     run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1], rpc, rpc_test_wallet, speculos_globals,
-                 e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
-
-
-def test_e2e_miniscript_nanos_large_policy(navigator: Navigator, firmware: Firmware, client:
-                                           RaggerClient, test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
-    # Nano S has much tighter memory limits.
-    # The policy in this test requires 304 bytes after is parsed, which is larger than the previous 276.
-    # However, it is a kind of policy in the style of the Liana wallet, that it would be nice to support.
-
-    # reported by pythcoiner
-
-    if firmware.name != "nanos":
-        pytest.skip("Test only for Nano S")
-
-    core_wallet_name1, core_xpub_orig1 = create_new_wallet()
-    core_wallet_name2, core_xpub_orig2 = create_new_wallet()
-    core_wallet_name3, core_xpub_orig3 = create_new_wallet()
-
-    path = "44'/1'/0'"
-    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
-    internal_xpub_orig = f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"
-
-    wallet_policy = WalletPolicy(
-        name="Memory-intensive",
-        descriptor_template="wsh(or_d(multi(4,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*,@3/<0;1>/*),and_v(v:thresh(3,pkh(@0/<2;3>/*),a:pkh(@1/<2;3>/*),a:pkh(@2/<2;3>/*),a:pkh(@3/<2;3>/*)),older(65535))))",
-        keys_info=[
-            internal_xpub_orig,
-            f"{core_xpub_orig1}",
-            f"{core_xpub_orig2}",
-            f"{core_xpub_orig3}",
-        ])
-
-    run_test_e2e(navigator, client, wallet_policy, [core_wallet_name1, core_wallet_name2,
-                                                    core_wallet_name3], rpc, rpc_test_wallet, speculos_globals,
                  e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
 
 

@@ -87,8 +87,15 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
+    if (wallet_header.n_keys > MAX_N_KEYS_IN_WALLET_POLICY) {
+        PRINTF("At most %d key expressions are supported in a wallet policy.\n",
+               MAX_N_KEYS_IN_WALLET_POLICY);
+        SEND_SW(dc, SW_NOT_SUPPORTED);
+        return;
+    }
+
     if (count_distinct_keys_info(&policy_map.parsed) != (int) wallet_header.n_keys) {
-        PRINTF("Number of keys in descriptor template doesn't provided keys\n");
+        PRINTF("The number of keys in descriptor template doesn't match the provided keys\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
@@ -123,13 +130,11 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-    if (!ui_display_register_wallet(dc, &wallet_header, (char *) policy_map_descriptor)) {
-        SEND_SW(dc, SW_DENY);
-        ui_post_processing_confirm_wallet_registration(dc, false);
-        return;
-    }
-
     uint32_t master_key_fingerprint = crypto_get_master_key_fingerprint();
+
+    char keys_info[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1];
+    key_type_e keys_type[MAX_N_KEYS_IN_WALLET_POLICY];
+    memset(keys_type, 0, sizeof(keys_type));
 
     for (size_t cosigner_index = 0; cosigner_index < wallet_header.n_keys; cosigner_index++) {
         /**
@@ -137,30 +142,27 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
          * Asks the user to validate the pubkey info.
          */
 
-        uint8_t next_pubkey_info[MAX_POLICY_KEY_INFO_LEN + 1];
-        int pubkey_info_len = call_get_merkle_leaf_element(dc,
-                                                           wallet_header.keys_info_merkle_root,
-                                                           wallet_header.n_keys,
-                                                           cosigner_index,
-                                                           next_pubkey_info,
-                                                           MAX_POLICY_KEY_INFO_LEN);
+        int key_info_len = call_get_merkle_leaf_element(dc,
+                                                        wallet_header.keys_info_merkle_root,
+                                                        wallet_header.n_keys,
+                                                        cosigner_index,
+                                                        (uint8_t *) keys_info[cosigner_index],
+                                                        MAX_POLICY_KEY_INFO_LEN);
 
-        if (pubkey_info_len < 0) {
+        if (key_info_len < 0) {
             SEND_SW(dc, SW_INCORRECT_DATA);
-            ui_post_processing_confirm_wallet_registration(dc, false);
             return;
         }
 
-        next_pubkey_info[pubkey_info_len] = 0;
+        keys_info[cosigner_index][key_info_len] = 0;
 
         // Make a sub-buffer for the pubkey info
-        buffer_t key_info_buffer = buffer_create(next_pubkey_info, pubkey_info_len);
+        buffer_t key_info_buffer = buffer_create(keys_info[cosigner_index], key_info_len);
 
         policy_map_key_info_t key_info;
         if (parse_policy_map_key_info(&key_info_buffer, &key_info, wallet_header.version) == -1) {
             PRINTF("Incorrect policy map.\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
-            ui_post_processing_confirm_wallet_registration(dc, false);
             return;
         }
 
@@ -176,15 +178,13 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         // supported, but disabled for now (question to address: can only _some_ of the keys have a
         // wildcard?).
 
-        key_type_e key_type;
-
         if (memcmp(key_info.ext_pubkey.compressed_pubkey,
                    BIP0341_NUMS_PUBKEY,
                    sizeof(BIP0341_NUMS_PUBKEY)) == 0) {
             // this public key is known to be unspendable
-            key_type = PUBKEY_TYPE_UNSPENDABLE;
+            keys_type[cosigner_index] = PUBKEY_TYPE_UNSPENDABLE;
         } else {
-            key_type = PUBKEY_TYPE_EXTERNAL;
+            keys_type[cosigner_index] = PUBKEY_TYPE_EXTERNAL;
 
             // if there is key origin information and the fingerprint matches, we make sure it's not
             // a false positive (it could be wrong info, or a collision).
@@ -199,24 +199,14 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
                                                 &pubkey_derived);
                 if (serialized_pubkey_len == -1) {
                     SEND_SW(dc, SW_BAD_STATE);
-                    ui_post_processing_confirm_wallet_registration(dc, false);
                     return;
                 }
 
                 if (memcmp(&key_info.ext_pubkey, &pubkey_derived, sizeof(pubkey_derived)) == 0) {
-                    key_type = PUBKEY_TYPE_INTERNAL;
+                    keys_type[cosigner_index] = PUBKEY_TYPE_INTERNAL;
                     ++n_internal_keys;
                 }
             }
-        }
-
-        if (!ui_display_policy_map_cosigner_pubkey(dc,
-                                                   (char *) next_pubkey_info,
-                                                   cosigner_index,  // 1-indexed for the UI
-                                                   wallet_header.n_keys,
-                                                   key_type)) {
-            SEND_SW(dc, SW_DENY);
-            return;
         }
     }
 
@@ -225,15 +215,42 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         // We disallow that, might reconsider in future versions if needed.
         PRINTF("Wallet policy with no internal keys\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
-        ui_post_processing_confirm_wallet_registration(dc, false);
         return;
     } else if (n_internal_keys != 1 && wallet_header.version == WALLET_POLICY_VERSION_V1) {
         // for legacy policies, we keep the restriction to exactly 1 internal key
         PRINTF("V1 policies must have exactly 1 internal key\n");
         SEND_SW(dc, SW_INCORRECT_DATA);
-        ui_post_processing_confirm_wallet_registration(dc, false);
         return;
     }
+
+#ifdef HAVE_BAGL
+    // show wallet header
+    if (!ui_display_register_wallet(dc, &wallet_header, (char *) policy_map_descriptor)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+    // show each cosigner
+    for (size_t cosigner_index = 0; cosigner_index < wallet_header.n_keys; cosigner_index++) {
+        if (!ui_display_policy_map_cosigner_pubkey(dc,
+                                                   keys_info[cosigner_index],
+                                                   cosigner_index,  // 1-indexed for the UI
+                                                   wallet_header.n_keys,
+                                                   keys_type[cosigner_index])) {
+            SEND_SW(dc, SW_DENY);
+            return;
+        }
+    }
+#else
+    // show wallet policy
+    if (!ui_display_register_wallet_policy(dc,
+                                           &wallet_header,
+                                           (char *) policy_map_descriptor,
+                                           &keys_info,
+                                           &keys_type)) {
+        SEND_SW(dc, SW_DENY);
+        return;
+    }
+#endif
 
     struct {
         uint8_t wallet_id[32];
@@ -254,7 +271,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
     compute_wallet_hmac(wallet_id, response.hmac);
 
     SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
-    ui_post_processing_confirm_wallet_registration(dc, true);
 }
 
 static bool is_policy_acceptable(const policy_node_t *policy) {

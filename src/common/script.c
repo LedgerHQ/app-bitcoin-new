@@ -189,8 +189,8 @@ int format_opscript_script(const uint8_t script[],
         }
 
         if (hex_length == 1) {
-            if (script[offset] == 0x81 || script[offset] <= 16) {
-                // non-standard, it should use OP_1NEGATE, or one of OP_0, ..., OP_16
+            if (script[offset] == 0x81 || (1 <= script[offset] && script[offset] <= 16)) {
+                // non-standard, it should use OP_1NEGATE, or one of OP_1, ..., OP_16
                 return -1;
             }
         }
@@ -219,3 +219,24 @@ int format_opscript_script(const uint8_t script[],
     out[out_ctr - 1] = '\0';
     return out_ctr;
 }
+
+#ifndef SKIP_FOR_CMOCKA
+
+bool format_script(const uint8_t script[],
+                   size_t script_len,
+                   char out[static MAX_OUTPUT_SCRIPT_DESC_SIZE]) {
+    int address_len = get_script_address(script, script_len, out, MAX_OUTPUT_SCRIPT_DESC_SIZE);
+    if (address_len < 0) {
+        // script does not have an address; check if OP_RETURN
+        if (is_opreturn(script, script_len)) {
+            if (0 > format_opscript_script(script, script_len, out)) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+#endif

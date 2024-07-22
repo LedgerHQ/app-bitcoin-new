@@ -24,7 +24,7 @@ Build the app as normal from the root folder. For convenience, you probably want
 DEBUG=1 make
 ```
 
-Then run all the tests from this folder, specifying the device: nanos, nanox, nanosp, stax, or all:
+Then run all the tests from this folder, specifying the device: nanox, nanosp, stax, flex, or all:
 
 ```
 pytest --device yourdevice

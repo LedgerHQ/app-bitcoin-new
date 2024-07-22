@@ -168,15 +168,6 @@ UX_STEP_NOCB(ux_validate_address_step,
              });
 
 // Step with eye icon and a "high fees" warning
-#ifdef TARGET_NANOS
-UX_STEP_NOCB(ux_high_fee_step,
-             pnn,
-             {
-                 &C_icon_eye,
-                 "Fees over 10%",
-                 "of total value!",
-             });
-#else
 UX_STEP_NOCB(ux_high_fee_step,
              pnn,
              {
@@ -184,7 +175,6 @@ UX_STEP_NOCB(ux_high_fee_step,
                  "Fees are above 10%",
                  "of total amount!",
              });
-#endif
 
 UX_STEP_NOCB(ux_confirm_selftransfer_step, pnn, {&C_icon_eye, "Confirm", "self-transfer"});
 UX_STEP_NOCB(ux_confirm_transaction_fees_step,
@@ -198,12 +188,12 @@ UX_STEP_CB(ux_sign_transaction_step,
            set_ux_flow_response(true),
            {&C_icon_validate_14, "Sign", "transaction"});
 
-// Step with wallet icon and "Register wallet"
+// Step with wallet icon and "Register account"
 UX_STEP_NOCB(ux_display_register_wallet_step,
              pb,
              {
                  &C_icon_wallet,
-                 "Register wallet",
+                 "Register account",
              });
 
 // Step with wallet icon and "Receive in known wallet"
@@ -212,7 +202,7 @@ UX_STEP_NOCB(ux_display_receive_in_registered_wallet_step,
              {
                  &C_icon_wallet,
                  "Receive in",
-                 "known wallet",
+                 "known account",
              });
 
 // Step with wallet icon and "Spend from known wallet"
@@ -221,14 +211,14 @@ UX_STEP_NOCB(ux_display_spend_from_registered_wallet_step,
              {
                  &C_icon_wallet,
                  "Spend from",
-                 "known wallet",
+                 "known account",
              });
 
 // Step with "Wallet name:", followed by the wallet name
 UX_STEP_NOCB(ux_display_wallet_name_step,
              bnnn_paging,
              {
-                 .title = "Wallet name:",
+                 .title = "Account name:",
                  .text = g_ui_state.wallet.wallet_name,
              });
 
@@ -332,8 +322,8 @@ UX_FLOW(ux_display_pubkey_suspicious_flow,
         &ux_display_reject_step);
 
 // FLOW to display the header of a policy map wallet:
-// #1 screen: Wallet icon + "Register wallet"
-// #2 screen: "Wallet name:" and wallet name
+// #1 screen: Wallet icon + "Register account"
+// #2 screen: "Account name:" and wallet policy name
 // #3 screen: display policy map (paginated)
 // #4 screen: approve button
 // #5 screen: reject button
@@ -475,8 +465,7 @@ void ui_sign_message_path_hash_and_confirm_flow(void) {
     ux_flow_init(0, ux_sign_message_path_hash_and_confirm_flow, NULL);
 }
 
-void ui_sign_message_content_flow(uint8_t pageCount) {
-    (void) pageCount;
+void ui_sign_message_content_flow(void) {
     if (get_streaming_index() == 0) {
         ux_flow_init(0, ux_sign_message_path_and_content_flow, NULL);
     } else {

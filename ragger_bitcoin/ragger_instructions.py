@@ -38,52 +38,74 @@ class Instructions:
         self.new_request(text, NavInsID.RIGHT_CLICK, NavInsID.RIGHT_CLICK,
                          save_screenshot=save_screenshot)
 
-    def navigate_end_of_flow(self, save_screenshot=True):
-        self.new_request("Processing", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+    def review_start(self, output_count: int = 1, save_screenshot=True, has_warning=False):
+        self.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                        save_screenshot=save_screenshot)
+
+        if has_warning:
+            self.same_request("Warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
+                            save_screenshot=save_screenshot)
+
+        for output_index in range(0, output_count):
+            # the initial 2 outputs are cached; that depends on the N_CACHED_EXTERNAL_OUTPUTS constant
+            if output_index < 2:
+                self.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                            save_screenshot=save_screenshot)
+            else:
+                self.new_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                            save_screenshot=save_screenshot)
+    def review_fees(self, fees_on_same_request: bool = True, save_screenshot=True):
+        if fees_on_same_request:
+            self.same_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                         save_screenshot=save_screenshot)
+        else:
+            self.new_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                          save_screenshot=save_screenshot)
 
     def confirm_transaction(self, save_screenshot=True):
-        self.new_request("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_CONFIRM,
-                         save_screenshot=save_screenshot)
-        self.new_request("TRANSACTION", NavInsID.USE_CASE_REVIEW_TAP,
-                         NavInsID.USE_CASE_STATUS_DISMISS,
-                         save_screenshot=save_screenshot)
-
-    def same_request_confirm_transaction(self, save_screenshot=True):
         self.same_request("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_CONFIRM,
                           save_screenshot=save_screenshot)
-        self.new_request("TRANSACTION", NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Transaction", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_STATUS_DISMISS,
                          save_screenshot=save_screenshot)
 
+    def review_message(self, page_count=1, save_screenshot=True):
+        self.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+        self.same_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+        for _ in range(1, page_count):
+            self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+
     def confirm_message(self, save_screenshot=True):
-        self.new_request("Sign", NavInsID.USE_CASE_REVIEW_TAP,
+        self.same_request("Sign", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_REVIEW_CONFIRM, save_screenshot=save_screenshot)
-        self.new_request("MESSAGE", NavInsID.USE_CASE_REVIEW_TAP,
+        self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_STATUS_DISMISS,  save_screenshot=save_screenshot)
 
     def confirm_wallet(self, save_screenshot=True):
-        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_CONFIRM,
+        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
                          save_screenshot=save_screenshot)
-        self.same_request("WALLET", NavInsID.USE_CASE_REVIEW_TAP,
+        self.same_request("Wallet", NavInsID.USE_CASE_REVIEW_TAP,
                           NavInsID.USE_CASE_STATUS_DISMISS, save_screenshot=save_screenshot)
 
     def reject_message(self, save_screenshot=True):
-        self.new_request("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_REJECT,
+        self.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+        self.same_request("Message", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_REJECT,
                          save_screenshot=save_screenshot)
         self.same_request("Reject", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
                           save_screenshot=save_screenshot)
-        self.new_request("MESSAGE", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_STATUS_DISMISS,
-                         save_screenshot=save_screenshot)
-
-    def warning_accept(self, save_screenshot=True):
-        self.new_request("Warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
+        self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_STATUS_DISMISS,
                          save_screenshot=save_screenshot)
 
     def address_confirm(self, save_screenshot=True):
         self.new_request("Confirm", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_ADDRESS_CONFIRMATION_CONFIRM,
                          save_screenshot=save_screenshot)
+        self.same_request("Address verified", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,
+                save_screenshot=save_screenshot)
 
     def choice_confirm(self, save_screenshot=True):
         self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
@@ -94,5 +116,15 @@ class Instructions:
                          save_screenshot=save_screenshot)
 
     def footer_cancel(self, save_screenshot=True):
-        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,
+        self.new_request("Confirm", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,
+                         save_screenshot=save_screenshot)
+        self.new_request("rejected", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_STATUS_DISMISS,
+                         save_screenshot=save_screenshot)
+
+    def status_dismiss(self, text, status_on_same_request=True, save_screenshot=True):
+        if status_on_same_request:
+            self.same_request(text, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,
+                         save_screenshot=save_screenshot)
+        else:
+            self.new_request(text, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_STATUS_DISMISS,
                          save_screenshot=save_screenshot)

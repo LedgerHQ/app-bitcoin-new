@@ -21,7 +21,7 @@
 #ifndef OS_H
 #define OS_H
 
-#define TARGET_NANOS
+#define TARGET_NANOSP
 #define USB_SEGMENT_SIZE 64
 
 // #include "os_hal.h"

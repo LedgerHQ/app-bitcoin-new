@@ -55,6 +55,11 @@ void io_clear_processing_timeout();
 void io_reset_timeouts();
 
 /**
+ * Shows the "Processing..." screen.
+ */
+void io_show_processing_screen();
+
+/**
  * TODO: docs
  */
 void io_reset_response();

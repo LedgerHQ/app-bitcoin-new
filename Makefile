@@ -47,13 +47,20 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 2
-APPVERSION_P = 3
+APPVERSION_P = 4
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 else
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-$(strip $(APPVERSION_SUFFIX))"
+endif
+
+# If set, the app will automatically approve all requests without user interaction. Useful for performance tests.
+# It is critical that no such app is ever deployed in production.
+AUTOAPPROVE_FOR_PERF_TESTS ?= 0
+ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+    DEFINES += HAVE_AUTOAPPROVE_FOR_PERF_TESTS
 endif
 
 # Setting to allow building variant applications
@@ -74,41 +81,50 @@ HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
 HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ifeq ($(COIN),bitcoin_testnet)
+    # Bitcoin testnet, no legacy support
+    DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
+    DEFINES   += BIP44_COIN_TYPE=1
+    DEFINES   += COIN_P2PKH_VERSION=111
+    DEFINES   += COIN_P2SH_VERSION=196
+    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
+    DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-# Bitcoin testnet, no legacy support
-DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
-DEFINES   += BIP44_COIN_TYPE=1
-DEFINES   += COIN_P2PKH_VERSION=111
-DEFINES   += COIN_P2SH_VERSION=196
-DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
-DEFINES   += COIN_COINID_SHORT=\"TEST\"
-
-APPNAME = "Bitcoin Test"
-
+    APPNAME = "Bitcoin Test"
 else ifeq ($(COIN),bitcoin)
+    # the version for performance tests automatically approves all requests
+    # there is no reason to ever compile the mainnet app with this flag
+    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+        $(error Use testnet app for performance tests)
+    endif
 
-# Bitcoin mainnet, no legacy support
-DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
-DEFINES   += BIP44_COIN_TYPE=0
-DEFINES   += COIN_P2PKH_VERSION=0
-DEFINES   += COIN_P2SH_VERSION=5
-DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
-DEFINES   += COIN_COINID_SHORT=\"BTC\"
+    # Bitcoin mainnet, no legacy support
+    DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
+    DEFINES   += BIP44_COIN_TYPE=0
+    DEFINES   += COIN_P2PKH_VERSION=0
+    DEFINES   += COIN_P2SH_VERSION=5
+    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
+    DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-APPNAME = "Bitcoin"
+    APPNAME = "Bitcoin"
 
 else
-ifeq ($(filter clean,$(MAKECMDGOALS)),)
-$(error Unsupported COIN - use bitcoin_testnet, bitcoin)
+    ifeq ($(filter clean,$(MAKECMDGOALS)),)
+        $(error Unsupported COIN - use bitcoin_testnet, bitcoin)
+    endif
 endif
+
+ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
+  ifeq ($(TARGET_NAME),TARGET_NANOS)
+    $(error This branch is not compatible with the Nano S device. Checkout the 'nanos' branch for the latest code for Nano S.)
+  endif
 endif
 
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOS = icons/nanos_app_bitcoin.gif
 ICON_NANOX = icons/nanox_app_bitcoin.gif
 ICON_NANOSP = icons/nanox_app_bitcoin.gif
 ICON_STAX = icons/stax_app_bitcoin.gif
+ICON_FLEX = icons/flex_app_bitcoin.gif
 
 ########################################
 # Application communication interfaces #
@@ -133,19 +149,7 @@ DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=72
-DEFINES       += HAVE_WALLET_ID_SDK
-else
-DEFINES       += IO_SEPROXYHAL_BUFFER_SIZE_B=300
-endif
-
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-    # enables optimizations using the shared 1K CXRAM region
-    DEFINES   += USE_CXRAM_SECTION
-    # enables usage of the NVRAM to free up some RAM
-    DEFINES   += USE_NVRAM_STASH
-endif
+DEFINES   += IO_SEPROXYHAL_BUFFER_SIZE_B=300
 
 # debugging helper functions and macros
 CFLAGS    += -include debug-helpers/debug.h

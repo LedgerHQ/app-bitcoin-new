@@ -242,8 +242,13 @@ static void test_format_opscript_script_valid(void **state) {
     CHECK_VALID_TESTCASE(input24,
                          "OP_RETURN 8 -1 0x0102030405060708090a0b0c0d0e0f 0 0x11223344556677");
 
-    uint8_t input_25[] = {OP_RETURN};
-    CHECK_VALID_TESTCASE(input_25, "OP_RETURN");
+    // because the number 0 is encoded as OP_0, the minimal push for the byte sequence 0x00 is
+    // done with OP_PUSHDATA1 (unlike pushes for 0x01 to 0x10 that would use OP_1 to OP_16)
+    uint8_t input25[] = {OP_RETURN, OP_13, 1, 0x00};
+    CHECK_VALID_TESTCASE(input25, "OP_RETURN 13 0x00");
+
+    uint8_t input_26[] = {OP_RETURN};
+    CHECK_VALID_TESTCASE(input_26, "OP_RETURN");
 }
 
 static void test_format_opscript_script_invalid(void **state) {
@@ -298,7 +303,7 @@ static void test_format_opscript_script_invalid(void **state) {
     CHECK_INVALID_TESTCASE(input_negative1_notminimal_1);
     uint8_t input_negative1_notminimal_2[] = {OP_RETURN, OP_PUSHDATA1, 1, 0x81};
     CHECK_INVALID_TESTCASE(input_negative1_notminimal_2);
-    for (uint8_t i = 0; i <= 16; i++) {
+    for (uint8_t i = 1; i <= 16; i++) {
         uint8_t input_negative1_notminimal_push_1[] = {OP_RETURN, 1, i};
         CHECK_INVALID_TESTCASE(input_negative1_notminimal_push_1);
         uint8_t input_negative1_notminimal_push_2[] = {OP_RETURN, OP_PUSHDATA1, 1, i};

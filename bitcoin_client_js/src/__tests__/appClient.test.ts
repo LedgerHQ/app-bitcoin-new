@@ -102,8 +102,6 @@ describe("test AppClient", () => {
   beforeEach(async () => {
     sp = spawn(speculos_path, [
       repoRootPath + "/bin/app.elf",
-      '-k', '2.1',
-      '--model', 'nanos',
       '--display', 'headless'
     ]);
     

@@ -52,7 +52,7 @@ def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
     parser.addoption("--enableslowtests", action="store_true")
-    parser.addoption("--model", action="store", default="nanos")
+    parser.addoption("--model", action="store", default="nanosp")
 
 
 @pytest.fixture(scope="module")

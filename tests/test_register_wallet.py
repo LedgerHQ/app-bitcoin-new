@@ -94,6 +94,9 @@ def test_register_wallet_with_long_name(navigator: Navigator, firmware: Firmware
 
 def test_register_wallet_reject_header(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
+    if not firmware.name.startswith("nano"):
+        pytest.skip()
+
     wallet = MultisigWallet(
         name="Cold storage",
         address_type=AddressType.WIT,
@@ -200,8 +203,7 @@ def test_register_wallet_unsupported_policy(navigator: Navigator, firmware: Firm
 
 def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str, speculos_globals):
-    # This test makes sure that policies longer than 256 bytes work as expected on all devices,
-    # except on Nano S that has 196 bytes as a technical limitation.
+    # This test makes sure that policies longer than 256 bytes work as expected on all devices
     wallet = WalletPolicy(
         name="Long policy",
         descriptor_template=f"wsh(and_v(and_v(v:pk(@0/**),or_c(pk(@1/**),or_c(pk(@2/**),v:older(1000)))),and_v(v:hash256(0563fb3e85cbc61b134941ad6610a2b0dfd77543dfb77a5433ff3cb538213807),and_v(v:hash256(ad3391a00bad00a6a03f907b3fcc2f369a88be038c63c7db7f43b01e097efbbe),hash256(137dfa9b54a538200c94e3c9dd1a59b431e3b89aef8093fc910df48a98cb06d9)))))",
@@ -211,25 +213,18 @@ def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmwar
             "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
         ])
 
-    if (firmware.name == "nanos"):
-        with pytest.raises(ExceptionRAPDU) as e:
-            client.register_wallet(wallet)
+    wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
+                                                    instructions=register_wallet_instruction_approve_long(
+                                                        firmware),
+                                                    testname=test_name)
 
-        assert DeviceException.exc.get(e.value.status) == IncorrectDataError
-        assert len(e.value.data) == 0
-    else:
-        wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
-                                                        instructions=register_wallet_instruction_approve_long(
-                                                            firmware),
-                                                        testname=test_name)
+    assert wallet_id == wallet.id
 
-        assert wallet_id == wallet.id
-
-        assert hmac.compare_digest(
-            hmac.new(speculos_globals.wallet_registration_key,
-                     wallet_id, sha256).digest(),
-            wallet_hmac,
-        )
+    assert hmac.compare_digest(
+        hmac.new(speculos_globals.wallet_registration_key,
+                    wallet_id, sha256).digest(),
+        wallet_hmac,
+    )
 
 
 def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmware, client:

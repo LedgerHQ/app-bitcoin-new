@@ -1,5 +1,9 @@
 #pragma once
 
+#include "os.h"
+
+#include "../constants.h"
+
 /** Script opcodes */
 // from bitcoin-core
 enum opcodetype {
@@ -233,3 +237,22 @@ int get_script_address(const uint8_t script[], size_t script_len, char *out, siz
 int format_opscript_script(const uint8_t script[],
                            size_t script_len,
                            char out[static MAX_OPRETURN_OUTPUT_DESC_SIZE]);
+
+// the maximum length of the description of an output that we can display (address or OP_RETURN),
+// including the terminating null character
+#define MAX_OUTPUT_SCRIPT_DESC_SIZE MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)
+
+/**
+ * Formats a bitcoin Script in the format that is displayed to the user. Only scripts with an
+ * address are supported, or OP_RETURN scripts as documented in format_opscript_script.
+ *
+ * The string is written onto `out` and is 0-terminated.
+ *
+ * @param[in] script the script to parse and format.
+ * @param[in] script_len the length of the script.
+ * @param[out] out the output array, that must be at least MAX_OPRETURN_OUTPUT_DESC_SIZE bytes long.
+ * @return `true` the script is a supported one that can be shown to the user, `false` otherwise.
+ */
+bool format_script(const uint8_t script[],
+                   size_t script_len,
+                   char out[static MAX_OUTPUT_SCRIPT_DESC_SIZE]);
