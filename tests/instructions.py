@@ -4,14 +4,14 @@ from ragger.firmware import Firmware
 from ragger_bitcoin.ragger_instructions import Instructions
 
 
-def message_instruction_approve(model: Firmware) -> Instructions:
+def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.nano_skip_screen("Path")
-        instructions.same_request("Sign")
+        instructions.nano_skip_screen("Path", save_screenshot=save_screenshot)
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
     else:
-        instructions.confirm_message()
+        instructions.confirm_message(save_screenshot=save_screenshot)
     return instructions
 
 
