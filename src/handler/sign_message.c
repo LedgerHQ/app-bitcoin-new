@@ -56,7 +56,13 @@ static bool display_message_content_and_confirm(dispatcher_context_t* dc,
 
         total_chunk_len += offset;
 
-        for (int j = 0; j < MESSAGE_CHUNK_PER_DISPLAY; j++) {
+        // each UX display will show MESSAGE_CHUNK_PER_DISPLAY chunks
+        size_t group_start_index = get_streaming_index() * MESSAGE_CHUNK_PER_DISPLAY;
+
+        for (int j = 0;
+             j < MESSAGE_CHUNK_PER_DISPLAY &&
+             (group_start_index + j) < (unsigned int) n_chunks;  // make sure not to overflow
+             j++) {
             offset += j * MESSAGE_CHUNK_SIZE;
 
             int chunk_len =
