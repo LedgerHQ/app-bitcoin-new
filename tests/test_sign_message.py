@@ -19,6 +19,15 @@ def test_sign_message(navigator: Navigator, firmware: Firmware, client: RaggerCl
     assert result == "IOR4YRVlmJGMx+H7PgQvHzWAF0HAgrUggQeRdnoWKpypfaAberpvF+XbOCM5Cd/ljogNyU3w2OIL8eYCyZ6Ru2k="
 
 
+def test_sign_message_64bytes(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Version 2.2.2 introduced a bug where signing a 64 bytes message would fail; this test is to avoid regressions
+    msg = "a" * 64
+    path = "m/44'/1'/0'/0/0"
+    client.sign_message(msg, path, navigator,
+                        instructions=message_instruction_approve(firmware, save_screenshot=False),
+                        testname=test_name)
+
+
 def test_sign_message_accept(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     message = "Hello world!"
 
