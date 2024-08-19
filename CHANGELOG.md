@@ -9,6 +9,10 @@ Dates are in `dd-mm-yyyy` format.
 
 ## [2.2.5] - TBD
 
+### Added
+
+- Support for crosschain swap protocol.
+
 ### Fixed
 
 - `signMessage` would fail since version 2.2.2 for certain message lengths.
