@@ -3,11 +3,13 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
 #include "../../common/wallet.h"
+#include "../../handler/sign_psbt/sign_psbt_cache.h"
 
 /**
  * TODO
  */
 int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
+                                  sign_psbt_cache_t *sign_psbt_cache,
                                   uint32_t change,
                                   uint32_t address_index,
                                   const policy_node_t *policy,

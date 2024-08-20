@@ -469,10 +469,16 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
 
     // we derive the /<change>/<address_index> child of this pubkey
     // we reuse the same memory of ext_pubkey
-    bip32_CKDpub(&ext_pubkey,
-                 wdi->change ? key_placeholder->num_second : key_placeholder->num_first,
-                 &ext_pubkey);
-    bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey);
+    if (0 > derive_first_step_for_pubkey(&ext_pubkey,
+                                         key_placeholder,
+                                         wdi->sign_psbt_cache,
+                                         wdi->change,
+                                         &ext_pubkey)) {
+        return -1;
+    }
+    if (0 > bip32_CKDpub(&ext_pubkey, wdi->address_index, &ext_pubkey)) {
+        return -1;
+    }
 
     memcpy(out, ext_pubkey.compressed_pubkey, 33);
 

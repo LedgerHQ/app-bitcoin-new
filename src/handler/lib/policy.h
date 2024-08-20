@@ -2,6 +2,7 @@
 
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/wallet.h"
+#include "../../handler/sign_psbt/sign_psbt_cache.h"
 
 /**
  * Parses a serialized wallet policy, saving the wallet header, the policy map descriptor and the
@@ -48,6 +49,8 @@ typedef struct {
     uint32_t n_keys;        // The number of key information placeholders in the policy
     size_t address_index;   // The address index to use in the derivation
     bool change;            // whether a change address or a receive address is derived
+    sign_psbt_cache_t
+        *sign_psbt_cache;  // If not NULL, the cache for key derivations used during signing
 } wallet_derivation_info_t;
 
 /**
