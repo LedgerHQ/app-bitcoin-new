@@ -78,6 +78,28 @@ static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a'
 static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
 static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
+// Copy of cx_ecfp_scalar_mult_no_throw, but without using randomization for the scalar
+// multiplication. Therefore, it is faster, but not safe to use on private data, as it is vulnerable
+// to timing attacks.
+cx_err_t cx_ecfp_scalar_mult_unsafe(cx_curve_t curve, uint8_t *P, const uint8_t *k, size_t k_len) {
+    size_t size;
+    cx_ecpoint_t ecP;
+    cx_err_t error;
+
+    CX_CHECK(cx_ecdomain_parameters_length(curve, &size));
+    CX_CHECK(cx_bn_lock(size, 0));
+
+    CX_CHECK(cx_ecpoint_alloc(&ecP, curve));
+    CX_CHECK(cx_ecpoint_init(&ecP, P + 1, size, P + 1 + size, size));
+    CX_CHECK(cx_ecpoint_scalarmul(&ecP, k, k_len));
+    P[0] = 0x04;
+    CX_CHECK(cx_ecpoint_export(&ecP, &P[1], size, &P[1 + size], size));
+
+end:
+    cx_bn_unlock();
+    return error;
+}
+
 /**
  * Gets the point on the SECP256K1 that corresponds to kG, where G is the curve's generator point.
  * Returns -1 if point is Infinity or any error occurs; 0 otherwise.
@@ -85,6 +107,16 @@ static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'}
 static int secp256k1_point(const uint8_t k[static 32], uint8_t out[static 65]) {
     memcpy(out, secp256k1_generator, 65);
     if (CX_OK != cx_ecfp_scalar_mult_no_throw(CX_CURVE_SECP256K1, out, k, 32)) return -1;
+    return 0;
+}
+
+/**
+ * Equivalent to secp256k1_point, but it does not use randomization; it is faster, but only to be
+ * used with public data, as it is vulnerable to timing attacks.
+ */
+static int secp256k1_point_unsafe(const uint8_t k[static 32], uint8_t out[static 65]) {
+    memcpy(out, secp256k1_generator, 65);
+    if (CX_OK != cx_ecfp_scalar_mult_unsafe(CX_CURVE_SECP256K1, out, k, 32)) return -1;
     return 0;
 }
 
@@ -126,7 +158,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     {  // make sure that heavy memory allocations are freed as soon as possible
         // compute point(I_L)
         uint8_t P[65];
-        if (0 > secp256k1_point(I_L, P)) return -1;
+        if (0 > secp256k1_point_unsafe(I_L, P)) return -1;
 
         uint8_t K_par[65];
         crypto_get_uncompressed_pubkey(parent->compressed_pubkey, K_par);
@@ -543,7 +575,7 @@ int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
         return -1;
     }
 
-    if (0 > secp256k1_point(t, Q)) {
+    if (0 > secp256k1_point_unsafe(t, Q)) {
         // point at infinity, or error
         return -1;
     }
