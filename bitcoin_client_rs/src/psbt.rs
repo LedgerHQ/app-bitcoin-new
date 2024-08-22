@@ -8,7 +8,7 @@ use bitcoin::{
     consensus::encode::{deserialize, serialize, VarInt},
     ecdsa,
     hashes::Hash,
-    key::Error as KeyError,
+    key::FromSliceError as KeyError,
     psbt::{raw, Input, Output, Psbt},
     secp256k1::{self, XOnlyPublicKey},
     taproot,
