@@ -86,7 +86,7 @@ impl<T: Transport> BitcoinClient<T> {
                 BitcoinClientError::ClientError("Failed to derive descriptor".to_string())
             })?
             .script_pubkey()
-            != expected_address.payload().script_pubkey()
+            != expected_address.assume_checked_ref().script_pubkey()
         {
             return Err(BitcoinClientError::InvalidResponse("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new".to_string()));
         }

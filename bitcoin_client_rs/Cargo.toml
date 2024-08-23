@@ -1,6 +1,6 @@
 [package]
 name = "ledger_bitcoin_client"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Edouard Paris <m@edouard.paris>"]
 edition = "2018"
 description = "Ledger Bitcoin application client"
@@ -21,8 +21,8 @@ paranoid_client = ["miniscript"]
 
 [dependencies]
 async-trait = { version = "0.1", optional = true }
-bitcoin = { version = "0.31", default-features = false, features = ["no-std"] }
-miniscript = { version = "11.0", optional = true, default-features = false, features = ["no-std"] }
+bitcoin = { version = "0.32", default-features = false }
+miniscript = { version = "12.2", optional = true, default-features = false, features = ["no-std"] }
 
 [workspace]
 members = ["examples/ledger_hwi"]
