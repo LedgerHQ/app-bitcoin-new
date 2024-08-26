@@ -158,6 +158,8 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
     {  // make sure that heavy memory allocations are freed as soon as possible
         // compute point(I_L)
         uint8_t P[65];
+        // as the arguments of bip32_CKDpub are public keys, we do not need to use math functions
+        // hardened against side channels attacks, which are slower
         if (0 > secp256k1_point_unsafe(I_L, P)) return -1;
 
         uint8_t K_par[65];
@@ -575,6 +577,8 @@ int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
         return -1;
     }
 
+    // as the arguments of bip32_CKDpub are public keys, we do not need to use math functions
+    // hardened against side channels attacks, which are slower
     if (0 > secp256k1_point_unsafe(t, Q)) {
         // point at infinity, or error
         return -1;
