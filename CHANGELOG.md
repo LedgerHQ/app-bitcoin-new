@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.2.5] - TBD
+## [2.3.0] - 26-08-2024
 
 ### Added
 
 - Support for crosschain swap protocol.
+
+### Changed
+
+- Improvements in signing performance, especially for large transactions.
 
 ### Fixed
 
