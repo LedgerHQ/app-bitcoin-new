@@ -48,6 +48,7 @@
 
 #include "handlers.h"
 
+#include "sign_psbt/sign_psbt_cache.h"
 #include "sign_psbt/compare_wallet_script_at_path.h"
 #include "sign_psbt/extract_bip32_derivation.h"
 #include "sign_psbt/update_hashes_with_map_value.h"
@@ -373,6 +374,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     placeholder_info_t *placeholder_info,
     in_out_info_t *in_out,
+    sign_psbt_cache_t *sign_psbt_cache,
     int psbt_key_type,
     buffer_t *data,
     const merkleized_map_commitment_t *map_commitment,
@@ -424,27 +426,32 @@ static int read_change_and_index_from_psbt_bip32_derivation(
             }
         }
 
-        uint32_t change = fpt_der[1 + der_len - 2];
+        uint32_t change_step = fpt_der[1 + der_len - 2];
         uint32_t addr_index = fpt_der[1 + der_len - 1];
+
+        // check if the 'change' derivation step is indeed coherent with placeholder
+        if (change_step == placeholder_info->placeholder.num_first) {
+            in_out->is_change = false;
+            in_out->address_index = addr_index;
+        } else if (change_step == placeholder_info->placeholder.num_second) {
+            in_out->is_change = true;
+            in_out->address_index = addr_index;
+        } else {
+            return 0;
+        }
 
         // check that we can indeed derive the same key from the current placeholder
         serialized_extended_pubkey_t pubkey;
-        if (0 > bip32_CKDpub(&placeholder_info->pubkey, change, &pubkey)) return -1;
+        if (0 > derive_first_step_for_pubkey(&placeholder_info->pubkey,
+                                             &placeholder_info->placeholder,
+                                             sign_psbt_cache,
+                                             in_out->is_change,
+                                             &pubkey))
+            return -1;
         if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey)) return -1;
 
         int pk_offset = is_tap ? 1 : 0;
         if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0) {
-            return 0;
-        }
-
-        // check if the 'change' derivation step is indeed coherent with placeholder
-        if (change == placeholder_info->placeholder.num_first) {
-            in_out->is_change = false;
-            in_out->address_index = addr_index;
-        } else if (change == placeholder_info->placeholder.num_second) {
-            in_out->is_change = true;
-            in_out->address_index = addr_index;
-        } else {
             return 0;
         }
 
@@ -463,6 +470,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
  */
 static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
                               const sign_psbt_state_t *state,
+                              sign_psbt_cache_t *sign_psbt_cache,
                               const in_out_info_t *in_out_info,
                               bool is_input) {
     // If we did not find any info about the pubkey associated to the placeholder we're considering,
@@ -477,6 +485,7 @@ static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
     }
 
     return compare_wallet_script_at_path(dispatcher_context,
+                                         sign_psbt_cache,
                                          in_out_info->is_change,
                                          in_out_info->address_index,
                                          state->wallet_policy_map,
@@ -751,6 +760,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
 typedef struct {
     placeholder_info_t *placeholder_info;
     input_info_t *input;
+    sign_psbt_cache_t *sign_psbt_cache;
 } input_keys_callback_data_t;
 
 /**
@@ -781,6 +791,7 @@ static void input_keys_callback(dispatcher_context_t *dc,
                 read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                  callback_data->placeholder_info,
                                                                  &callback_data->input->in_out,
+                                                                 callback_data->sign_psbt_cache,
                                                                  key_type,
                                                                  data,
                                                                  map_commitment,
@@ -794,6 +805,7 @@ static void input_keys_callback(dispatcher_context_t *dc,
 static bool __attribute__((noinline))
 preprocess_inputs(dispatcher_context_t *dc,
                   sign_psbt_state_t *st,
+                  sign_psbt_cache_t *sign_psbt_cache,
                   uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -810,7 +822,8 @@ preprocess_inputs(dispatcher_context_t *dc,
         memset(&input, 0, sizeof(input));
 
         input_keys_callback_data_t callback_data = {.input = &input,
-                                                    .placeholder_info = &placeholder_info};
+                                                    .placeholder_info = &placeholder_info,
+                                                    .sign_psbt_cache = sign_psbt_cache};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
@@ -908,7 +921,7 @@ preprocess_inputs(dispatcher_context_t *dc,
 
         // check if the input is internal; if not, continue
 
-        int is_internal = is_in_out_internal(dc, st, &input.in_out, true);
+        int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
         if (is_internal < 0) {
             PRINTF("Error checking if input %d is internal\n", cur_input_index);
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -1007,6 +1020,7 @@ preprocess_inputs(dispatcher_context_t *dc,
 typedef struct {
     placeholder_info_t *placeholder_info;
     output_info_t *output;
+    sign_psbt_cache_t *sign_psbt_cache;
 } output_keys_callback_data_t;
 
 /**
@@ -1029,6 +1043,7 @@ static void output_keys_callback(dispatcher_context_t *dc,
                 read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                  callback_data->placeholder_info,
                                                                  &callback_data->output->in_out,
+                                                                 callback_data->sign_psbt_cache,
                                                                  key_type,
                                                                  data,
                                                                  map_commitment,
@@ -1042,6 +1057,7 @@ static void output_keys_callback(dispatcher_context_t *dc,
 static bool __attribute__((noinline))
 preprocess_outputs(dispatcher_context_t *dc,
                    sign_psbt_state_t *st,
+                   sign_psbt_cache_t *sign_psbt_cache,
                    uint8_t internal_outputs[static BITVECTOR_REAL_SIZE(MAX_N_OUTPUTS_CAN_SIGN)]) {
     /** OUTPUTS VERIFICATION FLOW
      *
@@ -1067,7 +1083,8 @@ preprocess_outputs(dispatcher_context_t *dc,
         memset(&output, 0, sizeof(output));
 
         output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .placeholder_info = &placeholder_info};
+                                                     .placeholder_info = &placeholder_info,
+                                                     .sign_psbt_cache = sign_psbt_cache};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
@@ -1122,7 +1139,7 @@ preprocess_outputs(dispatcher_context_t *dc,
 
         output.in_out.scriptPubKey_len = result_len;
 
-        int is_internal = is_in_out_internal(dc, st, &output.in_out, false);
+        int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &output.in_out, false);
 
         if (is_internal < 0) {
             PRINTF("Error checking if output %d is internal\n", cur_output_index);
@@ -2423,6 +2440,7 @@ compute_segwit_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, segwit_ha
 
 static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_t *dc,
                                                              sign_psbt_state_t *st,
+                                                             sign_psbt_cache_t *sign_psbt_cache,
                                                              segwit_hashes_t *hashes,
                                                              placeholder_info_t *placeholder_info,
                                                              input_info_t *input,
@@ -2573,7 +2591,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                 .change = input->in_out.is_change ? 1 : 0,
                                 .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
                                 .n_keys = st->wallet_header.n_keys,
-                                .wallet_version = st->wallet_header.version},
+                                .wallet_version = st->wallet_header.version,
+                                .sign_psbt_cache = sign_psbt_cache},
                             r_policy_node_tree(&policy->tree),
                             input->taptree_hash)) {
                     PRINTF("Error while computing taptree hash\n");
@@ -2603,22 +2622,22 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
                               sign_psbt_state_t *st,
                               const input_info_t *input,
                               const policy_node_t *tapleaf_ptr,
-                              placeholder_info_t *placeholder_info) {
+                              placeholder_info_t *placeholder_info,
+                              sign_psbt_cache_t *sign_psbt_cache) {
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
-    // we compute the tapscript once just to compute its length
-    // this avoids having to store it
-    int tapscript_len = get_wallet_internal_script_hash(
-        dc,
-        tapleaf_ptr,
-        &(wallet_derivation_info_t){.wallet_version = st->wallet_header.version,
+    wallet_derivation_info_t wdi = {.wallet_version = st->wallet_header.version,
                                     .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
                                     .n_keys = st->wallet_header.n_keys,
                                     .change = input->in_out.is_change,
-                                    .address_index = input->in_out.address_index},
-        WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
-        NULL);
+                                    .address_index = input->in_out.address_index,
+                                    .sign_psbt_cache = sign_psbt_cache};
+
+    // we compute the tapscript once just to compute its length
+    // this avoids having to store it
+    int tapscript_len =
+        get_wallet_internal_script_hash(dc, tapleaf_ptr, &wdi, WRAPPED_SCRIPT_TYPE_TAPSCRIPT, NULL);
     if (tapscript_len < 0) {
         PRINTF("Failed to compute tapleaf script\n");
         return false;
@@ -2628,17 +2647,11 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
     crypto_hash_update_varint(&hash_context.header, tapscript_len);
 
     // we compute it again to get add the actual script code to the hash computation
-    if (0 >
-        get_wallet_internal_script_hash(
-            dc,
-            tapleaf_ptr,
-            &(wallet_derivation_info_t){.wallet_version = st->wallet_header.version,
-                                        .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                        .n_keys = st->wallet_header.n_keys,
-                                        .change = input->in_out.is_change,
-                                        .address_index = input->in_out.address_index},
-            WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
-            &hash_context.header)) {
+    if (0 > get_wallet_internal_script_hash(dc,
+                                            tapleaf_ptr,
+                                            &wdi,
+                                            WRAPPED_SCRIPT_TYPE_TAPSCRIPT,
+                                            &hash_context.header)) {
         return false;  // should never happen!
     }
     crypto_hash_digest(&hash_context.header, placeholder_info->tapleaf_hash, 32);
@@ -2649,6 +2662,7 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
 static bool __attribute__((noinline))
 sign_transaction(dispatcher_context_t *dc,
                  sign_psbt_state_t *st,
+                 sign_psbt_cache_t *sign_psbt_cache,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -2717,10 +2731,17 @@ sign_transaction(dispatcher_context_t *dc,
                                                                               st,
                                                                               &input,
                                                                               tapleaf_ptr,
-                                                                              &placeholder_info))
+                                                                              &placeholder_info,
+                                                                              sign_psbt_cache))
                         return false;
 
-                    if (!sign_transaction_input(dc, st, &hashes, &placeholder_info, &input, i)) {
+                    if (!sign_transaction_input(dc,
+                                                st,
+                                                sign_psbt_cache,
+                                                &hashes,
+                                                &placeholder_info,
+                                                &input,
+                                                i)) {
                         // we do not send a status word, since sign_transaction_input
                         // already does it on failure
                         return false;
@@ -2745,6 +2766,9 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // read APDU inputs, intialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
 
+    sign_psbt_cache_t cache;
+    init_sign_psbt_cache(&cache);
+
     // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
     memset(internal_inputs, 0, sizeof(internal_inputs));
@@ -2761,14 +2785,14 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      *  - detect internal inputs that should be signed, and if there are external inputs or unusual
      * sighashes
      */
-    if (!preprocess_inputs(dc, &st, internal_inputs)) return;
+    if (!preprocess_inputs(dc, &st, &cache, internal_inputs)) return;
 
     /** OUTPUTS VERIFICATION FLOW
      *
      *  For each output, check if it's a change address.
      *  Check if it's an acceptable output.
      */
-    if (!preprocess_outputs(dc, &st, internal_outputs)) return;
+    if (!preprocess_outputs(dc, &st, &cache, internal_outputs)) return;
 
     if (G_swap_state.called_from_swap) {
         /** SWAP CHECKS
@@ -2794,7 +2818,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      * For each internal placeholder, and for each internal input, sign using the
      * appropriate algorithm.
      */
-    int sign_result = sign_transaction(dc, &st, internal_inputs);
+    int sign_result = sign_transaction(dc, &st, &cache, internal_inputs);
 
     if (!G_swap_state.called_from_swap) {
         ui_post_processing_confirm_transaction(dc, sign_result);

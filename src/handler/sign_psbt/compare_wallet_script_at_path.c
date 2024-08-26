@@ -9,6 +9,7 @@
 #include "../../common/read.h"
 
 int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
+                                  sign_psbt_cache_t *sign_psbt_cache,
                                   uint32_t change,
                                   uint32_t address_index,
                                   const policy_node_t *policy,
@@ -28,7 +29,8 @@ int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
                                                       .keys_merkle_root = keys_merkle_root,
                                                       .n_keys = n_keys,
                                                       .change = change,
-                                                      .address_index = address_index},
+                                                      .address_index = address_index,
+                                                      .sign_psbt_cache = sign_psbt_cache},
                           wallet_script);
     if (wallet_script_len < 0) {
         PRINTF("Failed to get wallet script\n");

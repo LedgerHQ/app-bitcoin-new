@@ -424,7 +424,12 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
     return 0;
 }
 
-static int parse_placeholder(buffer_t *in_buf, int version, policy_node_key_placeholder_t *out) {
+// parses a placeholder from in_buf, storing it in out. On success, the pointed placeholder_index is
+// stored in out->placeholder_index, and then it's incremented.
+static int parse_placeholder(buffer_t *in_buf,
+                             int version,
+                             policy_node_key_placeholder_t *out,
+                             uint16_t *placeholder_index) {
     char c;
     if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
         return WITH_ERROR(-1, "Expected key placeholder starting with '@'");
@@ -489,6 +494,8 @@ static int parse_placeholder(buffer_t *in_buf, int version, policy_node_key_plac
         return WITH_ERROR(-1, "Invalid version number");
     }
 
+    out->placeholder_index = *placeholder_index;
+    ++(*placeholder_index);
     return 0;
 }
 
@@ -543,6 +550,15 @@ static int parse_script(buffer_t *in_buf,
                         size_t depth,
                         unsigned int context_flags) {
     int n_wrappers = 0;
+
+    // Keep track of how many key placeholders have been created while parsing
+    // This allows to know the counter even in recursive calls
+    static uint16_t key_placeholder_count = 0;
+
+    if (depth == 0) {
+        // reset the counter on function entry, but not in recursive calls
+        key_placeholder_count = 0;
+    }
 
     policy_node_t *outermost_node = (policy_node_t *) buffer_get_cur(out_buf);
     policy_node_with_script_t *inner_wrapper = NULL;  // pointer to the inner wrapper, if any
@@ -1396,7 +1412,7 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
+            if (0 > parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1466,7 +1482,7 @@ static int parse_script(buffer_t *in_buf,
             }
             i_policy_node_key_placeholder(&node->key_placeholder, key_placeholder);
 
-            if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
+            if (0 > parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1606,7 +1622,8 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Out of memory");
                 }
 
-                if (0 > parse_placeholder(in_buf, version, key_placeholder)) {
+                if (0 >
+                    parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
                     return WITH_ERROR(-1, "Error parsing key placeholder");
                 }
 
