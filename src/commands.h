@@ -10,4 +10,5 @@ typedef enum {
     SIGN_PSBT = 0x04,
     GET_MASTER_FINGERPRINT = 0x05,
     SIGN_MESSAGE = 0x10,
+    WITHDRAW = 0x11,
 } command_e;

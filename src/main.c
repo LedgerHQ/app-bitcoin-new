@@ -91,6 +91,11 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
         .ins = SIGN_MESSAGE,
         .handler = (command_handler_t)handler_sign_message
     },
+    {
+        .cla = CLA_APP,
+        .ins = WITHDRAW,
+        .handler = (command_handler_t)handler_withdraw
+    },
 };
 // clang-format on
 
