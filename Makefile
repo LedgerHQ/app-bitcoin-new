@@ -152,10 +152,11 @@ DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 DEFINES   += IO_SEPROXYHAL_BUFFER_SIZE_B=300
 
 # debugging helper functions and macros
-CFLAGS    += -include debug-helpers/debug.h
+CFLAGS    += -g -include debug-helpers/debug.h
 
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
+DEBUG = 1 # 0 for production, 1 for debug
 ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
     DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
