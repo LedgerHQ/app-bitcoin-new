@@ -23,7 +23,7 @@
 
 #define SETTING_INFO_NB 3
 static const char* const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer", "Copyright"};
-static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Ledger", "(c) 2024 Ledger"};
+static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Blooo", "(c) 2024 Blooo"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = SETTING_INFO_NB,
@@ -35,9 +35,9 @@ static void exit(void) {
     os_sched_exit(-1);
 }
 
-void ui_menu_main_flow_bitcoin(void) {
+void ui_menu_main_flow_acre(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_Bitcoin_64px,
+                                &C_Acre_64px,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
@@ -46,10 +46,10 @@ void ui_menu_main_flow_bitcoin(void) {
                                 exit);
 }
 
-void ui_menu_main_flow_bitcoin_testnet(void) {
+void ui_menu_main_flow_acre_testnet(void) {
     nbgl_useCaseHomeAndSettings(
-        "Bitcoin Testnet",
-        &C_Bitcoin_64px,
+        "Acre Testnet",
+        &C_Acre_64px,
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
         INIT_HOME_PAGE,
         NULL,

@@ -26,8 +26,8 @@
 
 void ui_menu_main() {
     if (BIP32_PUBKEY_VERSION == BIP32_PUBKEY_VERSION_MAINNET) {  // mainnet
-        ui_menu_main_flow_bitcoin();
+        ui_menu_main_flow_acre();
     } else if (BIP32_PUBKEY_VERSION == BIP32_PUBKEY_VERSION_TESTNET) {  // testnet
-        ui_menu_main_flow_bitcoin_testnet();
+        ui_menu_main_flow_acre_testnet();
     }
 }
