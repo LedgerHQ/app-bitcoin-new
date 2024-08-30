@@ -45,9 +45,9 @@ PATH_APP_LOAD_PARAMS = ""
 PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
-APPVERSION_M = 2
-APPVERSION_N = 2
-APPVERSION_P = 5
+APPVERSION_M = 1
+APPVERSION_N = 0
+APPVERSION_P = 0
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -89,7 +89,7 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-    APPNAME = "Bitcoin Test"
+    APPNAME = "Acre Test"
 else ifeq ($(COIN),bitcoin)
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
@@ -105,7 +105,7 @@ else ifeq ($(COIN),bitcoin)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-    APPNAME = "Bitcoin"
+    APPNAME = "Acre"
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
