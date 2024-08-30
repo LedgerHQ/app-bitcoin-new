@@ -102,9 +102,6 @@ static bool display_message_content_and_confirm(dispatcher_context_t* dc,
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
-}
-
-void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
     (void) protocol_version;
 
     uint8_t bip32_path_len;
