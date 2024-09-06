@@ -31,12 +31,13 @@
 
 #include "handlers.h"
 
-#define DATA_CHUNK_INDEX      5
+#define DATA_CHUNK_INDEX_1    5
+#define DATA_CHUNK_INDEX_2    7
 #define CHUNK_SIZE_IN_BYTES   64
 #define ADDRESS_SIZE_IN_BYTES 20
 #define ADDRESS_SIZE_IN_CHARS 40
-#define AMMOUNT_SIZE_IN_BYTES 8
-#define AMMOUNT_SIZE_IN_CHARS 16
+#define AMOUNT_SIZE_IN_BYTES  8
+#define AMOUNT_SIZE_IN_CHARS  16 + 10
 
 // #define MAX_DISPLAYBLE_CHUNK_NUMBER \
 //     (5 * MESSAGE_CHUNK_PER_DISPLAY)  // If the message is too long we will not display it
@@ -50,43 +51,46 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                              size_t n_chunks,
                                              uint8_t* path_str) {
     reset_streaming_index();
-    while (get_streaming_index() <= (n_chunks - 1)) {
-        uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
-        char data_chunk_hex[CHUNK_SIZE_IN_BYTES * 2 + 1];
-        char spender[ADDRESS_SIZE_IN_BYTES * 2 + 1];
-        char value[50];
-        char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 1];
+    uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
+    char value[AMOUNT_SIZE_IN_CHARS + 1];
+    char data_chunk_hex[CHUNK_SIZE_IN_BYTES * 2 + 1];
+    char spender[ADDRESS_SIZE_IN_BYTES * 2 + 1];
+    char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 1];
 
-        int total_chunk_len = 0;
-        int offset = 0;
+    int total_chunk_len = 0;
+    // Get the first chunk that contains the data to display
+    int current_chunk_len = call_get_merkle_leaf_element(dc,
+                                                         data_merkle_root,
+                                                         n_chunks,
+                                                         DATA_CHUNK_INDEX_1,
+                                                         data_chunk,
+                                                         CHUNK_SIZE_IN_BYTES);
+    // Start Parsing
 
-        int current_chunk_len = call_get_merkle_leaf_element(dc,
-                                                             data_merkle_root,
-                                                             n_chunks,
-                                                             DATA_CHUNK_INDEX,
-                                                             data_chunk,
-                                                             CHUNK_SIZE_IN_BYTES);
+    // format spender
+    if (!format_hex(&data_chunk[12], ADDRESS_SIZE_IN_BYTES, spender, sizeof(spender))) {
+        return false;
+    }
+    // format value
+    int offset_value = 12 + ADDRESS_SIZE_IN_BYTES + 24;
+    uint64_t value_u64 = read_u64_be(data_chunk, offset_value);
 
-        if (current_chunk_len < 0) {
-            return false;
-        }
+    if (!format_fpu64(value, sizeof(value), value_u64, 18)) {
+        return false;
+    };
+    value[AMOUNT_SIZE_IN_CHARS] = '\0';
 
-        // Start Parsing
+    // // Trim the value of trailing zeros
+    // int i = 0;
+    // while (value[i] != '\0') {
+    //     i++;
+    // }
+    // Display data
+    if (!ui_validate_withdraw_data_and_confirm(dc, spender, value)) {
+        return false;
 
-        // format spender
-        if (!format_hex(&data_chunk[12], ADDRESS_SIZE_IN_BYTES, spender, sizeof(spender))) {
-            return false;
-        }
-        // format value
-        int offset_value = 12 + ADDRESS_SIZE_IN_BYTES + 24;
-        uint64_t value_u64 = read_u64_be(data_chunk, offset_value);
-        if (format_u64(value, sizeof(value), value_u64)) {
-            return false;
-        }
-        // Display data
-        if (!ui_validate_withdraw_data_and_confirm(dc, spender, value)) {
-            return false;
-        }
+        // while (get_streaming_index() <= (n_chunks - 1)) {
+        // }
     }
 
     // if (!ui_validate_withdraw_data_and_confirm(dc, spender, value)) {

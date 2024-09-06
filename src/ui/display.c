@@ -164,7 +164,7 @@ bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
     ui_validate_withdraw_state_t *state = (ui_validate_withdraw_state_t *) &g_ui_state;
     // copy the spender and value to the state
     strncpy(state->spender, spender, sizeof(state->spender));
-    snprintf(state->value, sizeof(state->value), "%llu", *value);
+    strncpy(state->value, value, sizeof(state->value));
 
     ui_display_withdraw_content_flow();
 
