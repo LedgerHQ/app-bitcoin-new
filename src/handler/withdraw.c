@@ -53,11 +53,9 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
-    char data_chunk_hex[CHUNK_SIZE_IN_BYTES * 2 + 1];
     char spender[ADDRESS_SIZE_IN_BYTES * 2 + 1];
     char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 1];
 
-    int total_chunk_len = 0;
     // Get the first chunk that contains the data to display
     int current_chunk_len = call_get_merkle_leaf_element(dc,
                                                          data_merkle_root,
@@ -68,7 +66,8 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     // Start Parsing
 
     // format spender
-    if (!format_hex(&data_chunk[12], ADDRESS_SIZE_IN_BYTES, spender, sizeof(spender))) {
+    const int offset_address = 12;
+    if (!format_hex(&data_chunk[offset_address], ADDRESS_SIZE_IN_BYTES, spender, sizeof(spender))) {
         return false;
     }
     // format value
@@ -78,24 +77,41 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     if (!format_fpu64(value, sizeof(value), value_u64, 18)) {
         return false;
     };
-    value[AMOUNT_SIZE_IN_CHARS] = '\0';
 
-    // // Trim the value of trailing zeros
-    // int i = 0;
-    // while (value[i] != '\0') {
-    //     i++;
-    // }
+    // Concat the COIN_COINID_SHORT to the value
+    int ticker_len = strlen(COIN_COINID_SHORT);
+    char value_with_ticker[AMOUNT_SIZE_IN_CHARS + 1 + ticker_len + 1];
+    snprintf(value_with_ticker, sizeof(value_with_ticker), "%s %s", COIN_COINID_SHORT, value);
+
+    // Trim the value of trailing zeros in a char of size of value
+    int i = sizeof(value_with_ticker) - 1;
+    while (value_with_ticker[i] == '0' || value_with_ticker[i] == '\0') {
+        value_with_ticker[i] = '\0';
+        i--;
+    }
+    // Get the second chunk that contains the data to display
+    current_chunk_len = call_get_merkle_leaf_element(dc,
+                                                     data_merkle_root,
+                                                     n_chunks,
+                                                     DATA_CHUNK_INDEX_2,
+                                                     data_chunk,
+                                                     CHUNK_SIZE_IN_BYTES);
+
+    // format redeemer
+    if (!format_hex(&data_chunk[offset_address],
+                    ADDRESS_SIZE_IN_BYTES,
+                    redeemer,
+                    sizeof(redeemer))) {
+        return false;
+    }
+
     // Display data
-    if (!ui_validate_withdraw_data_and_confirm(dc, spender, value)) {
+    if (!ui_validate_withdraw_data_and_confirm(dc, spender, value_with_ticker, redeemer)) {
         return false;
 
         // while (get_streaming_index() <= (n_chunks - 1)) {
         // }
     }
-
-    // if (!ui_validate_withdraw_data_and_confirm(dc, spender, value)) {
-    //     return false;
-    // }
 
     return true;
 }
@@ -114,11 +130,13 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
         !buffer_read_varint(&dc->read_buffer, &n_chunks) ||
         !buffer_read_bytes(&dc->read_buffer, data_merkle_root, 32)) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        ui_post_processing_confirm_withdraw(dc, false);
         return;
     }
 
     if (bip32_path_len > MAX_BIP32_PATH_STEPS) {
         SEND_SW(dc, SW_INCORRECT_DATA);
+        ui_post_processing_confirm_withdraw(dc, false);
         return;
     }
 
@@ -131,11 +149,17 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     // ui_pre_processing_message();
     if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks, (uint8_t*) path_str)) {
         SEND_SW(dc, SW_DENY);
-        return;
-
-#endif
-        // COMPUTE THE HASH THAT WE WILL SIGN
-        // SIGN MESSAGE (the message is the hash previously computed)
+        ui_post_processing_confirm_withdraw(dc, false);
         return;
     }
+
+#endif
+    // COMPUTE THE HASH THAT WE WILL SIGN
+    // SIGN MESSAGE (the message is the hash previously computed)
+    uint8_t sig[MAX_DER_SIG_LEN] = {7};
+
+    SEND_RESPONSE(dc, sig, sizeof(sig), SW_OK);
+
+    ui_post_processing_confirm_withdraw(dc, true);
+    return;
 }

@@ -267,13 +267,12 @@ UX_STEP_NOCB(ux_withdraw_step,
                  "Withdraw",
              });
 
-UX_STEP_CB(ux_withdraw_display_spender_step,
-           bnnn_paging,
-           set_ux_flow_response(true),
-           {
-               .title = "Spender",
-               .text = g_ui_state.validate_withdraw.spender,
-           });
+UX_STEP_NOCB(ux_withdraw_display_spender_step,
+             bnnn_paging,
+             {
+                 .title = "Spender",
+                 .text = g_ui_state.validate_withdraw.spender,
+             });
 
 UX_STEP_NOCB(ux_withdraw_display_value_step,
              bnnn_paging,
@@ -282,17 +281,17 @@ UX_STEP_NOCB(ux_withdraw_display_value_step,
                  .text = g_ui_state.validate_withdraw.value,
              });
 
-// UX_STEP_NOCB(ux_withdraw_display_redeemer_step,
-//              bnnn_paging,
-//              {
-//                  .title = "Reedeemer",
-//                  .text = g_ui_state.validate_withdraw.redeemer,
-//              });
+UX_STEP_NOCB(ux_withdraw_display_redeemer_step,
+             bnnn_paging,
+             {
+                 .title = "Redeemer",
+                 .text = g_ui_state.validate_withdraw.redeemer,
+             });
 
-UX_STEP_CB(ux_withdraw_accept_new,
+UX_STEP_CB(ux_withdraw_accept_step,
            pbb,
            set_ux_flow_response(true),
-           {&C_icon_validate_14, "Withdraw"});
+           {&C_icon_validate_14, "Approve", "withdraw"});
 
 // FLOW to display BIP32 path to sign a message:
 // #1 screen: certificate icon + "Sign message"
@@ -492,13 +491,15 @@ UX_FLOW(ux_accept_selftransfer_flow,
 // #1 screen: certificate icon + "Withdraw"
 // #2 screen: spender
 // #3 screen: value
-// #5 screen: "Withdraw" button, with approve button
-// #6 screen: reject button
-UX_FLOW(ux_withdraw_display_spender_and_value_flow,
+// #4 screen: redeemer
+// #5 screen: "Approve" button
+// #6 screen: "Reject" button
+UX_FLOW(ux_withdraw_display_data_flow,
         &ux_withdraw_step,
         &ux_withdraw_display_spender_step,
         &ux_withdraw_display_value_step,
-        &ux_withdraw_accept_new,
+        &ux_withdraw_display_redeemer_step,
+        &ux_withdraw_accept_step,
         &ux_display_reject_step);
 
 void ui_display_pubkey_flow(void) {
@@ -582,10 +583,6 @@ void ui_accept_transaction_flow(bool is_self_transfer) {
 }
 
 void ui_display_withdraw_content_flow(void) {
-    if (get_streaming_index() == 0) {
-        ux_flow_init(0, ux_withdraw_display_spender_and_value_flow, NULL);
-    } else {
-        ux_flow_init(0, ux_sign_message_content_flow, NULL);
-    }
+    ux_flow_init(0, ux_withdraw_display_data_flow, NULL);
 }
 #endif  // HAVE_BAGL

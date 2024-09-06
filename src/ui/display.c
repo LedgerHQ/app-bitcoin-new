@@ -156,7 +156,8 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
 
 bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
                                            const char *spender,
-                                           const char *value) {
+                                           const char *value,
+                                           const char *redeemer) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
@@ -165,6 +166,7 @@ bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
     // copy the spender and value to the state
     strncpy(state->spender, spender, sizeof(state->spender));
     strncpy(state->value, value, sizeof(state->value));
+    strncpy(state->redeemer, redeemer, sizeof(state->redeemer));
 
     ui_display_withdraw_content_flow();
 
@@ -462,6 +464,11 @@ bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool 
 }
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
+    (void) context;
+    (void) success;
+    return true;
+}
+bool ui_post_processing_confirm_withdraw(dispatcher_context_t *context, bool success) {
     (void) context;
     (void) success;
     return true;

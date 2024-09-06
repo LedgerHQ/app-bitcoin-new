@@ -104,7 +104,7 @@ typedef struct {
 typedef struct {
     char spender[MAX_ADDRESS_LENGTH_STR + 1];
     char value[MAX_AMOUNT_LENGTH + 1];
-    char reedeemer[MAX_ADDRESS_LENGTH_STR + 1];
+    char redeemer[MAX_ADDRESS_LENGTH_STR + 1];
     char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
     char message[MESSAGE_MAX_DISPLAY_SIZE];
 } ui_validate_withdraw_state_t;
@@ -268,12 +268,15 @@ bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool 
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success);
 
+bool ui_post_processing_confirm_withdraw(dispatcher_context_t *context, bool success);
+
 void ui_pre_processing_message(void);
 
 void ui_display_withdraw_content_flow(void);
 bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
                                            const char *spender,
-                                           const char *value);
+                                           const char *value,
+                                           const char *redeemer);
 
 #ifdef HAVE_NBGL
 bool ui_transaction_prompt(dispatcher_context_t *context);
