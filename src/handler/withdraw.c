@@ -84,8 +84,7 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     };
 
     // Concat the COIN_COINID_SHORT to the value
-    int ticker_len = strlen(COIN_COINID_SHORT);
-    char value_with_ticker[AMOUNT_SIZE_IN_CHARS + 1 + ticker_len + 1];
+    char value_with_ticker[AMOUNT_SIZE_IN_CHARS + 1 + 5 + 1];
     snprintf(value_with_ticker, sizeof(value_with_ticker), "%s %s", COIN_COINID_SHORT, value);
 
     // Trim the value of trailing zeros in a char of size of value
@@ -121,6 +120,35 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     }
 
     return true;
+}
+
+void compute_hash(dispatcher_context_t* dc,
+                  uint8_t* data_merkle_root,
+                  size_t n_chunks,
+                  uint8_t* path_str,
+                  cx_sha3_t* hash) {
+    CX_THROW(cx_keccak_init_no_throw(hash, 256));
+
+    // Get the chuck containing the data
+    uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
+    int current_chunk_len = call_get_merkle_leaf_element(dc,
+                                                         data_merkle_root,
+                                                         n_chunks,
+                                                         0,
+                                                         data_chunk,
+                                                         CHUNK_SIZE_IN_BYTES);
+    // Extract the destination address (first 20 bytes)
+    uint8_t to[32];
+    memset(to, 0, sizeof(to));
+    memcpy(to + 12, data_chunk, ADDRESS_SIZE_IN_BYTES);
+
+    // Write the data to the hash
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash,
+                              0,           // mode
+                              to,          // input
+                              sizeof(to),  // input length
+                              NULL,        // output
+                              0));         // output length
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
@@ -162,8 +190,10 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
 
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN
+    cx_sha3_t hash;
+    compute_hash(dc, data_merkle_root, n_chunks, (uint8_t*) path_str, &hash);
     // SIGN MESSAGE (the message is the hash previously computed)
-    uint8_t sig[MAX_DER_SIG_LEN] = {7};
+    uint8_t sig[MAX_DER_SIG_LEN];
 
     SEND_RESPONSE(dc, sig, sizeof(sig), SW_OK);
 
