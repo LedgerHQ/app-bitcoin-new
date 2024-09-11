@@ -8,6 +8,7 @@ from ledger_bitcoin.wallet import WalletPolicy
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.client import NewClient
 from ledger_bitcoin.client_base import print_response, print_apdu, ApduException
+from ledger_bitcoin.withdraw import AcreWithdrawalData
 
 from ragger.navigator import Navigator
 from ragger_bitcoin.ragger_instructions import Instructions
@@ -210,6 +211,24 @@ class RaggerClient(NewClient):
             self.instructions = instructions
 
         response = NewClient.sign_message(self, message, bip32_path)
+
+        self.navigate = False
+
+        return response
+    
+    def sign_withdraw(self, data: AcreWithdrawalData, bip32_path: str, navigator:
+                     Optional[Navigator] = None,
+                     instructions: Instructions = None,
+                     testname: str = ""
+                     ) -> str:
+
+        if navigator:
+            self.navigate = True
+            self.navigator = navigator
+            self.testname = testname
+            self.instructions = instructions
+
+        response = NewClient.sign_withdraw(self, data, bip32_path)
 
         self.navigate = False
 

@@ -17,6 +17,7 @@ from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
+from .withdraw import AcreWithdrawalData
 from . import segwit_addr
 from ._serialize import deser_string
 
@@ -265,6 +266,42 @@ class NewClient(Client):
         client_intepreter.add_known_list(chunks)
 
         sw, response = self._make_request(self.builder.sign_message(message_bytes, bip32_path), client_intepreter)
+
+        if sw != 0x9000:
+            raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_MESSAGE)
+
+        return base64.b64encode(response).decode('utf-8')
+    
+    def sign_withdraw(self, data: AcreWithdrawalData, bip32_path: str) -> str:
+        data_bytes = data.to_bytes()
+        chunks = []
+
+        # Chunk 0: to[20] + gasToken[20] + refundReceiver[20]
+        chunks.append(data_bytes.to + data_bytes.gasToken + data_bytes.refundReceiver)
+
+        # Chunk 1: value[32] + safeTxGas[32]
+        chunks.append(data_bytes.value + data_bytes.safeTxGas)
+
+        # Chunk 2: baseGas[32] + gasPrice[32]
+        chunks.append(data_bytes.baseGas + data_bytes.gasPrice)
+
+        # Chunk 3: nonce[32] + operation[1]
+        chunks.append(data_bytes.nonce + data_bytes.operation)
+
+        # Chunk 4: data_selector[4] (the first 4 bytes of data)
+        chunks.append(data_bytes.data[:4])
+
+        # Calculate the number of 64-byte chunks needed for the remaining data
+        n_chunks_data = (len(data_bytes.data) - 4 + 63) // 64
+
+        # Chunk 5 to n: data[64]
+        for i in range(n_chunks_data):
+            chunks.append(data_bytes.data[4 + 64 * i: 4 + 64 * (i + 1)])
+
+        client_intepreter = ClientCommandInterpreter()
+        client_intepreter.add_known_list(chunks)
+
+        sw, response = self._make_request(self.builder.sign_withdraw(data_bytes, bip32_path), client_intepreter)
 
         if sw != 0x9000:
             raise DeviceException(error_code=sw, ins=BitcoinInsType.SIGN_MESSAGE)

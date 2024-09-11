@@ -3,6 +3,7 @@ from typing import List, Tuple, Mapping, Union, Iterator, Optional
 
 from .common import bip32_path_from_string, write_varint
 from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
+from .withdraw import AcreWithdrawalDataBytes
 from .wallet import WalletPolicy
 
 # p2 encodes the protocol version implemented
@@ -37,6 +38,7 @@ class BitcoinInsType(enum.IntEnum):
     SIGN_PSBT = 0x04
     GET_MASTER_FINGERPRINT = 0x05
     SIGN_MESSAGE = 0x10
+    SIGN_WITHDRAW = 0x11
 
 class FrameworkInsType(enum.IntEnum):
     CONTINUE_INTERRUPTED = 0x01
@@ -189,6 +191,48 @@ class BitcoinCommandBuilder:
         return self.serialize(
             cla=self.CLA_BITCOIN,
             ins=BitcoinInsType.SIGN_MESSAGE,
+            cdata=bytes(cdata)
+        )
+    
+    def sign_withdraw(self, data_bytes: AcreWithdrawalDataBytes, bip32_path: str):
+        cdata = bytearray()
+
+        bip32_path: List[bytes] = bip32_path_from_string(bip32_path)
+
+        chunks = []
+
+        # Chunk 0: to[20] + gasToken[20] + refundReceiver[20]
+        chunks.append(data_bytes.to + data_bytes.gasToken + data_bytes.refundReceiver)
+
+        # Chunk 1: value[32] + safeTxGas[32]
+        chunks.append(data_bytes.value + data_bytes.safeTxGas)
+
+        # Chunk 2: baseGas[32] + gasPrice[32]
+        chunks.append(data_bytes.baseGas + data_bytes.gasPrice)
+
+        # Chunk 3: nonce[32] + operation[1]
+        chunks.append(data_bytes.nonce + data_bytes.operation)
+
+        # Chunk 4: data_selector[4] (the first 4 bytes of data)
+        chunks.append(data_bytes.data[:4])
+
+        # Calculate the number of 64-byte chunks needed for the remaining data
+        n_chunks_data = (len(data_bytes.data) - 4 + 63) // 64
+
+        # Chunk 5 to n: data[64]
+        for i in range(n_chunks_data):
+            chunks.append(data_bytes.data[4 + 64 * i: 4 + 64 * (i + 1)])
+
+        cdata += len(bip32_path).to_bytes(1, byteorder="big")
+        cdata += b''.join(bip32_path)
+
+        cdata += write_varint(n_chunks_data + 5)
+
+        cdata += MerkleTree(element_hash(c) for c in chunks).root
+
+        return self.serialize(
+            cla=self.CLA_BITCOIN,
+            ins=BitcoinInsType.SIGN_WITHDRAW,
             cdata=bytes(cdata)
         )
 
