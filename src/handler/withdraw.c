@@ -53,8 +53,8 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
-    char spender[ADDRESS_SIZE_IN_BYTES * 2 + 1];
-    char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 1];
+    char spender[ADDRESS_SIZE_IN_BYTES * 2 + 2 + 1];
+    char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 2 + 1];
 
     // Get the first chunk that contains the data to display
     int current_chunk_len = call_get_merkle_leaf_element(dc,
@@ -67,7 +67,12 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 
     // format spender
     const int offset_address = 12;
-    if (!format_hex(&data_chunk[offset_address], ADDRESS_SIZE_IN_BYTES, spender, sizeof(spender))) {
+    spender[0] = '0';
+    spender[1] = 'x';
+    if (!format_hex(&data_chunk[offset_address],
+                    ADDRESS_SIZE_IN_BYTES,
+                    spender + 2,
+                    sizeof(spender))) {
         return false;
     }
     // format value
@@ -98,9 +103,11 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                                      CHUNK_SIZE_IN_BYTES);
 
     // format redeemer
+    redeemer[0] = '0';
+    redeemer[1] = 'x';
     if (!format_hex(&data_chunk[offset_address],
                     ADDRESS_SIZE_IN_BYTES,
-                    redeemer,
+                    redeemer + 2,
                     sizeof(redeemer))) {
         return false;
     }
