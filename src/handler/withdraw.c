@@ -39,6 +39,10 @@
 #define AMOUNT_SIZE_IN_BYTES  8
 #define AMOUNT_SIZE_IN_CHARS  16 + 10
 
+// Constants for hash computation
+
+////////////////////////
+
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
@@ -144,32 +148,14 @@ void add_leading_zeroes(uint8_t* dest_buffer,
     memcpy(dest_buffer + buffer_offset, src_buffer, src_size);
 }
 
-/**
- * @brief Fetches a chunk of data from a Merkle tree and adds it to a hash.
- *
- * This function retrieves a specific chunk of data from a Merkle tree using the provided
- * dispatcher context and Merkle root. The retrieved chunk is then added to a hash buffer
- * at a specified offset and hashed using the provided SHA-3 context.
- *
- * @param dc                Pointer to the dispatcher context. (in)
- * @param data_merkle_root  Pointer to the Merkle root of the data. (in)
- * @param n_chunks          Total number of chunks in the Merkle tree. (in)
- * @param chunk_index       Index of the chunk to fetch. (in)
- * @param hash              Pointer to the SHA-3 hash context. (in/out)
- * @param buffer_offset     Offset within the hash buffer where the chunk data should be added. (in)
- * @param chunk_offset      Offset within the chunk data to start copying from. (in)
- * @param chunk_data_size   Size of the chunk data to copy. (in)
- *
- * @return void
- */
 void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                                  uint8_t* data_merkle_root,
                                  size_t n_chunks,
+                                 cx_sha3_t* hash_context,
                                  size_t chunk_index,
-                                 cx_sha3_t* hash,
-                                 size_t buffer_offset,
                                  size_t chunk_offset,
-                                 size_t chunk_data_size) {
+                                 size_t chunk_data_size,
+                                 bool abi_encode) {
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     int current_chunk_len = call_get_merkle_leaf_element(dc,
                                                          data_merkle_root,
@@ -179,34 +165,70 @@ void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                                                          CHUNK_SIZE_IN_BYTES);
     if (current_chunk_len < 0) {
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        ui_post_processing_confirm_withdraw(dc, false);
+        return;
     }
-    uint8_t hash_buffer[32];
-    add_leading_zeroes(hash_buffer,
-                       sizeof(hash_buffer),
-                       data_chunk + chunk_offset,
-                       chunk_data_size);
-    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash,
-                              0,                    // mode
-                              hash_buffer,          // input
-                              sizeof(hash_buffer),  // input length
-                              NULL,                 // output
-                              0));                  // output length
+    size_t input_buffer_size;
+    uint8_t input_buffer[32];
+
+    if (abi_encode) {
+        input_buffer_size = 32;
+        add_leading_zeroes(input_buffer,
+                           sizeof(input_buffer),
+                           data_chunk + chunk_offset,
+                           chunk_data_size);
+    } else {
+        input_buffer_size = chunk_data_size;
+        memcpy(input_buffer, data_chunk + chunk_offset, input_buffer_size);
+    }
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash_context,
+                              0,                  // mode
+                              input_buffer,       // input data
+                              input_buffer_size,  // input length
+                              NULL,               // output (intermediate)
+                              0));                // no output yet
 }
 
-void compute_hash(dispatcher_context_t* dc,
-                  uint8_t* data_merkle_root,
-                  size_t n_chunks,
-                  cx_sha3_t* hash) {
-    CX_THROW(cx_keccak_init_no_throw(hash, 256));
+void fetch_and_hash_tx_data(dispatcher_context_t* dc,
+                            uint8_t* data_merkle_root,
+                            size_t n_chunks,
+                            cx_sha3_t* hash_context,
+                            uint8_t* output_buffer) {
+    // Fetch and add the first 4 bytes of the tx.data to the hash
+    fetch_and_add_chunk_to_hash(dc, data_merkle_root, n_chunks, hash_context, 4, 0, 4, false);
+    // Fetch and add the other value is tx.data to the hash
+    for (size_t i = 5; i < n_chunks; i++) {
+        // Fetch and add data[32] to the hash
+        fetch_and_add_chunk_to_hash(dc, data_merkle_root, n_chunks, hash_context, i, 0, 32, false);
+        // Fetch and add data[32] to the hash
+        fetch_and_add_chunk_to_hash(dc, data_merkle_root, n_chunks, hash_context, i, 32, 32, false);
+    }
+    // Finalize the hash and store the result in output_hash
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash_context,
+                              CX_LAST,        // final block mode
+                              NULL,           // no more input
+                              0,              // no more input length
+                              output_buffer,  // output hash buffer
+                              32));           // output hash length (32 bytes)
+}
 
-    fetch_and_add_chunk_to_hash(dc,
-                                data_merkle_root,
-                                n_chunks,
-                                0,
-                                hash,
-                                12,
-                                0,
-                                ADDRESS_SIZE_IN_BYTES);
+void compute_tx_hash(dispatcher_context_t* dc,
+                     uint8_t* data_merkle_root,
+                     size_t n_chunks,
+                     u_int8_t output_buffer[32]) {
+    cx_sha3_t hash_context;
+
+    // Initialize the SHA-3 context for Keccak-256 (256-bit output)
+    CX_THROW(cx_keccak_init_no_throw(&hash_context, 256));
+    u_int8_t keccak_of_tx_data[32];
+    // Compute keccak256 hash of the tx_data_data
+    fetch_and_hash_tx_data(dc, data_merkle_root, n_chunks, &hash_context, keccak_of_tx_data);
+
+    // Abi.encode 1
+    // Abi.encode 2
+    // Compute keccak256 hash of abi.encode 2
+    // Abi.encodePacked
+    // Keccak256 hash of abi.encodePacked
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
@@ -238,22 +260,22 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     }
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    // ui_pre_processing_message();
-    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
-        SEND_SW(dc, SW_DENY);
-        ui_post_processing_confirm_withdraw(dc, false);
-        return;
-    }
+    // // ui_pre_processing_message();
+    // if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
+    //     SEND_SW(dc, SW_DENY);
+    //     ui_post_processing_confirm_withdraw(dc, false);
+    //     return;
+    // }
 
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN
-    cx_sha3_t hash;
-    compute_hash(dc, data_merkle_root, n_chunks, &hash);
+    uint8_t tx_hash[32];
+    compute_tx_hash(dc, data_merkle_root, n_chunks, tx_hash);
     // SIGN MESSAGE (the message is the hash previously computed)
-    uint8_t sig[MAX_DER_SIG_LEN];
 
+    // Send the response to the JS Library
+    uint8_t sig[65];
     SEND_RESPONSE(dc, sig, sizeof(sig), SW_OK);
-
     ui_post_processing_confirm_withdraw(dc, true);
     return;
 }
