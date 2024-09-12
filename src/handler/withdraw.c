@@ -121,6 +121,34 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 
     return true;
 }
+void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
+                                 uint8_t* data_merkle_root,
+                                 size_t n_chunks,
+                                 uint8_t* path_str,
+                                 size_t chunk_index,
+                                 cx_sha3_t* hash,
+                                 size_t buffer_offset,
+                                 size_t chunk_offset,
+                                 size_t chunk_data_size) {
+    uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
+    int current_chunk_len = call_get_merkle_leaf_element(dc,
+                                                         data_merkle_root,
+                                                         n_chunks,
+                                                         chunk_index,
+                                                         data_chunk,
+                                                         CHUNK_SIZE_IN_BYTES);
+    uint8_t hash_buffer[32];
+    memset(hash_buffer, 0, sizeof(hash_buffer));
+
+    memcpy(hash_buffer + buffer_offset, data_chunk + chunk_offset, chunk_data_size);
+
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash,
+                              0,                    // mode
+                              hash_buffer,          // input
+                              sizeof(hash_buffer),  // input length
+                              NULL,                 // output
+                              0));                  // output length
+}
 
 void compute_hash(dispatcher_context_t* dc,
                   uint8_t* data_merkle_root,
@@ -129,26 +157,15 @@ void compute_hash(dispatcher_context_t* dc,
                   cx_sha3_t* hash) {
     CX_THROW(cx_keccak_init_no_throw(hash, 256));
 
-    // Get the chuck containing the data
-    uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
-    int current_chunk_len = call_get_merkle_leaf_element(dc,
-                                                         data_merkle_root,
-                                                         n_chunks,
-                                                         0,
-                                                         data_chunk,
-                                                         CHUNK_SIZE_IN_BYTES);
-    // Extract the destination address (first 20 bytes)
-    uint8_t to[32];
-    memset(to, 0, sizeof(to));
-    memcpy(to + 12, data_chunk, ADDRESS_SIZE_IN_BYTES);
-
-    // Write the data to the hash
-    CX_THROW(cx_hash_no_throw((cx_hash_t*) hash,
-                              0,           // mode
-                              to,          // input
-                              sizeof(to),  // input length
-                              NULL,        // output
-                              0));         // output length
+    fetch_and_add_chunk_to_hash(dc,
+                                data_merkle_root,
+                                n_chunks,
+                                path_str,
+                                0,
+                                hash,
+                                12,
+                                0,
+                                ADDRESS_SIZE_IN_BYTES);
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
