@@ -119,6 +119,32 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 }
 
 /**
+ * @brief Adds leading zeroes to a source buffer and copies it to a destination buffer.
+ *
+ * This function clears the destination buffer, calculates the offset where the source data
+ * should start, and then copies the source data to the destination buffer starting from
+ * the calculated offset. The leading part of the destination buffer will be filled with zeroes.
+ *
+ * @param dest_buffer Pointer to the destination buffer.
+ * @param dest_size Size of the destination buffer.
+ * @param src_buffer Pointer to the source buffer.
+ * @param src_size Size of the source buffer.
+ */
+void add_leading_zeroes(uint8_t* dest_buffer,
+                        size_t dest_size,
+                        uint8_t* src_buffer,
+                        size_t src_size) {
+    // Clear the destination buffer
+    memset(dest_buffer, 0, dest_size);
+
+    // Calculate the offset where the data should start
+    size_t buffer_offset = dest_size - src_size;
+
+    // Copy the source data to the destination buffer starting from the calculated offset
+    memcpy(dest_buffer + buffer_offset, src_buffer, src_size);
+}
+
+/**
  * @brief Fetches a chunk of data from a Merkle tree and adds it to a hash.
  *
  * This function retrieves a specific chunk of data from a Merkle tree using the provided
@@ -155,10 +181,10 @@ void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
         SEND_SW(dc, SW_WRONG_DATA_LENGTH);
     }
     uint8_t hash_buffer[32];
-    memset(hash_buffer, 0, sizeof(hash_buffer));
-
-    memcpy(hash_buffer + buffer_offset, data_chunk + chunk_offset, chunk_data_size);
-
+    add_leading_zeroes(hash_buffer,
+                       sizeof(hash_buffer),
+                       data_chunk + chunk_offset,
+                       chunk_data_size);
     CX_THROW(cx_hash_no_throw((cx_hash_t*) hash,
                               0,                    // mode
                               hash_buffer,          // input
