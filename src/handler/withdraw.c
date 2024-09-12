@@ -117,6 +117,25 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 
     return true;
 }
+
+/**
+ * @brief Fetches a chunk of data from a Merkle tree and adds it to a hash.
+ *
+ * This function retrieves a specific chunk of data from a Merkle tree using the provided
+ * dispatcher context and Merkle root. The retrieved chunk is then added to a hash buffer
+ * at a specified offset and hashed using the provided SHA-3 context.
+ *
+ * @param dc                Pointer to the dispatcher context. (in)
+ * @param data_merkle_root  Pointer to the Merkle root of the data. (in)
+ * @param n_chunks          Total number of chunks in the Merkle tree. (in)
+ * @param chunk_index       Index of the chunk to fetch. (in)
+ * @param hash              Pointer to the SHA-3 hash context. (in/out)
+ * @param buffer_offset     Offset within the hash buffer where the chunk data should be added. (in)
+ * @param chunk_offset      Offset within the chunk data to start copying from. (in)
+ * @param chunk_data_size   Size of the chunk data to copy. (in)
+ *
+ * @return void
+ */
 void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                                  uint8_t* data_merkle_root,
                                  size_t n_chunks,
