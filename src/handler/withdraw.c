@@ -39,17 +39,13 @@
 #define AMOUNT_SIZE_IN_BYTES  8
 #define AMOUNT_SIZE_IN_CHARS  16 + 10
 
-// #define MAX_DISPLAYBLE_CHUNK_NUMBER \
-//     (5 * MESSAGE_CHUNK_PER_DISPLAY)  // If the message is too long we will not display it
-
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
 
 static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                              uint8_t* data_merkle_root,
-                                             size_t n_chunks,
-                                             uint8_t* path_str) {
+                                             size_t n_chunks) {
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
@@ -124,7 +120,6 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                                  uint8_t* data_merkle_root,
                                  size_t n_chunks,
-                                 uint8_t* path_str,
                                  size_t chunk_index,
                                  cx_sha3_t* hash,
                                  size_t buffer_offset,
@@ -137,6 +132,9 @@ void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                                                          chunk_index,
                                                          data_chunk,
                                                          CHUNK_SIZE_IN_BYTES);
+    if (current_chunk_len < 0) {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+    }
     uint8_t hash_buffer[32];
     memset(hash_buffer, 0, sizeof(hash_buffer));
 
@@ -153,14 +151,12 @@ void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
 void compute_hash(dispatcher_context_t* dc,
                   uint8_t* data_merkle_root,
                   size_t n_chunks,
-                  uint8_t* path_str,
                   cx_sha3_t* hash) {
     CX_THROW(cx_keccak_init_no_throw(hash, 256));
 
     fetch_and_add_chunk_to_hash(dc,
                                 data_merkle_root,
                                 n_chunks,
-                                path_str,
                                 0,
                                 hash,
                                 12,
@@ -175,7 +171,6 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
     uint64_t n_chunks;
     uint8_t data_merkle_root[32];
-    bool printable = true;
 
     if (!buffer_read_u8(&dc->read_buffer, &bip32_path_len) ||
         !buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len) ||
@@ -199,7 +194,7 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     // ui_pre_processing_message();
-    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks, (uint8_t*) path_str)) {
+    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
         SEND_SW(dc, SW_DENY);
         ui_post_processing_confirm_withdraw(dc, false);
         return;
@@ -208,7 +203,7 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN
     cx_sha3_t hash;
-    compute_hash(dc, data_merkle_root, n_chunks, (uint8_t*) path_str, &hash);
+    compute_hash(dc, data_merkle_root, n_chunks, &hash);
     // SIGN MESSAGE (the message is the hash previously computed)
     uint8_t sig[MAX_DER_SIG_LEN];
 
