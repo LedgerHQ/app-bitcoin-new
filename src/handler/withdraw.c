@@ -260,12 +260,12 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     }
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    // // ui_pre_processing_message();
-    // if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
-    //     SEND_SW(dc, SW_DENY);
-    //     ui_post_processing_confirm_withdraw(dc, false);
-    //     return;
-    // }
+    // ui_pre_processing_message();
+    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
+        SEND_SW(dc, SW_DENY);
+        ui_post_processing_confirm_withdraw(dc, false);
+        return;
+    }
 
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN
