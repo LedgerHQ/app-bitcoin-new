@@ -37,7 +37,7 @@
 #define ADDRESS_SIZE_IN_BYTES 20
 #define ADDRESS_SIZE_IN_CHARS 40
 #define AMOUNT_SIZE_IN_BYTES  8
-#define AMOUNT_SIZE_IN_CHARS  16 + 10
+#define AMOUNT_SIZE_IN_CHARS  50
 
 // Constants for hash computation
 
@@ -53,6 +53,7 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
+    memset(value, 0, sizeof(value));
     char redeemer_output_script[65];
 
     // Get the first chunk that contains the data to display
@@ -78,10 +79,11 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
 
     // Trim the value of trailing zeros in a char of size of value
     int i = sizeof(value_with_ticker) - 1;
-    while (value_with_ticker[i] == '0' || value_with_ticker[i] == '\0') {
-        value_with_ticker[i] = '\0';
+    while (value_with_ticker[i] == '0' || value_with_ticker[i] == '\0' ||
+           value_with_ticker[i] == '.') {
         i--;
     }
+    value_with_ticker[i + 1] = '\0';
     // Get the second chunk that contains the data to display
     current_chunk_len = call_get_merkle_leaf_element(dc,
                                                      data_merkle_root,
