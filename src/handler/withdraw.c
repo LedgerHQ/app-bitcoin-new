@@ -188,6 +188,59 @@ void fetch_and_add_chunk_to_hash(dispatcher_context_t* dc,
                               NULL,               // output (intermediate)
                               0));                // no output yet
 }
+/**
+ * @brief Fetches a chunk of data from a Merkle tree and adds it to the output buffer.
+ *
+ * This function retrieves a specific chunk of data from a Merkle tree using the provided
+ * dispatcher context and Merkle root. The chunk is then optionally ABI-encoded and added
+ * to the specified position in the output buffer.
+ *
+ * @param dc The dispatcher context used for the operation.
+ * @param data_merkle_root The Merkle root of the data tree.
+ * @param n_chunks The total number of chunks in the data tree.
+ * @param chunk_index The index of the chunk to fetch.
+ * @param chunk_offset The offset within the chunk to start reading data from.
+ * @param chunk_data_size The size of the data to read from the chunk.
+ * @param abi_encode A boolean flag indicating whether to ABI-encode the data.
+ * @param output_buffer The buffer to which the fetched data will be added.
+ * @param output_buffer_offset The offset within the output buffer to start writing data to.
+ */
+void fetch_and_add_chunk_to_buffer(dispatcher_context_t* dc,
+                                   uint8_t* data_merkle_root,
+                                   size_t n_chunks,
+                                   size_t chunk_index,
+                                   size_t chunk_offset,
+                                   size_t chunk_data_size,
+                                   bool abi_encode,
+                                   uint8_t* output_buffer,
+                                   size_t output_buffer_offset) {
+    uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
+    int current_chunk_len = call_get_merkle_leaf_element(dc,
+                                                         data_merkle_root,
+                                                         n_chunks,
+                                                         chunk_index,
+                                                         data_chunk,
+                                                         CHUNK_SIZE_IN_BYTES);
+    if (current_chunk_len < 0) {
+        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+        ui_post_processing_confirm_withdraw(dc, false);
+        return;
+    }
+    size_t input_buffer_size;
+    uint8_t input_buffer[32];
+
+    if (abi_encode && chunk_data_size < 32) {
+        input_buffer_size = 32;
+        add_leading_zeroes(input_buffer,
+                           sizeof(input_buffer),
+                           data_chunk + chunk_offset,
+                           chunk_data_size);
+    } else {
+        input_buffer_size = chunk_data_size;
+        memcpy(input_buffer, data_chunk + chunk_offset, input_buffer_size);
+    }
+    memcpy(output_buffer + output_buffer_offset, input_buffer, input_buffer_size);
+}
 
 void fetch_and_hash_tx_data(dispatcher_context_t* dc,
                             uint8_t* data_merkle_root,
@@ -212,6 +265,118 @@ void fetch_and_hash_tx_data(dispatcher_context_t* dc,
                               32));           // output hash length (32 bytes)
 }
 
+void fetch_and_abi_encode_tx_fields(dispatcher_context_t* dc,
+                                    uint8_t* data_merkle_root,
+                                    size_t n_chunks,
+                                    uint8_t* keccak_of_tx_data,
+                                    uint8_t* output_buffer) {
+    size_t offset = 0;
+    // Fetch 'SafeTxTypeHash' field, add leading zeroes and add to output_buffer
+    offset += 32;
+    // Fetch 'to' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  0,
+                                  0,
+                                  20,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'value' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  1,
+                                  0,
+                                  32,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Add keccak_of_tx_data to output_buffer
+    memcpy(output_buffer + offset, keccak_of_tx_data, 32);
+    offset += 32;
+    // Fetch 'operation' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  3,
+                                  0,
+                                  1,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'safeTXGas' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  1,
+                                  32,
+                                  32,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'baseGas' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  2,
+                                  1,
+                                  32,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'gasPrice' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  2,
+                                  32,
+                                  32,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'gasToken' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  0,
+                                  20,
+                                  20,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch 'refundReceiver' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  0,
+                                  40,
+                                  20,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+    // Fetch '_nonce' field, add leading zeroes and add to output_buffer
+    fetch_and_add_chunk_to_buffer(dc,
+                                  data_merkle_root,
+                                  n_chunks,
+                                  3,
+                                  0,
+                                  32,
+                                  true,
+                                  output_buffer,
+                                  offset);
+    offset += 32;
+}
+
 void compute_tx_hash(dispatcher_context_t* dc,
                      uint8_t* data_merkle_root,
                      size_t n_chunks,
@@ -223,8 +388,13 @@ void compute_tx_hash(dispatcher_context_t* dc,
     u_int8_t keccak_of_tx_data[32];
     // Compute keccak256 hash of the tx_data_data
     fetch_and_hash_tx_data(dc, data_merkle_root, n_chunks, &hash_context, keccak_of_tx_data);
-
-    // Abi.encode 1
+    // Fetch and ABI-encode the tx fields
+    u_int8_t abi_encoded_tx_fields[32 * 11];
+    fetch_and_abi_encode_tx_fields(dc,
+                                   data_merkle_root,
+                                   n_chunks,
+                                   keccak_of_tx_data,
+                                   &abi_encoded_tx_fields);
     // Abi.encode 2
     // Compute keccak256 hash of abi.encode 2
     // Abi.encodePacked
@@ -260,12 +430,12 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     }
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    // ui_pre_processing_message();
-    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
-        SEND_SW(dc, SW_DENY);
-        ui_post_processing_confirm_withdraw(dc, false);
-        return;
-    }
+    // // ui_pre_processing_message();
+    // if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
+    //     SEND_SW(dc, SW_DENY);
+    //     ui_post_processing_confirm_withdraw(dc, false);
+    //     return;
+    // }
 
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN
