@@ -281,6 +281,7 @@ bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
 #ifdef HAVE_NBGL
 bool ui_transaction_prompt(dispatcher_context_t *context);
 void ui_display_post_processing_confirm_message(bool success);
+void ui_display_post_processing_confirm_withdraw(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
 void ui_set_display_prompt(void);
 #else

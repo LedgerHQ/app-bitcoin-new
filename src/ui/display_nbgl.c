@@ -499,6 +499,26 @@ void ui_sign_message_confirm_flow(void) {
     nbgl_useCaseReviewStreamingFinish("Sign message?", start_processing_message_callback);
 }
 
+void ui_display_withdraw_content_flow(void) {
+    pairList.pairs = pairs;
+    pairList.nbPairs = 3;
+
+    pairs[0].item = "Spender";
+    pairs[0].value = g_ui_state.validate_withdraw.spender;
+    pairs[1].item = "Redeemer";
+    pairs[1].value = g_ui_state.validate_withdraw.redeemer;
+    pairs[2].item = "Value";
+    pairs[2].value = g_ui_state.validate_withdraw.value;
+
+    nbgl_useCaseReview(TYPE_TRANSACTION,
+                       &pairList,
+                       &C_Acre_64px,
+                       "Review transaction\nto withdraw Bitcoin",
+                       NULL,
+                       "Sign transaction\nto withdraw Bitcoin?",
+                       start_transaction_callback);
+}
+
 void ui_set_display_prompt(void) {
     show_message_start_page = true;
 }
@@ -580,6 +600,15 @@ void ui_display_post_processing_confirm_message(bool success) {
     } else {
         ux_flow_response_false();
         nbgl_useCaseReviewStatus(STATUS_TYPE_MESSAGE_REJECTED, ui_menu_main);
+    }
+}
+void ui_display_post_processing_confirm_withdraw(bool success) {
+    if (success) {
+        ux_flow_response_true();
+        nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_SIGNED, ui_menu_main);
+    } else {
+        ux_flow_response_false();
+        nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_menu_main);
     }
 }
 

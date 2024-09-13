@@ -503,6 +503,17 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     return true;
 }
 
+bool ui_post_processing_confirm_withdraw(dispatcher_context_t *context, bool success) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+
+    (void) context;
+    ui_display_post_processing_confirm_withdraw(success);
+
+    return true;
+}
+
 void ui_pre_processing_message(void) {
     ui_set_display_prompt();
 }
