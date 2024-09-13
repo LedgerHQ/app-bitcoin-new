@@ -267,13 +267,6 @@ UX_STEP_NOCB(ux_withdraw_step,
                  "Withdraw",
              });
 
-UX_STEP_NOCB(ux_withdraw_display_spender_step,
-             bnnn_paging,
-             {
-                 .title = "Spender",
-                 .text = g_ui_state.validate_withdraw.spender,
-             });
-
 UX_STEP_NOCB(ux_withdraw_display_value_step,
              bnnn_paging,
              {
@@ -281,11 +274,11 @@ UX_STEP_NOCB(ux_withdraw_display_value_step,
                  .text = g_ui_state.validate_withdraw.value,
              });
 
-UX_STEP_NOCB(ux_withdraw_display_redeemer_step,
+UX_STEP_NOCB(ux_withdraw_display_redeemer_output_script_step,
              bnnn_paging,
              {
-                 .title = "Redeemer",
-                 .text = g_ui_state.validate_withdraw.redeemer,
+                 .title = "Output Script",
+                 .text = g_ui_state.validate_withdraw.redeemer_output_script,
              });
 
 UX_STEP_CB(ux_withdraw_accept_step,
@@ -489,16 +482,14 @@ UX_FLOW(ux_accept_selftransfer_flow,
 
 // FLOW to data from withdraw tx:
 // #1 screen: certificate icon + "Withdraw"
-// #2 screen: spender
-// #3 screen: value
-// #4 screen: redeemer
-// #5 screen: "Approve" button
-// #6 screen: "Reject" button
+// #2 screen: value
+// #3 screen: redeemer_output_script
+// #4 screen: "Approve" button
+// #5 screen: "Reject" button
 UX_FLOW(ux_withdraw_display_data_flow,
         &ux_withdraw_step,
-        &ux_withdraw_display_spender_step,
         &ux_withdraw_display_value_step,
-        &ux_withdraw_display_redeemer_step,
+        &ux_withdraw_display_redeemer_output_script_step,
         &ux_withdraw_accept_step,
         &ux_display_reject_step);
 

@@ -32,7 +32,7 @@
 #include "handlers.h"
 
 #define DATA_CHUNK_INDEX_1    5
-#define DATA_CHUNK_INDEX_2    7
+#define DATA_CHUNK_INDEX_2    10
 #define CHUNK_SIZE_IN_BYTES   64
 #define ADDRESS_SIZE_IN_BYTES 20
 #define ADDRESS_SIZE_IN_CHARS 40
@@ -53,8 +53,7 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
-    char spender[ADDRESS_SIZE_IN_BYTES * 2 + 2 + 1];
-    char redeemer[ADDRESS_SIZE_IN_BYTES * 2 + 2 + 1];
+    char redeemer_output_script[65];
 
     // Get the first chunk that contains the data to display
     int current_chunk_len = call_get_merkle_leaf_element(dc,
@@ -65,18 +64,8 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                                          CHUNK_SIZE_IN_BYTES);
     // Start Parsing
 
-    // format spender
-    const int offset_address = 12;
-    spender[0] = '0';
-    spender[1] = 'x';
-    if (!format_hex(&data_chunk[offset_address],
-                    ADDRESS_SIZE_IN_BYTES,
-                    spender + 2,
-                    sizeof(spender))) {
-        return false;
-    }
     // format value
-    int offset_value = 12 + ADDRESS_SIZE_IN_BYTES + 24;
+    int offset_value = 32 + 24;
     uint64_t value_u64 = read_u64_be(data_chunk, offset_value);
 
     if (!format_fpu64(value, sizeof(value), value_u64, 18)) {
@@ -100,19 +89,24 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                                      DATA_CHUNK_INDEX_2,
                                                      data_chunk,
                                                      CHUNK_SIZE_IN_BYTES);
+    // get the length from the first 32 bytes of data_chunk. It is the last 2 bytes
+    int offset_length = 30;
+    size_t len_redeemer_output_script = read_u16_be(data_chunk, offset_length);
+    if (len_redeemer_output_script > 32) {
+        len_redeemer_output_script = 32;
+    }
+    // format redeemer output script
+    const int offset_output_script = 32;
 
-    // format redeemer
-    redeemer[0] = '0';
-    redeemer[1] = 'x';
-    if (!format_hex(&data_chunk[offset_address],
-                    ADDRESS_SIZE_IN_BYTES,
-                    redeemer + 2,
-                    sizeof(redeemer))) {
+    if (!format_hex(&data_chunk[offset_output_script],
+                    len_redeemer_output_script,
+                    redeemer_output_script,
+                    sizeof(redeemer_output_script))) {
         return false;
     }
 
     // Display data
-    if (!ui_validate_withdraw_data_and_confirm(dc, spender, value_with_ticker, redeemer)) {
+    if (!ui_validate_withdraw_data_and_confirm(dc, value_with_ticker, redeemer_output_script)) {
         return false;
 
         // while (get_streaming_index() <= (n_chunks - 1)) {
@@ -394,7 +388,7 @@ void compute_tx_hash(dispatcher_context_t* dc,
                                    data_merkle_root,
                                    n_chunks,
                                    keccak_of_tx_data,
-                                   &abi_encoded_tx_fields);
+                                   abi_encoded_tx_fields);
     // Abi.encode 2
     // Compute keccak256 hash of abi.encode 2
     // Abi.encodePacked
@@ -430,12 +424,12 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     }
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    // // ui_pre_processing_message();
-    // if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
-    //     SEND_SW(dc, SW_DENY);
-    //     ui_post_processing_confirm_withdraw(dc, false);
-    //     return;
-    // }
+    // ui_pre_processing_message();
+    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
+        SEND_SW(dc, SW_DENY);
+        ui_post_processing_confirm_withdraw(dc, false);
+        return;
+    }
 
 #endif
     // COMPUTE THE HASH THAT WE WILL SIGN

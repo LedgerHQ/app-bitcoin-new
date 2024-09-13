@@ -155,18 +155,18 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
 }
 
 bool ui_validate_withdraw_data_and_confirm(dispatcher_context_t *context,
-                                           const char *spender,
                                            const char *value,
-                                           const char *redeemer) {
+                                           const char *redeemer_output_script) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
     ui_validate_withdraw_state_t *state = (ui_validate_withdraw_state_t *) &g_ui_state;
-    // copy the spender and value to the state
-    strncpy(state->spender, spender, sizeof(state->spender));
+    // copy the redeemer_output_script and value to the state
     strncpy(state->value, value, sizeof(state->value));
-    strncpy(state->redeemer, redeemer, sizeof(state->redeemer));
+    strncpy(state->redeemer_output_script,
+            redeemer_output_script,
+            sizeof(state->redeemer_output_script));
 
     ui_display_withdraw_content_flow();
 
