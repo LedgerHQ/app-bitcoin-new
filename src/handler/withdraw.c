@@ -429,15 +429,14 @@ void compute_tx_hash(dispatcher_context_t* dc,
     memcpy(abi_encode_packed + 2 + 32, keccak_of_abi_encoded_tx_fields, 32);
 
     // Keccak256 hash of abi.encodePacked
-    u_int8_t final_hash[32];
     // reset the hash context and compute the hash
     CX_THROW(cx_keccak_init_no_throw(&hash_context, 256));
     CX_THROW(cx_hash_no_throw((cx_hash_t*) &hash_context,
                               CX_LAST,
                               abi_encode_packed,
                               sizeof(abi_encode_packed),
-                              final_hash,
-                              sizeof(final_hash)));
+                              output_buffer,
+                              sizeof(output_buffer)));
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
