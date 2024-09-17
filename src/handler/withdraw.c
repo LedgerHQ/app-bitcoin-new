@@ -436,7 +436,7 @@ void compute_tx_hash(dispatcher_context_t* dc,
                               abi_encode_packed,
                               sizeof(abi_encode_packed),
                               output_buffer,
-                              sizeof(output_buffer)));
+                              32));
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
