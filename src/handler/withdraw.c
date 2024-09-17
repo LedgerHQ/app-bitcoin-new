@@ -47,6 +47,23 @@ static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
 
+// Keccak-256 hash of the ABI-encoded data:
+// abi.encode(
+//     DOMAIN_SEPARATOR_TYPEHASH, // 0x47e79534a245952e8b16893a336b85a3
+//                                     d9ea9fa8c573f3d803afb92a79469218
+//     getChainId(),              // 0x01
+//     this                       // 0x41675C099F32341bf84BFc5382aF534df5C7461a
+// )
+// Resulting hash value:
+// 0xc4864056e21022913a49884ba9fb4035364d5c2ab8b40f0305583ae419c72f86
+static const uint8_t keccak_of_abi_encode_2[32] = {
+    0xc4, 0x86, 0x40, 0x56, 0xe2, 0x10, 0x22, 0x91, 0x3a, 0x49, 0x88, 0x4b, 0xa9, 0xfb, 0x40, 0x35,
+    0x36, 0x4d, 0x5c, 0x2a, 0xb8, 0xb4, 0x0f, 0x03, 0x05, 0x58, 0x3a, 0xe4, 0x19, 0xc7, 0x2f, 0x86};
+
+static const uint8_t safe_tx_typehash[32] = {
+    0xbb, 0x83, 0x10, 0xd4, 0x86, 0x36, 0x8d, 0xb6, 0xbd, 0x6f, 0x84, 0x94, 0x02, 0xfd, 0xd7, 0x3a,
+    0xd5, 0x3d, 0x31, 0x6b, 0x5a, 0x4b, 0x26, 0x44, 0xad, 0x6e, 0xfe, 0x0f, 0x94, 0x12, 0x86, 0xd8};
+
 static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                              uint8_t* data_merkle_root,
                                              size_t n_chunks) {
@@ -267,7 +284,9 @@ void fetch_and_abi_encode_tx_fields(dispatcher_context_t* dc,
                                     uint8_t* keccak_of_tx_data,
                                     uint8_t* output_buffer) {
     size_t offset = 0;
-    // Fetch 'SafeTxTypeHash' field, add leading zeroes and add to output_buffer
+
+    // Copy 'SafeTxTypeHash' field into output_buffer
+    memcpy(output_buffer + offset, safe_tx_typehash, 32);
     offset += 32;
     // Fetch 'to' field, add leading zeroes and add to output_buffer
     fetch_and_add_chunk_to_buffer(dc,
@@ -391,10 +410,34 @@ void compute_tx_hash(dispatcher_context_t* dc,
                                    n_chunks,
                                    keccak_of_tx_data,
                                    abi_encoded_tx_fields);
-    // Abi.encode 2
-    // Compute keccak256 hash of abi.encode 2
+    // Hash the abi_encoded_tx_fields
+    u_int8_t keccak_of_abi_encoded_tx_fields[32];
+    CX_THROW(cx_keccak_init_no_throw(&hash_context, 256));
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) &hash_context,
+                              CX_LAST,
+                              abi_encoded_tx_fields,
+                              sizeof(abi_encoded_tx_fields),
+                              keccak_of_abi_encoded_tx_fields,
+                              sizeof(keccak_of_abi_encoded_tx_fields)));
+
     // Abi.encodePacked
+    u_int8_t abi_encode_packed[2 + 32 + 32]  // 2 bytes + 2 keccak256 hashes
+        = {0x19, 0x01};
+    // Add the keccak_of_abi_encode_2 to the abi_encode_packed
+    memcpy(abi_encode_packed + 2, keccak_of_abi_encode_2, 32);
+    // Add the keccak_of_tx_data to the abi_encode_packed
+    memcpy(abi_encode_packed + 2 + 32, keccak_of_abi_encoded_tx_fields, 32);
+
     // Keccak256 hash of abi.encodePacked
+    u_int8_t final_hash[32];
+    // reset the hash context and compute the hash
+    CX_THROW(cx_keccak_init_no_throw(&hash_context, 256));
+    CX_THROW(cx_hash_no_throw((cx_hash_t*) &hash_context,
+                              CX_LAST,
+                              abi_encode_packed,
+                              sizeof(abi_encode_packed),
+                              final_hash,
+                              sizeof(final_hash)));
 }
 
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
