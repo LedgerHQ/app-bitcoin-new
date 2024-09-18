@@ -23,10 +23,9 @@ def test_sign_withdraw(navigator: Navigator, firmware: Firmware, client: RaggerC
         refundReceiver= "0x0000000000000000000000000000000000000000",
         nonce= "0xC",
     )
-    path = "m/44'/1'/0'/0/0"
+    path = "m/44'/0'/0'/0/0"
     result = client.sign_withdraw(data, path, navigator,
                                  instructions=withdrawal_instruction_approve(firmware),
                                  testname=test_name)
 
-    # assert result == ...
-    assert 1 == 1
+    assert result == "20a923c0b79f07e960100d9651e2058728cb84c53fdb95c435f4468c476fa3898362c84e0cb4b4fabecf5a34289f2b6287100872619d4f7155f84090f07abef8f29000"
