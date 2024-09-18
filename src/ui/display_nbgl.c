@@ -503,8 +503,8 @@ void ui_display_withdraw_content_flow(void) {
     pairList.pairs = pairs;
     pairList.nbPairs = 2;
 
-    pairs[0].item = "Redeemer Output Script";
-    pairs[0].value = g_ui_state.validate_withdraw.redeemer_output_script;
+    pairs[0].item = "Redeemer Address";
+    pairs[0].value = g_ui_state.validate_withdraw.redeemer_address;
     pairs[1].item = "Value";
     pairs[1].value = g_ui_state.validate_withdraw.value;
 

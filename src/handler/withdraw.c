@@ -28,6 +28,7 @@
 #include "../ui/display.h"
 #include "../ui/menu.h"
 #include "lib/get_merkle_leaf_element.h"
+#include "../common/script.h"
 
 #include "handlers.h"
 
@@ -38,6 +39,7 @@
 #define ADDRESS_SIZE_IN_CHARS 40
 #define AMOUNT_SIZE_IN_BYTES  8
 #define AMOUNT_SIZE_IN_CHARS  50
+#define CHUNK_SECOND_PART     32
 
 // Constants for hash computation
 
@@ -71,7 +73,6 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
     memset(value, 0, sizeof(value));
-    char redeemer_output_script[65];
 
     // Get the first chunk that contains the data to display
     int current_chunk_len = call_get_merkle_leaf_element(dc,
@@ -83,7 +84,7 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     // Start Parsing
 
     // format value
-    int offset_value = 32 + 24;
+    int offset_value = CHUNK_SECOND_PART + 24;
     uint64_t value_u64 = read_u64_be(data_chunk, offset_value);
 
     if (!format_fpu64(value, sizeof(value), value_u64, 18)) {
@@ -114,18 +115,19 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     if (len_redeemer_output_script > 32) {
         len_redeemer_output_script = 32;
     }
-    // format redeemer output script
-    const int offset_output_script = 32;
+    const int offset_output_script = CHUNK_SECOND_PART + 1;  // the first byte is the length
+    char redeemer_address[MAX_ADDRESS_LENGTH_STR + 1];
+    memset(redeemer_address, 0, sizeof(redeemer_address));
 
-    if (!format_hex(&data_chunk[offset_output_script],
-                    len_redeemer_output_script,
-                    redeemer_output_script,
-                    sizeof(redeemer_output_script))) {
+    if (-1 == get_script_address(&data_chunk[offset_output_script],
+                                 len_redeemer_output_script - 1,  // the first byte is the length
+                                 (char*) redeemer_address,
+                                 MAX_ADDRESS_LENGTH_STR)) {
         return false;
     }
 
     // Display data
-    if (!ui_validate_withdraw_data_and_confirm(dc, value_with_ticker, redeemer_output_script)) {
+    if (!ui_validate_withdraw_data_and_confirm(dc, value_with_ticker, redeemer_address)) {
         return false;
 
         // while (get_streaming_index() <= (n_chunks - 1)) {
