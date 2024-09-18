@@ -439,6 +439,44 @@ void compute_tx_hash(dispatcher_context_t* dc,
                               32));
 }
 
+uint32_t sign_tx_hash(dispatcher_context_t* dc,
+                      uint32_t* bip32_path,
+                      uint8_t bip32_path_len,
+                      char* tx_hash,
+                      uint8_t* sig) {
+    size_t tx_hash_length = strlen(tx_hash);
+    cx_sha256_t bsm_digest_context;  // used to compute the Bitcoin Message Signing digest
+    cx_sha256_init(&bsm_digest_context);
+
+    crypto_hash_update(&bsm_digest_context.header, BSM_SIGN_MAGIC, sizeof(BSM_SIGN_MAGIC));
+    crypto_hash_update_varint(&bsm_digest_context.header, tx_hash_length);
+    crypto_hash_update(&bsm_digest_context.header, tx_hash, tx_hash_length);
+
+    uint8_t bsm_digest[32];
+
+    crypto_hash_digest(&bsm_digest_context.header, bsm_digest, 32);
+    cx_hash_sha256(bsm_digest, 32, bsm_digest, 32);
+
+#ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    ui_pre_processing_message();
+#endif
+
+    uint32_t info;
+    int sig_len = crypto_ecdsa_sign_sha256_hash_with_key(bip32_path,
+                                                         bip32_path_len,
+                                                         bsm_digest,
+                                                         NULL,
+                                                         sig,
+                                                         &info);
+    if (sig_len < 0) {
+        // unexpected error when signing
+        SEND_SW(dc, SW_BAD_STATE);
+        ui_post_processing_confirm_message(dc, false);
+        return -1;
+    }
+    return info;
+}
+
 void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     (void) protocol_version;
 
@@ -479,11 +517,46 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
     // COMPUTE THE HASH THAT WE WILL SIGN
     uint8_t tx_hash[32];
     compute_tx_hash(dc, data_merkle_root, n_chunks, tx_hash);
-    // SIGN MESSAGE (the message is the hash previously computed)
 
-    // Send the response to the JS Library
-    uint8_t sig[65];
-    SEND_RESPONSE(dc, sig, sizeof(sig), SW_OK);
-    ui_post_processing_confirm_withdraw(dc, true);
+    // Convert tx_hash to a string for display
+    char tx_hash_str[65];
+    if (!format_hex(tx_hash, 32, tx_hash_str, sizeof(tx_hash_str))) {
+        SEND_SW(dc, SW_BAD_STATE);
+        ui_post_processing_confirm_message(dc, false);
+        return;
+    };
+
+    // SIGN MESSAGE (the message is the hash previously computed)
+    uint8_t sig[MAX_DER_SIG_LEN];
+    uint32_t info = sign_tx_hash(dc, bip32_path, bip32_path_len, tx_hash_str, sig);
+
+    // convert signature to the standard Bitcoin format, always 65 bytes long
+
+    uint8_t result[65];
+    memset(result, 0, sizeof(result));
+
+    // # Format signature into standard bitcoin format
+    int r_length = sig[3];
+    int s_length = sig[4 + r_length + 1];
+
+    if (r_length > 33 || s_length > 33) {
+        SEND_SW(dc, SW_BAD_STATE);  // can never happen
+        ui_post_processing_confirm_message(dc, false);
+        return;
+    }
+
+    // Write s, r, and the first byte in reverse order, as the two loops will underflow by 1
+    // byte (that needs to be discarded) when s_length and r_length (respectively) are equal
+    // to 33.
+    for (int i = s_length - 1; i >= 0; --i) {
+        result[1 + 32 + 32 - s_length + i] = sig[4 + r_length + 2 + i];
+    }
+    for (int i = r_length - 1; i >= 0; --i) {
+        result[1 + 32 - r_length + i] = sig[4 + i];
+    }
+    result[0] = 27 + 4 + ((info & CX_ECCINFO_PARITY_ODD) ? 1 : 0);
+
+    SEND_RESPONSE(dc, result, sizeof(result), SW_OK);
+    ui_post_processing_confirm_message(dc, true);
     return;
 }
