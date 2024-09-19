@@ -35,9 +35,9 @@ static void exit(void) {
     os_sched_exit(-1);
 }
 
-void ui_menu_main_flow_acre(void) {
+void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_Acre_64px,
+                                &C_Bitcoin_64px,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
@@ -46,10 +46,10 @@ void ui_menu_main_flow_acre(void) {
                                 exit);
 }
 
-void ui_menu_main_flow_acre_testnet(void) {
+void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
-        "Acre Testnet",
-        &C_Acre_64px,
+        "Bitcoin Testnet",
+        &C_Bitcoin_64px,
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
         INIT_HOME_PAGE,
         NULL,

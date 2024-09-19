@@ -1,7 +1,7 @@
 #pragma once
 
 /**
- * Instruction class of the Acre application.
+ * Instruction class of the Bitcoin application.
  */
 #define CLA_APP 0xE1
 

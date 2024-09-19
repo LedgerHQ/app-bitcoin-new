@@ -45,9 +45,9 @@ PATH_APP_LOAD_PARAMS = ""
 PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Application version
-APPVERSION_M = 1
-APPVERSION_N = 0
-APPVERSION_P = 0
+APPVERSION_M = 2
+APPVERSION_N = 2
+APPVERSION_P = 5
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -89,7 +89,7 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-    APPNAME = "Acre Test"
+    APPNAME = "Bitcoin Test"
 else ifeq ($(COIN),bitcoin)
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
@@ -105,7 +105,7 @@ else ifeq ($(COIN),bitcoin)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-    APPNAME = "Acre"
+    APPNAME = "Bitcoin"
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -121,10 +121,10 @@ endif
 
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOX = icons/nanox_app_acre.gif
-ICON_NANOSP = icons/nanox_app_acre.gif
-ICON_STAX = icons/stax_app_acre.gif
-ICON_FLEX = icons/flex_app_acre.gif
+ICON_NANOX = icons/nanox_app_bitcoin.gif
+ICON_NANOSP = icons/nanox_app_bitcoin.gif
+ICON_STAX = icons/stax_app_bitcoin.gif
+ICON_FLEX = icons/flex_app_bitcoin.gif
 
 ########################################
 # Application communication interfaces #
@@ -156,7 +156,7 @@ CFLAGS    += -g -include debug-helpers/debug.h
 
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
-DEBUG = 1 # 0 for production, 1 for debug
+DEBUG = 0 # 0 for production, 1 for debug
 ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
     DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf

@@ -220,7 +220,7 @@ void ui_accept_transaction_simplified_flow(void) {
 
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &pairList,
-                       &C_Acre_64px,
+                       &C_Bitcoin_64px,
                        "Review transaction\nto send Bitcoin",
                        NULL,
                        "Sign transaction\nto send Bitcoin?",
@@ -229,7 +229,7 @@ void ui_accept_transaction_simplified_flow(void) {
 
 void ui_display_transaction_prompt(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
-                                     &C_Acre_64px,
+                                     &C_Bitcoin_64px,
                                      "Review transaction\nto send Bitcoin",
                                      NULL,
                                      start_transaction_callback);
@@ -293,7 +293,7 @@ void ui_display_pubkey_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Acre_64px,
+                            &C_Bitcoin_64px,
                             "Confirm public key",
                             NULL,
                             "Approve public key",
@@ -312,7 +312,7 @@ void ui_display_receive_in_wallet_flow(void) {
 
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               &pairList,
-                              &C_Acre_64px,
+                              &C_Bitcoin_64px,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);
@@ -356,7 +356,7 @@ void ui_display_register_wallet_policy_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Acre_64px,
+                            &C_Bitcoin_64px,
                             "Review account\nto register",
                             NULL,
                             "Register account?",
@@ -381,7 +381,7 @@ void ui_display_pubkey_suspicious_flow(void) {
     pairList.pairs = pairs;
 
     contentList[0].type = CENTERED_INFO;
-    contentList[0].content.centeredInfo.icon = &C_Acre_64px;
+    contentList[0].content.centeredInfo.icon = &C_Bitcoin_64px;
     contentList[0].content.centeredInfo.text1 = "Confirm public key";
     contentList[0].content.centeredInfo.text2 = NULL;
     contentList[0].content.centeredInfo.text3 = NULL;
@@ -404,7 +404,7 @@ void ui_display_pubkey_suspicious_flow(void) {
 
     contentList[3].type = INFO_BUTTON;
     contentList[3].content.infoButton.text = "Approve public key";
-    contentList[3].content.infoButton.icon = &C_Acre_64px;
+    contentList[3].content.infoButton.icon = &C_Bitcoin_64px;
     contentList[3].content.infoButton.buttonText = "Approve";
     contentList[3].content.infoButton.buttonToken = REVIEW_CONFIRM;
     contentList[3].content.infoButton.tuneId = TUNE_TAP_CASUAL;
@@ -478,7 +478,7 @@ void ui_sign_message_content_flow(void) {
     if (show_message_start_page == true) {
         show_message_start_page = false;
         nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                         &C_Acre_64px,
+                                         &C_Bitcoin_64px,
                                          "Review message",
                                          NULL,
                                          message_display_content);
@@ -489,7 +489,7 @@ void ui_sign_message_content_flow(void) {
 
 void ui_sign_message_path_hash_and_confirm_flow(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                     &C_Acre_64px,
+                                     &C_Bitcoin_64px,
                                      "Review message",
                                      NULL,
                                      message_display_path);
@@ -536,7 +536,7 @@ void ui_display_spend_from_wallet_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Acre_64px,
+                            &C_Bitcoin_64px,
                             "Spend from\nknown account",
                             NULL,
                             "Confirm account name",
@@ -547,7 +547,7 @@ void ui_display_spend_from_wallet_flow(void) {
 void ui_display_default_wallet_address_flow(void) {
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
-                              &C_Acre_64px,
+                              &C_Bitcoin_64px,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);

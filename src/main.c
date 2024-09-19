@@ -160,7 +160,7 @@ void app_main() {
                         &cmd);
 
         if (G_swap_state.called_from_swap && G_swap_state.should_exit) {
-            // Acre app will keep listening as long as it does not receive a valid TX
+            // Bitcoin app will keep listening as long as it does not receive a valid TX
             finalize_exchange_sign_transaction(true);
         }
     }
