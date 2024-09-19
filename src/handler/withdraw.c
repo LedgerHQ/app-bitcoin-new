@@ -31,6 +31,9 @@
 #include "../common/script.h"
 
 #include "handlers.h"
+#include "../swap/handle_check_address.h"
+#include "crypto.h"
+#include "../common/script.h"
 
 #define DATA_CHUNK_INDEX_1    5
 #define DATA_CHUNK_INDEX_2    10
@@ -66,9 +69,48 @@ static const uint8_t safe_tx_typehash[32] = {
     0xbb, 0x83, 0x10, 0xd4, 0x86, 0x36, 0x8d, 0xb6, 0xbd, 0x6f, 0x84, 0x94, 0x02, 0xfd, 0xd7, 0x3a,
     0xd5, 0x3d, 0x31, 0x6b, 0x5a, 0x4b, 0x26, 0x44, 0xad, 0x6e, 0xfe, 0x0f, 0x94, 0x12, 0x86, 0xd8};
 
+static bool check_address(uint32_t* bip32_path,
+                          uint8_t bip32_path_len,
+                          char* address_to_check,
+                          uint8_t address_to_check_len,
+                          uint8_t address_type) {
+    unsigned char compressed_public_key[33];
+    if (address_to_check_len > MAX_ADDRESS_LENGTH_STR) {
+        return false;
+    }
+    if (address_to_check_len < 1) {
+        return false;
+    }
+    if (!crypto_get_compressed_pubkey_at_path(bip32_path,
+                                              bip32_path_len,
+                                              compressed_public_key,
+                                              NULL)) {
+        return false;
+    }
+    char address_recovered[MAX_ADDRESS_LENGTH_STR + 1];
+    if (!get_address_from_compressed_public_key(address_type,
+                                                compressed_public_key,
+                                                COIN_P2PKH_VERSION,
+                                                COIN_P2SH_VERSION,
+                                                COIN_NATIVE_SEGWIT_PREFIX,
+                                                address_recovered,
+                                                sizeof(address_recovered))) {
+        PRINTF("Can't create address from given public key\n");
+        return false;
+    }
+    if (os_strcmp(address_recovered, address_to_check) != 0) {
+        PRINTF("Addresses don't match\n");
+        return false;
+    }
+    PRINTF("Addresses match\n");
+    return true;
+}
+
 static bool display_data_content_and_confirm(dispatcher_context_t* dc,
                                              uint8_t* data_merkle_root,
-                                             size_t n_chunks) {
+                                             size_t n_chunks,
+                                             uint32_t* bip32_path,
+                                             uint8_t bip32_path_len) {
     reset_streaming_index();
     uint8_t data_chunk[CHUNK_SIZE_IN_BYTES];
     char value[AMOUNT_SIZE_IN_CHARS + 1];
@@ -119,19 +161,35 @@ static bool display_data_content_and_confirm(dispatcher_context_t* dc,
     char redeemer_address[MAX_ADDRESS_LENGTH_STR + 1];
     memset(redeemer_address, 0, sizeof(redeemer_address));
 
-    if (-1 == get_script_address(&data_chunk[offset_output_script],
-                                 len_redeemer_output_script - 1,  // the first byte is the length
-                                 (char*) redeemer_address,
-                                 MAX_ADDRESS_LENGTH_STR)) {
+    int address_type =
+        get_script_type(&data_chunk[offset_output_script],
+                        len_redeemer_output_script - 1);  // the first byte is the length
+
+    int redeemer_address_len =
+        get_script_address(&data_chunk[offset_output_script],
+                           len_redeemer_output_script - 1,  // the first byte is the length
+                           (char*) redeemer_address,
+                           MAX_ADDRESS_LENGTH_STR);
+
+    if (address_type == -1 || redeemer_address_len == -1) {
+        PRINTF("Error: Address type or address length is invalid\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        ui_post_processing_confirm_withdraw(dc, false);
+        return false;
+    }
+    if (check_address(bip32_path,
+                      bip32_path_len,
+                      redeemer_address,
+                      redeemer_address_len,
+                      address_type) == false) {
+        SEND_SW(dc, SW_INCORRECT_DATA);
+        ui_post_processing_confirm_withdraw(dc, false);
         return false;
     }
 
     // Display data
     if (!ui_validate_withdraw_data_and_confirm(dc, value_with_ticker, redeemer_address)) {
         return false;
-
-        // while (get_streaming_index() <= (n_chunks - 1)) {
-        // }
     }
 
     return true;
@@ -509,7 +567,11 @@ void handler_withdraw(dispatcher_context_t* dc, uint8_t protocol_version) {
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     // ui_pre_processing_message();
-    if (!display_data_content_and_confirm(dc, data_merkle_root, n_chunks)) {
+    if (!display_data_content_and_confirm(dc,
+                                          data_merkle_root,
+                                          n_chunks,
+                                          bip32_path,
+                                          bip32_path_len)) {
         SEND_SW(dc, SW_DENY);
         ui_post_processing_confirm_withdraw(dc, false);
         return;

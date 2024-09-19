@@ -88,7 +88,7 @@ bool get_address_from_compressed_public_key(unsigned char format,
     return true;
 }
 
-static int os_strcmp(const char* s1, const char* s2) {
+int os_strcmp(const char* s1, const char* s2) {
     size_t size = strlen(s1) + 1;
     return memcmp(s1, s2, size);
 }
