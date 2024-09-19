@@ -510,7 +510,7 @@ void ui_display_withdraw_content_flow(void) {
 
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &pairList,
-                       &C_Acre_64px,
+                       &C_Bitcoin_64px,
                        "Review transaction\nto withdraw Bitcoin",
                        NULL,
                        "Sign transaction\nto withdraw Bitcoin?",
