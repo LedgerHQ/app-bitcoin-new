@@ -28,4 +28,4 @@ def test_sign_withdraw(navigator: Navigator, firmware: Firmware, client: RaggerC
                                  instructions=withdrawal_instruction_approve(firmware),
                                  testname=test_name)
 
-    assert result == "20a923c0b79f07e960100d9651e2058728cb84c53fdb95c435f4468c476fa3898362c84e0cb4b4fabecf5a34289f2b6287100872619d4f7155f84090f07abef8f29000"
+    assert result == "IKkjwLefB+lgEA2WUeIFhyjLhMU/25XENfRGjEdvo4mDYshODLS0+r7PWjQonytihxAIcmGdT3FV+ECQ8Hq++PI="
