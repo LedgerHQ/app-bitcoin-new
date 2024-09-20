@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches:
-    - master
-    - develop
+      - master
+      - develop
   pull_request:
     branches:
-    - master
-    - develop
+      - master
+      - develop
 
 jobs:
   job_lint:
@@ -20,9 +20,12 @@ jobs:
       - name: Clone
         uses: actions/checkout@v2
 
+      - name: Install distutils
+        run: sudo apt-get install -y python3-distutils
+
       - name: Lint
         uses: DoozyX/clang-format-lint-action@v0.12
         with:
-          source: './src'
-          extensions: 'h,c'
+          source: "./src"
+          extensions: "h,c"
           clangFormatVersion: 12
