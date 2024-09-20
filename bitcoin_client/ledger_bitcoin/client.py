@@ -325,17 +325,4 @@ def createClient(comm_client: Optional[TransportClient] = None, chain: Chain = C
     if comm_client is None:
         comm_client = TransportClient("hid")
 
-    base_client = Client(comm_client, chain, debug)
-    app_name, app_version, _ = base_client.get_version()
-
-    version = parse_version(app_version)
-
-    # Use the legacy client if either:
-    # - the name of the app is "Bitcoin Legacy" or "Bitcoin Test Legacy" (regardless of the version)
-    # - the version is strictly less than 2.1
-    use_legacy = app_name in ["Bitcoin Legacy", "Bitcoin Test Legacy"] or version.major < 2 or (version.major == 2 and version.minor == 0)
-
-    if use_legacy:
-        return LegacyClient(comm_client, chain, debug)
-    else:
-        return NewClient(comm_client, chain, debug)
+    return NewClient(comm_client, chain, debug)
