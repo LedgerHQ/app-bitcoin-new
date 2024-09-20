@@ -89,7 +89,7 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-    APPNAME = "Bitcoin Test"
+    APPNAME = "Acre Test"
 else ifeq ($(COIN),bitcoin)
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
@@ -105,7 +105,7 @@ else ifeq ($(COIN),bitcoin)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-    APPNAME = "Bitcoin"
+    APPNAME = "Acre"
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)

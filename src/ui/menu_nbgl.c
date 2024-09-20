@@ -48,7 +48,7 @@ void ui_menu_main_flow_bitcoin(void) {
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
-        "Bitcoin Testnet",
+        "Acre Testnet",
         &C_Bitcoin_64px,
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
         INIT_HOME_PAGE,
