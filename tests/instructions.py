@@ -28,6 +28,16 @@ def withdrawal_instruction_approve(model: Firmware, save_screenshot=True) -> Ins
 
     return instructions
 
+def withdrawal_instruction_reject(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Reject")
+    else:
+        instructions.reject_message()
+
+    return instructions
+
 
 def message_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)
