@@ -1,5 +1,6 @@
 import enum
 from typing import List, Tuple, Mapping, Union, Iterator, Optional
+import math
 
 from .common import bip32_path_from_string, write_varint
 from .merkle import get_merkleized_map_commitment, MerkleTree, element_hash
@@ -217,7 +218,7 @@ class BitcoinCommandBuilder:
         chunks.append(data_bytes.data[:4])
 
         # Calculate the number of 64-byte chunks needed for the remaining data
-        n_chunks_data = (len(data_bytes.data) - 4 + 63) // 64
+        n_chunks_data = math.ceil((len(data_bytes.data) - 4) / 64)
 
         # Chunk 5 to n: data[64]
         for i in range(n_chunks_data):

@@ -31,11 +31,18 @@ class AcreWithdrawalData:
                 hex_str = hex_str[2:]
             hex_str = hex_str.zfill(size * 2)  # Pad with leading zeros to the desired byte length
             return bytes.fromhex(hex_str)
+        
+        def hex_to_bytes_data(hex_str: str) -> bytes:
+            if hex_str.startswith("0x"):
+                hex_str = hex_str[2:]
+            size = len(hex_str) // 2  # Calculate size without the 0x prefix
+            hex_str = hex_str.zfill(size * 2)  # Pad with leading zeros to the desired byte length
+            return bytes.fromhex(hex_str)
 
         return AcreWithdrawalDataBytes(
             to=hex_to_bytes(self.to, 20),
             value=hex_to_bytes(self.value, 32),
-            data=hex_to_bytes(self.data, len(self.data) // 2),
+            data=hex_to_bytes_data(self.data),
             operation=hex_to_bytes(self.operation, 1),
             safeTxGas=hex_to_bytes(self.safeTxGas, 32),
             baseGas=hex_to_bytes(self.baseGas, 32),
