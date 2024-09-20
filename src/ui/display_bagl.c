@@ -265,6 +265,7 @@ UX_STEP_NOCB(ux_withdraw_step,
              {
                  &C_icon_certificate,
                  "Withdraw",
+                 "",
              });
 
 UX_STEP_NOCB(ux_withdraw_display_value_step,

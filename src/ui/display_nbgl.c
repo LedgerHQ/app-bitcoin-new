@@ -95,6 +95,7 @@ static void start_processing_message_callback(bool confirm) {
 
 static void start_transaction_callback(bool confirm) {
     if (confirm) {
+        nbgl_useCaseSpinner("Processing");
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
@@ -513,7 +514,7 @@ void ui_display_withdraw_content_flow(void) {
                        &C_Acre_64px,
                        "Review transaction\nto withdraw Bitcoin",
                        NULL,
-                       "Sign transaction\nto withdraw Bitcoin?",
+                       "Approve\nWithdrawal ",
                        start_transaction_callback);
 }
 
