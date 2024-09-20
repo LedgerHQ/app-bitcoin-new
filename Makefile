@@ -121,10 +121,10 @@ endif
 
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOX = icons/nanox_app_bitcoin.gif
-ICON_NANOSP = icons/nanox_app_bitcoin.gif
-ICON_STAX = icons/stax_app_bitcoin.gif
-ICON_FLEX = icons/flex_app_bitcoin.gif
+ICON_NANOX = icons/nanox_app_acre.gif
+ICON_NANOSP = icons/nanox_app_acre.gif
+ICON_STAX = icons/stax_app_acre.gif
+ICON_FLEX = icons/flex_app_acre.gif
 
 ########################################
 # Application communication interfaces #

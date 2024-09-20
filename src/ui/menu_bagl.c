@@ -24,10 +24,8 @@
 
 // We have a screen with the icon and "Acre is ready" for Bitcoin,
 // "Acre Testnet is ready" for Bitcoin Testnet.
-UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_bitcoin_logo, "Acre", "is ready"});
-UX_STEP_NOCB(ux_menu_ready_step_bitcoin_testnet,
-             pnn,
-             {&C_bitcoin_logo, "Acre Testnet", "is ready"});
+UX_STEP_NOCB(ux_menu_ready_step_bitcoin, pnn, {&C_acre_logo, "Acre", "is ready"});
+UX_STEP_NOCB(ux_menu_ready_step_bitcoin_testnet, pnn, {&C_acre_logo, "Acre Testnet", "is ready"});
 
 UX_STEP_NOCB(ux_menu_version_step, bn, {"Version", APPVERSION});
 UX_STEP_CB(ux_menu_about_step, pb, ui_menu_about(), {&C_icon_certificate, "About"});
