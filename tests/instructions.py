@@ -4,28 +4,13 @@ from ragger.firmware import Firmware
 from ragger_bitcoin.ragger_instructions import Instructions
 
 
-def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.nano_skip_screen("Path", save_screenshot=save_screenshot)
-        instructions.same_request("Sign", save_screenshot=save_screenshot)
-    else:
-        instructions.review_message(save_screenshot=save_screenshot)
-        instructions.confirm_message(save_screenshot=save_screenshot)
-
-    return instructions
-
-
 def withdrawal_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve", save_screenshot=save_screenshot)
     else:
-        instructions.review_message(save_screenshot=save_screenshot)
-        instructions.confirm_message(save_screenshot=save_screenshot)
-
+        instructions.confirm_withdrawal()
     return instructions
 
 def withdrawal_instruction_reject(model: Firmware) -> Instructions:
@@ -38,6 +23,17 @@ def withdrawal_instruction_reject(model: Firmware) -> Instructions:
 
     return instructions
 
+def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.nano_skip_screen("Path", save_screenshot=save_screenshot)
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
+    else:
+        instructions.review_message(save_screenshot=save_screenshot)
+        instructions.confirm_message(save_screenshot=save_screenshot)
+
+    return instructions
 
 def message_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)

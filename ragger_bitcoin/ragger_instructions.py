@@ -77,6 +77,10 @@ class Instructions:
         for _ in range(1, page_count):
             self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+            
+    def confirm_withdrawal(self, save_screenshot=True):
+        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_CONFIRM, save_screenshot=save_screenshot)
 
     def confirm_message(self, save_screenshot=True):
         self.same_request("Sign", NavInsID.USE_CASE_REVIEW_TAP,

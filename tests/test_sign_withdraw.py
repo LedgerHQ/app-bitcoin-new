@@ -1,6 +1,6 @@
 import pytest
 
-from ledger_bitcoin.exception.errors import DenyError
+from ledger_bitcoin.exception.errors import DenyError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ragger.navigator import Navigator
 from ragger.firmware import Firmware
@@ -11,27 +11,6 @@ from .instructions import withdrawal_instruction_approve, withdrawal_instruction
 
 
 def test_sign_withdraw(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
-    data = AcreWithdrawalData(
-        to= "0xc14972DC5a4443E4f5e89E3655BE48Ee95A795aB",
-        value= "0x0",
-        data= "0xcae9ca510000000000000000000000000e781e9d538895ee99bd6e9bf28664942beff32f00000000000000000000000000000000000000000000000000470de4df820000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006083Bde64CCBF08470a1a0dAa9a0281B4951be7C4b5e4623765ec95cfa6e261406d5c446012eff9300000000000000000000000008dcc842b8ed75efe1f222ebdc22d1b06ef35efff6469f708057266816f0595200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000587f579c500000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000001a1976a9143c6480044cfafde6dad7f718f76938cc87d0679a88ac000000000000",
-        operation= "0",
-        safeTxGas= "0x0",
-        baseGas= "0x0",
-        gasPrice= "0x0",
-        gasToken= "0x0000000000000000000000000000000000000000",
-        refundReceiver= "0x0000000000000000000000000000000000000000",
-        nonce= "0xC",
-    )
-    path = "m/44'/0'/0'/0/0"
-    result = client.sign_withdraw(data, path, navigator,
-                                 instructions=withdrawal_instruction_approve(firmware),
-                                 testname=test_name)
-
-    assert result == "IKkjwLefB+lgEA2WUeIFhyjLhMU/25XENfRGjEdvo4mDYshODLS0+r7PWjQonytihxAIcmGdT3FV+ECQ8Hq++PI="
-
-
-def test_sign_withdraw_2(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     data = AcreWithdrawalData(
         to= "0xc14972DC5a4443E4f5e89E3655BE48Ee95A795aB",
         value= "0x0",
@@ -48,7 +27,29 @@ def test_sign_withdraw_2(navigator: Navigator, firmware: Firmware, client: Ragge
     result = client.sign_withdraw(data, path, navigator,
                                  instructions=withdrawal_instruction_approve(firmware),
                                  testname=test_name)
+    assert result == "ICk6sWthXlV33df4cHjx2SK7ihGeSM1pRwxCeD9ybuMNKN6eqK4VSGIXS19AmydEyzE57u9vhEyZIy5AnjKRpeU="
 
+def test_sign_withdraw_wrong_address(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    data = AcreWithdrawalData(
+        to= "0xc14972DC5a4443E4f5e89E3655BE48Ee95A795aB",
+        value= "0x0",
+        data= "0xcae9ca510000000000000000000000000e781e9d538895ee99bd6e9bf28664942beff32f00000000000000000000000000000000000000000000000000470de4df820000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000001000000000000000000000000006083Bde64CCBF08470a1a0dAa9a0281B4951be7C4b5e4623765ec95cfa6e261406d5c446012eff9300000000000000000000000008dcc842b8ed75efe1f222ebdc22d1b06ef35efff6469f708057266816f0595200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000587f579c500000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000001a1976a9143c6480044cfafde6dad7f718f76938cc87d0679a88ac000000000000",
+        operation= "0",
+        safeTxGas= "0x0",
+        baseGas= "0x0",
+        gasPrice= "0x0",
+        gasToken= "0x0000000000000000000000000000000000000000",
+        refundReceiver= "0x0000000000000000000000000000000000000000",
+        nonce= "0xC",
+    )
+    path = "m/44'/0'/0'/0/0"
+    with pytest.raises(ExceptionRAPDU) as e:
+        result = client.sign_withdraw(data, path, navigator,
+                                    instructions=withdrawal_instruction_approve(firmware),
+                                    testname=test_name)
+
+        assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+        assert len(e.value.data) == 0
 
 def test_sign_withdraw_reject(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     data = AcreWithdrawalData(
@@ -71,4 +72,3 @@ def test_sign_withdraw_reject(navigator: Navigator, firmware: Firmware, client: 
 
         assert DeviceException.exc.get(e.value.status) == DenyError
         assert len(e.value.data) == 0
-
