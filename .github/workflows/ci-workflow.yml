@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build
         run: |
@@ -42,13 +42,13 @@ jobs:
           make clean
           make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK=${{ matrix.SDK }} && mv bin/ bitcoin-testnet-bin/
       - name: Upload Bitcoin app binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: bitcoin-app-${{ matrix.model }}
           path: bitcoin-bin
 
       - name: Upload Bitcoin Testnet app binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: bitcoin-testnet-app-${{ matrix.model }}
           path: bitcoin-testnet-bin
@@ -63,14 +63,14 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build
         run: |
           make DEBUG=0 COIN=bitcoin_testnet BOLOS_SDK="$NANOSP_SDK" AUTOAPPROVE_FOR_PERF_TESTS=1
 
       - name: Upload Bitcoin Testnet app binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: bitcoin-testnet-perftest-app-nanosp
           path: bin
@@ -85,7 +85,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build unit tests
         run: |
@@ -99,7 +99,7 @@ jobs:
           lcov --directory . -b "$(realpath build/)" --add-tracefile coverage.base --add-tracefile coverage.capture -o coverage.info && \
           lcov --directory . -b "$(realpath build/)" --remove coverage.info '*/unit-tests/*' -o coverage.info && \
           genhtml coverage.info -o coverage
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: code-coverage
           path: unit-tests/coverage
@@ -117,7 +117,7 @@ jobs:
       - name: HTML documentation
         run: doxygen .doxygen/Doxyfile
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: documentation
           path: doc/html
@@ -148,10 +148,10 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download Bitcoin app binary
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: bitcoin-app-${{matrix.model}}
           path: bin
@@ -180,7 +180,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Run tests
         run: |
@@ -207,10 +207,10 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Download Bitcoin app binary for perftests
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: bitcoin-testnet-perftest-app-nanosp
           path: bin
@@ -221,7 +221,7 @@ jobs:
           pip install -r requirements.txt
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
       - name: Upload benchmarks summary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: benchmarks-log
           path: tests_perf/benchmarks.json
@@ -244,19 +244,19 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: 20
 
       - name: Install yarn
         run: |
           npm install -g yarn
 
       - name: Download Bitcoin Testnet app binary
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: bitcoin-testnet-app-nanosp
           path: bin
@@ -278,7 +278,7 @@ jobs:
 
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Run tests
         run: |
