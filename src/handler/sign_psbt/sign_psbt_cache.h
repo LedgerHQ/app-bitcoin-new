@@ -53,7 +53,7 @@ number of BIP-32 derivations is cut almost by half when using the cache.
  * @return 0 on success, -1 on failure.
  */
 int derive_first_step_for_pubkey(const serialized_extended_pubkey_t *base_key,
-                                 const policy_node_key_placeholder_t *placeholder,
+                                 const policy_node_keyexpr_t *placeholder,
                                  sign_psbt_cache_t *cache,
                                  bool is_change,
                                  serialized_extended_pubkey_t *out_pubkey);
