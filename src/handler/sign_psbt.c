@@ -65,7 +65,8 @@ typedef struct {
                                    // PSBT_{IN,OUT}_BIP32_DERIVATION or
                                    // PSBT_{IN,OUT}_TAP_BIP32_DERIVATION is not the correct length.
 
-    bool placeholder_found;  // Set to true if a matching placeholder is found in the input info
+    bool key_expression_found;  // Set to true if the input/output info in the psbt was correctly
+                                // matched with the current key expression in the signing flow
 
     bool is_change;
     int address_index;
@@ -106,7 +107,7 @@ typedef struct {
 } output_info_t;
 
 typedef struct {
-    policy_node_keyexpr_t placeholder;
+    policy_node_keyexpr_t key_expression;
     int cur_index;
     uint32_t fingerprint;
     uint8_t key_derivation_length;
@@ -114,7 +115,7 @@ typedef struct {
     serialized_extended_pubkey_t pubkey;
     bool is_tapscript;         // true if signing with a BIP342 tapleaf script path spend
     uint8_t tapleaf_hash[32];  // only used for tapscripts
-} placeholder_info_t;
+} keyexpr_info_t;
 
 // Cache for partial hashes during segwit signing (avoid quadratic hashing for segwit transactions)
 typedef struct {
@@ -371,9 +372,10 @@ static int get_amount_scriptpubkey_from_psbt(
 
 // Convenience function to share common logic when processing all the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
+// TODO: not generalized for musig2
 static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
-    placeholder_info_t *placeholder_info,
+    keyexpr_info_t *keyexpr_info,
     in_out_info_t *in_out,
     sign_psbt_cache_t *sign_psbt_cache,
     int psbt_key_type,
@@ -416,13 +418,13 @@ static int read_change_and_index_from_psbt_bip32_derivation(
         return -1;
     }
 
-    // if this derivation path matches the internal placeholder,
+    // if this derivation path matches the internal key expression,
     // we use it to detect whether the current input is change or not,
     // and store its address index
-    if (fpt_der[0] == placeholder_info->fingerprint &&
-        der_len == placeholder_info->key_derivation_length + 2) {
-        for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-            if (placeholder_info->key_derivation[i] != fpt_der[1 + i]) {
+    if (fpt_der[0] == keyexpr_info->fingerprint &&
+        der_len == keyexpr_info->key_derivation_length + 2) {
+        for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
+            if (keyexpr_info->key_derivation[i] != fpt_der[1 + i]) {
                 return 0;
             }
         }
@@ -430,21 +432,21 @@ static int read_change_and_index_from_psbt_bip32_derivation(
         uint32_t change_step = fpt_der[1 + der_len - 2];
         uint32_t addr_index = fpt_der[1 + der_len - 1];
 
-        // check if the 'change' derivation step is indeed coherent with placeholder
-        if (change_step == placeholder_info->placeholder.num_first) {
+        // check if the 'change' derivation step is indeed coherent with key expression
+        if (change_step == keyexpr_info->key_expression.num_first) {
             in_out->is_change = false;
             in_out->address_index = addr_index;
-        } else if (change_step == placeholder_info->placeholder.num_second) {
+        } else if (change_step == keyexpr_info->key_expression.num_second) {
             in_out->is_change = true;
             in_out->address_index = addr_index;
         } else {
             return 0;
         }
 
-        // check that we can indeed derive the same key from the current placeholder
+        // check that we can indeed derive the same key from the current key expression
         serialized_extended_pubkey_t pubkey;
-        if (0 > derive_first_step_for_pubkey(&placeholder_info->pubkey,
-                                             &placeholder_info->placeholder,
+        if (0 > derive_first_step_for_pubkey(&keyexpr_info->pubkey,
+                                             &keyexpr_info->key_expression,
                                              sign_psbt_cache,
                                              in_out->is_change,
                                              &pubkey))
@@ -456,7 +458,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
             return 0;
         }
 
-        in_out->placeholder_found = true;
+        in_out->key_expression_found = true;
         return 1;
     }
     return 0;
@@ -474,9 +476,9 @@ static int is_in_out_internal(dispatcher_context_t *dispatcher_context,
                               sign_psbt_cache_t *sign_psbt_cache,
                               const in_out_info_t *in_out_info,
                               bool is_input) {
-    // If we did not find any info about the pubkey associated to the placeholder we're considering,
-    // then it's external
-    if (!in_out_info->placeholder_found) {
+    // If we did not find any info about the pubkey associated to the key expression we're
+    // considering, then it's external
+    if (!in_out_info->key_expression_found) {
         return 0;
     }
 
@@ -661,17 +663,16 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     return true;
 }
 
-static bool __attribute__((noinline))
-fill_placeholder_info_if_internal(dispatcher_context_t *dc,
-                                  sign_psbt_state_t *st,
-                                  placeholder_info_t *placeholder_info) {
+static bool __attribute__((noinline)) fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
+                                                                    sign_psbt_state_t *st,
+                                                                    keyexpr_info_t *keyexpr_info) {
     policy_map_key_info_t key_info;
     {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
         int key_info_len = call_get_merkle_leaf_element(dc,
                                                         st->wallet_header.keys_info_merkle_root,
                                                         st->wallet_header.n_keys,
-                                                        placeholder_info->placeholder.key_index,
+                                                        keyexpr_info->key_expression.key_index,
                                                         key_info_str,
                                                         sizeof(key_info_str));
 
@@ -701,56 +702,55 @@ fill_placeholder_info_if_internal(dispatcher_context_t *dc,
         if (0 > get_extended_pubkey_at_path(key_info.master_key_derivation,
                                             key_info.master_key_derivation_len,
                                             BIP32_PUBKEY_VERSION,
-                                            &placeholder_info->pubkey)) {
+                                            &keyexpr_info->pubkey)) {
             SEND_SW(dc, SW_BAD_STATE);
             return false;
         }
 
-        if (memcmp(&key_info.ext_pubkey,
-                   &placeholder_info->pubkey,
-                   sizeof(placeholder_info->pubkey)) != 0) {
+        if (memcmp(&key_info.ext_pubkey, &keyexpr_info->pubkey, sizeof(keyexpr_info->pubkey)) !=
+            0) {
             return false;
         }
 
-        placeholder_info->key_derivation_length = key_info.master_key_derivation_len;
+        keyexpr_info->key_derivation_length = key_info.master_key_derivation_len;
         for (int i = 0; i < key_info.master_key_derivation_len; i++) {
-            placeholder_info->key_derivation[i] = key_info.master_key_derivation[i];
+            keyexpr_info->key_derivation[i] = key_info.master_key_derivation[i];
         }
 
-        placeholder_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
+        keyexpr_info->fingerprint = read_u32_be(key_info.master_key_fingerprint, 0);
     }
 
     return true;
 }
 
-// finds the first placeholder that corresponds to an internal key
-static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
-                                                sign_psbt_state_t *st,
-                                                placeholder_info_t *placeholder_info) {
-    placeholder_info->cur_index = 0;
+// finds the first key expression that corresponds to an internal key
+static bool find_first_internal_keyexpr(dispatcher_context_t *dc,
+                                        sign_psbt_state_t *st,
+                                        keyexpr_info_t *keyexpr_info) {
+    keyexpr_info->cur_index = 0;
 
     // find and parse our registered key info in the wallet
     while (true) {
-        int n_key_placeholders = get_key_placeholder_by_index(st->wallet_policy_map,
-                                                              placeholder_info->cur_index,
-                                                              NULL,
-                                                              &placeholder_info->placeholder);
-        if (n_key_placeholders < 0) {
+        int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
+                                                     keyexpr_info->cur_index,
+                                                     NULL,
+                                                     &keyexpr_info->key_expression);
+        if (n_key_expressions < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
         }
 
-        if (placeholder_info->cur_index >= n_key_placeholders) {
+        if (keyexpr_info->cur_index >= n_key_expressions) {
             // all keys have been processed
             break;
         }
 
-        if (fill_placeholder_info_if_internal(dc, st, placeholder_info)) {
+        if (fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
             return true;
         }
 
         // Not an internal key, move on
-        ++placeholder_info->cur_index;
+        ++keyexpr_info->cur_index;
     }
 
     PRINTF("No internal key found in wallet policy");
@@ -759,7 +759,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
 }
 
 typedef struct {
-    placeholder_info_t *placeholder_info;
+    keyexpr_info_t *keyexpr_info;
     input_info_t *input;
     sign_psbt_cache_t *sign_psbt_cache;
 } input_keys_callback_data_t;
@@ -787,16 +787,15 @@ static void input_keys_callback(dispatcher_context_t *dc,
             callback_data->input->has_sighash_type = true;
         } else if ((key_type == PSBT_IN_BIP32_DERIVATION ||
                     key_type == PSBT_IN_TAP_BIP32_DERIVATION) &&
-                   !callback_data->input->in_out.placeholder_found) {
-            if (0 >
-                read_change_and_index_from_psbt_bip32_derivation(dc,
-                                                                 callback_data->placeholder_info,
-                                                                 &callback_data->input->in_out,
-                                                                 callback_data->sign_psbt_cache,
-                                                                 key_type,
-                                                                 data,
-                                                                 map_commitment,
-                                                                 i)) {
+                   !callback_data->input->in_out.key_expression_found) {
+            if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
+                                                                     callback_data->keyexpr_info,
+                                                                     &callback_data->input->in_out,
+                                                                     callback_data->sign_psbt_cache,
+                                                                     key_type,
+                                                                     data,
+                                                                     map_commitment,
+                                                                     i)) {
                 callback_data->input->in_out.unexpected_pubkey_error = true;
             }
         }
@@ -812,10 +811,10 @@ preprocess_inputs(dispatcher_context_t *dc,
 
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
-    placeholder_info_t placeholder_info;
-    memset(&placeholder_info, 0, sizeof(placeholder_info));
+    keyexpr_info_t keyexpr_info;
+    memset(&keyexpr_info, 0, sizeof(keyexpr_info));
 
-    if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
+    if (!find_first_internal_keyexpr(dc, st, &keyexpr_info)) return false;
 
     // process each input
     for (unsigned int cur_input_index = 0; cur_input_index < st->n_inputs; cur_input_index++) {
@@ -823,7 +822,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         memset(&input, 0, sizeof(input));
 
         input_keys_callback_data_t callback_data = {.input = &input,
-                                                    .placeholder_info = &placeholder_info,
+                                                    .keyexpr_info = &keyexpr_info,
                                                     .sign_psbt_cache = sign_psbt_cache};
         int res = call_get_merkleized_map_with_callback(
             dc,
@@ -1025,7 +1024,7 @@ preprocess_inputs(dispatcher_context_t *dc,
 }
 
 typedef struct {
-    placeholder_info_t *placeholder_info;
+    keyexpr_info_t *keyexpr_info;
     output_info_t *output;
     sign_psbt_cache_t *sign_psbt_cache;
 } output_keys_callback_data_t;
@@ -1045,16 +1044,15 @@ static void output_keys_callback(dispatcher_context_t *dc,
         buffer_read_u8(data, &key_type);
 
         if ((key_type == PSBT_OUT_BIP32_DERIVATION || key_type == PSBT_OUT_TAP_BIP32_DERIVATION) &&
-            !callback_data->output->in_out.placeholder_found) {
-            if (0 >
-                read_change_and_index_from_psbt_bip32_derivation(dc,
-                                                                 callback_data->placeholder_info,
-                                                                 &callback_data->output->in_out,
-                                                                 callback_data->sign_psbt_cache,
-                                                                 key_type,
-                                                                 data,
-                                                                 map_commitment,
-                                                                 i)) {
+            !callback_data->output->in_out.key_expression_found) {
+            if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
+                                                                     callback_data->keyexpr_info,
+                                                                     &callback_data->output->in_out,
+                                                                     callback_data->sign_psbt_cache,
+                                                                     key_type,
+                                                                     data,
+                                                                     map_commitment,
+                                                                     i)) {
                 callback_data->output->in_out.unexpected_pubkey_error = true;
             }
         }
@@ -1074,10 +1072,10 @@ preprocess_outputs(dispatcher_context_t *dc,
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    placeholder_info_t placeholder_info;
-    memset(&placeholder_info, 0, sizeof(placeholder_info));
+    keyexpr_info_t keyexpr_info;
+    memset(&keyexpr_info, 0, sizeof(keyexpr_info));
 
-    if (!find_first_internal_key_placeholder(dc, st, &placeholder_info)) return false;
+    if (!find_first_internal_keyexpr(dc, st, &keyexpr_info)) return false;
 
     memset(&st->outputs, 0, sizeof(st->outputs));
 
@@ -1090,7 +1088,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         memset(&output, 0, sizeof(output));
 
         output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .placeholder_info = &placeholder_info,
+                                                     .keyexpr_info = &keyexpr_info,
                                                      .sign_psbt_cache = sign_psbt_cache};
         int res = call_get_merkleized_map_with_callback(
             dc,
@@ -1978,7 +1976,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
                                                                segwit_hashes_t *hashes,
                                                                input_info_t *input,
                                                                unsigned int cur_input_index,
-                                                               placeholder_info_t *placeholder_info,
+                                                               keyexpr_info_t *keyexpr_info,
                                                                uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -2013,7 +2011,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
     }
 
     // ext_flag
-    uint8_t ext_flag = placeholder_info->is_tapscript ? 1 : 0;
+    uint8_t ext_flag = keyexpr_info->is_tapscript ? 1 : 0;
     // annex is not supported
     const uint8_t annex_present = 0;
     uint8_t spend_type = ext_flag * 2 + annex_present;
@@ -2097,9 +2095,9 @@ static bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_contex
         crypto_hash_update(&sighash_context.header, tmp, 32);
     }
 
-    if (placeholder_info->is_tapscript) {
+    if (keyexpr_info->is_tapscript) {
         // If spending a tapscript, append the Common Signature Message Extension per BIP-0342
-        crypto_hash_update(&sighash_context.header, placeholder_info->tapleaf_hash, 32);
+        crypto_hash_update(&sighash_context.header, keyexpr_info->tapleaf_hash, 32);
         crypto_hash_update_u8(&sighash_context.header, 0x00);         // key_version
         crypto_hash_update_u32(&sighash_context.header, 0xffffffff);  // no OP_CODESEPARATOR
     }
@@ -2151,25 +2149,24 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     return true;
 }
 
-static bool __attribute__((noinline))
-sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
-                             sign_psbt_state_t *st,
-                             placeholder_info_t *placeholder_info,
-                             input_info_t *input,
-                             unsigned int cur_input_index,
-                             uint8_t sighash[static 32]) {
+static bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
+                                                                   sign_psbt_state_t *st,
+                                                                   keyexpr_info_t *keyexpr_info,
+                                                                   input_info_t *input,
+                                                                   unsigned int cur_input_index,
+                                                                   uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-        sign_path[i] = placeholder_info->key_derivation[i];
+    for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
+        sign_path[i] = keyexpr_info->key_derivation[i];
     }
-    sign_path[placeholder_info->key_derivation_length] =
-        input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                : placeholder_info->placeholder.num_first;
-    sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
+    sign_path[keyexpr_info->key_derivation_length] = input->in_out.is_change
+                                                         ? keyexpr_info->key_expression.num_second
+                                                         : keyexpr_info->key_expression.num_first;
+    sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
 
-    int sign_path_len = placeholder_info->key_derivation_length + 2;
+    int sign_path_len = keyexpr_info->key_derivation_length + 2;
 
     uint8_t sig[MAX_DER_SIG_LEN + 1];  // extra byte for the appended sighash-type
 
@@ -2196,13 +2193,12 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
     return true;
 }
 
-static bool __attribute__((noinline))
-sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
-                               sign_psbt_state_t *st,
-                               placeholder_info_t *placeholder_info,
-                               input_info_t *input,
-                               unsigned int cur_input_index,
-                               uint8_t sighash[static 32]) {
+static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
+                                                                     sign_psbt_state_t *st,
+                                                                     keyexpr_info_t *keyexpr_info,
+                                                                     input_info_t *input,
+                                                                     unsigned int cur_input_index,
+                                                                     uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     if (st->wallet_policy_map->type != TOKEN_TR) {
@@ -2230,15 +2226,15 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
         uint32_t sign_path[MAX_BIP32_PATH_STEPS];
 
-        for (int i = 0; i < placeholder_info->key_derivation_length; i++) {
-            sign_path[i] = placeholder_info->key_derivation[i];
+        for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
+            sign_path[i] = keyexpr_info->key_derivation[i];
         }
-        sign_path[placeholder_info->key_derivation_length] =
-            input->in_out.is_change ? placeholder_info->placeholder.num_second
-                                    : placeholder_info->placeholder.num_first;
-        sign_path[placeholder_info->key_derivation_length + 1] = input->in_out.address_index;
+        sign_path[keyexpr_info->key_derivation_length] =
+            input->in_out.is_change ? keyexpr_info->key_expression.num_second
+                                    : keyexpr_info->key_expression.num_first;
+        sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
 
-        int sign_path_len = placeholder_info->key_derivation_length + 2;
+        int sign_path_len = keyexpr_info->key_derivation_length + 2;
 
         if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
                                           sign_path,
@@ -2251,7 +2247,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
 
         policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
 
-        if (!placeholder_info->is_tapscript) {
+        if (!keyexpr_info->is_tapscript) {
             if (isnull_policy_node_tree(&policy->tree)) {
                 // tweak as specified in BIP-86 and BIP-386
                 crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
@@ -2263,7 +2259,7 @@ sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
             }
         } else {
             // tapscript, we need to yield the tapleaf hash together with the pubkey
-            tapleaf_hash = placeholder_info->tapleaf_hash;
+            tapleaf_hash = keyexpr_info->tapleaf_hash;
         }
 
         // generate corresponding public key
@@ -2451,7 +2447,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                              sign_psbt_state_t *st,
                                                              sign_psbt_cache_t *sign_psbt_cache,
                                                              segwit_hashes_t *hashes,
-                                                             placeholder_info_t *placeholder_info,
+                                                             keyexpr_info_t *keyexpr_info,
                                                              input_info_t *input,
                                                              unsigned int cur_input_index) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -2497,12 +2493,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         uint8_t sighash[32];
         if (!compute_sighash_legacy(dc, st, input, cur_input_index, sighash)) return false;
 
-        if (!sign_sighash_ecdsa_and_yield(dc,
-                                          st,
-                                          placeholder_info,
-                                          input,
-                                          cur_input_index,
-                                          sighash))
+        if (!sign_sighash_ecdsa_and_yield(dc, st, keyexpr_info, input, cur_input_index, sighash))
             return false;
     } else {
         {
@@ -2569,7 +2560,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             if (!sign_sighash_ecdsa_and_yield(dc,
                                               st,
-                                              placeholder_info,
+                                              keyexpr_info,
                                               input,
                                               cur_input_index,
                                               sighash))
@@ -2585,12 +2576,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                           hashes,
                                           input,
                                           cur_input_index,
-                                          placeholder_info,
+                                          keyexpr_info,
                                           sighash))
                 return false;
 
             policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
-            if (!placeholder_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
+            if (!keyexpr_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
                 // keypath spend, we compute the taptree hash so that we find it ready
                 // later in sign_sighash_schnorr_and_yield (which has less available stack).
                 if (0 > compute_taptree_hash(
@@ -2612,7 +2603,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             if (!sign_sighash_schnorr_and_yield(dc,
                                                 st,
-                                                placeholder_info,
+                                                keyexpr_info,
                                                 input,
                                                 cur_input_index,
                                                 sighash))
@@ -2627,12 +2618,12 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 }
 
 static bool __attribute__((noinline))
-fill_taproot_placeholder_info(dispatcher_context_t *dc,
-                              sign_psbt_state_t *st,
-                              const input_info_t *input,
-                              const policy_node_t *tapleaf_ptr,
-                              placeholder_info_t *placeholder_info,
-                              sign_psbt_cache_t *sign_psbt_cache) {
+fill_taproot_keyexpr_info(dispatcher_context_t *dc,
+                          sign_psbt_state_t *st,
+                          const input_info_t *input,
+                          const policy_node_t *tapleaf_ptr,
+                          keyexpr_info_t *keyexpr_info,
+                          sign_psbt_cache_t *sign_psbt_cache) {
     cx_sha256_t hash_context;
     crypto_tr_tapleaf_hash_init(&hash_context);
 
@@ -2663,7 +2654,7 @@ fill_taproot_placeholder_info(dispatcher_context_t *dc,
                                             &hash_context.header)) {
         return false;  // should never happen!
     }
-    crypto_hash_digest(&hash_context.header, placeholder_info->tapleaf_hash, 32);
+    crypto_hash_digest(&hash_context.header, keyexpr_info->tapleaf_hash, 32);
 
     return true;
 }
@@ -2675,7 +2666,7 @@ sign_transaction(dispatcher_context_t *dc,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    int placeholder_index = 0;
+    int key_expression_index = 0;
 
     segwit_hashes_t hashes;
 
@@ -2687,42 +2678,41 @@ sign_transaction(dispatcher_context_t *dc,
         return false;
     }
 
-    // Iterate over all the placeholders that correspond to keys owned by us
+    // Iterate over all the key expressions that correspond to keys owned by us
     while (true) {
-        placeholder_info_t placeholder_info;
-        memset(&placeholder_info, 0, sizeof(placeholder_info));
+        keyexpr_info_t keyexpr_info;
+        memset(&keyexpr_info, 0, sizeof(keyexpr_info));
 
         const policy_node_t *tapleaf_ptr = NULL;
-        int n_key_placeholders = get_key_placeholder_by_index(st->wallet_policy_map,
-                                                              placeholder_index,
-                                                              &tapleaf_ptr,
-                                                              &placeholder_info.placeholder);
+        int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
+                                                     key_expression_index,
+                                                     &tapleaf_ptr,
+                                                     &keyexpr_info.key_expression);
 
-        if (n_key_placeholders < 0) {
+        if (n_key_expressions < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
         }
 
-        if (placeholder_index >= n_key_placeholders) {
-            // all placeholders were processed
+        if (key_expression_index >= n_key_expressions) {
+            // all key expressions were processed
             break;
         }
 
         if (tapleaf_ptr != NULL) {
-            // get_key_placeholder_by_index returns the pointer to the tapleaf only if the key being
+            // get_keyexpr_by_index returns the pointer to the tapleaf only if the key being
             // spent is indeed in a tapleaf
-            placeholder_info.is_tapscript = true;
+            keyexpr_info.is_tapscript = true;
         }
 
-        if (fill_placeholder_info_if_internal(dc, st, &placeholder_info) == true) {
+        if (fill_keyexpr_info_if_internal(dc, st, &keyexpr_info) == true) {
             for (unsigned int i = 0; i < st->n_inputs; i++)
                 if (bitvector_get(internal_inputs, i)) {
                     input_info_t input;
                     memset(&input, 0, sizeof(input));
 
-                    input_keys_callback_data_t callback_data = {
-                        .input = &input,
-                        .placeholder_info = &placeholder_info};
+                    input_keys_callback_data_t callback_data = {.input = &input,
+                                                                .keyexpr_info = &keyexpr_info};
                     int res = call_get_merkleized_map_with_callback(
                         dc,
                         (void *) &callback_data,
@@ -2736,19 +2726,19 @@ sign_transaction(dispatcher_context_t *dc,
                         return false;
                     }
 
-                    if (tapleaf_ptr != NULL && !fill_taproot_placeholder_info(dc,
-                                                                              st,
-                                                                              &input,
-                                                                              tapleaf_ptr,
-                                                                              &placeholder_info,
-                                                                              sign_psbt_cache))
+                    if (tapleaf_ptr != NULL && !fill_taproot_keyexpr_info(dc,
+                                                                          st,
+                                                                          &input,
+                                                                          tapleaf_ptr,
+                                                                          &keyexpr_info,
+                                                                          sign_psbt_cache))
                         return false;
 
                     if (!sign_transaction_input(dc,
                                                 st,
                                                 sign_psbt_cache,
                                                 &hashes,
-                                                &placeholder_info,
+                                                &keyexpr_info,
                                                 &input,
                                                 i)) {
                         // we do not send a status word, since sign_transaction_input
@@ -2758,7 +2748,7 @@ sign_transaction(dispatcher_context_t *dc,
                 }
         }
 
-        ++placeholder_index;
+        ++key_expression_index;
     }
 
     return true;
@@ -2824,7 +2814,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
     /** SIGNING FLOW
      *
-     * For each internal placeholder, and for each internal input, sign using the
+     * For each internal key expression, and for each internal input, sign using the
      * appropriate algorithm.
      */
     int sign_result = sign_transaction(dc, &st, &cache, internal_inputs);

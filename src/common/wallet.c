@@ -444,10 +444,10 @@ static int parse_keyexpr(buffer_t *in_buf,
                          policy_node_keyexpr_t *out,
                          bool is_taproot,
                          buffer_t *out_buf,
-                         uint16_t *placeholder_index) {
+                         uint16_t *keyexpr_index) {
     char c;
     if (!buffer_read_u8(in_buf, (uint8_t *) &c)) {
-        return WITH_ERROR(-1, "Expected key placeholder");
+        return WITH_ERROR(-1, "Expected key expression");
     }
 
     if (c == '@') {
@@ -475,7 +475,7 @@ static int parse_keyexpr(buffer_t *in_buf,
             return WITH_ERROR(-1, "musig key expressions are only supported with version number 2");
         }
 
-        uint16_t key_placeholders[MAX_PUBKEYS_PER_MUSIG];
+        uint16_t keys[MAX_PUBKEYS_PER_MUSIG];
         int n_musig_keys = 0;
 
         // parse comma-separated list of @NUM
@@ -493,7 +493,7 @@ static int parse_keyexpr(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Too many keys in musig");
             }
 
-            key_placeholders[n_musig_keys] = (uint16_t) k;
+            keys[n_musig_keys] = (uint16_t) k;
             ++n_musig_keys;
 
             // the next character must be "," if there are more keys, or ')' otherwise
@@ -529,14 +529,14 @@ static int parse_keyexpr(buffer_t *in_buf,
         if (key_indexes == NULL) {
             return WITH_ERROR(-1, "Out of memory");
         }
-        memcpy(key_indexes, key_placeholders, sizeof(uint16_t) * n_musig_keys);
+        memcpy(key_indexes, keys, sizeof(uint16_t) * n_musig_keys);
 
         musig_info->n = n_musig_keys;
         i_uint16(&musig_info->key_indexes, key_indexes);
 
         i_musig_aggr_key_info(&out->musig_info, musig_info);
     } else {
-        return WITH_ERROR(-1, "Expected key placeholder starting with '@', or musig");
+        return WITH_ERROR(-1, "Expected key expression starting with '@', or musig");
     }
 
     if (version == WALLET_POLICY_VERSION_V1) {
@@ -550,12 +550,12 @@ static int parse_keyexpr(buffer_t *in_buf,
             || !buffer_peek(in_buf, &next_character)  // we must be able to read the next character
             || !(next_character == '*' || next_character == '<')  // and it must be '*' or '<'
         ) {
-            return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+            return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key expression");
         }
 
         if (next_character == '*') {
             if (!consume_characters(in_buf, "**", 2)) {
-                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key expression");
             }
             out->num_first = 0;
             out->num_second = 1;
@@ -565,18 +565,18 @@ static int parse_keyexpr(buffer_t *in_buf,
                 out->num_first > 0x80000000u) {
                 return WITH_ERROR(
                     -1,
-                    "Expected /** or /<M;N>/* in key placeholder, with unhardened M and N");
+                    "Expected /** or /<M;N>/* in key expression, with unhardened M and N");
             }
 
             if (!consume_character(in_buf, ';')) {
-                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key expression");
             }
 
             if (parse_unsigned_decimal(in_buf, &out->num_second) == -1 ||
                 out->num_second > 0x80000000u) {
                 return WITH_ERROR(
                     -1,
-                    "Expected /** or /<M;N>/* in key placeholder, with unhardened M and N");
+                    "Expected /** or /<M;N>/* in key expression, with unhardened M and N");
             }
 
             if (out->num_first == out->num_second) {
@@ -584,15 +584,15 @@ static int parse_keyexpr(buffer_t *in_buf,
             }
 
             if (!consume_characters(in_buf, ">/*", 3)) {
-                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key placeholder");
+                return WITH_ERROR(-1, "Expected /** or /<M;N>/* in key expression");
             }
         }
     } else {
         return WITH_ERROR(-1, "Invalid version number");
     }
 
-    out->placeholder_index = *placeholder_index;
-    ++(*placeholder_index);
+    out->keyexpr_index = *keyexpr_index;
+    ++(*keyexpr_index);
     return 0;
 }
 
@@ -648,13 +648,13 @@ static int parse_script(buffer_t *in_buf,
                         unsigned int context_flags) {
     int n_wrappers = 0;
 
-    // Keep track of how many key placeholders have been created while parsing
+    // Keep track of how many key expressions have been created while parsing
     // This allows to know the counter even in recursive calls
-    static uint16_t key_placeholder_count = 0;
+    static uint16_t key_expression_count = 0;
 
     if (depth == 0) {
         // reset the counter on function entry, but not in recursive calls
-        key_placeholder_count = 0;
+        key_expression_count = 0;
     }
 
     policy_node_t *outermost_node = (policy_node_t *) buffer_get_cur(out_buf);
@@ -1491,13 +1491,13 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            policy_node_keyexpr_t *key_placeholder =
+            policy_node_keyexpr_t *key_expr =
                 buffer_alloc(out_buf, sizeof(policy_node_keyexpr_t), true);
 
-            if (key_placeholder == NULL) {
+            if (key_expr == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
-            i_policy_node_keyexpr(&node->key_placeholder, key_placeholder);
+            i_policy_node_keyexpr(&node->key, key_expr);
 
             if (token == TOKEN_WPKH) {
                 if (depth > 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
@@ -1512,11 +1512,11 @@ static int parse_script(buffer_t *in_buf,
             bool is_taproot = (context_flags & CONTEXT_WITHIN_TR) != 0;
             if (0 > parse_keyexpr(in_buf,
                                   version,
-                                  key_placeholder,
+                                  key_expr,
                                   is_taproot,
                                   out_buf,
-                                  &key_placeholder_count)) {
-                return WITH_ERROR(-1, "Couldn't parse key placeholder");
+                                  &key_expression_count)) {
+                return WITH_ERROR(-1, "Couldn't parse key expression");
             }
 
             if (token == TOKEN_WPKH) {
@@ -1578,20 +1578,16 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            policy_node_keyexpr_t *key_placeholder =
+            policy_node_keyexpr_t *key_expr =
                 buffer_alloc(out_buf, sizeof(policy_node_keyexpr_t), true);
-            if (key_placeholder == NULL) {
+            if (key_expr == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
-            i_policy_node_keyexpr(&node->key_placeholder, key_placeholder);
+            i_policy_node_keyexpr(&node->key, key_expr);
 
-            if (0 > parse_keyexpr(in_buf,
-                                  version,
-                                  key_placeholder,
-                                  true,
-                                  out_buf,
-                                  &key_placeholder_count)) {
-                return WITH_ERROR(-1, "Couldn't parse key placeholder");
+            if (0 >
+                parse_keyexpr(in_buf, version, key_expr, true, out_buf, &key_expression_count)) {
+                return WITH_ERROR(-1, "Couldn't parse key expression");
             }
 
             uint8_t c;
@@ -1706,7 +1702,7 @@ static int parse_script(buffer_t *in_buf,
             // We allocate the array of key indices at the current position in the output buffer
             // (on success)
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            i_policy_node_keyexpr(&node->key_placeholders, buffer_get_cur(out_buf));
+            i_policy_node_keyexpr(&node->keys, buffer_get_cur(out_buf));
 
             node->n = 0;
             while (true) {
@@ -1721,22 +1717,22 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Expected ','");
                 }
 
-                policy_node_keyexpr_t *key_placeholder = (policy_node_keyexpr_t *) buffer_alloc(
+                policy_node_keyexpr_t *key_expr = (policy_node_keyexpr_t *) buffer_alloc(
                     out_buf,
                     sizeof(policy_node_keyexpr_t),
                     true);  // we align this pointer, as there's padding in an array of
                             // structures
-                if (key_placeholder == NULL) {
+                if (key_expr == NULL) {
                     return WITH_ERROR(-1, "Out of memory");
                 }
 
                 if (0 > parse_keyexpr(in_buf,
                                       version,
-                                      key_placeholder,
+                                      key_expr,
                                       is_taproot,
                                       out_buf,
-                                      &key_placeholder_count)) {
-                    return WITH_ERROR(-1, "Error parsing key placeholder");
+                                      &key_expression_count)) {
+                    return WITH_ERROR(-1, "Error parsing key expression");
                 }
 
                 ++node->n;
