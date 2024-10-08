@@ -39,12 +39,12 @@ number of BIP-32 derivations is cut almost by half when using the cache.
 */
 
 /**
- * Derives the first step for a public key in a placeholder, using a precomputed value from the
+ * Derives the first step for a public key in a key expression, using a precomputed value from the
  * cache if available. If the key is not in the cache, it is computed and stored in the cache,
- * unless the index is placeholder index is too large.
+ * unless the key expression index is too large.
  *
  * @param[in] base_key Pointer to the base serialized extended public key.
- * @param[in] placeholder Pointer to the policy node key placeholder, which contains derivation
+ * @param[in] keyexpr Pointer to the policy node key expression, which contains derivation
  * information.
  * @param[in] cache Pointer to the cache structure used to store derived child keys.
  * @param[in] is_change true if deriving the change address, false otherwise.
@@ -53,7 +53,7 @@ number of BIP-32 derivations is cut almost by half when using the cache.
  * @return 0 on success, -1 on failure.
  */
 int derive_first_step_for_pubkey(const serialized_extended_pubkey_t *base_key,
-                                 const policy_node_keyexpr_t *placeholder,
+                                 const policy_node_keyexpr_t *keyexpr,
                                  sign_psbt_cache_t *cache,
                                  bool is_change,
                                  serialized_extended_pubkey_t *out_pubkey);

@@ -33,7 +33,7 @@ static int parse_policy(const char *descriptor_template, uint8_t *out, size_t ou
 #define MAX_WALLET_POLICY_MEMORY_SIZE 512
 
 // convenience function to compactly check common assertions on a pointer to a key expression with a
-// single placeholder
+// single key
 static void check_key_expr_plain(const policy_node_keyexpr_t *ptr,
                                  int key_index,
                                  uint32_t num_first,
@@ -72,7 +72,7 @@ static void test_parse_policy_map_singlesig_1(void **state) {
     policy_node_with_key_t *node_1 = (policy_node_with_key_t *) out;
 
     assert_int_equal(node_1->base.type, TOKEN_PKH);
-    check_key_expr_plain(r_policy_node_keyexpr(&node_1->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&node_1->key), 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_2(void **state) {
@@ -90,7 +90,7 @@ static void test_parse_policy_map_singlesig_2(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) r_policy_node(&root->script);
 
     assert_int_equal(inner->base.type, TOKEN_WPKH);
-    check_key_expr_plain(r_policy_node_keyexpr(&inner->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&inner->key), 0, 0, 1);
 }
 
 static void test_parse_policy_map_singlesig_3(void **state) {
@@ -112,7 +112,7 @@ static void test_parse_policy_map_singlesig_3(void **state) {
     policy_node_with_key_t *inner = (policy_node_with_key_t *) r_policy_node(&mid->script);
 
     assert_int_equal(inner->base.type, TOKEN_PKH);
-    check_key_expr_plain(r_policy_node_keyexpr(&inner->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&inner->key), 0, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_1(void **state) {
@@ -128,9 +128,9 @@ static void test_parse_policy_map_multisig_1(void **state) {
     assert_int_equal(node_1->base.type, TOKEN_SORTEDMULTI);
     assert_int_equal(node_1->k, 2);
     assert_int_equal(node_1->n, 3);
-    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->key_placeholders)[0], 0, 0, 1);
-    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->key_placeholders)[1], 1, 0, 1);
-    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->key_placeholders)[2], 2, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->keys)[0], 0, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->keys)[1], 1, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&node_1->keys)[2], 2, 0, 1);
 }
 
 static void test_parse_policy_map_multisig_2(void **state) {
@@ -151,7 +151,7 @@ static void test_parse_policy_map_multisig_2(void **state) {
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        check_key_expr_plain(&r_policy_node_keyexpr(&inner->key_placeholders)[i], i, 0, 1);
+        check_key_expr_plain(&r_policy_node_keyexpr(&inner->keys)[i], i, 0, 1);
     }
 }
 
@@ -177,7 +177,7 @@ static void test_parse_policy_map_multisig_3(void **state) {
     assert_int_equal(inner->k, 3);
     assert_int_equal(inner->n, 5);
     for (int i = 0; i < 5; i++) {
-        check_key_expr_plain(&r_policy_node_keyexpr(&inner->key_placeholders)[i], i, 0, 1);
+        check_key_expr_plain(&r_policy_node_keyexpr(&inner->keys)[i], i, 0, 1);
     }
 }
 
@@ -194,7 +194,7 @@ static void test_parse_policy_tr(void **state) {
     policy_node_tr_t *root = (policy_node_tr_t *) out;
 
     assert_true(isnull_policy_node_tree(&root->tree));
-    check_key_expr_plain(r_policy_node_keyexpr(&root->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&root->key), 0, 0, 1);
 
     // Simple tr with a TREE that is a simple script
     res = parse_policy("tr(@0/**,pk(@1/**))", out, sizeof(out));
@@ -202,7 +202,7 @@ static void test_parse_policy_tr(void **state) {
     assert_true(res >= 0);
     root = (policy_node_tr_t *) out;
 
-    check_key_expr_plain(r_policy_node_keyexpr(&root->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&root->key), 0, 0, 1);
 
     assert_int_equal(r_policy_node_tree(&root->tree)->is_leaf, true);
 
@@ -210,7 +210,7 @@ static void test_parse_policy_tr(void **state) {
         (policy_node_with_key_t *) r_policy_node(&r_policy_node_tree(&root->tree)->script);
 
     assert_int_equal(tapscript->base.type, TOKEN_PK);
-    check_key_expr_plain(r_policy_node_keyexpr(&tapscript->key_placeholder), 1, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&tapscript->key), 1, 0, 1);
 
     // Simple tr with a TREE with two tapleaves
     res = parse_policy("tr(@0/**,{pk(@1/**),pk(@2/<5;7>/*)})", out, sizeof(out));
@@ -218,7 +218,7 @@ static void test_parse_policy_tr(void **state) {
     assert_true(res >= 0);
     root = (policy_node_tr_t *) out;
 
-    check_key_expr_plain(r_policy_node_keyexpr(&root->key_placeholder), 0, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&root->key), 0, 0, 1);
 
     policy_node_tree_t *taptree = r_policy_node_tree(&root->tree);
 
@@ -231,7 +231,7 @@ static void test_parse_policy_tr(void **state) {
         (policy_node_with_key_t *) r_policy_node(&taptree_left->script);
 
     assert_int_equal(tapscript_left->base.type, TOKEN_PK);
-    check_key_expr_plain(r_policy_node_keyexpr(&tapscript_left->key_placeholder), 1, 0, 1);
+    check_key_expr_plain(r_policy_node_keyexpr(&tapscript_left->key), 1, 0, 1);
 
     policy_node_tree_t *taptree_right =
         (policy_node_tree_t *) r_policy_node_tree(&taptree->right_tree);
@@ -240,7 +240,7 @@ static void test_parse_policy_tr(void **state) {
         (policy_node_with_key_t *) r_policy_node(&taptree_right->script);
 
     assert_int_equal(tapscript_right->base.type, TOKEN_PK);
-    check_key_expr_plain(r_policy_node_keyexpr(&tapscript_right->key_placeholder), 2, 5, 7);
+    check_key_expr_plain(r_policy_node_keyexpr(&tapscript_right->key), 2, 5, 7);
 }
 
 static void test_parse_policy_tr_multisig(void **state) {
@@ -258,9 +258,9 @@ static void test_parse_policy_tr_multisig(void **state) {
 
     policy_node_tr_t *root = (policy_node_tr_t *) out;
 
-    assert_int_equal(r_policy_node_keyexpr(&root->key_placeholder)->key_index, 0);
-    assert_int_equal(r_policy_node_keyexpr(&root->key_placeholder)->num_first, 0);
-    assert_int_equal(r_policy_node_keyexpr(&root->key_placeholder)->num_second, 1);
+    assert_int_equal(r_policy_node_keyexpr(&root->key)->key_index, 0);
+    assert_int_equal(r_policy_node_keyexpr(&root->key)->num_first, 0);
+    assert_int_equal(r_policy_node_keyexpr(&root->key)->num_second, 1);
 
     policy_node_tree_t *taptree = r_policy_node_tree(&root->tree);
 
@@ -275,8 +275,8 @@ static void test_parse_policy_tr_multisig(void **state) {
     assert_int_equal(tapscript_left->base.type, TOKEN_MULTI_A);
     assert_int_equal(tapscript_left->k, 1);
     assert_int_equal(tapscript_left->n, 2);
-    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_left->key_placeholders)[0], 1, 0, 1);
-    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_left->key_placeholders)[1], 2, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_left->keys)[0], 1, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_left->keys)[1], 2, 0, 1);
 
     policy_node_tree_t *taptree_right =
         (policy_node_tree_t *) r_policy_node_tree(&taptree->right_tree);
@@ -287,9 +287,9 @@ static void test_parse_policy_tr_multisig(void **state) {
     assert_int_equal(tapscript_right->base.type, TOKEN_SORTEDMULTI_A);
     assert_int_equal(tapscript_right->k, 2);
     assert_int_equal(tapscript_right->n, 3);
-    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->key_placeholders)[0], 3, 0, 1);
-    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->key_placeholders)[1], 4, 0, 1);
-    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->key_placeholders)[2], 5, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->keys)[0], 3, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->keys)[1], 4, 0, 1);
+    check_key_expr_plain(&r_policy_node_keyexpr(&tapscript_right->keys)[2], 5, 0, 1);
 }
 
 static void test_parse_policy_tr_musig_keypath(void **state) {
@@ -306,11 +306,7 @@ static void test_parse_policy_tr_musig_keypath(void **state) {
     assert_int_equal(root->base.type, TOKEN_TR);
     assert_true(isnull_policy_node_tree(&root->tree));
 
-    check_key_expr_musig(r_policy_node_keyexpr(&root->key_placeholder),
-                         3,
-                         (uint16_t[]){2, 0, 1},
-                         3,
-                         13);
+    check_key_expr_musig(r_policy_node_keyexpr(&root->key), 3, (uint16_t[]){2, 0, 1}, 3, 13);
 }
 
 static void test_parse_policy_tr_musig_scriptpath(void **state) {
@@ -334,11 +330,7 @@ static void test_parse_policy_tr_musig_scriptpath(void **state) {
     policy_node_with_key_t *script_pk = (policy_node_with_key_t *) r_policy_node(&tree->script);
     assert_int_equal(script_pk->base.type, TOKEN_PK);
 
-    check_key_expr_musig(r_policy_node_keyexpr(&script_pk->key_placeholder),
-                         3,
-                         (uint16_t[]){2, 0, 3},
-                         0,
-                         1);
+    check_key_expr_musig(r_policy_node_keyexpr(&script_pk->key), 3, (uint16_t[]){2, 0, 3}, 0, 1);
 }
 
 static void test_get_policy_segwit_version(void **state) {
