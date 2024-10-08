@@ -4,15 +4,15 @@ from ragger.firmware import Firmware
 from ragger_bitcoin.ragger_instructions import Instructions
 
 
-def message_instruction_approve(model: Firmware) -> Instructions:
+def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.nano_skip_screen("Path")
-        instructions.same_request("Sign")
+        instructions.nano_skip_screen("Path", save_screenshot=save_screenshot)
+        instructions.same_request("Sign", save_screenshot=save_screenshot)
     else:
-        instructions.review_message()
-        instructions.confirm_message()
+        instructions.review_message(save_screenshot=save_screenshot)
+        instructions.confirm_message(save_screenshot=save_screenshot)
 
     return instructions
 
@@ -168,11 +168,11 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
                                  save_screenshot=save_screenshot)
         if has_sighashwarning:
             instructions.same_request(
-                "Non-default sighash", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+                "Non-default sighash", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
 
         if has_unverifiedwarning:
             instructions.same_request(
-                "Unverified inputs", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+                "Unverified inputs", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
 
         instructions.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                   save_screenshot=save_screenshot)
@@ -185,7 +185,7 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
 
         if has_feewarning:
             instructions.same_request(
-                "Fees are above", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
+                "Fees are above", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
         instructions.confirm_transaction(save_screenshot=save_screenshot)
     return instructions
 

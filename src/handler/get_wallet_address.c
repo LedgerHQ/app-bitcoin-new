@@ -217,5 +217,18 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         }
 
         SEND_RESPONSE(dc, address, address_len, SW_OK);
+
+#ifdef HAVE_NBGL
+        // Workaround for a glitch when get_wallet_address is called right after a UX flow that has
+        // a long confirmation screen (e.g. register_wallet), as processing this command sometimes
+        // lead to the "Processing..." screen not being cleared at the end of the command.
+        // By forcing to show the dashboard, we avoid it; however, this is not a perfect solution,
+        // as it results in cutting short the duration of the "Address verified" status.
+        // This only happens on Flex and Stax, and only for complex policies. Therefore,
+        // we use the workaround for non-default wallets, and only on NBGL devices.
+        if (!is_wallet_default) {
+            ui_menu_main();
+        }
+#endif
     }
 }

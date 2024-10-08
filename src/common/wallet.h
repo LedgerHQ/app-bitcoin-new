@@ -300,6 +300,8 @@ typedef struct {
 
     // common between V1 and V2
     int16_t key_index;  // index of the key
+    int16_t
+        placeholder_index;  // index of the placeholder in the descriptor template, in parsing order
 } policy_node_key_placeholder_t;
 
 DEFINE_REL_PTR(policy_node_key_placeholder, policy_node_key_placeholder_t)
