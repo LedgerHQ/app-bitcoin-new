@@ -106,7 +106,7 @@ typedef struct {
 } output_info_t;
 
 typedef struct {
-    policy_node_key_placeholder_t placeholder;
+    policy_node_keyexpr_t placeholder;
     int cur_index;
     uint32_t fingerprint;
     uint8_t key_derivation_length;

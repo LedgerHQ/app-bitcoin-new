@@ -19,6 +19,10 @@
 // bitcoin-core supports up to 20, but we limit to 16 as bigger pushes require special handling.
 #define MAX_PUBKEYS_PER_MULTISIG 16
 
+// The maximum number of keys supported in a musig() key expression
+// It is basically unlimited in theory, but we need to set a practical limit.
+#define MAX_PUBKEYS_PER_MUSIG MAX_PUBKEYS_PER_MULTISIG
+
 #define WALLET_POLICY_VERSION_V1 1  // the legacy version of the first release
 #define WALLET_POLICY_VERSION_V2 2  // the current full version
 
@@ -292,19 +296,39 @@ typedef struct policy_node_ext_info_s {
  * array don't have extra derivation steps.
  */
 #pragma GCC diagnostic pop
-// 12 bytes
+
+DEFINE_REL_PTR(uint16, uint16_t)
+
+typedef struct {
+    int16_t n;                  // number of key indexes
+    rptr_uint16_t key_indexes;  // pointer to an array of exactly n key indexes
+} musig_aggr_key_info_t;
+
+DEFINE_REL_PTR(musig_aggr_key_info, musig_aggr_key_info_t)
+
+typedef enum {
+    KEY_EXPRESSION_NORMAL = 0,  // a key expression with a single key placeholder
+    KEY_EXPRESSION_MUSIG = 1    // a key expression containing a musig()
+} KeyExpressionType;
+
+// 16 bytes
 typedef struct {
     // the following fields are only used in V2
     uint32_t num_first;   // NUM_a of /<NUM_a,NUM_b>/*
     uint32_t num_second;  // NUM_b of /<NUM_a,NUM_b>/*
 
-    // common between V1 and V2
-    int16_t key_index;  // index of the key
+    KeyExpressionType type;
+    union {
+        // type == 0
+        int16_t key_index;  // index of the key (common between V1 and V2)
+        // type == 1
+        rptr_musig_aggr_key_info_t musig_info;  // only used in V2
+    };
     int16_t
         placeholder_index;  // index of the placeholder in the descriptor template, in parsing order
-} policy_node_key_placeholder_t;
+} policy_node_keyexpr_t;
 
-DEFINE_REL_PTR(policy_node_key_placeholder, policy_node_key_placeholder_t)
+DEFINE_REL_PTR(policy_node_keyexpr, policy_node_keyexpr_t)
 
 // 4 bytes
 typedef struct {
@@ -335,7 +359,7 @@ typedef policy_node_with_script3_t policy_node_with_scripts_t;
 // 4 bytes
 typedef struct {
     struct policy_node_s base;
-    rptr_policy_node_key_placeholder_t key_placeholder;
+    rptr_policy_node_keyexpr_t key_placeholder;
 } policy_node_with_key_t;
 
 // 8 bytes
@@ -346,11 +370,10 @@ typedef struct {
 
 // 12 bytes
 typedef struct {
-    struct policy_node_s base;  // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
-    int16_t k;                  // threshold
-    int16_t n;                  // number of keys
-    rptr_policy_node_key_placeholder_t
-        key_placeholders;  // pointer to array of exactly n key placeholders
+    struct policy_node_s base;                    // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
+    int16_t k;                                    // threshold
+    int16_t n;                                    // number of keys
+    rptr_policy_node_keyexpr_t key_placeholders;  // pointer to array of exactly n key placeholders
 } policy_node_multisig_t;
 
 // 8 bytes
@@ -400,7 +423,7 @@ typedef struct policy_node_tree_s {
 
 typedef struct {
     struct policy_node_s base;
-    rptr_policy_node_key_placeholder_t key_placeholder;
+    rptr_policy_node_keyexpr_t key_placeholder;
     rptr_policy_node_tree_t tree;  // NULL if tr(KP)
 } policy_node_tr_t;
 

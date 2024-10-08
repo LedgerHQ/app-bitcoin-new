@@ -424,23 +424,120 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
     return 0;
 }
 
-// parses a placeholder from in_buf, storing it in out. On success, the pointed placeholder_index is
-// stored in out->placeholder_index, and then it's incremented.
-static int parse_placeholder(buffer_t *in_buf,
-                             int version,
-                             policy_node_key_placeholder_t *out,
-                             uint16_t *placeholder_index) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcomment"
+// The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
+
+/**
+ * Parses a key expression, in one of the following forms:
+ * - Single key index:
+ *   - @IDX/**
+ *   - @IDX/<M;N>/*
+ * - MuSig2 aggregate key (only if is_taproot is true):
+ *   - musig(@IDX,@IDX,...,@IDX)/**
+ *   - musig(@IDX,@IDX,...,@IDX)/<M;N>/*
+ * where IDX is a key index.
+ */
+#pragma GCC diagnostic pop
+static int parse_keyexpr(buffer_t *in_buf,
+                         int version,
+                         policy_node_keyexpr_t *out,
+                         bool is_taproot,
+                         buffer_t *out_buf,
+                         uint16_t *placeholder_index) {
     char c;
-    if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
-        return WITH_ERROR(-1, "Expected key placeholder starting with '@'");
+    if (!buffer_read_u8(in_buf, (uint8_t *) &c)) {
+        return WITH_ERROR(-1, "Expected key placeholder");
     }
 
-    uint32_t k;
-    if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
-        return WITH_ERROR(-1, "The key index in a placeholder must be at most 32767");
-    }
+    if (c == '@') {
+        out->type = KEY_EXPRESSION_NORMAL;
 
-    out->key_index = (int16_t) k;
+        uint32_t k;
+        if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
+            return WITH_ERROR(-1, "The key index in a placeholder must be at most 32767");
+        }
+
+        out->key_index = (int16_t) k;
+    } else if (c == 'm') {
+        // parse a musig(key1,...,keyn) expression, where each key is a key expression
+        if (!consume_characters(in_buf, "usig(", 5)) {
+            return WITH_ERROR(-1, "Expected musig key expression");
+        }
+
+        if (!is_taproot) {
+            return WITH_ERROR(-1, "musig is only allows in taproot");
+        }
+
+        out->type = KEY_EXPRESSION_MUSIG;
+
+        if (version != WALLET_POLICY_VERSION_V2) {
+            return WITH_ERROR(-1, "musig key expressions are only supported with version number 2");
+        }
+
+        uint16_t key_placeholders[MAX_PUBKEYS_PER_MUSIG];
+        int n_musig_keys = 0;
+
+        // parse comma-separated list of @NUM
+        while (true) {
+            if (!buffer_read_u8(in_buf, (uint8_t *) &c) || c != '@') {
+                return WITH_ERROR(-1, "Expected key placeholder starting with '@'");
+            }
+
+            uint32_t k;
+            if (parse_unsigned_decimal(in_buf, &k) == -1 || k > INT16_MAX) {
+                return WITH_ERROR(-1, "The key index in a placeholder must be at most 32767");
+            }
+
+            if (n_musig_keys >= MAX_PUBKEYS_PER_MUSIG) {
+                return WITH_ERROR(-1, "Too many keys in musig");
+            }
+
+            key_placeholders[n_musig_keys] = (uint16_t) k;
+            ++n_musig_keys;
+
+            // the next character must be "," if there are more keys, or ')' otherwise
+            if (!buffer_read_u8(in_buf, (uint8_t *) &c)) {
+                return WITH_ERROR(-1, "Expression terminated prematurely");
+            }
+
+            if (c == ')') {
+                break;
+            } else if (c != ',') {
+                return WITH_ERROR(-1, "Invalid character in musig; expected ',' or ')'");
+            }
+        }
+
+        if (n_musig_keys < 2) {
+            return WITH_ERROR(-1, "musig must have at least 2 key indexes");
+        }
+        if (n_musig_keys > MAX_PUBKEYS_PER_MUSIG) {
+            return WITH_ERROR(-1, "Too many keys in musig");
+        }
+
+        // allocate musig structures
+
+        musig_aggr_key_info_t *musig_info =
+            (musig_aggr_key_info_t *) buffer_alloc(out_buf, sizeof(musig_info), true);
+
+        if (musig_info == NULL) {
+            return WITH_ERROR(-1, "Out of memory");
+        }
+
+        uint16_t *key_indexes =
+            (uint16_t *) buffer_alloc(out_buf, sizeof(uint16_t) * n_musig_keys, true);
+        if (key_indexes == NULL) {
+            return WITH_ERROR(-1, "Out of memory");
+        }
+        memcpy(key_indexes, key_placeholders, sizeof(uint16_t) * n_musig_keys);
+
+        musig_info->n = n_musig_keys;
+        i_uint16(&musig_info->key_indexes, key_indexes);
+
+        i_musig_aggr_key_info(&out->musig_info, musig_info);
+    } else {
+        return WITH_ERROR(-1, "Expected key placeholder starting with '@', or musig");
+    }
 
     if (version == WALLET_POLICY_VERSION_V1) {
         // default values for compatibility with the new code
@@ -1394,13 +1491,13 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            policy_node_key_placeholder_t *key_placeholder =
-                buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
+            policy_node_keyexpr_t *key_placeholder =
+                buffer_alloc(out_buf, sizeof(policy_node_keyexpr_t), true);
 
             if (key_placeholder == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
-            i_policy_node_key_placeholder(&node->key_placeholder, key_placeholder);
+            i_policy_node_keyexpr(&node->key_placeholder, key_placeholder);
 
             if (token == TOKEN_WPKH) {
                 if (depth > 0 && ((context_flags & CONTEXT_WITHIN_SH) == 0)) {
@@ -1412,7 +1509,13 @@ static int parse_script(buffer_t *in_buf,
 
             node->base.type = token;
 
-            if (0 > parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
+            bool is_taproot = (context_flags & CONTEXT_WITHIN_TR) != 0;
+            if (0 > parse_keyexpr(in_buf,
+                                  version,
+                                  key_placeholder,
+                                  is_taproot,
+                                  out_buf,
+                                  &key_placeholder_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1475,14 +1578,19 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            policy_node_key_placeholder_t *key_placeholder =
-                buffer_alloc(out_buf, sizeof(policy_node_key_placeholder_t), true);
+            policy_node_keyexpr_t *key_placeholder =
+                buffer_alloc(out_buf, sizeof(policy_node_keyexpr_t), true);
             if (key_placeholder == NULL) {
                 return WITH_ERROR(-1, "Out of memory");
             }
-            i_policy_node_key_placeholder(&node->key_placeholder, key_placeholder);
+            i_policy_node_keyexpr(&node->key_placeholder, key_placeholder);
 
-            if (0 > parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
+            if (0 > parse_keyexpr(in_buf,
+                                  version,
+                                  key_placeholder,
+                                  true,
+                                  out_buf,
+                                  &key_placeholder_count)) {
                 return WITH_ERROR(-1, "Couldn't parse key placeholder");
             }
 
@@ -1559,7 +1667,8 @@ static int parse_script(buffer_t *in_buf,
                 return WITH_ERROR(-1, "Out of memory");
             }
 
-            if ((context_flags & CONTEXT_WITHIN_TR) != 0) {
+            bool is_taproot = (context_flags & CONTEXT_WITHIN_TR) != 0;
+            if (is_taproot) {
                 if (token != TOKEN_MULTI_A && token != TOKEN_SORTEDMULTI_A) {
                     return WITH_ERROR(
                         -1,
@@ -1597,7 +1706,7 @@ static int parse_script(buffer_t *in_buf,
             // We allocate the array of key indices at the current position in the output buffer
             // (on success)
             buffer_alloc(out_buf, 0, true);  // ensure alignment of current pointer
-            i_policy_node_key_placeholder(&node->key_placeholders, buffer_get_cur(out_buf));
+            i_policy_node_keyexpr(&node->key_placeholders, buffer_get_cur(out_buf));
 
             node->n = 0;
             while (true) {
@@ -1612,18 +1721,21 @@ static int parse_script(buffer_t *in_buf,
                     return WITH_ERROR(-1, "Expected ','");
                 }
 
-                policy_node_key_placeholder_t *key_placeholder =
-                    (policy_node_key_placeholder_t *) buffer_alloc(
-                        out_buf,
-                        sizeof(policy_node_key_placeholder_t),
-                        true);  // we align this pointer, as there's padding in an array of
-                                // structures
+                policy_node_keyexpr_t *key_placeholder = (policy_node_keyexpr_t *) buffer_alloc(
+                    out_buf,
+                    sizeof(policy_node_keyexpr_t),
+                    true);  // we align this pointer, as there's padding in an array of
+                            // structures
                 if (key_placeholder == NULL) {
                     return WITH_ERROR(-1, "Out of memory");
                 }
 
-                if (0 >
-                    parse_placeholder(in_buf, version, key_placeholder, &key_placeholder_count)) {
+                if (0 > parse_keyexpr(in_buf,
+                                      version,
+                                      key_placeholder,
+                                      is_taproot,
+                                      out_buf,
+                                      &key_placeholder_count)) {
                     return WITH_ERROR(-1, "Error parsing key placeholder");
                 }
 

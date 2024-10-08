@@ -1,7 +1,7 @@
 #include "sign_psbt_cache.h"
 
 int derive_first_step_for_pubkey(const serialized_extended_pubkey_t *base_key,
-                                 const policy_node_key_placeholder_t *placeholder,
+                                 const policy_node_keyexpr_t *placeholder,
                                  sign_psbt_cache_t *cache,
                                  bool is_change,
                                  serialized_extended_pubkey_t *out_pubkey) {
