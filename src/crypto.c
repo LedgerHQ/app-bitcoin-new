@@ -39,44 +39,12 @@
 
 #include "crypto.h"
 
-/**
- * Generator for secp256k1, value 'g' defined in "Standards for Efficient Cryptography"
- * (SEC2) 2.7.1.
- */
-// clang-format off
-static const uint8_t secp256k1_generator[] = {
-    0x04,
-    0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
-    0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
-    0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65, 0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
-    0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19, 0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8};
-// clang-format on
-
-/**
- * Modulo for secp256k1
- */
-static const uint8_t secp256k1_p[] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x2f};
-
-/**
- * Curve order for secp256k1
- */
-static const uint8_t secp256k1_n[] = {
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
-    0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36, 0x41, 0x41};
-
-/**
- * (p + 1)/4, used to calculate square roots in secp256k1
- */
-static const uint8_t secp256k1_sqr_exponent[] = {
-    0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbf, 0xff, 0xff, 0x0c};
+#include "secp256k1.h"
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
-static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
-static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
-static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
+const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
+const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
+const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
 // Copy of cx_ecfp_scalar_mult_no_throw, but without using randomization for the scalar
 // multiplication. Therefore, it is faster, but not safe to use on private data, as it is vulnerable
@@ -122,7 +90,8 @@ static int secp256k1_point_unsafe(const uint8_t k[static 32], uint8_t out[static
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
-                 serialized_extended_pubkey_t *child) {
+                 serialized_extended_pubkey_t *child,
+                 uint8_t *tweak) {
     PRINT_STACK_POINTER();
 
     if (index >= BIP32_FIRST_HARDENED_CHILD) {
@@ -146,6 +115,10 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
+
+    if (tweak != NULL) {
+        memcpy(tweak, I_L, 32);
+    }
 
     // fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
     int diff;
@@ -466,7 +439,7 @@ void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
     crypto_tr_tagged_hash_init(hash_context, BIP0341_tapleaf_tag, sizeof(BIP0341_tapleaf_tag));
 }
 
-static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
+int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) {
     // save memory by reusing output buffer for intermediate results
     uint8_t *y = out + 1 + 32;
     // we use the memory for the x-coordinate of the output as a temporary variable
@@ -505,13 +478,13 @@ static int crypto_tr_lift_x(const uint8_t x[static 32], uint8_t out[static 65]) 
 
 // Computes a tagged hash according to BIP-340.
 // If data2_len > 0, then data2 must be non-NULL and the `data` and `data2` arrays are concatenated.
-static void crypto_tr_tagged_hash(const uint8_t *tag,
-                                  uint16_t tag_len,
-                                  const uint8_t *data,
-                                  uint16_t data_len,
-                                  const uint8_t *data2,
-                                  uint16_t data2_len,
-                                  uint8_t out[static CX_SHA256_SIZE]) {
+void crypto_tr_tagged_hash(const uint8_t *tag,
+                           uint16_t tag_len,
+                           const uint8_t *data,
+                           uint16_t data_len,
+                           const uint8_t *data2,
+                           uint16_t data2_len,
+                           uint8_t out[static CX_SHA256_SIZE]) {
     // First compute hashtag, reuse out buffer for that
     cx_sha256_hash(tag, tag_len, out);
 

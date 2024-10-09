@@ -303,6 +303,41 @@ def test_get_wallet_address_tr_script_sortedmulti(client: RaggerClient):
     assert res == "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7"
 
 
+def test_get_wallet_address_tr_musig_keypath(client: RaggerClient):
+    wallet = WalletPolicy(
+        name="Musig in keypath",
+        descriptor_template="tr(musig(@0,@1)/**)",
+        keys_info=[
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm"
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "05b7b4bccd3188effc24de8fd67e83231d8486772800884db0d81bad19f2be3e")
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
+    assert res == "tb1pc87la0ksvw4pfq6qc3gn9en33kx7s9rx4c4epy578kfjsdjv6mks7u7dgn"
+
+
+def test_get_wallet_address_tr_musig_scriptpath(client: RaggerClient):
+    wallet = WalletPolicy(
+        name="Musig in script path",
+        descriptor_template="tr(@0/**,pk(musig(@1,@2)/**))",
+        keys_info=[
+            "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm"
+        ]
+    )
+
+    wallet_hmac = bytes.fromhex(
+        "b22397b717949ede59c3c9f31c987acda098471211f754b6633c87054c1efb51")
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 3, False)
+    assert res == "tb1pa423acwcjc8jgt36muavyun8e2hz3t5qwptsr3wr8afmdfk3wchswf9ntp"
+
+
 def test_get_wallet_address_large_addr_index(client: RaggerClient):
     # 2**31 - 1 is the largest index allowed, per BIP-32
 
