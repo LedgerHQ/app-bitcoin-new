@@ -462,7 +462,12 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
 
     serialized_extended_pubkey_t ext_pubkey;
 
-    int ret = get_extended_pubkey(dispatcher_context, wdi, key_expr->key_index, &ext_pubkey);
+    if (key_expr->type != KEY_EXPRESSION_NORMAL) {
+        PRINTF("Not implemented\n");  // TODO
+        return -1;
+    }
+
+    int ret = get_extended_pubkey(dispatcher_context, wdi, key_expr->k.key_index, &ext_pubkey);
     if (ret < 0) {
         return -1;
     }
@@ -1382,7 +1387,12 @@ static int get_bip44_purpose(const policy_node_t *descriptor_template) {
             return -1;
     }
 
-    if (kp->key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
+    if (kp->type != KEY_EXPRESSION_NORMAL) {
+        // any key expression that is not a plain xpub is not BIP-44 compliant
+        return -1;
+    }
+
+    if (kp->k.key_index != 0 || kp->num_first != 0 || kp->num_second != 1) {
         return -1;
     }
 
@@ -1514,7 +1524,7 @@ end:
 static int get_keyexpr_by_index_in_tree(const policy_node_tree_t *tree,
                                         unsigned int i,
                                         const policy_node_t **out_tapleaf_ptr,
-                                        policy_node_keyexpr_t *out_keyexpr) {
+                                        policy_node_keyexpr_t **out_keyexpr) {
     if (tree->is_leaf) {
         int ret = get_keyexpr_by_index(r_policy_node(&tree->script), i, NULL, out_keyexpr);
         if (ret >= 0 && out_tapleaf_ptr != NULL && i < (unsigned) ret) {
@@ -1540,16 +1550,12 @@ static int get_keyexpr_by_index_in_tree(const policy_node_tree_t *tree,
     }
 }
 
-// TODO: generalize for musig. Note that this is broken for musig, as out_keyexpr
-//       can't be filled in for musig key expressions (as it's dynamic and contains
-//       relative pointers). We should probably refactor to return the pointer to the
-//       key expression and removing the out_keyexpr argument.
 int get_keyexpr_by_index(const policy_node_t *policy,
                          unsigned int i,
                          const policy_node_t **out_tapleaf_ptr,
-                         policy_node_keyexpr_t *out_keyexpr) {
+                         policy_node_keyexpr_t **out_keyexpr) {
     // make sure that out_keyexpr is a valid pointer, if the output is not needed
-    policy_node_keyexpr_t tmp;
+    policy_node_keyexpr_t *tmp;
     if (out_keyexpr == NULL) {
         out_keyexpr = &tmp;
     }
@@ -1574,16 +1580,14 @@ int get_keyexpr_by_index(const policy_node_t *policy,
         case TOKEN_WPKH: {
             if (i == 0) {
                 policy_node_with_key_t *wpkh = (policy_node_with_key_t *) policy;
-                memcpy(out_keyexpr,
-                       r_policy_node_keyexpr(&wpkh->key),
-                       sizeof(policy_node_keyexpr_t));
+                *out_keyexpr = r_policy_node_keyexpr(&wpkh->key);
             }
             return 1;
         }
         case TOKEN_TR: {
             policy_node_tr_t *tr = (policy_node_tr_t *) policy;
             if (i == 0) {
-                memcpy(out_keyexpr, r_policy_node_keyexpr(&tr->key), sizeof(policy_node_keyexpr_t));
+                *out_keyexpr = r_policy_node_keyexpr(&tr->key);
             }
             if (!isnull_policy_node_tree(&tr->tree)) {
                 int ret_tree = get_keyexpr_by_index_in_tree(
@@ -1610,7 +1614,7 @@ int get_keyexpr_by_index(const policy_node_t *policy,
 
             if (i < (unsigned int) node->n) {
                 policy_node_keyexpr_t *key_expressions = r_policy_node_keyexpr(&node->keys);
-                memcpy(out_keyexpr, &key_expressions[i], sizeof(policy_node_keyexpr_t));
+                *out_keyexpr = &key_expressions[i];
             }
 
             return node->n;
@@ -1722,18 +1726,28 @@ int get_keyexpr_by_index(const policy_node_t *policy,
 
 int count_distinct_keys_info(const policy_node_t *policy) {
     int ret = -1;
-
+    policy_node_keyexpr_t *key_expression_ptr;
     int n_key_expressions = get_keyexpr_by_index(policy, 0, NULL, NULL);
     if (n_key_expressions < 0) {
         return -1;
     }
 
     for (int cur = 0; cur < n_key_expressions; ++cur) {
-        policy_node_keyexpr_t key_expression;
-        if (0 > get_keyexpr_by_index(policy, cur, NULL, &key_expression)) {
+        if (0 > get_keyexpr_by_index(policy, cur, NULL, &key_expression_ptr)) {
             return -1;
         }
-        ret = MAX(ret, key_expression.key_index + 1);
+        if (key_expression_ptr->type == KEY_EXPRESSION_NORMAL) {
+            ret = MAX(ret, key_expression_ptr->k.key_index + 1);
+        } else if (key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
+            musig_aggr_key_info_t *musig_info =
+                r_musig_aggr_key_info(&key_expression_ptr->m.musig_info);
+            uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+            for (int i = 0; i < musig_info->n; i++) {
+                ret = MAX(ret, key_indexes[i] + 1);
+            }
+        } else {
+            LEDGER_ASSERT(false, "Unknown key expression type");
+        }
     }
     return ret;
 }
@@ -1920,21 +1934,21 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
     // proportional to the depth of the wallet policy's abstract syntax tree.
     for (int i = 0; i < n_key_expressions - 1;
          i++) {  // no point in running this for the last key expression
-        policy_node_keyexpr_t kp_i;
+        policy_node_keyexpr_t *kp_i;
         if (0 > get_keyexpr_by_index(policy, i, NULL, &kp_i)) {
             return WITH_ERROR(-1, "Unexpected error retrieving key expressions from the policy");
         }
         for (int j = i + 1; j < n_key_expressions; j++) {
-            policy_node_keyexpr_t kp_j;
+            policy_node_keyexpr_t *kp_j;
             if (0 > get_keyexpr_by_index(policy, j, NULL, &kp_j)) {
                 return WITH_ERROR(-1,
                                   "Unexpected error retrieving key expressions from the policy");
             }
 
             // key expressions for the same key must have disjoint derivation options
-            if (kp_i.key_index == kp_j.key_index) {
-                if (kp_i.num_first == kp_j.num_first || kp_i.num_first == kp_j.num_second ||
-                    kp_i.num_second == kp_j.num_first || kp_i.num_second == kp_j.num_second) {
+            if (kp_i->k.key_index == kp_j->k.key_index) {
+                if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
+                    kp_i->num_second == kp_j->num_first || kp_i->num_second == kp_j->num_second) {
                     return WITH_ERROR(-1,
                                       "Key expressions with repeated derivations in miniscript");
                 }

@@ -106,7 +106,7 @@ typedef struct {
 } output_info_t;
 
 typedef struct {
-    policy_node_keyexpr_t key_expression;
+    policy_node_keyexpr_t *key_expression_ptr;
     int cur_index;
     uint32_t fingerprint;
     uint8_t key_derivation_length;
@@ -432,10 +432,10 @@ static int read_change_and_index_from_psbt_bip32_derivation(
         uint32_t addr_index = fpt_der[1 + der_len - 1];
 
         // check if the 'change' derivation step is indeed coherent with key expression
-        if (change_step == keyexpr_info->key_expression.num_first) {
+        if (change_step == keyexpr_info->key_expression_ptr->num_first) {
             in_out->is_change = false;
             in_out->address_index = addr_index;
-        } else if (change_step == keyexpr_info->key_expression.num_second) {
+        } else if (change_step == keyexpr_info->key_expression_ptr->num_second) {
             in_out->is_change = true;
             in_out->address_index = addr_index;
         } else {
@@ -445,7 +445,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
         // check that we can indeed derive the same key from the current key expression
         serialized_extended_pubkey_t pubkey;
         if (0 > derive_first_step_for_pubkey(&keyexpr_info->pubkey,
-                                             &keyexpr_info->key_expression,
+                                             keyexpr_info->key_expression_ptr,
                                              sign_psbt_cache,
                                              in_out->is_change,
                                              &pubkey))
@@ -668,12 +668,17 @@ static bool __attribute__((noinline)) fill_keyexpr_info_if_internal(dispatcher_c
     policy_map_key_info_t key_info;
     {
         uint8_t key_info_str[MAX_POLICY_KEY_INFO_LEN];
-        int key_info_len = call_get_merkle_leaf_element(dc,
-                                                        st->wallet_header.keys_info_merkle_root,
-                                                        st->wallet_header.n_keys,
-                                                        keyexpr_info->key_expression.key_index,
-                                                        key_info_str,
-                                                        sizeof(key_info_str));
+
+        // TODO: generalize for musig: keyexpr_info->key_expression_ptr->k.key_index is wrong
+        LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL, "TODO");
+
+        int key_info_len =
+            call_get_merkle_leaf_element(dc,
+                                         st->wallet_header.keys_info_merkle_root,
+                                         st->wallet_header.n_keys,
+                                         keyexpr_info->key_expression_ptr->k.key_index,
+                                         key_info_str,
+                                         sizeof(key_info_str));
 
         if (key_info_len < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
@@ -733,7 +738,7 @@ static bool find_first_internal_keyexpr(dispatcher_context_t *dc,
         int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
                                                      keyexpr_info->cur_index,
                                                      NULL,
-                                                     &keyexpr_info->key_expression);
+                                                     &keyexpr_info->key_expression_ptr);
         if (n_key_expressions < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
@@ -2152,9 +2157,9 @@ static bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_co
     for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
         sign_path[i] = keyexpr_info->key_derivation[i];
     }
-    sign_path[keyexpr_info->key_derivation_length] = input->in_out.is_change
-                                                         ? keyexpr_info->key_expression.num_second
-                                                         : keyexpr_info->key_expression.num_first;
+    sign_path[keyexpr_info->key_derivation_length] =
+        input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
+                                : keyexpr_info->key_expression_ptr->num_first;
     sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
 
     int sign_path_len = keyexpr_info->key_derivation_length + 2;
@@ -2221,8 +2226,8 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
             sign_path[i] = keyexpr_info->key_derivation[i];
         }
         sign_path[keyexpr_info->key_derivation_length] =
-            input->in_out.is_change ? keyexpr_info->key_expression.num_second
-                                    : keyexpr_info->key_expression.num_first;
+            input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
+                                    : keyexpr_info->key_expression_ptr->num_first;
         sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
 
         int sign_path_len = keyexpr_info->key_derivation_length + 2;
@@ -2678,7 +2683,7 @@ sign_transaction(dispatcher_context_t *dc,
         int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
                                                      key_expression_index,
                                                      &tapleaf_ptr,
-                                                     &keyexpr_info.key_expression);
+                                                     &keyexpr_info.key_expression_ptr);
 
         if (n_key_expressions < 0) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
