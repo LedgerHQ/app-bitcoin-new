@@ -42,9 +42,9 @@
 #include "secp256k1.h"
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
-static const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
-static const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
-static const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
+const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
+const uint8_t BIP0341_tapbranch_tag[] = {'T', 'a', 'p', 'B', 'r', 'a', 'n', 'c', 'h'};
+const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 
 // Copy of cx_ecfp_scalar_mult_no_throw, but without using randomization for the scalar
 // multiplication. Therefore, it is faster, but not safe to use on private data, as it is vulnerable
@@ -90,7 +90,8 @@ static int secp256k1_point_unsafe(const uint8_t k[static 32], uint8_t out[static
 
 int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
                  uint32_t index,
-                 serialized_extended_pubkey_t *child) {
+                 serialized_extended_pubkey_t *child,
+                 uint8_t *tweak) {
     PRINT_STACK_POINTER();
 
     if (index >= BIP32_FIRST_HARDENED_CHILD) {
@@ -114,6 +115,10 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 
     uint8_t *I_L = &I[0];
     uint8_t *I_R = &I[32];
+
+    if (tweak != NULL) {
+        memcpy(tweak, I_L, 32);
+    }
 
     // fail if I_L is not smaller than the group order n, but the probability is < 1/2^128
     int diff;
