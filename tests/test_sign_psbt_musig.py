@@ -113,13 +113,13 @@ def test_sign_psbt_musig2_keypath(client: RaggerClient, speculos_globals: Specul
     wallet_hmac = hmac.new(
         speculos_globals.wallet_registration_key, wallet_policy.id, sha256).digest()
 
-    psbt_b64 = "cHNidP8BAIACAAAAAWbcwfJ78yV/+Jn0waX9pBWhDp2pZCm0GuTEXe2wXcP2AQAAAAD9////AQAAAAAAAAAARGpCVGhpcyBpbnB1dHMgaGFzIHR3byBwdWJrZXlzIGJ1dCB5b3Ugb25seSBzZWUgb25lLiAjbXBjZ2FuZyByZXZlbmdlAAAAAAABASuf/gQAAAAAACJRIPSL0RqGcuiQxWUrpyqc9CJwAk7i1Wk1p+YZWmGpB5tmIRbGANErPozSP7sjGM7KD11/WcKOe0InwGoEZz9MPQ7Bxg0AAAAAAAAAAAADAAAAAAA="
+    psbt_b64 = "cHNidP8BAIACAAAAAdF2HhQ2XCgTpd3Sel7VkS5FvESbwo1rgeuG4tBt9GICAAAAAAD9////AQAAAAAAAAAARGpCVGhpcyBpbnB1dHMgaGFzIHR3byBwdWJrZXlzIGJ1dCB5b3Ugb25seSBzZWUgb25lLiAjbXBjZ2FuZyByZXZlbmdlAAAAAAABASuf/gQAAAAAACJRIMH9/r7QY6oUg0DEUTLmcY2N6BRmriuQkp49kyg2TNbtIRaQZkYWUCCfi7xZsFr10WFcUPX3nBiNe+dC/ZMiUvaPDA0AW4+8kwAAAAADAAAAAAA="
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
     sighashes = [
         bytes.fromhex(
-            "f3f6d4ae955af42665667ccff4edc9244d9143ada53ba26aee036258e0ffeda9")
+            "a3aeecb6c236b4a7e72c95fa138250d449b97a75c573f8ab612356279ff64046")
     ]
 
     signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
@@ -147,13 +147,13 @@ def test_sign_psbt_musig2_scriptpath(client: RaggerClient, speculos_globals: Spe
     wallet_hmac = hmac.new(
         speculos_globals.wallet_registration_key, wallet_policy.id, sha256).digest()
 
-    psbt_b64 = "cHNidP8BAFoCAAAAAeyfHxrwzXffQqF9egw6KMS7RwCLP4rW95dxtXUKYJGFAQAAAAD9////AQAAAAAAAAAAHmocTXVzaWcyLiBOb3cgZXZlbiBpbiBTY3JpcHRzLgAAAAAAAQErOTAAAAAAAAAiUSDZqQIMWvfc0h2w2z6+0vTt0z1YoUHA6JHynopzSe3hgiIVwethFsEeXf/x51pIczoAIsj9RoVePIBTyk/rOMW8B6uIIyDGANErPozSP7sjGM7KD11/WcKOe0InwGoEZz9MPQ7BxqzAIRbGANErPozSP7sjGM7KD11/WcKOe0InwGoEZz9MPQ7Bxi0BkW61VIaT9Qaz/k0SzoZ1UBsjkrXzPqXQbCbBjbNZP/kAAAAAAAAAAAMAAAABFyDrYRbBHl3/8edaSHM6ACLI/UaFXjyAU8pP6zjFvAeriAEYIJFutVSGk/UGs/5NEs6GdVAbI5K18z6l0GwmwY2zWT/5AAA="
+    psbt_b64 = "cHNidP8BAFoCAAAAAdOnEESfpXpBe9X59Q4jxz1u9E4Wovn2bkAuuyqUUY0mAAAAAAD9////AQAAAAAAAAAAHmocTXVzaWcyLiBOb3cgZXZlbiBpbiBTY3JpcHRzLgAAAAAAAQErOTAAAAAAAAAiUSDtVR7h2JYPJC463zrCcmfKriiugHBXAcXDP1O2ptF2LyIVwethFsEeXf/x51pIczoAIsj9RoVePIBTyk/rOMW8B6uIIyCQZkYWUCCfi7xZsFr10WFcUPX3nBiNe+dC/ZMiUvaPDKzAIRaQZkYWUCCfi7xZsFr10WFcUPX3nBiNe+dC/ZMiUvaPDC0BuYMCXh1wIlpyBMdMaCFPSwOeOyvhqg+FJ+fOMoWlJsRbj7yTAAAAAAMAAAABFyDrYRbBHl3/8edaSHM6ACLI/UaFXjyAU8pP6zjFvAeriAEYILmDAl4dcCJacgTHTGghT0sDnjsr4aoPhSfnzjKFpSbEAAA="
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
     sighashes = [
         bytes.fromhex(
-            "ba6d1d859dbc471999fff1fc5b8740fdacadd64a10c8d62de76e39a1c8dcd835")
+            "28f86cd95c144ed4a877701ae7166867e8805b654c43d9f44da45d7b0070c313")
     ]
 
     signer_1 = LedgerMusig2Cosigner(client, wallet_policy, wallet_hmac)
