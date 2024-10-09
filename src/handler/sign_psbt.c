@@ -822,9 +822,7 @@ static bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
             memcpy(&keyexpr_info->pubkey.compressed_pubkey[1],
                    musig_ctx.Q.x,
                    sizeof(musig_ctx.Q.x));
-            memcpy(&keyexpr_info->pubkey.chain_code,
-                   BIP_MUSIG_CHAINCODE,
-                   sizeof(BIP_MUSIG_CHAINCODE));
+            memcpy(&keyexpr_info->pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
 
             keyexpr_info->fingerprint =
                 crypto_get_key_fingerprint(keyexpr_info->pubkey.compressed_pubkey);
@@ -2598,7 +2596,7 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
 
     ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
     memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
-    memcpy(&ext_pubkey.chain_code, BIP_MUSIG_CHAINCODE, sizeof(BIP_MUSIG_CHAINCODE));
+    memcpy(&ext_pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
 
     // 2) compute musig2 tweaks
     // We always have exactly 2 BIP32 tweaks in wallet policies; if the musig is in the keypath
