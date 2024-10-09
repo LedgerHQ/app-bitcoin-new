@@ -420,7 +420,7 @@ execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, 
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
-__attribute__((noinline, warn_unused_result)) static int get_extended_pubkey(
+__attribute__((noinline, warn_unused_result)) int get_extended_pubkey(
     dispatcher_context_t *dispatcher_context,
     const wallet_derivation_info_t *wdi,
     int key_index,
