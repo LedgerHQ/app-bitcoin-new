@@ -451,7 +451,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
                                              in_out->is_change,
                                              &pubkey))
             return -1;
-        if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey)) return -1;
+        if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey, NULL)) return -1;
 
         int pk_offset = is_tap ? 1 : 0;
         if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0) {
