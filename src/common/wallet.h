@@ -319,9 +319,13 @@ typedef struct {
     KeyExpressionType type;
     union {
         // type == 0
-        int16_t key_index;  // index of the key (common between V1 and V2)
+        struct {
+            int16_t key_index;  // index of the key (common between V1 and V2)
+        } k;
         // type == 1
-        rptr_musig_aggr_key_info_t musig_info;  // only used in V2
+        struct {
+            rptr_musig_aggr_key_info_t musig_info;  // only used in V2
+        } m;
     };
     int16_t
         keyexpr_index;  // index of the key expression in the descriptor template, in parsing order
