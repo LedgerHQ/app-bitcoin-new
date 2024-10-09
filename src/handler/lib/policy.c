@@ -500,7 +500,7 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
 
         ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
         memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
-        memcpy(&ext_pubkey.chain_code, BIP_MUSIG_CHAINCODE, sizeof(BIP_MUSIG_CHAINCODE));
+        memcpy(&ext_pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
     } else {
         LEDGER_ASSERT(false, "Unreachable code");
     }

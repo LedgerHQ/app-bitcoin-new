@@ -42,7 +42,7 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
 
 
 def aggr_xpub(pubkeys: List[bytes], chain: Chain) -> str:
-    BIP_MUSIG_CHAINCODE = bytes.fromhex(
+    BIP_328_CHAINCODE = bytes.fromhex(
         "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
     # sort the pubkeys prior to aggregation
     ctx = key_agg(list(sorted(pubkeys)))
@@ -59,7 +59,7 @@ def aggr_xpub(pubkeys: List[bytes], chain: Chain) -> str:
         b'\x00',  # depth
         b'\x00\x00\x00\x00',  # parent fingerprint
         b'\x00\x00\x00\x00',  # child number
-        BIP_MUSIG_CHAINCODE,
+        BIP_328_CHAINCODE,
         compressed_pubkey
     ]))
 
