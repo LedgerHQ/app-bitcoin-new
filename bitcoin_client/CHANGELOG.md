@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.3.0] - 15-02-2024
+
+### Changed
+
+- Removed external dependencies by using a local clone of [embit](https://github.com/diybitcoinhardware/embit) to perform the address checks introduced in version 0.2.2.
+
+## [0.2.2] - 26-06-2023
+
+### Added
+
+- The client library now independently computes the expected address for `get_wallet_address` using the wallet policy, raising an error in case of mismatch. Similarly, `register_wallet` computes and checks the first receive address.
+
 ## [0.2.1] - 18-04-2023
 
 ### Changed
