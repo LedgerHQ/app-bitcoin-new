@@ -3,22 +3,24 @@ from typing import Tuple, List, Mapping, Optional, Union
 import base64
 from io import BytesIO, BufferedReader
 
+from .embit import base58
 from .embit.base import EmbitError 
 from .embit.descriptor import Descriptor
 from .embit.networks import NETWORKS
 
 from .command_builder import BitcoinCommandBuilder, BitcoinInsType
 from .common import Chain, read_uint, read_varint
-from .client_command import ClientCommandInterpreter
-from .client_base import Client, TransportClient, PartialSignature
+from .client_command import ClientCommandInterpreter, CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG, CCMD_YIELD_MUSIG_PUBNONCE_TAG
+from .client_base import Client, MusigPartialSignature, MusigPubNonce, SignPsbtYieldedObject, TransportClient, PartialSignature
 from .client_legacy import LegacyClient
 from .exception import DeviceException
 from .errors import UnknownDeviceError
 from .merkle import get_merkleized_map_commitment
 from .wallet import WalletPolicy, WalletType
 from .psbt import PSBT, normalize_psbt
-from . import segwit_addr
 from ._serialize import deser_string
+
+from .bip0327 import key_agg, cbytes
 
 
 def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
@@ -39,6 +41,54 @@ def parse_stream_to_map(f: BufferedReader) -> Mapping[bytes, bytes]:
     return result
 
 
+def aggr_xpub(pubkeys: List[bytes], chain: Chain) -> str:
+    BIP_328_CHAINCODE = bytes.fromhex(
+        "868087ca02a6f974c4598924c36b57762d32cb45717167e300622c7167e38965")
+    # sort the pubkeys prior to aggregation
+    ctx = key_agg(list(sorted(pubkeys)))
+    compressed_pubkey = cbytes(ctx.Q)
+
+    # Serialize according to BIP-32
+    if chain == Chain.MAIN:
+        version = 0x0488B21E
+    else:
+        version = 0x043587CF
+
+    return base58.encode_check(b''.join([
+        version.to_bytes(4, byteorder='big'),
+        b'\x00',  # depth
+        b'\x00\x00\x00\x00',  # parent fingerprint
+        b'\x00\x00\x00\x00',  # child number
+        BIP_328_CHAINCODE,
+        compressed_pubkey
+    ]))
+
+
+# Given a valid descriptor, replaces each musig() (if any) with the
+# corresponding synthetic xpub/tpub.
+def replace_musigs(desc: str, chain: Chain) -> str:
+    while True:
+        musig_start = desc.find("musig(")
+        if musig_start == -1:
+            break
+        musig_end = desc.find(")", musig_start)
+        if musig_end == -1:
+            raise ValueError("Invalid descriptor template")
+
+        key_and_origs = desc[musig_start+6:musig_end].split(",")
+        pubkeys = []
+        for key_orig in key_and_origs:
+            orig_end = key_orig.find("]")
+            xpub = key_orig if orig_end == -1 else key_orig[orig_end+1:]
+            pubkeys.append(base58.decode_check(xpub)[-33:])
+
+        # replace with the aggregate xpub
+        desc = desc[:musig_start] + \
+            aggr_xpub(pubkeys, chain) + desc[musig_end+1:]
+
+    return desc
+
+
 def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSignature:
     if len(pubkey_augm) == 64:
         # tapscript spend: pubkey_augm is the concatenation of:
@@ -54,6 +104,60 @@ def _make_partial_signature(pubkey_augm: bytes, signature: bytes) -> PartialSign
             raise UnknownDeviceError(f"Invalid pubkey length returned: {len(pubkey_augm)}")
 
         return PartialSignature(signature=signature, pubkey=pubkey_augm)
+
+
+def _decode_signpsbt_yielded_value(res: bytes) -> Tuple[int, SignPsbtYieldedObject]:
+    res_buffer = BytesIO(res)
+    input_index_or_tag = read_varint(res_buffer)
+    if input_index_or_tag == CCMD_YIELD_MUSIG_PUBNONCE_TAG:
+        input_index = read_varint(res_buffer)
+        pubnonce = res_buffer.read(66)
+        participant_pk = res_buffer.read(33)
+        aggregate_pubkey = res_buffer.read(33)
+        tapleaf_hash = res_buffer.read()
+        if len(tapleaf_hash) == 0:
+            tapleaf_hash = None
+
+        return (
+            input_index,
+            MusigPubNonce(
+                participant_pubkey=participant_pk,
+                aggregate_pubkey=aggregate_pubkey,
+                tapleaf_hash=tapleaf_hash,
+                pubnonce=pubnonce
+            )
+        )
+    elif input_index_or_tag == CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG:
+        input_index = read_varint(res_buffer)
+        partial_signature = res_buffer.read(32)
+        participant_pk = res_buffer.read(33)
+        aggregate_pubkey = res_buffer.read(33)
+        tapleaf_hash = res_buffer.read()
+        if len(tapleaf_hash) == 0:
+            tapleaf_hash = None
+
+        return (
+            input_index,
+            MusigPartialSignature(
+                participant_pubkey=participant_pk,
+                aggregate_pubkey=aggregate_pubkey,
+                tapleaf_hash=tapleaf_hash,
+                partial_signature=partial_signature
+            )
+        )
+    else:
+        # other values follow an encoding without an explicit tag, where the
+        # first element is the input index. All the signature types are implemented
+        # by the PartialSignature type (not to be confused with the musig Partial Signature).
+        input_index = input_index_or_tag
+
+        pubkey_augm_len = read_uint(res_buffer, 8)
+        pubkey_augm = res_buffer.read(pubkey_augm_len)
+
+        signature = res_buffer.read()
+
+        return((input_index, _make_partial_signature(pubkey_augm, signature)))
+
 
 
 class NewClient(Client):
@@ -162,7 +266,7 @@ class NewClient(Client):
 
         return result
 
-    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, PartialSignature]]:
+    def sign_psbt(self, psbt: Union[PSBT, bytes, str], wallet: WalletPolicy, wallet_hmac: Optional[bytes]) -> List[Tuple[int, SignPsbtYieldedObject]]:
 
         psbt = normalize_psbt(psbt)
 
@@ -231,17 +335,10 @@ class NewClient(Client):
         if any(len(x) <= 1 for x in results):
             raise RuntimeError("Invalid response")
 
-        results_list: List[Tuple[int, PartialSignature]] = []
+        results_list: List[Tuple[int, SignPsbtYieldedObject]] = []
         for res in results:
-            res_buffer = BytesIO(res)
-            input_index = read_varint(res_buffer)
-
-            pubkey_augm_len = read_uint(res_buffer, 8)
-            pubkey_augm = res_buffer.read(pubkey_augm_len)
-
-            signature = res_buffer.read()
-
-            results_list.append((input_index, _make_partial_signature(pubkey_augm, signature)))
+            input_index, obj = _decode_signpsbt_yielded_value(res)
+            results_list.append((input_index, obj))
 
         return results_list
 
@@ -273,6 +370,11 @@ class NewClient(Client):
 
     def _derive_address_for_policy(self, wallet: WalletPolicy, change: bool, address_index: int) -> Optional[str]:
         desc_str = wallet.get_descriptor(change)
+
+        # Since embit does not support musig() in descriptors, we replace each
+        # occurrence with the corresponding aggregated xpub
+        desc_str = replace_musigs(desc_str, self.chain)
+
         try:
             desc = Descriptor.from_string(desc_str)
 

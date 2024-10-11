@@ -15,6 +15,10 @@ class ClientCommandCode(IntEnum):
     GET_MORE_ELEMENTS = 0xA0
 
 
+CCMD_YIELD_MUSIG_PUBNONCE_TAG = 0xFFFFFFFF
+CCMD_YIELD_MUSIG_PARTIALSIGNATURE_TAG = 0xFFFFFFFE
+
+
 class ClientCommand:
     def execute(self, request: bytes) -> bytes:
         raise NotImplementedError("Subclasses should implement this method.")
