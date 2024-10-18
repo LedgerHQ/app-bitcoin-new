@@ -33,6 +33,7 @@
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"
+#include "../error_codes.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
@@ -1198,14 +1199,14 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Swap feature: check that wallet policy is a default one
     if (!st->is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
     }
 
     // No external inputs allowed
     if (st->n_external_inputs > 0) {
         PRINTF("External inputs not allowed in swap transactions\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_EXTERNAL_INPUTS);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1213,7 +1214,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // Do not allow transactions with missing non-witness utxos or non-default sighash flags
         PRINTF(
             "Missing non-witness utxo or non-default sighash flags are not allowed during swaps\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_MISSING_NONWITNESSUTXO);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1229,7 +1230,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // There must be only one external output
         if (st->n_external_outputs != 1) {
             PRINTF("Standard swap transaction must have exactly 1 external output\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
             finalize_exchange_sign_transaction(false);
         }
     } else if (G_swap_state.mode == SWAP_MODE_CROSSCHAIN) {
@@ -1239,7 +1240,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         if (st->n_external_outputs != 2) {
             PRINTF("Cross-chain swap transaction must have exactly 2 external outputs\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1248,7 +1249,9 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         size_t opreturn_amount = st->outputs.output_amounts[0];
         if (opreturn_script_len < 4 || opreturn_script[0] != OP_RETURN) {
             PRINTF("The first output must be OP_RETURN <data> for a cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc,
+                       SW_FAIL_SWAP,
+                       EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD_INVALID_FIRST_OUTPUT);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1267,21 +1270,21 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // there are other valid OP_RETURN Scripts that we never expect here,
             // so we don't bother parsing.
             PRINTF("Unsupported or invalid OP_RETURN Script in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD);
             finalize_exchange_sign_transaction(false);
         }
 
         // Make sure there is a singla data push
         if (opreturn_script_len != 1 + push_opcode_size + data_size) {
             PRINTF("Invalid OP_RETURN Script length in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD);
             finalize_exchange_sign_transaction(false);
         }
 
         // Make sure the output's value is 0
         if (opreturn_amount != 0) {
             PRINTF("OP_RETURN with non-zero value during cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD_NONZERO_AMOUNT);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1292,18 +1295,18 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                    expected_payin_hash,
                    sizeof(expected_payin_hash)) != 0) {
             PRINTF("Mismatching payin hash in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_HASH);
             finalize_exchange_sign_transaction(false);
         }
     } else if (G_swap_state.mode == SWAP_MODE_ERROR) {
         // an error was detected in handle_swap_sign_transaction.c::copy_transaction_parameters
         // special case only to improve error reporting in debug mode
         PRINTF("Invalid parameters for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_GENERIC_COPY_TRANSACTION_PARAMETERS_FAILED);
         finalize_exchange_sign_transaction(false);
     } else {
         PRINTF("Unknown swap mode: %d\n", G_swap_state.mode);
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_GENERIC_UNKNOWN_MODE);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1313,14 +1316,14 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Check that total amount and fees are as expected
     if (fee != G_swap_state.fees) {
         PRINTF("Mismatching fee for swap\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_FEES);
         finalize_exchange_sign_transaction(false);
     }
 
     uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
     if (spent_amount != G_swap_state.amount) {
         PRINTF("Mismatching spent amount for swap\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_AMOUNT);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1331,7 +1334,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                        st->outputs.output_script_lengths[swap_dest_idx],
                        output_description)) {
         PRINTF("Invalid or unsupported script for external output\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_UNSUPPORTED_OUTPUT);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1354,7 +1357,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             PRINTF("%c", output_description[i]);
         }
         PRINTF("\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_DESTINATION);
         finalize_exchange_sign_transaction(false);
     }
 
