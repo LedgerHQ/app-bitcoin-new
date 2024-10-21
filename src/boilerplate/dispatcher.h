@@ -47,6 +47,15 @@ static inline void SEND_RESPONSE(struct dispatcher_context_s *dc,
     dc->send_response();
 }
 
+static inline void SEND_SW_EC(struct dispatcher_context_s *dc, uint16_t sw, uint16_t error_code) {
+    uint8_t error_code_buf[2];
+    error_code_buf[0] = (error_code >> 8) & 0xFF;
+    error_code_buf[1] = error_code & 0xFF;
+    dc->add_to_response(&error_code_buf, sizeof(error_code_buf));
+    dc->finalize_response(sw);
+    dc->send_response();
+}
+
 /**
  * Describes a command that can be processed by the dispatcher.
  */

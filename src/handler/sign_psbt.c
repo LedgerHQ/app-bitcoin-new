@@ -33,6 +33,7 @@
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"
+#include "../error_codes.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
@@ -641,13 +642,13 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // No hmac, verify that the policy is indeed a default one
             if (!is_wallet_policy_standard(dc, &st->wallet_header, st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
                 return false;
             }
 
             if (st->wallet_header.name_len != 0) {
                 PRINTF("Name must be zero-length for a standard wallet policy\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY);
                 return false;
             }
 
@@ -753,7 +754,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
     }
 
     PRINTF("No internal key found in wallet policy");
-    SEND_SW(dc, SW_INCORRECT_DATA);
+    SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
     return false;
 }
 
@@ -847,7 +848,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // either witness utxo or non-witness utxo (or both) must be present.
         if (!input.has_nonWitnessUtxo && !input.has_witnessUtxo) {
             PRINTF("No witness utxo nor non-witness utxo present in input.\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_AND_WITNESSUTXO);
             return false;
         }
 
@@ -869,13 +870,14 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
 
             // request non-witness utxo, and get the prevout's value and scriptpubkey
+            // Also checks that the recomputed transaction hash matches with prevout_hash.
             if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
                                                                  &input.in_out.map,
                                                                  &input.prevout_amount,
                                                                  input.in_out.scriptPubKey,
                                                                  &input.in_out.scriptPubKey_len,
                                                                  prevout_hash)) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED);
                 return false;
             }
 
@@ -906,7 +908,9 @@ preprocess_inputs(dispatcher_context_t *dc,
                     PRINTF(
                         "scriptPubKey or amount in non-witness utxo doesn't match with witness "
                         "utxo\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    SEND_SW_EC(dc,
+                               SW_INCORRECT_DATA,
+                               EC_SIGN_PSBT_NONWITNESSUTXO_AND_WITNESSUTXO_MISMATCH);
                     return false;
                 }
             } else {
@@ -943,7 +947,10 @@ preprocess_inputs(dispatcher_context_t *dc,
         if (segwit_version == -1) {
             if (!input.has_nonWitnessUtxo || input.has_witnessUtxo) {
                 PRINTF("Legacy inputs must have the non-witness utxo, but no witness utxo.\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(
+                    dc,
+                    SW_INCORRECT_DATA,
+                    EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_OR_UNEXPECTED_WITNESSUTXO_FOR_LEGACY);
                 return false;
             }
         }
@@ -958,7 +965,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // For all segwit transactions, the witness utxo must be present
         if (segwit_version >= 0 && !input.has_witnessUtxo) {
             PRINTF("Witness utxo missing for segwit input\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_WITNESSUTXO_FOR_SEGWIT);
             return false;
         }
 
@@ -1002,7 +1009,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
             (cur_input_index >= st->n_outputs)) {
             PRINTF("SIGHASH_SINGLE with input idx >= n_output is not allowed \n");
-            SEND_SW(dc, SW_NOT_SUPPORTED);
+            SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE);
             return false;
         }
     }
@@ -1184,7 +1191,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         // from unknowingly signing a transaction that sends the change to too many outputs
         // (possibly economically not worth spending).
         PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_TOO_MANY_CHANGE_OUTPUTS);
         return false;
     }
 
@@ -1198,14 +1205,14 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Swap feature: check that wallet policy is a default one
     if (!st->is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
     }
 
     // No external inputs allowed
     if (st->n_external_inputs > 0) {
         PRINTF("External inputs not allowed in swap transactions\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_EXTERNAL_INPUTS);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1213,7 +1220,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // Do not allow transactions with missing non-witness utxos or non-default sighash flags
         PRINTF(
             "Missing non-witness utxo or non-default sighash flags are not allowed during swaps\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_MISSING_NONWITNESSUTXO);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1229,7 +1236,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         // There must be only one external output
         if (st->n_external_outputs != 1) {
             PRINTF("Standard swap transaction must have exactly 1 external output\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
             finalize_exchange_sign_transaction(false);
         }
     } else if (G_swap_state.mode == SWAP_MODE_CROSSCHAIN) {
@@ -1239,7 +1246,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
         if (st->n_external_outputs != 2) {
             PRINTF("Cross-chain swap transaction must have exactly 2 external outputs\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_N_OF_OUTPUTS);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1248,7 +1255,9 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         size_t opreturn_amount = st->outputs.output_amounts[0];
         if (opreturn_script_len < 4 || opreturn_script[0] != OP_RETURN) {
             PRINTF("The first output must be OP_RETURN <data> for a cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc,
+                       SW_FAIL_SWAP,
+                       EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD_INVALID_FIRST_OUTPUT);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1267,21 +1276,21 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // there are other valid OP_RETURN Scripts that we never expect here,
             // so we don't bother parsing.
             PRINTF("Unsupported or invalid OP_RETURN Script in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD);
             finalize_exchange_sign_transaction(false);
         }
 
         // Make sure there is a singla data push
         if (opreturn_script_len != 1 + push_opcode_size + data_size) {
             PRINTF("Invalid OP_RETURN Script length in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD);
             finalize_exchange_sign_transaction(false);
         }
 
         // Make sure the output's value is 0
         if (opreturn_amount != 0) {
             PRINTF("OP_RETURN with non-zero value during cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD_NONZERO_AMOUNT);
             finalize_exchange_sign_transaction(false);
         }
 
@@ -1292,18 +1301,18 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                    expected_payin_hash,
                    sizeof(expected_payin_hash)) != 0) {
             PRINTF("Mismatching payin hash in cross-chain swap\n");
-            SEND_SW(dc, SW_FAIL_SWAP);
+            SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_HASH);
             finalize_exchange_sign_transaction(false);
         }
     } else if (G_swap_state.mode == SWAP_MODE_ERROR) {
         // an error was detected in handle_swap_sign_transaction.c::copy_transaction_parameters
         // special case only to improve error reporting in debug mode
         PRINTF("Invalid parameters for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_GENERIC_COPY_TRANSACTION_PARAMETERS_FAILED);
         finalize_exchange_sign_transaction(false);
     } else {
         PRINTF("Unknown swap mode: %d\n", G_swap_state.mode);
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_GENERIC_UNKNOWN_MODE);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1313,14 +1322,14 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // Check that total amount and fees are as expected
     if (fee != G_swap_state.fees) {
         PRINTF("Mismatching fee for swap\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_FEES);
         finalize_exchange_sign_transaction(false);
     }
 
     uint64_t spent_amount = st->outputs.total_amount - st->outputs.change_total_amount;
     if (spent_amount != G_swap_state.amount) {
         PRINTF("Mismatching spent amount for swap\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_AMOUNT);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1331,7 +1340,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                        st->outputs.output_script_lengths[swap_dest_idx],
                        output_description)) {
         PRINTF("Invalid or unsupported script for external output\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_WRONG_UNSUPPORTED_OUTPUT);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1354,7 +1363,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             PRINTF("%c", output_description[i]);
         }
         PRINTF("\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_DESTINATION);
         finalize_exchange_sign_transaction(false);
     }
 
@@ -1883,7 +1892,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_contex
             memcmp(input->script + 2, witnessScript_hash, 32) != 0) {
             PRINTF("Mismatching witnessScript\n");
 
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISMATCHING_WITNESS_SCRIPT);
             return false;
         }
     } else {
@@ -2535,7 +2544,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 if (input->in_out.scriptPubKey_len != 23 ||
                     memcmp(input->in_out.scriptPubKey, p2sh_redeemscript, 23) != 0) {
                     PRINTF("witnessUtxo's scriptPubKey does not match redeemScript\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISMATCHING_REDEEM_SCRIPT);
                     return false;
                 }
 

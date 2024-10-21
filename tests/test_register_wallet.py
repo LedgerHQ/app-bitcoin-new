@@ -159,11 +159,20 @@ def test_register_wallet_invalid_names(navigator: Navigator, firmware: Firmware,
         )
 
         with pytest.raises(ExceptionRAPDU) as e:
-            client.register_wallet(wallet, navigator,
+            client.register_wallet(wallet, None,
                                    testname=test_name)
 
         assert DeviceException.exc.get(e.value.status) == IncorrectDataError
-        assert len(e.value.data) == 0
+        # defined in error_codes.h
+        EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME = 0x0000
+
+        if invalid_name == too_long_name:
+            # We don't return an error code for name too long
+            assert len(e.value.data) == 0
+        else:
+            assert len(e.value.data) == 2
+            error_code = int.from_bytes(e.value.data, 'big')
+            assert error_code == EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME
 
 
 def test_register_wallet_missing_key(client: RaggerClient):
@@ -222,7 +231,7 @@ def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmwar
 
     assert hmac.compare_digest(
         hmac.new(speculos_globals.wallet_registration_key,
-                    wallet_id, sha256).digest(),
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
@@ -246,7 +255,14 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
         )
 
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_POLICY_NOT_SANE = 0x0001
+
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     # Key placeholders referring to the same key must have distinct derivations
     with pytest.raises(ExceptionRAPDU) as e:
@@ -261,7 +277,9 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
             testname=test_name
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     with pytest.raises(ExceptionRAPDU) as e:
         client.register_wallet(WalletPolicy(
@@ -276,7 +294,9 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
             testname=test_name
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     # Miniscript policy with timelock mixing
     with pytest.raises(ExceptionRAPDU) as e:
@@ -291,7 +311,9 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
             testname=test_name
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     # Miniscript policy that does not always require a signature
     with pytest.raises(ExceptionRAPDU) as e:
@@ -308,7 +330,9 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
             testname=test_name
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     # Malleable policy, even if it requires a signature
     with pytest.raises(ExceptionRAPDU) as e:
@@ -323,7 +347,9 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
             testname=test_name
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
     # TODO: we can probably not trigger stack and ops limits with the current limits we have on the
     # miniscript policy size; otherwise it would be worth to add tests for them, too.

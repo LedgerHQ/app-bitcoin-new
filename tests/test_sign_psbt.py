@@ -633,7 +633,13 @@ def test_sign_psbt_fail_11_changes(navigator: Navigator, firmware: Firmware, cli
                          testname=test_name)
 
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+
+    # defined in error_codes.h
+    EC_SIGN_PSBT_TOO_MANY_CHANGE_OUTPUTS = 0x0009
+
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_SIGN_PSBT_TOO_MANY_CHANGE_OUTPUTS
 
 
 def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: Firmware, client:
@@ -667,9 +673,18 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
         client.sign_psbt(psbt, wallet, None, navigator,
                          instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                          testname=test_name)
-    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
-    assert len(e.value.data) == 0
     client._no_clone_psbt = False
+
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+
+    # defined in error_codes.h
+    EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED = 0x0004
+
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED
+
+
 
 
 def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):

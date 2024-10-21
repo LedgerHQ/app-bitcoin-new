@@ -282,7 +282,13 @@ def test_sighash_single_3_ins_2_out(navigator: Navigator, firmware: Firmware, cl
                          instructions=sign_psbt_instruction_approve(firmware, has_sighashwarning=True),
                          testname=test_name)
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+
+    # defined in error_codes.h
+    EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE = 0x0008
+
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE
 
 
 def test_sighash_all_anyone_sign(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):

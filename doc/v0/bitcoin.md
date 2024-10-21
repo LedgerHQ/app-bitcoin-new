@@ -6,7 +6,7 @@ This page described the _deprecated_ version 0 of the protocol, as implemented i
 
 ### APDUs
 
-The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` and `P2` fields are reserved for future use and must be set to `0` in all messages.
+The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/device-app/explanation/io#apdu-interpretation-loop). The `P1` and `P2` fields are reserved for future use and must be set to `0` in all messages.
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
