@@ -8,7 +8,7 @@ The protocol documentation for version from 2.0.0 and before 2.1.0 is [here](./v
 
 ### APDUs
 
-The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/nano-app/application-structure/#apdu-interpretation-loop). The `P1` field is reserved for future use and must be set to `0` in all messages. The `P2` field is used as a protocol version identifier; the current version is `1`, while version `0` is still supported. No other value must be used.
+The messaging format of the app is compatible with the [APDU protocol](https://developers.ledger.com/docs/device-app/explanation/io#apdu-interpretation-loop). The `P1` field is reserved for future use and must be set to `0` in all messages. The `P2` field is used as a protocol version identifier; the current version is `1`, while version `0` is still supported. No other value must be used.
 
 The main commands use `CLA = 0xE1`, unlike the legacy Bitcoin application that used `CLA = 0xE0`.
 
