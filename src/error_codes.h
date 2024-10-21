@@ -1,16 +1,47 @@
 #pragma once
 
 /**
- * Wallet Policies
- */
-
-// TODO
-
-/**
  * SIGN_PSBT
  */
 
-// TODO
+// The wallet policy is not standard; it must be registered first and the HMAC must be provided.
+#define EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY 0x0000
+
+// For standard wallet policies, the name must be zero-length (empty).
+#define EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY 0x0001
+
+// No key in the wallet policy was recognized as internal.
+#define EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY 0x0002
+
+// Depending on the transaction type, at least one of the non-witness UTXO or witness UTXO must be
+// present in the PSBT. Check in BIP-174 for the specific requirements for the transaction type.
+#define EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_AND_WITNESSUTXO 0x0003
+
+// Failed to check the txid recomputed from the non-witness-utxo. Make sure that the
+// non-witness-utxo and the PSBT_IN_PREVIOUS_TXID fields are filled correctly.
+#define EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED 0x0004
+
+// The scriptpubkey or the amount in the non-witness-utxo does not match the one in the
+// witness-utxo.
+#define EC_SIGN_PSBT_NONWITNESSUTXO_AND_WITNESSUTXO_MISMATCH 0x0005
+
+// Per BIP-174, legacy inputs must have the non-witness-utxo, but no witness-utxo.
+#define EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_OR_UNEXPECTED_WITNESSUTXO_FOR_LEGACY 0x0006
+
+// Per BIP-174, all segwit (or taproot) inputs must have the witness-utxo field.
+#define EC_SIGN_PSBT_MISSING_WITNESSUTXO_FOR_SEGWIT 0x0007
+
+// If an input has SIGHASH_SINGLE, its index must be less than the number of outputs.
+#define EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE 0x0008
+
+// The number of change outputs is larger than the maximum that is allowed.
+#define EC_SIGN_PSBT_TOO_MANY_CHANGE_OUTPUTS 0x0009
+
+// The witness script in the PSBT is incorrect.
+#define EC_SIGN_PSBT_MISMATCHING_WITNESS_SCRIPT 0x000a
+
+// The redeem Script in the PSBT is incorrect.
+#define EC_SIGN_PSBT_MISMATCHING_REDEEM_SCRIPT 0x000b
 
 /**
  * Swap

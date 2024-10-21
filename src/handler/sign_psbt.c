@@ -642,13 +642,13 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             // No hmac, verify that the policy is indeed a default one
             if (!is_wallet_policy_standard(dc, &st->wallet_header, st->wallet_policy_map)) {
                 PRINTF("Non-standard policy, and no hmac provided\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_HMAC_FOR_NONDEFAULT_POLICY);
                 return false;
             }
 
             if (st->wallet_header.name_len != 0) {
                 PRINTF("Name must be zero-length for a standard wallet policy\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NO_NAME_FOR_DEFAULT_POLICY);
                 return false;
             }
 
@@ -754,7 +754,7 @@ static bool find_first_internal_key_placeholder(dispatcher_context_t *dc,
     }
 
     PRINTF("No internal key found in wallet policy");
-    SEND_SW(dc, SW_INCORRECT_DATA);
+    SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
     return false;
 }
 
@@ -848,7 +848,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // either witness utxo or non-witness utxo (or both) must be present.
         if (!input.has_nonWitnessUtxo && !input.has_witnessUtxo) {
             PRINTF("No witness utxo nor non-witness utxo present in input.\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_AND_WITNESSUTXO);
             return false;
         }
 
@@ -870,13 +870,14 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
 
             // request non-witness utxo, and get the prevout's value and scriptpubkey
+            // Also checks that the recomputed transaction hash matches with prevout_hash.
             if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
                                                                  &input.in_out.map,
                                                                  &input.prevout_amount,
                                                                  input.in_out.scriptPubKey,
                                                                  &input.in_out.scriptPubKey_len,
                                                                  prevout_hash)) {
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED);
                 return false;
             }
 
@@ -907,7 +908,9 @@ preprocess_inputs(dispatcher_context_t *dc,
                     PRINTF(
                         "scriptPubKey or amount in non-witness utxo doesn't match with witness "
                         "utxo\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    SEND_SW_EC(dc,
+                               SW_INCORRECT_DATA,
+                               EC_SIGN_PSBT_NONWITNESSUTXO_AND_WITNESSUTXO_MISMATCH);
                     return false;
                 }
             } else {
@@ -944,7 +947,10 @@ preprocess_inputs(dispatcher_context_t *dc,
         if (segwit_version == -1) {
             if (!input.has_nonWitnessUtxo || input.has_witnessUtxo) {
                 PRINTF("Legacy inputs must have the non-witness utxo, but no witness utxo.\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
+                SEND_SW_EC(
+                    dc,
+                    SW_INCORRECT_DATA,
+                    EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_OR_UNEXPECTED_WITNESSUTXO_FOR_LEGACY);
                 return false;
             }
         }
@@ -959,7 +965,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         // For all segwit transactions, the witness utxo must be present
         if (segwit_version >= 0 && !input.has_witnessUtxo) {
             PRINTF("Witness utxo missing for segwit input\n");
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISSING_WITNESSUTXO_FOR_SEGWIT);
             return false;
         }
 
@@ -1003,7 +1009,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         if (((input.sighash_type & SIGHASH_SINGLE) == SIGHASH_SINGLE) &&
             (cur_input_index >= st->n_outputs)) {
             PRINTF("SIGHASH_SINGLE with input idx >= n_output is not allowed \n");
-            SEND_SW(dc, SW_NOT_SUPPORTED);
+            SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_UNALLOWED_SIGHASH_SINGLE);
             return false;
         }
     }
@@ -1185,7 +1191,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         // from unknowingly signing a transaction that sends the change to too many outputs
         // (possibly economically not worth spending).
         PRINTF("Too many change outputs: %d\n", st->outputs.n_change);
-        SEND_SW(dc, SW_NOT_SUPPORTED);
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_TOO_MANY_CHANGE_OUTPUTS);
         return false;
     }
 
@@ -1886,7 +1892,7 @@ static bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_contex
             memcmp(input->script + 2, witnessScript_hash, 32) != 0) {
             PRINTF("Mismatching witnessScript\n");
 
-            SEND_SW(dc, SW_INCORRECT_DATA);
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISMATCHING_WITNESS_SCRIPT);
             return false;
         }
     } else {
@@ -2538,7 +2544,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 if (input->in_out.scriptPubKey_len != 23 ||
                     memcmp(input->in_out.scriptPubKey, p2sh_redeemscript, 23) != 0) {
                     PRINTF("witnessUtxo's scriptPubKey does not match redeemScript\n");
-                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISMATCHING_REDEEM_SCRIPT);
                     return false;
                 }
 
