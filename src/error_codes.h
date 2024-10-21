@@ -1,6 +1,19 @@
 #pragma once
 
 /**
+ * REGISTER_WALLET
+ */
+
+// The name of the policy is not acceptable
+#define EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME 0x0000
+
+// The wallet policy does not respect the requirement of BIP-388, or the sanity rules of miniscript
+#define EC_REGISTER_WALLET_POLICY_NOT_SANE 0x0001
+
+// No key in the wallet policy was recognized as internal.
+#define EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY 0x0002
+
+/**
  * SIGN_PSBT
  */
 

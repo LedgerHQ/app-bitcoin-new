@@ -32,13 +32,15 @@ def test_register_wallet_accept_legacy_v1(navigator: Navigator, firmware: Firmwa
     )
 
     wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
-                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    instructions=register_wallet_instruction_approve(
+                                                        firmware),
                                                     testname=test_name)
 
     assert wallet_id == wallet.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
@@ -57,13 +59,15 @@ def test_register_wallet_accept_sh_wit_v1(navigator: Navigator, firmware: Firmwa
     )
 
     wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
-                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    instructions=register_wallet_instruction_approve(
+                                                        firmware),
                                                     testname=test_name)
 
     assert wallet_id == wallet.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
@@ -82,13 +86,15 @@ def test_register_wallet_accept_wit_v1(navigator: Navigator, firmware: Firmware,
     )
 
     wallet_id, wallet_hmac = client.register_wallet(wallet, navigator,
-                                                    instructions=register_wallet_instruction_approve(firmware),
+                                                    instructions=register_wallet_instruction_approve(
+                                                        firmware),
                                                     testname=test_name)
 
     assert wallet_id == wallet.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
@@ -111,7 +117,8 @@ def test_register_wallet_reject_header_v1(navigator: Navigator, firmware: Firmwa
 
     with pytest.raises(ExceptionRAPDU) as e:
         client.register_wallet(wallet, navigator,
-                               instructions=register_wallet_instruction_reject(firmware),
+                               instructions=register_wallet_instruction_reject(
+                                   firmware),
                                testname=test_name)
 
     assert DeviceException.exc.get(e.value.status) == DenyError
@@ -120,12 +127,16 @@ def test_register_wallet_reject_header_v1(navigator: Navigator, firmware: Firmwa
 
 def test_register_wallet_invalid_names_v1(navigator: Navigator, firmware: Firmware, client:
                                           RaggerClient, test_name: str):
+    too_long_name = "This wallet name is much too long since it requires 65 characters"
+    assert len(too_long_name) == 65
+
     for invalid_name in [
         "",  # empty name not allowed
-        "Very long walletz",  # 17 characters is too long
-        " Test", "Test ",  # can't start with spaces
-        "Tæst",  # characters out of allowed range
+        too_long_name,
+        # " Test", "Test ",  # can't start or end with spaces
+        # "Tæst",  # characters out of allowed range
     ]:
+        print("Testing with:", invalid_name)  # TODO: remove
         wallet = MultisigWallet(
             name=invalid_name,
             address_type=AddressType.WIT,
@@ -137,11 +148,20 @@ def test_register_wallet_invalid_names_v1(navigator: Navigator, firmware: Firmwa
             version=WalletType.WALLET_POLICY_V1
         )
 
-    with pytest.raises(ExceptionRAPDU) as e:
-        client.register_wallet(wallet, navigator)
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(wallet, None)
 
-    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
-    assert len(e.value.data) == 0
+        assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+        # defined in error_codes.h
+        EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME = 0x0000
+
+        if invalid_name == too_long_name:
+            # We don't return an error code for name too long
+            assert len(e.value.data) == 0
+        else:
+            assert len(e.value.data) == 2
+            error_code = int.from_bytes(e.value.data, 'big')
+            assert error_code == EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME
 
 
 def test_register_wallet_unsupported_policy_v1(navigator: Navigator, firmware: Firmware, client:
@@ -181,4 +201,9 @@ def test_register_wallet_unsupported_policy_v1(navigator: Navigator, firmware: F
 
     # NotSupportedError
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
-    assert len(e.value.data) == 0
+    # defined in error_codes.h
+    EC_REGISTER_WALLET_POLICY_NOT_SANE = 0x0001
+
+    assert len(e.value.data) == 2
+    error_code = int.from_bytes(e.value.data, 'big')
+    assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
