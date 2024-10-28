@@ -889,7 +889,7 @@ __attribute__((warn_unused_result)) static int process_multi_a_sortedmulti_a_nod
 
     // bitvector of used keys (only relevant for sorting keys in SORTEDMULTI)
     uint8_t used[BITVECTOR_REAL_SIZE(MAX_PUBKEYS_PER_MULTISIG)];
-    memset(used, 0, sizeof(memset));
+    memset(used, 0, sizeof(used));
 
     for (int i = 0; i < policy->n; i++) {
         uint8_t compressed_pubkey[33];
