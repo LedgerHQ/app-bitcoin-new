@@ -104,9 +104,7 @@
 // A generic or unspecified error not covered by the specific error codes above. Refer to the
 // remaining bytes for further details on the error.
 #define EC_SWAP_ERROR_GENERIC 0xFF00
-
 // Unknown swap mode.
 #define EC_SWAP_ERROR_GENERIC_UNKNOWN_MODE 0xFF01
-
 // handle_swap_sign_transaction.c::copy_transaction_parameters failed.
 #define EC_SWAP_ERROR_GENERIC_COPY_TRANSACTION_PARAMETERS_FAILED 0xFF02

@@ -25,18 +25,16 @@ make load     # load the app on the Nano using ledgerblue
 
 ## Documentation
 
-High level documentation on the architecture and interface of the app:
-- [bitcoin.md](doc/bitcoin.md): specifications of application commands.
-- [wallet.md](doc/wallet.md): supported wallet signing policies.
-- [merkle.md](doc/merkle.md): rationale and specifications for the usage of Merkle trees.
+For many use cases, the code examples provided in the following client libraries might be sufficient to get started:
+- [Python client library](bitcoin_client)
+- [JavaScript client library](bitcoin_client_js)
+- [Rust client library](bitcoin_client_rs)
 
-Additional documentation can be generated with [doxygen](https://www.doxygen.nl)
-
-```
-doxygen .doxygen/Doxyfile
-```
-
-the process outputs HTML and LaTeX documentations in `doc/html` and `doc/latex` folders.
+If you need to go deeper into the rabbit hole 🐇🕳️, refer to the following documents:
+- [bitcoin.md](doc/bitcoin.md): Low-level documentation of the Bitcoin app's communication protocol and commands.
+- [merkle.md](doc/merkle.md): Advanced details on techniques used in the Bitcoin app's secured and scalable communication protocol.
+- [wallet.md](doc/wallet.md): Information on the types of scripts supported by the Ledger Bitcoin app and the security requirements for multi-user or multi-key spending policies.
+- [debugging.md](doc/debugging.md): Guidance on how to diagnose and resolve issues.
 
 ## Client libraries
 
