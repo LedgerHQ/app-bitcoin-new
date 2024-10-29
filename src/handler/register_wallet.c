@@ -32,6 +32,7 @@
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"
+#include "../error_codes.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
@@ -106,7 +107,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
     // Verify that the name is acceptable
     if (!is_policy_name_acceptable(wallet_header.name, wallet_header.name_len)) {
         PRINTF("Policy name is not acceptable\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_REGISTER_WALLET_UNACCEPTABLE_POLICY_NAME);
         return;
     }
 
@@ -126,7 +127,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
                            wallet_header.n_keys)) {
         PRINTF("Policy is not sane\n");
 
-        SEND_SW(dc, SW_NOT_SUPPORTED);
+        SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_REGISTER_WALLET_POLICY_NOT_SANE);
         return;
     }
 
@@ -214,7 +215,7 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         // Unclear if there is any use case for registering policies with no internal keys.
         // We disallow that, might reconsider in future versions if needed.
         PRINTF("Wallet policy with no internal keys\n");
-        SEND_SW(dc, SW_INCORRECT_DATA);
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_REGISTER_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
         return;
     } else if (n_internal_keys != 1 && wallet_header.version == WALLET_POLICY_VERSION_V1) {
         // for legacy policies, we keep the restriction to exactly 1 internal key
