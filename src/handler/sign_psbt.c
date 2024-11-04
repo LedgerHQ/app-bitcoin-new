@@ -396,6 +396,9 @@ static int get_amount_scriptpubkey_from_psbt(
 
 // Convenience function to share common logic when processing all the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
+// Note: This function must return -1 only on errors (causing signing to abort).
+//       It should return 1 if a derivation that makes sense for this input/output is found.
+//       It should return 0 otherwise (no match found, but continue the signing flow).
 static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     const keyexpr_info_t *keyexpr_info,
@@ -438,7 +441,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
 
     if (der_len < 2 || der_len > MAX_BIP32_PATH_STEPS) {
         PRINTF("BIP32_DERIVATION path too long\n");
-        return -1;
+        return 0;
     }
 
     // if this derivation path matches the internal key expression,
