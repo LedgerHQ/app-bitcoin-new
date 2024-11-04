@@ -11,7 +11,7 @@ RUN apt install -y bsdmainutils build-essential cmake pkg-config ccache git libb
 
 # clone bitcoin-core from github and compile it
 RUN cd / && \
-    git clone --depth=1 https://github.com/bitcoin/bitcoin.git && \
+    git clone --depth=1 https://github.com/achow101/bitcoin.git -b musig2 && \
     cd bitcoin && \
     cmake -B build && \
     cmake --build build && \
