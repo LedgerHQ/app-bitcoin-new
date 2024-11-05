@@ -11,7 +11,7 @@ from ledger_bitcoin.client_base import TransportClient
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 
-from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders
 
 from speculos.client import SpeculosClient
 
@@ -112,7 +112,7 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_keys(
+    n_internal_keys = count_internal_key_placeholders(
         speculos_globals.seed, "test", wallet_policy)
     # should be true as long as all inputs are internal
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)

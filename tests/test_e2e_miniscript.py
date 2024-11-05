@@ -11,7 +11,7 @@ from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 
-from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
@@ -106,7 +106,7 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_keys(speculos_globals.seed, "test", wallet_policy)
+    n_internal_keys = count_internal_key_placeholders(speculos_globals.seed, "test", wallet_policy)
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
 
     for i, part_sig in hww_sigs:
