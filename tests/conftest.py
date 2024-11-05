@@ -1,32 +1,32 @@
-import sys
-import os
 
-absolute_path = os.path.dirname(os.path.abspath(__file__))
-relative_bitcoin_path = ('../bitcoin_client')
-absolute_bitcoin_client_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
-sys.path.append(os.path.join(absolute_path, relative_bitcoin_path))
+import sys  # noqa: E402
+import os  # noqa: E402
 
-import random
-from typing import Tuple
+absolute_path = os.path.dirname(os.path.abspath(__file__))  # noqa: E402
+relative_bitcoin_path = ('../bitcoin_client')  # noqa: E402
+absolute_bitcoin_client_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '../')   # noqa: E402
+sys.path.append(os.path.join(absolute_path, relative_bitcoin_path))  # noqa: E402
 
-from test_utils.fixtures import *
-from test_utils.authproxy import AuthServiceProxy, JSONRPCException
-from test_utils import segwit_addr
-
-import shutil
-import subprocess
-from time import sleep
-from decimal import Decimal
-from pathlib import Path
-
-from ledger_bitcoin import Chain
-from ledger_bitcoin.common import sha256
-import ledger_bitcoin._base58 as base58
-
-from ragger.conftest import configuration
-from ragger.backend.interface import BackendInterface
-from ragger.backend import RaisePolicy
 from ragger_bitcoin import createRaggerClient, RaggerClient
+from ragger.backend import RaisePolicy
+from ragger.backend.interface import BackendInterface
+from ragger.conftest import configuration
+import ledger_bitcoin._base58 as base58
+from ledger_bitcoin.common import sha256
+from ledger_bitcoin import Chain
+from pathlib import Path
+from decimal import Decimal
+from time import sleep
+import subprocess
+import shutil
+from test_utils import segwit_addr
+from test_utils.authproxy import AuthServiceProxy, JSONRPCException
+from test_utils.fixtures import *
+from typing import Tuple
+import random
+from bip32 import BIP32
+
 
 ###########################
 ### CONFIGURATION START ###
@@ -105,7 +105,8 @@ def run_bitcoind():
 
     bitcoind = os.getenv("BITCOIND", "/bitcoin/bin/bitcoind")
 
-    shutil.copy(os.path.join(os.path.dirname(__file__), "bitcoin.conf"), BITCOIN_DIRNAME)
+    shutil.copy(os.path.join(os.path.dirname(__file__),
+                "bitcoin.conf"), BITCOIN_DIRNAME)
     subprocess.Popen([bitcoind, f"--datadir={BITCOIN_DIRNAME}"])
 
     # Make sure the node is ready, and generate some initial blocks
@@ -165,27 +166,61 @@ def get_unique_wallet_name() -> str:
     return result
 
 
+def get_pseudorandom_keypair(wallet_name: str) -> Tuple[str, str]:
+    """
+    Generates a tpub and tpriv deterministically from the wallet name
+    Used in tests to have deterministic wallets in bitcoin-core instances.
+    """
+
+    bip32 = BIP32.from_seed(wallet_name.encode(), network="test")
+
+    xpub = bip32.get_xpub_from_path("m")
+    xpriv = bip32.get_xpriv_from_path("m")
+
+    return xpub, xpriv
+
+
 def create_new_wallet() -> Tuple[str, str]:
     """Creates a new descriptor-enabled wallet in bitcoin-core. Each new wallet has an increasing counter as
-    part of it's name in order to avoid conflicts. Returns the wallet name and the xpub (dropping the key origin
+    part of it's name in order to avoid conflicts. Returns the wallet name and the xpub (with no key origin
     information)."""
 
     wallet_name = get_unique_wallet_name()
 
-    # TODO: derive seed from wallet_count, and use it to create a descriptor wallet (how?)
-    #       this would help to have repeatable tests, generating always the same seeds
-
     get_rpc().createwallet(wallet_name=wallet_name, descriptors=True)
-    wallet_rpc = get_wallet_rpc(wallet_name)
 
-    all_descriptors = wallet_rpc.listdescriptors()["descriptors"]
-    descriptor: str = next(filter(lambda d: d["desc"].startswith(
-        "pkh") and "/0/*" in d["desc"], all_descriptors))["desc"]
-
-    core_xpub_orig = descriptor[descriptor.index("(")+1: descriptor.index("/0/*")]
-    core_xpub = core_xpub_orig[core_xpub_orig.find("]") + 1:]
+    core_xpub, _ = get_pseudorandom_keypair(wallet_name)
 
     return wallet_name, core_xpub
+
+
+def recompute_checksum(rpc: AuthServiceProxy, descriptor: str) -> str:
+    # remove "#" and everything after it, if present
+    if '#' in descriptor:
+        descriptor = descriptor[:descriptor.index('#')]
+    descriptor_info = rpc.getdescriptorinfo(descriptor)
+    return descriptor + '#' + descriptor_info["checksum"]
+
+
+def import_descriptors_with_privkeys(core_wallet_name: str, receive_desc: str, change_desc: str):
+    wallet = get_wallet_rpc(core_wallet_name)
+    wallet_xpub, wallet_xpriv = get_pseudorandom_keypair(core_wallet_name)
+
+    assert wallet_xpub in receive_desc and wallet_xpub in change_desc
+
+    import_desc = [{
+        "desc": recompute_checksum(wallet, receive_desc.replace(wallet_xpub, wallet_xpriv)),
+        "active": True,
+        "internal": False,
+        "timestamp": "now"
+    }, {
+        "desc": recompute_checksum(wallet, change_desc.replace(wallet_xpub, wallet_xpriv)),
+        "active": True,
+        "internal": True,
+        "timestamp": "now"
+    }]
+    import_res = wallet.importdescriptors(import_desc)
+    assert import_res[0]["success"] and import_res[1]["success"]
 
 
 def generate_blocks(n):

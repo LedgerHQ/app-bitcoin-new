@@ -1,13 +1,11 @@
 import pytest
 
-from typing import List, Union
+from typing import List
 
 import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from ledger_bitcoin import Client
-from ledger_bitcoin.client_base import TransportClient
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
@@ -17,12 +15,12 @@ from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_pl
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
-from ragger.navigator import Navigator, NavInsID
+from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 
 from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
-from .conftest import AuthServiceProxy
+from .conftest import AuthServiceProxy, import_descriptors_with_privkeys
 from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
 
 
@@ -121,6 +119,11 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
 
     n_internal_keys = count_internal_key_placeholders(speculos_globals.seed, "test", wallet_policy)
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
+
+    # ==> import descriptor for each bitcoin-core wallet
+    for core_wallet_name in core_wallet_names:
+        import_descriptors_with_privkeys(
+            core_wallet_name, receive_descriptor_chk, change_descriptor_chk)
 
     # ==> sign it with bitcoin-core
 

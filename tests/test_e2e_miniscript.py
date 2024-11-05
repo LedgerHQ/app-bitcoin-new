@@ -1,6 +1,6 @@
 import pytest
 
-from typing import List, Union
+from typing import List
 
 import hmac
 from hashlib import sha256
@@ -15,13 +15,13 @@ from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_pl
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
-from ragger.navigator import Navigator, NavInsID
+from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 
 from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
-from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
+from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, import_descriptors_with_privkeys, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
 
 
@@ -34,11 +34,13 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
     assert wallet_id == wallet_policy.id
 
     assert hmac.compare_digest(
-        hmac.new(speculos_globals.wallet_registration_key, wallet_id, sha256).digest(),
+        hmac.new(speculos_globals.wallet_registration_key,
+                 wallet_id, sha256).digest(),
         wallet_hmac,
     )
 
-    address_hww = client.get_wallet_address(wallet_policy, wallet_hmac, 0, 3, False)
+    address_hww = client.get_wallet_address(
+        wallet_policy, wallet_hmac, 0, 3, False)
 
     # ==> verify the address matches what bitcoin-core computes
     receive_descriptor = wallet_policy.get_descriptor(change=False)
@@ -91,7 +93,8 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
             out_address: Decimal("0.01")
         },
         options={
-            "changePosition": 1 # We need a fixed position to be able to know how to navigate in the flows
+            # We need a fixed position to be able to know how to navigate in the flows
+            "changePosition": 1
         }
     )
 
@@ -106,19 +109,27 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_key_placeholders(speculos_globals.seed, "test", wallet_policy)
-    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)  # should be true as long as all inputs are internal
+    n_internal_keys = count_internal_key_placeholders(
+        speculos_globals.seed, "test", wallet_policy)
+    # should be true as long as all inputs are internal
+    assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)
 
     for i, part_sig in hww_sigs:
         psbt.inputs[i].partial_sigs[part_sig.pubkey] = part_sig.signature
 
     signed_psbt_hww_b64 = psbt.serialize()
 
+    # ==> import descriptor for each bitcoin-core wallet
+    for core_wallet_name in core_wallet_names:
+        import_descriptors_with_privkeys(
+            core_wallet_name, receive_descriptor_chk, change_descriptor_chk)
+
     # ==> sign it with bitcoin-core
     partial_psbts = [signed_psbt_hww_b64]
 
     for core_wallet_name in core_wallet_names:
-        partial_psbts.append(get_wallet_rpc(core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"])
+        partial_psbts.append(get_wallet_rpc(
+            core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"])
 
     # ==> finalize the psbt, extract tx and broadcast
     combined_psbt = rpc.combinepsbt(partial_psbts)
@@ -404,15 +415,18 @@ def test_invalid_miniscript(navigator: Navigator, firmware: Firmware, client: Ra
     run_test_invalid(client, "wsh(wsh(pkh(@0/**)))", [internal_xpub_orig])
 
     # sh(wsh(...)) is meaningful with valid miniscript, but current implementation of miniscript assumes wsh(...)
-    run_test_invalid(client, "sh(wsh(or_d(pk(@0/**),pkh(@1/**))))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "sh(wsh(or_d(pk(@0/**),pkh(@1/**))))",
+                     [internal_xpub_orig, core_xpub_orig1])
 
     # tr must be top-level
     run_test_invalid(client, "wsh(tr(pk(@0/**)))", [internal_xpub_orig])
     run_test_invalid(client, "sh(tr(pk(@0/**)))", [internal_xpub_orig])
 
     # valid miniscript must be inside wsh()
-    run_test_invalid(client, "or_d(pk(@0/**),pkh(@1/**))", [internal_xpub_orig, core_xpub_orig1])
-    run_test_invalid(client, "sh(or_d(pk(@0/**),pkh(@1/**)))", [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "or_d(pk(@0/**),pkh(@1/**))",
+                     [internal_xpub_orig, core_xpub_orig1])
+    run_test_invalid(client, "sh(or_d(pk(@0/**),pkh(@1/**)))",
+                     [internal_xpub_orig, core_xpub_orig1])
 
     # sortedmulti is not valid miniscript, can only be used as a descriptor inside sh or wsh
     run_test_invalid(client, "wsh(or_d(pk(@0/**),sortedmulti(3,@1/**,@2/**,@3/**,@4/**,@5/**)))",
