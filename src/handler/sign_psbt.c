@@ -403,7 +403,6 @@ static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     const keyexpr_info_t *keyexpr_info,
     in_out_info_t *in_out,
-    sign_psbt_cache_t *sign_psbt_cache,
     int psbt_key_type,
     buffer_t *data,
     const merkleized_map_commitment_t *map_commitment,
@@ -468,24 +467,6 @@ static int read_change_and_index_from_psbt_bip32_derivation(
         } else {
             return 0;
         }
-
-        // TODO: safe to remove this check? It should be, since we later re-derive
-        //       the script independently.
-        // // check that we can indeed derive the same key from the current key expression
-        // serialized_extended_pubkey_t pubkey;
-        // if (0 > derive_first_step_for_pubkey(&keyexpr_info->pubkey,
-        //                                      keyexpr_info->key_expression_ptr,
-        //                                      sign_psbt_cache,
-        //                                      in_out->is_change,
-        //                                      &pubkey))
-        //     return -1;
-        // if (0 > bip32_CKDpub(&pubkey, addr_index, &pubkey, NULL)) return -1;
-
-        // int pk_offset = is_tap ? 1 : 0;
-        // if (memcmp(pubkey.compressed_pubkey + pk_offset, bip32_derivation_pubkey, key_len) != 0)
-        // {
-        //     return 0;
-        // }
 
         in_out->key_expression_found = true;
         return 1;
@@ -876,7 +857,6 @@ static bool find_first_internal_keyexpr(dispatcher_context_t *dc,
 typedef struct {
     keyexpr_info_t *keyexpr_info;
     input_info_t *input;
-    sign_psbt_cache_t *sign_psbt_cache;
 } input_keys_callback_data_t;
 
 /**
@@ -906,7 +886,6 @@ static void input_keys_callback(dispatcher_context_t *dc,
             if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                      callback_data->keyexpr_info,
                                                                      &callback_data->input->in_out,
-                                                                     callback_data->sign_psbt_cache,
                                                                      key_type,
                                                                      data,
                                                                      map_commitment,
@@ -936,9 +915,7 @@ preprocess_inputs(dispatcher_context_t *dc,
         input_info_t input;
         memset(&input, 0, sizeof(input));
 
-        input_keys_callback_data_t callback_data = {.input = &input,
-                                                    .keyexpr_info = &keyexpr_info,
-                                                    .sign_psbt_cache = sign_psbt_cache};
+        input_keys_callback_data_t callback_data = {.input = &input, .keyexpr_info = &keyexpr_info};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
@@ -1141,7 +1118,6 @@ preprocess_inputs(dispatcher_context_t *dc,
 typedef struct {
     keyexpr_info_t *keyexpr_info;
     output_info_t *output;
-    sign_psbt_cache_t *sign_psbt_cache;
 } output_keys_callback_data_t;
 
 /**
@@ -1163,7 +1139,6 @@ static void output_keys_callback(dispatcher_context_t *dc,
             if (0 > read_change_and_index_from_psbt_bip32_derivation(dc,
                                                                      callback_data->keyexpr_info,
                                                                      &callback_data->output->in_out,
-                                                                     callback_data->sign_psbt_cache,
                                                                      key_type,
                                                                      data,
                                                                      map_commitment,
@@ -1203,8 +1178,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         memset(&output, 0, sizeof(output));
 
         output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .keyexpr_info = &keyexpr_info,
-                                                     .sign_psbt_cache = sign_psbt_cache};
+                                                     .keyexpr_info = &keyexpr_info};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
