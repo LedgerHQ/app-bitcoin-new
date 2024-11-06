@@ -1910,6 +1910,48 @@ static void sort_uint16_array(uint16_t *array, size_t n) {
     }
 }
 
+static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
+                                           const policy_node_keyexpr_t *kp2) {
+    if (kp1->type != kp2->type) {
+        return false;
+    }
+    if (kp1->type == KEY_EXPRESSION_NORMAL && kp2->type == KEY_EXPRESSION_NORMAL) {
+        return kp1->k.key_index == kp2->k.key_index;
+    } else if (kp1->type == KEY_EXPRESSION_MUSIG && kp2->type == KEY_EXPRESSION_MUSIG) {
+        const musig_aggr_key_info_t *musig_info_i = r_musig_aggr_key_info(&kp1->m.musig_info);
+        const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
+        const musig_aggr_key_info_t *musig_info_j = r_musig_aggr_key_info(&kp2->m.musig_info);
+        const uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
+
+        // two musig key expressions have identical placeholders if and only if they have
+        // exactly the same set of key indexes
+
+        if (musig_info_i->n != musig_info_j->n) {
+            return false;  // cannot be the same set if the size is different
+        }
+
+        uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
+        uint16_t key_indexes_j_sorted[MAX_PUBKEYS_PER_MUSIG];
+        memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
+        memcpy(key_indexes_j_sorted, key_indexes_j, musig_info_j->n * sizeof(uint16_t));
+
+        // sort the arrays
+        sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+        sort_uint16_array(key_indexes_j_sorted, musig_info_j->n);
+
+        if (memcmp(key_indexes_i_sorted,
+                   key_indexes_j_sorted,
+                   musig_info_i->n * sizeof(uint16_t)) != 0) {
+            return false;  // different set of keys
+        }
+        return true;
+    } else {
+        LEDGER_ASSERT(false, "Unknown key expression type");
+        return false;
+    }
+    LEDGER_ASSERT(false, "Unreachable code");
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -1997,10 +2039,10 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
         }
     }
 
-    // The following loop is computationally very inefficient (quadratic in the number of
-    // key expressions), but more efficient solutions likely require a substantial amount of RAM
-    // (proportional to the number of key expressions). Instead, this only requires stack depth
-    // proportional to the depth of the wallet policy's abstract syntax tree.
+    // The following loop is computationally very inefficient, but more efficient solutions likely
+    // require a substantial amount of RAM and/or more complex code.
+    // As it's unlikely that the number of keys in a wallet policy will be large enough for this to,
+    // matther, we rather keep the code as simple as possible.
     for (int i = 0; i < n_key_expressions - 1;
          i++) {  // no point in running this for the last key expression
         policy_node_keyexpr_t *kp_i;
@@ -2014,12 +2056,13 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                                   "Unexpected error retrieving key expressions from the policy");
             }
 
-            if ((kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_MUSIG) ||
-                (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_NORMAL)) {
-                // if one is a key and the other is a musig, there's nothing else to check
-                continue;
-            } else if (kp_i->type == KEY_EXPRESSION_NORMAL && kp_j->type == KEY_EXPRESSION_NORMAL) {
-                // key expressions for the same key must have disjoint derivation options
+            // There is nothing to check for two placeholders that are not identical.
+            // If they are identical, we make sure that the derivations are disjoint, as per
+            // BIP-388. Note that this means that we do not enforce that _all_ the keys in different
+            // musig placeholders are disjoint, as long as they are not exactly the same set of
+            // keys. Similarly, a key used in a normal placeholder could also be part of the set of
+            // keys in a musig placeholder.
+            if (are_key_placeholders_identical(kp_i, kp_j)) {
                 if (kp_i->k.key_index == kp_j->k.key_index) {
                     if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
                         kp_i->num_second == kp_j->num_first ||
@@ -2029,47 +2072,6 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
                             "Key expressions with repeated derivations in miniscript");
                     }
                 }
-            } else if (kp_i->type == KEY_EXPRESSION_MUSIG && kp_j->type == KEY_EXPRESSION_MUSIG) {
-                const musig_aggr_key_info_t *musig_info_i =
-                    r_musig_aggr_key_info(&kp_i->m.musig_info);
-                const uint16_t *key_indexes_i = r_uint16(&musig_info_i->key_indexes);
-                const musig_aggr_key_info_t *musig_info_j =
-                    r_musig_aggr_key_info(&kp_j->m.musig_info);
-                const uint16_t *key_indexes_j = r_uint16(&musig_info_j->key_indexes);
-                // if two musigs have exactly the same set of keys, then the derivation options must
-                // be disjoint
-
-                // make sure that there is no repeated key in the first musig
-
-                if (musig_info_i->n != musig_info_j->n) {
-                    continue;  // cannot be the same set if the size is different
-                }
-
-                uint16_t key_indexes_i_sorted[MAX_PUBKEYS_PER_MUSIG];
-                uint16_t key_indexes_j_sorted[MAX_PUBKEYS_PER_MUSIG];
-                memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
-                memcpy(key_indexes_j_sorted, key_indexes_j, musig_info_j->n * sizeof(uint16_t));
-
-                // sort the arrays
-                sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
-                sort_uint16_array(key_indexes_j_sorted, musig_info_j->n);
-
-                if (memcmp(key_indexes_i_sorted,
-                           key_indexes_j_sorted,
-                           musig_info_i->n * sizeof(uint16_t)) != 0) {
-                    continue;  // different set of keys
-                }
-
-                // same set of keys; therefore, we need to check that the derivation options are
-                // disjoint
-                if (kp_i->num_first == kp_j->num_first || kp_i->num_first == kp_j->num_second ||
-                    kp_i->num_second == kp_j->num_first || kp_i->num_second == kp_j->num_second) {
-                    return WITH_ERROR(-1,
-                                      "Key expressions with repeated derivations in miniscript");
-                }
-
-            } else {
-                LEDGER_ASSERT(false, "Unexpected key expression type");
             }
         }
     }
