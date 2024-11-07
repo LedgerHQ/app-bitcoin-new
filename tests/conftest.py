@@ -103,7 +103,7 @@ def run_bitcoind():
     # Run bitcoind in a separate folder
     os.makedirs(BITCOIN_DIRNAME, exist_ok=True)
 
-    bitcoind = os.getenv("BITCOIND", "/bitcoin/bin/bitcoind")
+    bitcoind = os.getenv("BITCOIND", "bitcoind")
 
     shutil.copy(os.path.join(os.path.dirname(__file__),
                 "bitcoin.conf"), BITCOIN_DIRNAME)
