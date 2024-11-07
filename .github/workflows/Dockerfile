@@ -1,7 +1,8 @@
-# An image derived from ledgerhq/speculos but also containing the bitcoin-core binaries
-# compiled from the master branch
 
-FROM ghcr.io/ledgerhq/speculos:latest
+FROM ubuntu:22.04
+
+# Set environment variable to avoid tzdata prompts
+ENV DEBIAN_FRONTEND=noninteractive
 
 # install git and curl
 RUN apt update -y && apt install -y git curl
@@ -18,11 +19,24 @@ RUN cd / && \
     cmake --install build
 
 
-FROM ghcr.io/ledgerhq/speculos:latest
+FROM ubuntu:22.04
 COPY --from=0 /usr/local/bin/ /usr/local/bin/
 
-# install runtime dependencies for bitcoind
-RUN apt update -y && apt install -y libminiupnpc-dev libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev
+
+# Update and install essential packages
+RUN apt-get update && apt-get install -y \
+    curl git sudo build-essential python3 python3-pip
+
+# Example: Installing Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Cleanup
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN apt update -y && \
+    # install runtime dependencies for bitcoind
+    apt install -y libminiupnpc-dev libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev libsqlite3-dev
 
 # Add bitcoin binaries to path
 ENV PATH=/usr/local/bin/:$PATH
