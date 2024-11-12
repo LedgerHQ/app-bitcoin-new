@@ -21,7 +21,10 @@
 
 // The maximum number of keys supported in a musig() key expression
 // It is basically unlimited in theory, but we need to set a practical limit.
-#define MAX_PUBKEYS_PER_MUSIG MAX_PUBKEYS_PER_MULTISIG
+// The implementation of MuSig2 requires quite a few large arrays (for example, the pubnonces are
+// 66 bytes each, and there is one for each cosigner), therefore we keep this quite small.
+// Increasing this might require optimizing the memory management in the MuSig2 implementation.
+#define MAX_PUBKEYS_PER_MUSIG 5
 
 #define WALLET_POLICY_VERSION_V1 1  // the legacy version of the first release
 #define WALLET_POLICY_VERSION_V2 2  // the current full version
