@@ -110,7 +110,8 @@ typedef struct {
 
 typedef struct {
     policy_node_keyexpr_t *key_expression_ptr;
-    int cur_index;
+    // index of this key expression in the descriptor template, in parsing order
+    int index;
     uint32_t fingerprint;
 
     // info about the internal key of this key expression
@@ -159,6 +160,9 @@ typedef struct {
     uint32_t master_key_fingerprint;
     uint32_t tx_version;
     uint32_t locktime;
+
+    unsigned int n_internal_key_expressions;
+    keyexpr_info_t internal_key_expressions[MAX_INTERNAL_KEY_EXPRESSIONS];
 
     unsigned int n_inputs;
     uint8_t inputs_root[32];  // merkle root of the vector of input maps commitments
@@ -819,41 +823,6 @@ static bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
     }
 }
 
-// finds the first key expression that corresponds to an internal key
-static bool find_first_internal_keyexpr(dispatcher_context_t *dc,
-                                        sign_psbt_state_t *st,
-                                        keyexpr_info_t *keyexpr_info) {
-    keyexpr_info->cur_index = 0;
-
-    // find and parse our registered key info in the wallet
-    while (true) {
-        int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
-                                                     keyexpr_info->cur_index,
-                                                     NULL,
-                                                     &keyexpr_info->key_expression_ptr);
-        if (n_key_expressions < 0) {
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return false;
-        }
-
-        if (keyexpr_info->cur_index >= n_key_expressions) {
-            // all keys have been processed
-            break;
-        }
-
-        if (fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
-            return true;
-        }
-
-        // Not an internal key, move on
-        ++keyexpr_info->cur_index;
-    }
-
-    PRINTF("No internal key found in wallet policy");
-    SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
-    return false;
-}
-
 typedef struct {
     keyexpr_info_t *keyexpr_info;
     input_info_t *input;
@@ -896,6 +865,58 @@ static void input_keys_callback(dispatcher_context_t *dc,
     }
 }
 
+static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    size_t cur_index = 0;
+
+    st->n_internal_key_expressions = 0;
+    memset(st->internal_key_expressions, 0, sizeof(st->internal_key_expressions));
+
+    // find and parse our registered key info in the wallet
+    keyexpr_info_t keyexpr_info;
+    while (true) {
+        int n_key_expressions = get_keyexpr_by_index(st->wallet_policy_map,
+                                                     cur_index,
+                                                     NULL,
+                                                     &keyexpr_info.key_expression_ptr);
+        if (n_key_expressions < 0) {
+            SEND_SW(dc, SW_BAD_STATE);  // should never happen
+            return false;
+        }
+
+        if (cur_index >= (size_t) n_key_expressions) {
+            // all keys have been processed
+            break;
+        }
+
+        if (fill_keyexpr_info_if_internal(dc, st, &keyexpr_info)) {
+            if (st->n_internal_key_expressions >= MAX_INTERNAL_KEY_EXPRESSIONS) {
+                PRINTF("Too many internal key expressions. The maximum supported is %d\n",
+                       MAX_INTERNAL_KEY_EXPRESSIONS);
+                SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_WALLET_POLICY_TOO_MANY_INTERNAL_KEYS);
+                return false;
+            }
+
+            // store this key info, as it's internal
+            memcpy(&st->internal_key_expressions[st->n_internal_key_expressions],
+                   &keyexpr_info,
+                   sizeof(keyexpr_info_t));
+            ++st->n_internal_key_expressions;
+            keyexpr_info.index = 0;
+        }
+
+        // Not an internal key, move on
+        ++cur_index;
+    }
+
+    if (st->n_internal_key_expressions == 0) {
+        PRINTF("No internal key found in wallet policy");
+        SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_WALLET_POLICY_HAS_NO_INTERNAL_KEY);
+        return false;
+    }
+
+    return true;
+}
+
 static bool __attribute__((noinline))
 preprocess_inputs(dispatcher_context_t *dc,
                   sign_psbt_state_t *st,
@@ -905,17 +926,17 @@ preprocess_inputs(dispatcher_context_t *dc,
 
     memset(internal_inputs, 0, BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN));
 
-    keyexpr_info_t keyexpr_info;
-    memset(&keyexpr_info, 0, sizeof(keyexpr_info));
-
-    if (!find_first_internal_keyexpr(dc, st, &keyexpr_info)) return false;
+    if (!fill_internal_key_expressions(dc, st)) return false;
 
     // process each input
     for (unsigned int cur_input_index = 0; cur_input_index < st->n_inputs; cur_input_index++) {
         input_info_t input;
         memset(&input, 0, sizeof(input));
 
-        input_keys_callback_data_t callback_data = {.input = &input, .keyexpr_info = &keyexpr_info};
+        input_keys_callback_data_t callback_data = {
+            .input = &input,
+            // it doesn't matter which key expression we use here
+            .keyexpr_info = &st->internal_key_expressions[0]};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
@@ -1162,11 +1183,6 @@ preprocess_outputs(dispatcher_context_t *dc,
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    keyexpr_info_t keyexpr_info;
-    memset(&keyexpr_info, 0, sizeof(keyexpr_info));
-
-    if (!find_first_internal_keyexpr(dc, st, &keyexpr_info)) return false;
-
     memset(&st->outputs, 0, sizeof(st->outputs));
 
     // the counter used when showing outputs to the user, which ignores change outputs
@@ -1177,8 +1193,10 @@ preprocess_outputs(dispatcher_context_t *dc,
         output_info_t output;
         memset(&output, 0, sizeof(output));
 
-        output_keys_callback_data_t callback_data = {.output = &output,
-                                                     .keyexpr_info = &keyexpr_info};
+        output_keys_callback_data_t callback_data = {
+            .output = &output,
+            // any internal key expression is good here
+            .keyexpr_info = &st->internal_key_expressions[0]};
         int res = call_get_merkleized_map_with_callback(
             dc,
             (void *) &callback_data,
@@ -2695,7 +2713,7 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
         // 5) generate and yield pubnonce
 
         uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->cur_index, rand_i_j);
+        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
 
         musig_secnonce_t secnonce;
         musig_pubnonce_t pubnonce;
@@ -2772,7 +2790,7 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
 
         // recompute secnonce from psbt_session randomness
         uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->cur_index, rand_i_j);
+        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
 
         musig_secnonce_t secnonce;
         musig_pubnonce_t pubnonce;

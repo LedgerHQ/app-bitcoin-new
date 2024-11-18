@@ -51,6 +51,13 @@
  */
 #define MAX_N_OUTPUTS_CAN_SIGN 512
 
+/**
+ * Maximum supported number of internal key expressions in a wallet policy.
+ * A key expression is internal if we can sign for it (either as an individual key,
+ * or as part of a MuSig key expression).
+ */
+#define MAX_INTERNAL_KEY_EXPRESSIONS 8
+
 // SIGHASH flags
 #define SIGHASH_DEFAULT      0x00000000
 #define SIGHASH_ALL          0x00000001

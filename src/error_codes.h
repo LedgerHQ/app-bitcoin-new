@@ -56,6 +56,9 @@
 // The redeem Script in the PSBT is incorrect.
 #define EC_SIGN_PSBT_MISMATCHING_REDEEM_SCRIPT 0x000b
 
+// The wallet policy has too many internal keys.
+#define EC_SIGN_PSBT_WALLET_POLICY_TOO_MANY_INTERNAL_KEYS 0x000c
+
 /**
  * Swap
  */
