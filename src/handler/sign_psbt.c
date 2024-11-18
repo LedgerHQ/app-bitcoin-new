@@ -3317,6 +3317,13 @@ sign_transaction(dispatcher_context_t *dc,
     return true;
 }
 
+// We declare this in the global space in order to use less stack space, since BOLOS enforces on
+// some device a 8kb stack limit.
+// Once this is resolved in BOLOS, we should move this to the function scope to avoid unnecessarily
+// reserving RAM that can only be used for the signing flow (which, at time of writing, is the most
+// RAM-intensive operation command of the app).
+sign_psbt_cache_t G_sign_psbt_cache;
+
 void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -3328,8 +3335,8 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // read APDU inputs, intialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
 
-    sign_psbt_cache_t cache;
-    init_sign_psbt_cache(&cache);
+    sign_psbt_cache_t *cache = &G_sign_psbt_cache;
+    init_sign_psbt_cache(cache);
 
     // bitmap to keep track of which inputs are internal
     uint8_t internal_inputs[BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)];
@@ -3347,14 +3354,14 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      *  - detect internal inputs that should be signed, and if there are external inputs or unusual
      * sighashes
      */
-    if (!preprocess_inputs(dc, &st, &cache, internal_inputs)) return;
+    if (!preprocess_inputs(dc, &st, cache, internal_inputs)) return;
 
     /** OUTPUTS VERIFICATION FLOW
      *
      *  For each output, check if it's a change address.
      *  Check if it's an acceptable output.
      */
-    if (!preprocess_outputs(dc, &st, &cache, internal_outputs)) return;
+    if (!preprocess_outputs(dc, &st, cache, internal_outputs)) return;
 
     if (G_swap_state.called_from_swap) {
         /** SWAP CHECKS
@@ -3380,7 +3387,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      * For each internal key expression, and for each internal input, sign using the
      * appropriate algorithm.
      */
-    int sign_result = sign_transaction(dc, &st, &cache, internal_inputs);
+    int sign_result = sign_transaction(dc, &st, cache, internal_inputs);
 
     if (!G_swap_state.called_from_swap) {
         ui_post_processing_confirm_transaction(dc, sign_result);
