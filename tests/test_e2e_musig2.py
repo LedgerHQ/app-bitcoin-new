@@ -26,33 +26,6 @@ from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruc
 from .conftest import AuthServiceProxy, create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, import_descriptors_with_privkeys, testnet_to_regtest_addr as T
 
 
-class BitcoinCoreMusig2Cosigner(PsbtMusig2Cosigner):
-    """
-    Implements a PsbtMusig2Cosigner for a given wallet policy using bitcoin-core.
-    """
-
-    def __init__(self, wallet_policy: WalletPolicy, rpc) -> None:
-        super().__init__()
-
-        self.wallet_policy = wallet_policy
-        self.rpc = rpc
-
-        self.musig_psbt_sessions: Dict[bytes, bytes] = {}
-
-    def compute_psbt_session_id(self, psbt: PSBT) -> bytes:
-        psbt.tx.rehash()
-        return sha256(psbt.tx.hash + self.wallet_policy.id)
-
-    def get_participant_pubkey(self) -> bip0327.Point:
-        raise NotImplementedError()
-
-    def generate_public_nonces(self, psbt: PSBT) -> None:
-        raise NotImplementedError()
-
-    def generate_partial_signatures(self, psbt: PSBT) -> None:
-        raise NotImplementedError()
-
-
 def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, speculos_globals: SpeculosGlobals,
                         instructions_register_wallet: Instructions,
                         instructions_sign_psbt: Instructions, test_name: str):
@@ -72,10 +45,6 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
                  wallet_id, sha256).digest(),
         wallet_hmac,
     )
-
-    # TODO: reenable registration above and delete this
-    wallet_hmac = hmac.new(speculos_globals.wallet_registration_key,
-                           wallet_policy.id, sha256).digest()
 
     address_hww = client.get_wallet_address(
         wallet_policy, wallet_hmac, 0, 3, False)
