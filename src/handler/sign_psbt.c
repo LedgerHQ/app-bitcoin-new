@@ -182,6 +182,9 @@ typedef struct {
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
 
+    // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCES field is present in the PSBT
+    bool has_musig2_pub_nonces;
+
     // aggregate info on outputs
     struct {
         uint64_t total_amount;         // amount of all the outputs (external + change)
@@ -892,6 +895,8 @@ static void input_keys_callback(dispatcher_context_t *dc,
             } else {
                 LEDGER_ASSERT(false, "Unreachable code");
             }
+        } else if (key_type == PSBT_IN_MUSIG2_PUB_NONCE) {
+            callback_data->state->has_musig2_pub_nonces = true;
         }
     }
 }
