@@ -54,23 +54,18 @@ typedef struct {
 } wallet_derivation_info_t;
 
 /**
- * Computes the a derived compressed pubkey for one of the key of the wallet policy,
- * for a given change/address_index combination.
- *
- * This function computes the extended public key (xpub) based on the provided
- * BIP32 derivation path. It supports both standard BIP32 derivation and
- * the derivation of Musig (multi-signature) keys.
+ * Requests and parses the serialized extended public key from the client.
  *
  * @param[in] dispatcher_context Pointer to the dispatcher content
  * @param[in] wdi Pointer to a `wallet_derivation_info_t` struct with the details of the
- * necessary details of the wallet policy, and the desired change/address_index pair.
+ * necessary details of the wallet policy. The change/addr_index pairs are not
  * @param[in] key_index Index of the pubkey in the vector of keys of the wallet policy.
  * @param[out] out Pointer to a `serialized_extended_pubkey_t` that will contain the requested
  * extended pubkey.
  *
  * @return -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard.
  */
-__attribute__((warn_unused_result)) int get_extended_pubkey(
+__attribute__((warn_unused_result)) int get_extended_pubkey_from_client(
     dispatcher_context_t *dispatcher_context,
     const wallet_derivation_info_t *wdi,
     int key_index,

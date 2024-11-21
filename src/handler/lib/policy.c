@@ -420,7 +420,7 @@ execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, 
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
-__attribute__((noinline, warn_unused_result)) int get_extended_pubkey(
+__attribute__((noinline, warn_unused_result)) int get_extended_pubkey_from_client(
     dispatcher_context_t *dispatcher_context,
     const wallet_derivation_info_t *wdi,
     int key_index,
@@ -464,7 +464,10 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
     serialized_extended_pubkey_t ext_pubkey;
 
     if (key_expr->type == KEY_EXPRESSION_NORMAL) {
-        if (0 > get_extended_pubkey(dispatcher_context, wdi, key_expr->k.key_index, &ext_pubkey)) {
+        if (0 > get_extended_pubkey_from_client(dispatcher_context,
+                                                wdi,
+                                                key_expr->k.key_index,
+                                                &ext_pubkey)) {
             return -1;
         }
     } else if (key_expr->type == KEY_EXPRESSION_MUSIG) {
@@ -473,7 +476,10 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
         plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
         for (int i = 0; i < musig_info->n; i++) {
             // we use ext_pubkey as a temporary variable; will overwrite later
-            if (0 > get_extended_pubkey(dispatcher_context, wdi, key_indexes[i], &ext_pubkey)) {
+            if (0 > get_extended_pubkey_from_client(dispatcher_context,
+                                                    wdi,
+                                                    key_indexes[i],
+                                                    &ext_pubkey)) {
                 return -1;
             }
             memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));

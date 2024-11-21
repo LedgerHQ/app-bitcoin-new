@@ -2588,7 +2588,7 @@ static bool compute_musig_per_input_info(dispatcher_context_t *dc,
     LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig key expression");
     for (int i = 0; i < musig_info->n; i++) {
         // we use ext_pubkey as a temporary variable; will overwrite later
-        if (0 > get_extended_pubkey(dc, &wdi, key_indexes[i], &ext_pubkey)) {
+        if (0 > get_extended_pubkey_from_client(dc, &wdi, key_indexes[i], &ext_pubkey)) {
             return -1;
         }
         memcpy(out->keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
