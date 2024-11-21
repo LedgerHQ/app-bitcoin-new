@@ -2606,16 +2606,8 @@ static bool compute_musig_per_input_info(dispatcher_context_t *dc,
         }
     }
 
-    musig_keyagg_context_t musig_ctx;
-    musig_key_agg(out->keys, musig_info->n, &musig_ctx);
-
-    // compute the aggregated extended pubkey
-    memset(&ext_pubkey, 0, sizeof(ext_pubkey));
-    write_u32_be(ext_pubkey.version, 0, BIP32_PUBKEY_VERSION);
-
-    ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
-    memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
-    memcpy(&ext_pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
+    // we already computed the aggregate (pre-tweaks) xpub in the keyexpr_info
+    memcpy(&ext_pubkey, &keyexpr_info->pubkey, sizeof(serialized_extended_pubkey_t));
 
     // 2) compute musig2 tweaks
     // We always have exactly 2 BIP32 tweaks in wallet policies; if the musig is in the keypath
