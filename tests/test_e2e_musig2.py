@@ -6,6 +6,7 @@ import hmac
 from hashlib import sha256
 from decimal import Decimal
 
+from ledger_bitcoin._script import is_p2tr
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ledger_bitcoin.psbt import PSBT
@@ -24,6 +25,20 @@ from ragger.error import ExceptionRAPDU
 from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
 from .conftest import AuthServiceProxy, create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, import_descriptors_with_privkeys, testnet_to_regtest_addr as T
+
+
+# Removes all the BIP_IN_TAP_BIP32_DERIVATION entries that are not for the musig aggregate keys
+# Returns a new PSBT without modifying the original
+def strip_non_musig2_derivations(psbt: PSBT) -> PSBT:
+    psbt_clone = PSBT()
+    psbt_clone.deserialize(psbt.serialize())
+    for input in psbt_clone.inputs:
+        if input.witness_utxo is not None and is_p2tr(input.witness_utxo.scriptPubKey):
+            for key, (_, deriv) in list(input.tap_bip32_paths.items()):
+                # a bit hacky, but musig key derivations in wallet policies are always 2 steps
+                if len(deriv.path) != 2:
+                    del input.tap_bip32_paths[key]
+    return psbt_clone
 
 
 def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, speculos_globals: SpeculosGlobals,
@@ -124,12 +139,13 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
     # ==> get nonce from the hww
 
     n_internal_keys = count_internal_key_placeholders(
-        speculos_globals.seed, "test", wallet_policy)
+        speculos_globals.seed, "test", wallet_policy, only_musig=True)
 
     psbt = PSBT()
     psbt.deserialize(psbt_b64)
 
-    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
+    psbt_stripped = strip_non_musig2_derivations(psbt)
+    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt_stripped, wallet_policy, wallet_hmac, navigator,
                                                                             instructions=instructions_sign_psbt,
                                                                             testname=f"{test_name}_sign")
 
@@ -190,7 +206,8 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
     psbt = PSBT()
     psbt.deserialize(combined_psbt)
 
-    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt, wallet_policy, wallet_hmac, navigator,
+    psbt_stripped = strip_non_musig2_derivations(psbt)
+    hww_yielded: List[Tuple[int, SignPsbtYieldedObject]] = client.sign_psbt(psbt_stripped, wallet_policy, wallet_hmac, navigator,
                                                                             instructions=instructions_sign_psbt,
                                                                             testname=f"{test_name}_sign")
 
@@ -267,6 +284,28 @@ def test_e2e_musig2_keypath(navigator: Navigator, firmware: Firmware, client: Ra
         keys_info=[
             f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
             f"{core_xpub_orig}",
+        ])
+
+    run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,
+                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+
+
+def test_e2e_musig2_keypath2(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                             test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
+    # We spend with the musig2 in the keypath, but there is a taptree
+
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+
+    core_wallet_name, core_xpub_orig = create_new_wallet()
+    _, core_xpub_orig_2 = create_new_wallet()
+    wallet_policy = WalletPolicy(
+        name="Musig 2 my ears",
+        descriptor_template="tr(musig(@0,@1)/**,pk(@2/**))",
+        keys_info=[
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpub_orig}",
+            f"{core_xpub_orig_2}",
         ])
 
     run_test_e2e_musig2(navigator, client, wallet_policy, [core_wallet_name], rpc, rpc_test_wallet, speculos_globals,

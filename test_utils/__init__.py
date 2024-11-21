@@ -91,7 +91,7 @@ def get_internal_xpub(seed: str, path: str) -> str:
     return bip32.get_xpub_from_path(f"m/{path}") if path else bip32.get_xpub_from_path("m")
 
 
-def count_internal_key_placeholders(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy) -> int:
+def count_internal_key_placeholders(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy, *, only_musig=False) -> int:
     """Count how many of the key placeholders in wallet_policy are indeed internal.
     musig() placeholders are counted as many times as there are internal keys in them."""
 
@@ -124,12 +124,13 @@ def count_internal_key_placeholders(seed: str, network: Union[Literal['main'], L
 
     count = 0
 
-    simple_key_placeholders = re.findall(
-        r'@(\d+)/', wallet_policy.descriptor_template)
-    # for each match, count it if the corresponding key is internal
-    for key_index in simple_key_placeholders:
-        if is_key_internal[int(key_index)]:
-            count += 1
+    if not only_musig:
+        simple_key_placeholders = re.findall(
+            r'@(\d+)/', wallet_policy.descriptor_template)
+        # for each match, count it if the corresponding key is internal
+        for key_index in simple_key_placeholders:
+            if is_key_internal[int(key_index)]:
+                count += 1
 
     if wallet_policy.version != WalletType.WALLET_POLICY_V1:  # no musig in V1 policies
         musig_key_placeholders = re.findall(

@@ -182,7 +182,7 @@ typedef struct {
     unsigned int n_external_inputs;
     unsigned int n_external_outputs;
 
-    // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCES field is present in the PSBT
+    // set to true if at least a PSBT_IN_MUSIG2_PUB_NONCE field is present in the PSBT
     bool has_musig2_pub_nonces;
 
     // aggregate info on outputs
@@ -948,7 +948,6 @@ static bool fill_internal_key_expressions(dispatcher_context_t *dc, sign_psbt_st
             ++st->n_internal_key_expressions;
         }
 
-        // Not an internal key, move on
         ++cur_index;
     }
 
@@ -2540,6 +2539,168 @@ static bool __attribute__((noinline)) yield_musig_data(dispatcher_context_t *dc,
     return true;
 }
 
+// Struct to hold the info computed for a given input in either of the two rounds
+typedef struct {
+    plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
+    serialized_extended_pubkey_t agg_key_tweaked;
+    uint8_t psbt_session_id[32];
+    uint8_t tweaks[3][32];  // 2 or three tweaks
+    size_t n_tweaks;
+    bool is_xonly[3];  // 2 or 3 elements
+} musig_per_input_info_t;
+
+static bool compute_musig_per_input_info(dispatcher_context_t *dc,
+                                         sign_psbt_state_t *st,
+                                         signing_state_t *signing_state,
+                                         const input_info_t *input,
+                                         const keyexpr_info_t *keyexpr_info,
+                                         musig_per_input_info_t *out) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    if (st->wallet_policy_map->type != TOKEN_TR) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    const policy_node_tr_t *tr_policy = (policy_node_tr_t *) st->wallet_policy_map;
+
+    // plan:
+    // 1) compute aggregate pubkey
+    // 2) compute musig2 tweaks
+    // 3) compute taproot tweak (if keypath spend)
+    // 4) compute the psbt_session_id that identifies the psbt-level signing session
+
+    wallet_derivation_info_t wdi = {.n_keys = st->wallet_header.n_keys,
+                                    .wallet_version = st->wallet_header.version,
+                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
+                                    .change = input->in_out.is_change,
+                                    .address_index = input->in_out.address_index,
+                                    .sign_psbt_cache = NULL};
+
+    // TODO: code duplication with policy.c::get_derived_pubkey; worth extracting a common method?
+
+    serialized_extended_pubkey_t ext_pubkey;
+
+    const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
+    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
+    const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
+
+    LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig key expression");
+    for (int i = 0; i < musig_info->n; i++) {
+        // we use ext_pubkey as a temporary variable; will overwrite later
+        if (0 > get_extended_pubkey(dc, &wdi, key_indexes[i], &ext_pubkey)) {
+            return -1;
+        }
+        memcpy(out->keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
+    }
+
+    // sort the keys in ascending order using bubble sort
+    for (int i = 0; i < musig_info->n; i++) {
+        for (int j = 0; j < musig_info->n - 1; j++) {
+            if (memcmp(out->keys[j], out->keys[j + 1], sizeof(plain_pk_t)) > 0) {
+                uint8_t tmp[sizeof(plain_pk_t)];
+                memcpy(tmp, out->keys[j], sizeof(plain_pk_t));
+                memcpy(out->keys[j], out->keys[j + 1], sizeof(plain_pk_t));
+                memcpy(out->keys[j + 1], tmp, sizeof(plain_pk_t));
+            }
+        }
+    }
+
+    musig_keyagg_context_t musig_ctx;
+    musig_key_agg(out->keys, musig_info->n, &musig_ctx);
+
+    // compute the aggregated extended pubkey
+    memset(&ext_pubkey, 0, sizeof(ext_pubkey));
+    write_u32_be(ext_pubkey.version, 0, BIP32_PUBKEY_VERSION);
+
+    ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
+    memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
+    memcpy(&ext_pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
+
+    // 2) compute musig2 tweaks
+    // We always have exactly 2 BIP32 tweaks in wallet policies; if the musig is in the keypath
+    // spend, we also have an x-only taptweak with the taproot tree hash (or BIP-86/BIP-386 style if
+    // there is no taproot tree).
+
+    uint32_t change_step = input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
+                                                   : keyexpr_info->key_expression_ptr->num_first;
+    uint32_t addr_index_step = input->in_out.address_index;
+
+    // in wallet policies, we always have at least two bip32-tweaks, and we might have
+    // one x-only tweak per BIP-0341 (if spending from the keypath).
+    out->is_xonly[0] = false;
+    out->is_xonly[1] = false;
+    out->n_tweaks = 2;  // might be changed to 3 below
+
+    if (0 > bip32_CKDpub(&ext_pubkey, change_step, &out->agg_key_tweaked, out->tweaks[0])) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    if (0 > bip32_CKDpub(&out->agg_key_tweaked,
+                         addr_index_step,
+                         &out->agg_key_tweaked,
+                         out->tweaks[1])) {
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    // 3) compute taproot tweak (if keypath spend)
+    memset(out->tweaks[2], 0, 32);
+    if (!keyexpr_info->is_tapscript) {
+        out->n_tweaks = 3;
+        out->is_xonly[2] = true;
+
+        crypto_tr_tagged_hash(
+            BIP0341_taptweak_tag,
+            sizeof(BIP0341_taptweak_tag),
+            out->agg_key_tweaked.compressed_pubkey + 1,  // xonly key, after BIP-32 tweaks
+            32,
+            input->taptree_hash,
+            // BIP-86 compliant tweak if there's no taptree, otherwise use the taptree hash
+            isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
+            out->tweaks[2]);
+
+        // also apply the taptweak to agg_key_tweaked
+
+        uint8_t parity = 0;
+        crypto_tr_tweak_pubkey(out->agg_key_tweaked.compressed_pubkey + 1,
+                               input->taptree_hash,
+                               isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
+                               &parity,
+                               out->agg_key_tweaked.compressed_pubkey + 1);
+        out->agg_key_tweaked.compressed_pubkey[0] = 0x02 + parity;
+    }
+
+    // we will no longer use the other fields of the extended pubkey, so we zero them for sanity
+    memset(out->agg_key_tweaked.chain_code, 0, sizeof(out->agg_key_tweaked.chain_code));
+    memset(out->agg_key_tweaked.child_number, 0, sizeof(out->agg_key_tweaked.child_number));
+    out->agg_key_tweaked.depth = 0;
+    memset(out->agg_key_tweaked.parent_fingerprint,
+           0,
+           sizeof(out->agg_key_tweaked.parent_fingerprint));
+    memset(out->agg_key_tweaked.version, 0, sizeof(out->agg_key_tweaked.version));
+
+    // The psbt_session_id identifies the musig signing session for the entire (psbt, wallet_policy)
+    // pair, in both rounds 1 and 2 of the protocol; it is the same for all the musig placeholders
+    // in the policy (if more than one), and it is the same for all the inputs in the psbt. By
+    // making the hash depend on both the wallet policy and the transaction hashes, we make sure
+    // that an accidental collision is impossible, allowing for independent, parallel MuSig2 signing
+    // sessions for different transactions or wallet policies.
+    // Malicious collisions are not a concern, as they would only result in a signing failure (since
+    // the nonces would be incorrectly regenerated during round 2 of MuSig2).
+    crypto_tr_tagged_hash(
+        (uint8_t[]){'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
+        13,
+        st->wallet_header.keys_info_merkle_root,  // TODO: wallet policy id would be more precise
+        32,
+        (uint8_t *) &signing_state->tx_hashes,
+        sizeof(tx_hashes_t),
+        out->psbt_session_id);
+
+    return true;
+}
+
 static bool yield_musig_pubnonce(dispatcher_context_t *dc,
                                  sign_psbt_state_t *st,
                                  unsigned int cur_input_index,
@@ -2586,132 +2747,17 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
                              uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    if (st->wallet_policy_map->type != TOKEN_TR) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+    musig_per_input_info_t musig_per_input_info;
+    if (!compute_musig_per_input_info(dc,
+                                      st,
+                                      signing_state,
+                                      input,
+                                      keyexpr_info,
+                                      &musig_per_input_info)) {
         return false;
     }
 
-    const policy_node_tr_t *tr_policy = (policy_node_tr_t *) st->wallet_policy_map;
-
-    // plan:
-    // 1) compute aggregate pubkey
-    // 2) compute musig2 tweaks
-    // 3) compute taproot tweak (if keypath spend)
-    // if my pubnonce is in the psbt:
-    //        5) generate and yield pubnonce
-    //    else:
-    //        6) generate and yield partial signature
-
-    // 1) compute aggregate pubkey
-
-    // TODO: we should compute the aggregate pubkey just once for the placeholder, instead of
-    // repeating for each input
-    wallet_derivation_info_t wdi = {.n_keys = st->wallet_header.n_keys,
-                                    .wallet_version = st->wallet_header.version,
-                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
-                                    .change = input->in_out.is_change,
-                                    .address_index = input->in_out.address_index};
-
-    // TODO: code duplication with policy.c::get_derived_pubkey; worth extracting a common method?
-
-    serialized_extended_pubkey_t ext_pubkey;
-
-    const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
-    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
-    const uint16_t *key_indexes = r_uint16(&musig_info->key_indexes);
-    plain_pk_t keys[MAX_PUBKEYS_PER_MUSIG];
-
-    LEDGER_ASSERT(musig_info->n <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig key expression");
-    for (int i = 0; i < musig_info->n; i++) {
-        // we use ext_pubkey as a temporary variable; will overwrite later
-        if (0 > get_extended_pubkey(dc, &wdi, key_indexes[i], &ext_pubkey)) {
-            return -1;
-        }
-        memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
-    }
-
-    // sort the keys in ascending order using bubble sort
-    for (int i = 0; i < musig_info->n; i++) {
-        for (int j = 0; j < musig_info->n - 1; j++) {
-            if (memcmp(keys[j], keys[j + 1], sizeof(plain_pk_t)) > 0) {
-                uint8_t tmp[sizeof(plain_pk_t)];
-                memcpy(tmp, keys[j], sizeof(plain_pk_t));
-                memcpy(keys[j], keys[j + 1], sizeof(plain_pk_t));
-                memcpy(keys[j + 1], tmp, sizeof(plain_pk_t));
-            }
-        }
-    }
-
-    musig_keyagg_context_t musig_ctx;
-    musig_key_agg(keys, musig_info->n, &musig_ctx);
-
-    // compute the aggregated extended pubkey
-    memset(&ext_pubkey, 0, sizeof(ext_pubkey));
-    write_u32_be(ext_pubkey.version, 0, BIP32_PUBKEY_VERSION);
-
-    ext_pubkey.compressed_pubkey[0] = (musig_ctx.Q.y[31] % 2 == 0) ? 2 : 3;
-    memcpy(&ext_pubkey.compressed_pubkey[1], musig_ctx.Q.x, sizeof(musig_ctx.Q.x));
-    memcpy(&ext_pubkey.chain_code, BIP_328_CHAINCODE, sizeof(BIP_328_CHAINCODE));
-
-    // 2) compute musig2 tweaks
-    // We always have exactly 2 BIP32 tweaks in wallet policies; if the musig is in the keypath
-    // spend, we also have an x-only taptweak with the taproot tree hash (or BIP-86/BIP-386 style if
-    // there is no taproot tree).
-
-    uint32_t change_step = input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
-                                                   : keyexpr_info->key_expression_ptr->num_first;
-    uint32_t addr_index_step = input->in_out.address_index;
-
-    // in wallet policies, we always have at least two bip32-tweaks, and we might have
-    // one x-only tweak per BIP-0341 (if spending from the keypath).
-    uint8_t tweaks[3][32];
-    uint8_t *tweaks_ptrs[3] = {tweaks[0], tweaks[1], tweaks[2]};
-    bool is_xonly[] = {false, false, true};
-    size_t n_tweaks = 2;  // might be changed to 3 below
-
-    serialized_extended_pubkey_t agg_key_tweaked;
-    if (0 > bip32_CKDpub(&ext_pubkey, change_step, &agg_key_tweaked, tweaks[0])) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
-    if (0 > bip32_CKDpub(&agg_key_tweaked, addr_index_step, &agg_key_tweaked, tweaks[1])) {
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
-    }
-
-    // 3) compute taproot tweak (if keypath spend)
-    memset(tweaks[2], 0, 32);
-    if (!keyexpr_info->is_tapscript) {
-        n_tweaks = 3;
-
-        crypto_tr_tagged_hash(
-            BIP0341_taptweak_tag,
-            sizeof(BIP0341_taptweak_tag),
-            agg_key_tweaked.compressed_pubkey + 1,  // xonly key, after BIP-32 tweaks
-            32,
-            input->taptree_hash,
-            // BIP-86 compliant tweak if there's no taptree, otherwise use the taptree hash
-            isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
-            tweaks[2]);
-
-        // also apply the taptweak to agg_key_tweaked
-
-        uint8_t parity = 0;
-        crypto_tr_tweak_pubkey(agg_key_tweaked.compressed_pubkey + 1,
-                               input->taptree_hash,
-                               isnull_policy_node_tree(&tr_policy->tree) ? 0 : 32,
-                               &parity,
-                               agg_key_tweaked.compressed_pubkey + 1);
-        agg_key_tweaked.compressed_pubkey[0] = 0x02 + parity;
-    }
-
-    // we will no longer use the other fields of the extended pubkey, so we zero them for sanity
-    memset(agg_key_tweaked.chain_code, 0, sizeof(agg_key_tweaked.chain_code));
-    memset(agg_key_tweaked.child_number, 0, sizeof(agg_key_tweaked.child_number));
-    agg_key_tweaked.depth = 0;
-    memset(agg_key_tweaked.parent_fingerprint, 0, sizeof(agg_key_tweaked.parent_fingerprint));
-    memset(agg_key_tweaked.version, 0, sizeof(agg_key_tweaked.version));
-
+    // 4) check if my pubnonce is in the psbt
     // Compute musig_my_psbt_id. It is the psbt key that this signer uses to find pubnonces and
     // partial signatures (PSBT_IN_MUSIG2_PUB_NONCE and PSBT_IN_MUSIG2_PARTIAL_SIG fields). The
     // length is either 33+33 (keypath spend), or 33+33+32 bytes (tapscript spend). It's the
@@ -2725,31 +2771,10 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
     uint8_t *musig_my_psbt_id = musig_my_psbt_id_key + 1;
     size_t psbt_id_len = keyexpr_info->is_tapscript ? 33 + 33 + 32 : 33 + 33;
     memcpy(musig_my_psbt_id, keyexpr_info->internal_pubkey.compressed_pubkey, 33);
-    memcpy(musig_my_psbt_id + 33, agg_key_tweaked.compressed_pubkey, 33);
+    memcpy(musig_my_psbt_id + 33, musig_per_input_info.agg_key_tweaked.compressed_pubkey, 33);
     if (keyexpr_info->is_tapscript) {
         memcpy(musig_my_psbt_id + 33 + 33, keyexpr_info->tapleaf_hash, 32);
     }
-
-    // The psbt_session_id identifies the musig signing session for the entire (psbt, wallet_policy)
-    // pair, in both rounds 1 and 2 of the protocol; it is the same for all the musig placeholders
-    // in the policy (if more than one), and it is the same for all the inputs in the psbt. By
-    // making the hash depend on both the wallet policy and the transaction hashes, we make sure
-    // that an accidental collision is impossible, allowing for independent, parallel MuSig2 signing
-    // sessions for different transactions or wallet policies.
-    // Malicious collisions are not a concern, as they would only result in a signing failure (since
-    // the nonces would be incorrectly regenerated during round 2 of MuSig2).
-    uint8_t psbt_session_id[32];
-    crypto_tr_tagged_hash(
-        (uint8_t[]){'P', 's', 'b', 't', 'S', 'e', 's', 's', 'i', 'o', 'n', 'I', 'd'},
-        13,
-        st->wallet_header.keys_info_merkle_root,  // TODO: wallet policy id would be more precise
-        32,
-        (uint8_t *) &signing_state->tx_hashes,
-        sizeof(signing_state->tx_hashes),
-        psbt_session_id);
-    memcpy(psbt_session_id, st->wallet_header.keys_info_merkle_root, sizeof(psbt_session_id));
-
-    // 4) check if my pubnonce is in the psbt
     musig_pubnonce_t my_pubnonce;
     if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
                                                                   &input->in_out.map,
@@ -2757,174 +2782,141 @@ sign_sighash_musig_and_yield(dispatcher_context_t *dc,
                                                                   1 + psbt_id_len,
                                                                   my_pubnonce.raw,
                                                                   sizeof(musig_pubnonce_t))) {
-        /**
-         * Round 1 of the MuSig2 protocol
-         **/
+        PRINTF("Missing pubnonce in PSBT\n");
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+    /**
+     * Round 2 of the MuSig2 protocol
+     **/
 
-        const musig_psbt_session_t *psbt_session =
-            musigsession_round1_initialize(psbt_session_id, &signing_state->musig);
-        if (psbt_session == NULL) {
-            // This should never happen
-            PRINTF("Unexpected: failed to initialize MuSig2 round 1\n");
-            SEND_SW(dc, SW_BAD_STATE);
-            return false;
-        }
+    const musig_psbt_session_t *psbt_session =
+        musigsession_round2_initialize(musig_per_input_info.psbt_session_id, &signing_state->musig);
 
-        // 5) generate and yield pubnonce
+    if (psbt_session == NULL) {
+        // The PSBT contains a partial nonce, but we do not have the corresponding psbt
+        // session in storage. Either it was deleted, or the pubnonces were not real. Either
+        // way, we cannot continue.
+        PRINTF("Missing MuSig2 session\n");
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
 
-        uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
+    // 6) generate and yield partial signature
 
-        musig_secnonce_t secnonce;
-        musig_pubnonce_t pubnonce;
-        if (0 > musig_nonce_gen(rand_i_j,
-                                keyexpr_info->internal_pubkey.compressed_pubkey,
-                                agg_key_tweaked.compressed_pubkey + 1,
-                                &secnonce,
-                                &pubnonce)) {
-            PRINTF("MuSig2 nonce generation failed\n");
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return false;
-        }
+    const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
+    const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
 
-        if (!yield_musig_pubnonce(dc,
-                                  st,
-                                  cur_input_index,
-                                  &pubnonce,
-                                  keyexpr_info->internal_pubkey.compressed_pubkey,
-                                  agg_key_tweaked.compressed_pubkey,
-                                  keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
-            PRINTF("Failed yielding MuSig2 pubnonce\n");
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return false;
-        }
-    } else {
-        /**
-         * Round 2 of the MuSig2 protocol
-         **/
+    musig_pubnonce_t nonces[MAX_PUBKEYS_PER_MUSIG];
 
-        const musig_psbt_session_t *psbt_session =
-            musigsession_round2_initialize(psbt_session_id, &signing_state->musig);
+    for (int i = 0; i < musig_info->n; i++) {
+        uint8_t musig_ith_psbt_id_key[1 + 33 + 33 + 32];
+        uint8_t *musig_ith_psbt_id = musig_ith_psbt_id_key + 1;
+        // copy from musig_my_psbt_id_key, but replace the corresponding pubkey
+        memcpy(musig_ith_psbt_id_key, musig_my_psbt_id_key, sizeof(musig_my_psbt_id_key));
+        memcpy(musig_ith_psbt_id, musig_per_input_info.keys[i], sizeof(plain_pk_t));
 
-        if (psbt_session == NULL) {
-            // The PSBT contains a partial nonce, but we do not have the corresponding psbt
-            // session in storage. Either it was deleted, or the pubnonces were not real. Either
-            // way, we cannot continue.
-            PRINTF("Missing MuSig2 session\n");
-            SEND_SW(dc, SW_BAD_STATE);
-            return false;
-        }
-
-        // 6) generate and yield partial signature
-
-        musig_pubnonce_t nonces[MAX_PUBKEYS_PER_MUSIG];
-
-        for (int i = 0; i < musig_info->n; i++) {
-            uint8_t musig_ith_psbt_id_key[1 + 33 + 33 + 32];
-            uint8_t *musig_ith_psbt_id = musig_ith_psbt_id_key + 1;
-            // copy from musig_my_psbt_id_key, but replace the corresponding pubkey
-            memcpy(musig_ith_psbt_id_key, musig_my_psbt_id_key, sizeof(musig_my_psbt_id_key));
-            memcpy(musig_ith_psbt_id, keys[i], sizeof(plain_pk_t));
-
-            // TODO: could avoid fetching again our own pubnonce
-            if (sizeof(musig_pubnonce_t) !=
-                call_get_merkleized_map_value(dc,
-                                              &input->in_out.map,
-                                              musig_ith_psbt_id_key,
-                                              1 + psbt_id_len,
-                                              nonces[i].raw,
-                                              sizeof(musig_pubnonce_t))) {
-                PRINTF("Missing or incorrect pubnonce for a MuSig2 cosigner\n");
-                SEND_SW(dc, SW_INCORRECT_DATA);
-                return false;
-            }
-        }
-
-        // compute aggregate nonce
-        musig_pubnonce_t aggnonce;
-        int res = musig_nonce_agg(nonces, musig_info->n, &aggnonce);
-        if (res < 0) {
-            PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
+        if (sizeof(musig_pubnonce_t) != call_get_merkleized_map_value(dc,
+                                                                      &input->in_out.map,
+                                                                      musig_ith_psbt_id_key,
+                                                                      1 + psbt_id_len,
+                                                                      nonces[i].raw,
+                                                                      sizeof(musig_pubnonce_t))) {
+            PRINTF("Missing or incorrect pubnonce for a MuSig2 cosigner\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
-        }
-
-        // recompute secnonce from psbt_session randomness
-        uint8_t rand_i_j[32];
-        compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
-
-        musig_secnonce_t secnonce;
-        musig_pubnonce_t pubnonce;
-
-        if (0 > musig_nonce_gen(rand_i_j,
-                                keyexpr_info->internal_pubkey.compressed_pubkey,
-                                agg_key_tweaked.compressed_pubkey + 1,
-                                &secnonce,
-                                &pubnonce)) {
-            PRINTF("MuSig2 nonce generation failed\n");
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return false;
         }
+    }
+
+    // compute aggregate nonce
+    musig_pubnonce_t aggnonce;
+    int res = musig_nonce_agg(nonces, musig_info->n, &aggnonce);
+    if (res < 0) {
+        PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
+        SEND_SW(dc, SW_INCORRECT_DATA);
+    }
+
+    // recompute secnonce from psbt_session randomness
+    uint8_t rand_i_j[32];
+    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
+
+    musig_secnonce_t secnonce;
+    musig_pubnonce_t pubnonce;
+
+    if (0 > musig_nonce_gen(rand_i_j,
+                            keyexpr_info->internal_pubkey.compressed_pubkey,
+                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                            &secnonce,
+                            &pubnonce)) {
+        PRINTF("MuSig2 nonce generation failed\n");
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    // derive secret key
+
+    cx_ecfp_private_key_t private_key = {0};
+    uint8_t psig[32];
+    bool err = false;
+    do {  // block executed once, only to allow safely breaking out on error
 
         // derive secret key
+        uint32_t sign_path[MAX_BIP32_PATH_STEPS];
 
-        cx_ecfp_private_key_t private_key = {0};
-        uint8_t psig[32];
-        bool err = false;
-        do {  // block executed once, only to allow safely breaking out on error
+        for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
+            sign_path[i] = keyexpr_info->key_derivation[i];
+        }
+        int sign_path_len = keyexpr_info->key_derivation_length;
 
-            // derive secret key
-            uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-
-            for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
-                sign_path[i] = keyexpr_info->key_derivation[i];
-            }
-            int sign_path_len = keyexpr_info->key_derivation_length;
-
-            if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
-                                              sign_path,
-                                              sign_path_len,
-                                              &private_key,
-                                              NULL) != CX_OK) {
-                err = true;
-                break;
-            }
-
-            // Create partial signature
-            musig_session_context_t musig_session_context = {.aggnonce = &aggnonce,
-                                                             .n_keys = musig_info->n,
-                                                             .pubkeys = keys,
-                                                             .n_tweaks = n_tweaks,
-                                                             .tweaks = tweaks_ptrs,
-                                                             .is_xonly = is_xonly,
-                                                             .msg = sighash,
-                                                             .msg_len = 32};
-
-            if (0 > musig_sign(&secnonce, private_key.d, &musig_session_context, psig)) {
-                PRINTF("Musig2 signature failed\n");
-                err = true;
-                break;
-            }
-        } while (false);
-
-        explicit_bzero(&private_key, sizeof(private_key));
-
-        if (err) {
-            PRINTF("Partial signature generation failed\n");
-            return false;
+        if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
+                                          sign_path,
+                                          sign_path_len,
+                                          &private_key,
+                                          NULL) != CX_OK) {
+            err = true;
+            break;
         }
 
-        if (!yield_musig_partial_signature(
-                dc,
-                st,
-                cur_input_index,
-                psig,
-                keyexpr_info->internal_pubkey.compressed_pubkey,
-                agg_key_tweaked.compressed_pubkey,
-                keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
-            PRINTF("Failed yielding MuSig2 partial signature\n");
-            SEND_SW(dc, SW_BAD_STATE);  // should never happen
-            return false;
+        // Create partial signature
+        uint8_t *tweaks_ptrs[3] = {
+            musig_per_input_info.tweaks[0],
+            musig_per_input_info.tweaks[1],
+            musig_per_input_info.tweaks[2]  // the last element is ignored if n_tweaks == 2
+        };
+        musig_session_context_t musig_session_context = {.aggnonce = &aggnonce,
+                                                         .n_keys = musig_info->n,
+                                                         .pubkeys = musig_per_input_info.keys,
+                                                         .n_tweaks = musig_per_input_info.n_tweaks,
+                                                         .tweaks = tweaks_ptrs,
+                                                         .is_xonly = musig_per_input_info.is_xonly,
+                                                         .msg = sighash,
+                                                         .msg_len = 32};
+
+        if (0 > musig_sign(&secnonce, private_key.d, &musig_session_context, psig)) {
+            PRINTF("Musig2 signature failed\n");
+            err = true;
+            break;
         }
+    } while (false);
+
+    explicit_bzero(&private_key, sizeof(private_key));
+
+    if (err) {
+        PRINTF("Partial signature generation failed\n");
+        return false;
+    }
+
+    if (!yield_musig_partial_signature(
+            dc,
+            st,
+            cur_input_index,
+            psig,
+            keyexpr_info->internal_pubkey.compressed_pubkey,
+            musig_per_input_info.agg_key_tweaked.compressed_pubkey,
+            keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
+        PRINTF("Failed yielding MuSig2 partial signature\n");
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
     }
 
     return true;
@@ -3295,24 +3287,162 @@ fill_taproot_keyexpr_info(dispatcher_context_t *dc,
     return true;
 }
 
+static bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
+                                       sign_psbt_state_t *st,
+                                       signing_state_t *signing_state,
+                                       const keyexpr_info_t *keyexpr_info,
+                                       const input_info_t *input,
+                                       unsigned int cur_input_index) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    musig_per_input_info_t musig_per_input_info;
+    if (!compute_musig_per_input_info(dc,
+                                      st,
+                                      signing_state,
+                                      input,
+                                      keyexpr_info,
+                                      &musig_per_input_info)) {
+        return false;
+    }
+
+    /**
+     * Round 1 of the MuSig2 protocol
+     **/
+
+    const musig_psbt_session_t *psbt_session =
+        musigsession_round1_initialize(musig_per_input_info.psbt_session_id, &signing_state->musig);
+    if (psbt_session == NULL) {
+        // This should never happen
+        PRINTF("Unexpected: failed to initialize MuSig2 round 1\n");
+        SEND_SW(dc, SW_BAD_STATE);
+        return false;
+    }
+
+    // 5) generate and yield pubnonce
+
+    uint8_t rand_i_j[32];
+    compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
+
+    musig_secnonce_t secnonce;
+    musig_pubnonce_t pubnonce;
+    if (0 > musig_nonce_gen(rand_i_j,
+                            keyexpr_info->internal_pubkey.compressed_pubkey,
+                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                            &secnonce,
+                            &pubnonce)) {
+        PRINTF("MuSig2 nonce generation failed\n");
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    if (!yield_musig_pubnonce(dc,
+                              st,
+                              cur_input_index,
+                              &pubnonce,
+                              keyexpr_info->internal_pubkey.compressed_pubkey,
+                              musig_per_input_info.agg_key_tweaked.compressed_pubkey,
+                              keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
+        PRINTF("Failed yielding MuSig2 pubnonce\n");
+        SEND_SW(dc, SW_BAD_STATE);  // should never happen
+        return false;
+    }
+
+    return true;
+}
+
+static bool __attribute__((noinline)) produce_musig2_pubnonces(
+    dispatcher_context_t *dc,
+    sign_psbt_state_t *st,
+    signing_state_t *signing_state,
+    sign_psbt_cache_t *sign_psbt_cache,
+    const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
+    LOG_PROCESSOR(__FILE__, __LINE__, __func__);
+
+    if (st->wallet_policy_map->type != TOKEN_TR) {
+        return true;  // nothing to do
+    }
+
+    // Iterate over all the key expressions that correspond to keys owned by us
+    for (size_t i_keyexpr = 0; i_keyexpr < st->n_internal_key_expressions; i_keyexpr++) {
+        keyexpr_info_t *keyexpr_info = &st->internal_key_expressions[i_keyexpr];
+        if (!keyexpr_info->to_sign ||
+            keyexpr_info->key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
+            continue;
+        }
+
+        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info) == true) {
+            continue;
+        }
+
+        for (unsigned int i = 0; i < st->n_inputs; i++) {
+            if (bitvector_get(internal_inputs, i)) {
+                input_info_t input;
+                memset(&input, 0, sizeof(input));
+
+                input_keys_callback_data_t callback_data = {.input = &input, .state = st};
+                int res = call_get_merkleized_map_with_callback(
+                    dc,
+                    (void *) &callback_data,
+                    st->inputs_root,
+                    st->n_inputs,
+                    i,
+                    (merkle_tree_elements_callback_t) input_keys_callback,
+                    &input.in_out.map);
+                if (res < 0) {
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return false;
+                }
+
+                // TODO: code duplication with sign_transaction_input
+                if (keyexpr_info->tapleaf_ptr != NULL) {
+                    if (!fill_taproot_keyexpr_info(dc,
+                                                   st,
+                                                   &input,
+                                                   keyexpr_info->tapleaf_ptr,
+                                                   keyexpr_info,
+                                                   sign_psbt_cache)) {
+                        return false;
+                    }
+                }
+
+                policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
+                if (!isnull_policy_node_tree(&policy->tree)) {
+                    if (0 > compute_taptree_hash(
+                                dc,
+                                &(wallet_derivation_info_t){
+                                    .address_index = input.in_out.address_index,
+                                    .change = input.in_out.is_change ? 1 : 0,
+                                    .keys_merkle_root = st->wallet_header.keys_info_merkle_root,
+                                    .n_keys = st->wallet_header.n_keys,
+                                    .wallet_version = st->wallet_header.version,
+                                    .sign_psbt_cache = sign_psbt_cache},
+                                r_policy_node_tree(&policy->tree),
+                                input.taptree_hash)) {
+                        PRINTF("Error while computing taptree hash\n");
+                        SEND_SW(dc, SW_BAD_STATE);
+                        return false;
+                    }
+                }
+
+                if (!produce_and_yield_pubnonce(dc, st, signing_state, keyexpr_info, &input, i)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 static bool __attribute__((noinline))
 sign_transaction(dispatcher_context_t *dc,
                  sign_psbt_state_t *st,
                  sign_psbt_cache_t *sign_psbt_cache,
+                 signing_state_t *signing_state,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     int key_expression_index = 0;
-
-    signing_state_t signing_state;
-
-    // compute all the tx-wide hashes
-    // while this is redundant for legacy transactions, we do it here in order to
-    // avoid doing it in places that have more stack limitations
-    if (!compute_tx_hashes(dc, st, &signing_state.tx_hashes)) {
-        // we do not send a status word, since compute_tx_hashes already does it on failure
-        return false;
-    }
 
     // Iterate over all the key expressions that correspond to keys owned by us
     for (size_t i_keyexpr = 0; i_keyexpr < st->n_internal_key_expressions; i_keyexpr++) {
@@ -3356,7 +3486,7 @@ sign_transaction(dispatcher_context_t *dc,
                 if (!sign_transaction_input(dc,
                                             st,
                                             sign_psbt_cache,
-                                            &signing_state,
+                                            signing_state,
                                             keyexpr_info,
                                             &input,
                                             i)) {
@@ -3369,10 +3499,6 @@ sign_transaction(dispatcher_context_t *dc,
 
         ++key_expression_index;
     }
-
-    // MuSig2: if there is an active session at the end of round 1, we move it to persistent
-    // storage. It is important that this is only done at the very end of the signing process.
-    musigsession_commit(&signing_state.musig);
 
     return true;
 }
@@ -3423,44 +3549,79 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
      */
     if (!preprocess_outputs(dc, &st, cache, internal_outputs)) return;
 
-    if (G_swap_state.called_from_swap) {
-        /** SWAP CHECKS
-         *
-         *  If called from the exchange app, perform the necessary additional checks.
-         */
-
-        // During swaps, the user approval was already obtained in the exchange app
-        if (!execute_swap_checks(dc, &st)) return;
-    } else {
-        /** TRANSACTION CONFIRMATION
-         *
-         *  Display each non-change output, and transaction fees, and acquire user confirmation,
-         */
-        if (!display_transaction(dc, &st, internal_outputs)) return;
+    // check if we're only executing the MuSig2 Round 1
+    bool only_signing_for_musig = true;
+    for (size_t i = 0; i < st.n_internal_key_expressions; i++) {
+        if (st.internal_key_expressions[i].to_sign &&
+            st.internal_key_expressions[i].key_expression_ptr->type != KEY_EXPRESSION_MUSIG) {
+            // at least one of the key expressions we're signing for is not a MuSig
+            only_signing_for_musig = false;
+        }
     }
 
-    // Signing always takes some time, so we rather not wait before showing the spinner
-    io_show_processing_screen();
+    signing_state_t signing_state;
+    memset(&signing_state, 0, sizeof(signing_state));
 
-    /** SIGNING FLOW
-     *
-     * For each internal key expression, and for each internal input, sign using the
-     * appropriate algorithm.
-     */
-    int sign_result = sign_transaction(dc, &st, cache, internal_inputs);
-
-    if (!G_swap_state.called_from_swap) {
-        ui_post_processing_confirm_transaction(dc, sign_result);
-    }
-
-    if (!sign_result) {
+    // compute all the tx-wide hashes
+    if (!compute_tx_hashes(dc, &st, &signing_state.tx_hashes)) {
         return;
     }
 
-    // Only if called from swap, the app should terminate after sending the response
-    if (G_swap_state.called_from_swap) {
-        G_swap_state.should_exit = true;
+    if (!st.has_musig2_pub_nonces) {
+        // We execute the first round of MuSig for any musig2 key expression.produce the pubnonces;
+        // this does not involve the private keys, therefore we can do it without user confirmation
+
+        if (!produce_musig2_pubnonces(dc, &st, &signing_state, cache, internal_inputs)) {
+            return;
+        }
     }
+
+    // we execute the signing flow only if we're producing any signature
+    // (or any MuSig partial signature)
+    if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
+        if (G_swap_state.called_from_swap) {
+            /** SWAP CHECKS
+             *
+             *  If called from the exchange app, perform the necessary additional checks.
+             */
+
+            // During swaps, the user approval was already obtained in the exchange app
+            if (!execute_swap_checks(dc, &st)) return;
+        } else {
+            /** TRANSACTION CONFIRMATION
+             *
+             *  Display each non-change output, and transaction fees, and acquire user confirmation,
+             */
+            if (!display_transaction(dc, &st, internal_outputs)) return;
+        }
+
+        // Signing always takes some time, so we rather not wait before showing the spinner
+        io_show_processing_screen();
+
+        /** SIGNING FLOW
+         *
+         * For each internal key expression, and for each internal input, sign using the
+         * appropriate algorithm.
+         */
+        int sign_result = sign_transaction(dc, &st, cache, &signing_state, internal_inputs);
+
+        if (!G_swap_state.called_from_swap) {
+            ui_post_processing_confirm_transaction(dc, sign_result);
+        }
+
+        if (!sign_result) {
+            return;
+        }
+
+        // Only if called from swap, the app should terminate after sending the response
+        if (G_swap_state.called_from_swap) {
+            G_swap_state.should_exit = true;
+        }
+    }
+
+    // MuSig2: if there is an active session at the end of round 1, we move it to persistent
+    // storage. It is important that this is only done at the very end of the signing process.
+    musigsession_commit(&signing_state.musig);
 
     SEND_SW(dc, SW_OK);
 }
