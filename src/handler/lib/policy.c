@@ -485,17 +485,8 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
             memcpy(keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
         }
 
-        // sort the keys in ascending order using bubble sort
-        for (int i = 0; i < musig_info->n; i++) {
-            for (int j = 0; j < musig_info->n - 1; j++) {
-                if (memcmp(keys[j], keys[j + 1], sizeof(plain_pk_t)) > 0) {
-                    uint8_t tmp[sizeof(plain_pk_t)];
-                    memcpy(tmp, keys[j], sizeof(plain_pk_t));
-                    memcpy(keys[j], keys[j + 1], sizeof(plain_pk_t));
-                    memcpy(keys[j + 1], tmp, sizeof(plain_pk_t));
-                }
-            }
-        }
+        // sort the keys in ascending order
+        qsort(keys, musig_info->n, sizeof(plain_pk_t), compare_plain_pk);
 
         musig_keyagg_context_t musig_ctx;
         musig_key_agg(keys, musig_info->n, &musig_ctx);
@@ -1903,17 +1894,11 @@ static int is_taptree_miniscript_sane(const policy_node_tree_t *taptree) {
     return 0;
 }
 
-// sort an array of uint16_t in place using bubble sort
-static void sort_uint16_array(uint16_t *array, size_t n) {
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = i + 1; j < n; j++) {
-            if (array[i] > array[j]) {
-                uint16_t tmp = array[i];
-                array[i] = array[j];
-                array[j] = tmp;
-            }
-        }
-    }
+static int compare_uint16(const void *a, const void *b) {
+    uint16_t num1 = *(const uint16_t *) a;
+    uint16_t num2 = *(const uint16_t *) b;
+
+    return (num1 > num2) - (num1 < num2);
 }
 
 static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
@@ -1942,8 +1927,8 @@ static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
         memcpy(key_indexes_j_sorted, key_indexes_j, musig_info_j->n * sizeof(uint16_t));
 
         // sort the arrays
-        sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
-        sort_uint16_array(key_indexes_j_sorted, musig_info_j->n);
+        qsort(key_indexes_i_sorted, musig_info_i->n, sizeof(uint16_t), compare_uint16);
+        qsort(key_indexes_j_sorted, musig_info_j->n, sizeof(uint16_t), compare_uint16);
 
         if (memcmp(key_indexes_i_sorted,
                    key_indexes_j_sorted,
@@ -2036,7 +2021,8 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             memcpy(key_indexes_i_sorted, key_indexes_i, musig_info_i->n * sizeof(uint16_t));
 
             // sort the arrays
-            sort_uint16_array(key_indexes_i_sorted, musig_info_i->n);
+            qsort(key_indexes_i_sorted, musig_info_i->n, sizeof(uint16_t), compare_uint16);
+
             for (int j = 0; j < musig_info_i->n - 1; j++) {
                 if (key_indexes_i_sorted[j] == key_indexes_i_sorted[j + 1]) {
                     return WITH_ERROR(-1, "Repeated key in musig key expression");

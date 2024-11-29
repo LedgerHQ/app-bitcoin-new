@@ -16,6 +16,7 @@
  *****************************************************************************/
 
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "lib_standard_app/crypto_helpers.h"
 
@@ -654,17 +655,8 @@ static bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
         if (has_internal_key) {
             keyexpr_info->psbt_root_key_derivation_length = 0;
 
-            // sort the keys in ascending order using bubble sort
-            for (int i = 0; i < musig_info->n; i++) {
-                for (int j = 0; j < musig_info->n - 1; j++) {
-                    if (memcmp(keys[j], keys[j + 1], sizeof(plain_pk_t)) > 0) {
-                        uint8_t tmp[sizeof(plain_pk_t)];
-                        memcpy(tmp, keys[j], sizeof(plain_pk_t));
-                        memcpy(keys[j], keys[j + 1], sizeof(plain_pk_t));
-                        memcpy(keys[j + 1], tmp, sizeof(plain_pk_t));
-                    }
-                }
-            }
+            // sort the keys in ascending order
+            qsort(keys, musig_info->n, sizeof(plain_pk_t), compare_plain_pk);
 
             musig_keyagg_context_t musig_ctx;
             musig_key_agg(keys, musig_info->n, &musig_ctx);

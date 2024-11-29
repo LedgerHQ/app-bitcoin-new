@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "musig_signing.h"
 #include "lib_standard_app/crypto_helpers.h"
 #include "../boilerplate/sw.h"
@@ -51,17 +53,8 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
         memcpy(out->keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
     }
 
-    // sort the keys in ascending order using bubble sort
-    for (int i = 0; i < musig_info->n; i++) {
-        for (int j = 0; j < musig_info->n - 1; j++) {
-            if (memcmp(out->keys[j], out->keys[j + 1], sizeof(plain_pk_t)) > 0) {
-                uint8_t tmp[sizeof(plain_pk_t)];
-                memcpy(tmp, out->keys[j], sizeof(plain_pk_t));
-                memcpy(out->keys[j], out->keys[j + 1], sizeof(plain_pk_t));
-                memcpy(out->keys[j + 1], tmp, sizeof(plain_pk_t));
-            }
-        }
-    }
+    // sort the keys in ascending order
+    qsort(out->keys, musig_info->n, sizeof(plain_pk_t), compare_plain_pk);
 
     // we already computed the aggregate (pre-tweaks) xpub in the keyexpr_info
     memcpy(&ext_pubkey, &keyexpr_info->pubkey, sizeof(serialized_extended_pubkey_t));

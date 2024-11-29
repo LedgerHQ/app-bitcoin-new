@@ -58,6 +58,12 @@ typedef struct musig_session_context_s {
     size_t msg_len;
 } musig_session_context_t;
 
+// Comparator for 33-byte compressed public key, in order to sort according to the KeySort
+// algorithm of BIP-327.
+static inline int compare_plain_pk(const void *a, const void *b) {
+    return memcmp(a, b, sizeof(plain_pk_t));
+}
+
 /**
  * Computes the KeyAgg Context per BIP-0327.
  *
