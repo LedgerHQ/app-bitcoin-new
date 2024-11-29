@@ -229,17 +229,33 @@ No output data; the signature are returned using the YIELD client command.
 
 Using the information in the PSBT and the wallet description, this command verifies what inputs are internal and what outputs match the pattern for a change address. After validating all the external outputs and the transaction fee with the user, it signs each of the internal inputs; each signature is sent to the client using the YIELD command, in the format described below. If multiple key placeholders of the wallet policy are internal, the process is repeated for each of them.
 
-The results yielded via the YIELD command respect the following format: `<input_index> <pubkey_augm_len> <pubkey_augm> <signature>`, where:
-- `input_index` is a Bitcoin style varint, the index input of the input being signed (starting from 0);
-- `pubkey_augm_len` is an unsigned byte equal to the length of `pubkey_augm`;
-- `pubkey_augm` is the `pubkey` used for signing for legacy, segwit or taproot script path spends (a compressed pubkey if non-taproot, a 32-byte x-only pubkey if taproot); for taproot script path spends, it is the concatenation of the `x-only` pubkey and the 32-byte *tapleaf hash* as defined in [BIP-0341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki);
-- `signature` is the returned signature, possibly concatenated with the sighash byte (as it would be pushed on the stack).
-
-If `P2` is `0` (version `0` of the protocol), `pubkey_augm_len` and `pubkey_augm` are omitted in the YIELD messages.
-
 For a registered wallet, the hmac must be correct.
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
+
+The data yielded has with a `<tag_or_input_index>`, represented as a bitcoin-style varint; the rest of the message depends on the value of `<tag_or_input_index>`, as specified in the following subsections.
+
+##### If `<tag_or_input_index>` is at most 65535
+
+If `<tag_or_input index>` is at most 65535, then it is an `<input_index>` and a partial_signature is being yielded.
+
+The results yielded via the YIELD command respect the following format: `<input_index> <pubkey_augm_len> <pubkey_augm> <signature>`, where:
+- `input_index` is a Bitcoin style varint, the index input of the input being signed (starting from 0);
+- `pubkey_augm_len` is an unsigned byte equal to the length of `pubkey_augm`;
+- `pubkey_augm` is the `pubkey` used for signing for legacy, segwit or taproot keypath spends (a compressed pubkey if non-taproot, a 32-byte x-only pubkey if taproot); for taproot script path spends, it is the concatenation of the `x-only` pubkey and the 32-byte *tapleaf hash* as defined in [BIP-0341](https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki);
+- `signature` is the returned signature, possibly concatenated with the sighash byte (as it would be pushed on the stack).
+
+##### If `<tag_or_input_index>` is more than 65535
+
+In this case `<tag_or_input_index>` is a `<tag>` that specifies what the rest of the data contains.
+
+- If `<tag>` equals `0xFFFFFFFF`: a pubnonce is being yielded during Round 1 of the MuSig2 protocol. The format is: `<tag> <input_index: varint)> <pubnonce: 66 bytes> <participant_pk: 33 bytes> <aggregate_pubkey: 33 bytes> <tapleaf_hash: 0 or 32 bytes>`.
+- If `<tag>` equals `0xFFFFFFFE`: a partial signature is being yielded, completing Round 2 of the MuSig2 protocol. The format is: `<tag> <input_index: varint)> <partial_signature: 32 bytes> <participant_pk: 33 bytes> <aggregate_pubkey: 33 bytes> <tapleaf_hash: 0 or 32 bytes>`
+
+In both cases, the `tapleaf_hash` is only present for a Script path spend.
+
+Other values of the `<tag>` are undefined and reserved for future use.
+
 
 #### Client commands
 
@@ -249,7 +265,7 @@ The client must respond to the `GET_PREIMAGE`, `GET_MERKLE_LEAF_PROOF` and `GET_
 
 The `GET_MORE_ELEMENTS` command must be handled.
 
-The `YIELD` command must be processed in order to receive the signatures.
+The `YIELD` command must be processed in order to receive the signatures, or the MuSig2 partial nonces or partial signatures.
 
 ### GET_MASTER_FINGERPRINT
 
