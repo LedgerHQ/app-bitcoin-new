@@ -2849,7 +2849,7 @@ sign_transaction(dispatcher_context_t *dc,
 }
 
 // We declare this in the global space in order to use less stack space, since BOLOS enforces on
-// some device a 8kb stack limit.
+// some devices an 8kb stack limit.
 // Once this is resolved in BOLOS, we should move this to the function scope to avoid unnecessarily
 // reserving RAM that can only be used for the signing flow (which, at time of writing, is the most
 // RAM-intensive operation command of the app).
@@ -2913,16 +2913,17 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     }
 
     if (!st.has_musig2_pub_nonces) {
-        // We execute the first round of MuSig for any musig2 key expression.produce the pubnonces;
-        // this does not involve the private keys, therefore we can do it without user confirmation
+        // We execute the first round of MuSig for any musig2 key expression, producing the
+        // pubnonces; this does not involve the private keys, therefore we can do it without user
+        // confirmation
 
         if (!produce_musig2_pubnonces(dc, &st, &signing_state, cache, internal_inputs)) {
             return;
         }
     }
 
-    // we execute the signing flow only if we're producing any signature
-    // (or any MuSig partial signature)
+    // we execute the signing flow only if we're expected to produce any signature
+    // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
     if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
         if (G_swap_state.called_from_swap) {
             /** SWAP CHECKS
@@ -2965,7 +2966,8 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     }
 
     // MuSig2: if there is an active session at the end of round 1, we move it to persistent
-    // storage. It is important that this is only done at the very end of the signing process.
+    // storage. It is important that this is only done at the very end of the signing process,
+    // end only if everything is successful.
     musigsession_commit(&signing_state.musig);
 
     SEND_SW(dc, SW_OK);

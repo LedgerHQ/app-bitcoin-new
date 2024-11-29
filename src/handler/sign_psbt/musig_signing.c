@@ -36,8 +36,6 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                     .address_index = input->in_out.address_index,
                                     .sign_psbt_cache = NULL};
 
-    // TODO: code duplication with policy.c::get_derived_pubkey; worth extracting a common method?
-
     serialized_extended_pubkey_t ext_pubkey;
 
     const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
@@ -254,7 +252,7 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
     }
 
     /**
-     * Round 1 of the MuSig2 protocol
+     * Round 1 of the MuSig2 protocol: generate and yield pubnonce
      **/
 
     const musig_psbt_session_t *psbt_session =
@@ -265,8 +263,6 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
         SEND_SW(dc, SW_BAD_STATE);
         return false;
     }
-
-    // 5) generate and yield pubnonce
 
     uint8_t rand_i_j[32];
     compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
@@ -317,7 +313,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         return false;
     }
 
-    // 4) check if my pubnonce is in the psbt
+    // Find my pubnonce is in the psbt.
+    //
     // Compute musig_my_psbt_id. It is the psbt key that this signer uses to find pubnonces and
     // partial signatures (PSBT_IN_MUSIG2_PUB_NONCE and PSBT_IN_MUSIG2_PARTIAL_SIG fields). The
     // length is either 33+33 (keypath spend), or 33+33+32 bytes (tapscript spend). It's the
@@ -342,8 +339,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
                                                                   1 + psbt_id_len,
                                                                   my_pubnonce.raw,
                                                                   sizeof(musig_pubnonce_t))) {
-        PRINTF("Missing pubnonce in PSBT\n");
-        SEND_SW(dc, SW_BAD_STATE);
+        PRINTF("Missing or erroneous pubnonce in PSBT\n");
+        SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
     /**
@@ -362,7 +359,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         return false;
     }
 
-    // 6) generate and yield partial signature
+    // collect all pubnonces
 
     const policy_node_keyexpr_t *key_expr = keyexpr_info->key_expression_ptr;
     const musig_aggr_key_info_t *musig_info = r_musig_aggr_key_info(&key_expr->m.musig_info);
@@ -413,7 +410,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
         return false;
     }
 
-    // derive secret key
+    // generate and yield partial signature
 
     cx_ecfp_private_key_t private_key = {0};
     uint8_t psig[32];

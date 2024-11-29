@@ -466,7 +466,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         }
 
         if (!is_taproot) {
-            return WITH_ERROR(-1, "musig is only allows in taproot");
+            return WITH_ERROR(-1, "musig is only allowed in taproot");
         }
 
         out->type = KEY_EXPRESSION_MUSIG;
