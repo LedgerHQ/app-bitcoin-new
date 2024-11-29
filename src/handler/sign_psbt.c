@@ -2907,6 +2907,9 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     signing_state_t signing_state;
     memset(&signing_state, 0, sizeof(signing_state));
 
+    // Make sure that the signing state for MuSig2 is initialized correctly
+    musigsession_initialize_signing_state(&signing_state.musig);
+
     // compute all the tx-wide hashes
     if (!compute_tx_hashes(dc, &st, &signing_state.tx_hashes)) {
         return;

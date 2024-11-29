@@ -83,6 +83,10 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
     crypto_hash_digest(&hash_context.header, out, 32);
 }
 
+void musigsession_initialize_signing_state(musig_signing_state_t *musig_signing_state) {
+    memset(musig_signing_state, 0, sizeof(musig_signing_state_t));
+}
+
 const musig_psbt_session_t *musigsession_round1_initialize(
     uint8_t psbt_session_id[static 32],
     musig_signing_state_t *musig_signing_state) {
@@ -126,6 +130,9 @@ void musigsession_commit(musig_signing_state_t *musig_signing_state) {
     for (size_t i = 0; i < sizeof(musig_signing_state->_round1); i++) {
         acc |= musig_signing_state->_round1._id[i];
     }
+    // If round 1 was not executed, then there is nothing to store.
+    // This assumes that musigsession_initialize_signing_state, therefore the field is zeroed out
+    // if it wasn't used.
     if (acc != 0) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }

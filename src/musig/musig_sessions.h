@@ -39,6 +39,20 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
                       uint8_t out[static 32]);
 
 /**
+ * Make sure that the musig signing state is initialized correctly.
+ *
+ * This method must be called before musigsession_round1_initialize or
+ * musigsession_round2_initialize are called in the code.
+ *
+ * This allows the calling code to not make any assumption about how
+ * the inialization of the musig signing state is done.
+ *
+ * @param[in]  musig_signing_state
+ *   Pointer to the musig signing state.
+ */
+void musigsession_initialize_signing_state(musig_signing_state_t *musig_signing_state);
+
+/**
  * Handles the creation of a new musig psbt session into the volatile memory, or its retrieval (if
  * the session already exists).
  * It must be called when starting MuSig2 round 1 for a fixed input/placeholder pair, during the
@@ -80,8 +94,6 @@ __attribute__((warn_unused_result)) const musig_psbt_session_t *musigsession_rou
  * been returned to the client. It must _not_ be called if any error occurs, or if the signing
  * process is aborted for any reason.
  *
- * @param[in]  psbt_session_id
- *   Pointer to the musig psbt session id.
  * @param[in]  musig_signing_state
  *   Pointer to the musig signing state.
  */
