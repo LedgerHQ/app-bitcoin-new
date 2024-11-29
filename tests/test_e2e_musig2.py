@@ -1,6 +1,6 @@
 import pytest
 
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import hmac
 from hashlib import sha256
@@ -13,8 +13,7 @@ from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 from ledger_bitcoin import MusigPubNonce, MusigPartialSignature, PartialSignature, SignPsbtYieldedObject
 
-from test_utils import SpeculosGlobals, bip0327, get_internal_xpub, count_internal_key_placeholders
-from test_utils.musig2 import PsbtMusig2Cosigner
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
@@ -44,12 +43,6 @@ def strip_non_musig2_derivations(psbt: PSBT) -> PSBT:
 def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPolicy, core_wallet_names: List[str], rpc: AuthServiceProxy, rpc_test_wallet: AuthServiceProxy, speculos_globals: SpeculosGlobals,
                         instructions_register_wallet: Instructions,
                         instructions_sign_psbt: Instructions, test_name: str):
-    # TODO: delete
-    def printb(*args):
-        print('\033[94m', end='')
-        print(*args)
-        print('\033[0m', end='')
-
     wallet_id, wallet_hmac = client.register_wallet(wallet_policy, navigator,
                                                     instructions=instructions_register_wallet, testname=f"{test_name}_register")
 
@@ -77,9 +70,6 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
     change_descriptor = wallet_policy.get_descriptor(change=True)
     change_descriptor_info = rpc.getdescriptorinfo(change_descriptor)
     change_descriptor_chk: str = change_descriptor_info["descriptor"]
-
-    printb("Receive descriptor:", receive_descriptor_chk)  # TODO: remove
-    printb("Change descriptor:", change_descriptor_chk)  # TODO: remove
 
     # ==> import wallet in bitcoin-core
 
@@ -131,9 +121,6 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
 
     psbt_b64 = result["psbt"]
 
-    printb("PSBT before the first round:")
-    printb(psbt_b64)
-
     # Round 1: get nonces
 
     # ==> get nonce from the hww
@@ -149,12 +136,8 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
                                                                             instructions=instructions_sign_psbt,
                                                                             testname=f"{test_name}_sign")
 
-    printb("SignPsbt yielded:", hww_yielded)
     for (input_index, yielded) in hww_yielded:
         if isinstance(yielded, MusigPubNonce):
-            printb(f"Yielded MusigPubNonce for input {input_index}:")
-            printb(yielded.participant_pubkey.hex(), yielded.aggregate_pubkey.hex(
-            ), None if yielded.tapleaf_hash is None else yielded.tapleaf_hash.hex())
             psbt_key = (
                 yielded.participant_pubkey,
                 yielded.aggregate_pubkey,
@@ -177,31 +160,19 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
 
     signed_psbt_hww_b64 = psbt.serialize()
 
-    printb("PSBT after the first round for the hww:", signed_psbt_hww_b64)
-
     # ==> Process it with bitcoin-core to get the musig pubnonces
     partial_psbts = [signed_psbt_hww_b64]
 
     # partial_psbts = []
 
     for core_wallet_name in core_wallet_names:
-        printb("Processing for:", core_wallet_name)
         psbt_res = get_wallet_rpc(
             core_wallet_name).walletprocesspsbt(psbt_b64)["psbt"]
-        printb("PSBT processed by core:")
-        printb(psbt_res)
         partial_psbts.append(psbt_res)
 
     combined_psbt = rpc.combinepsbt(partial_psbts)
 
     # Round 2: get Musig Partial Signatures
-
-    printb(wallet_policy.get_descriptor(None))
-
-    # TODO: should now do the second round
-    printb("PSBT after the first round:", combined_psbt)
-
-    printb("Starting round 2")
 
     psbt = PSBT()
     psbt.deserialize(combined_psbt)
@@ -211,7 +182,6 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
                                                                             instructions=instructions_sign_psbt,
                                                                             testname=f"{test_name}_sign")
 
-    printb("SignPsbt yielded:", hww_yielded)
     for (input_index, yielded) in hww_yielded:
         if isinstance(yielded, MusigPartialSignature):
             psbt_key = (
@@ -236,17 +206,12 @@ def run_test_e2e_musig2(navigator: Navigator, client: RaggerClient, wallet_polic
 
     signed_psbt_hww_b64 = psbt.serialize()
 
-    printb("PSBT after the second round for the hww:", signed_psbt_hww_b64)
-
     # ==> Get Musig partial signatures with each bitcoin-core wallet
 
     partial_psbts = [signed_psbt_hww_b64]
     for core_wallet_name in core_wallet_names:
-        printb("Processing for:", core_wallet_name)
         psbt_res = get_wallet_rpc(
             core_wallet_name).walletprocesspsbt(combined_psbt)["psbt"]
-        printb("PSBT processed by core:")
-        printb(psbt_res)
         partial_psbts.append(psbt_res)
 
     # ==> finalize the psbt, extract tx and broadcast
