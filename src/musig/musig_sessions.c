@@ -75,6 +75,11 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
                       int i,
                       int j,
                       uint8_t out[static 32]) {
+    // It is extremely important that different choices of the root of randomness, i and j always
+    // produce a different result in out.
+    // Failure would be catastrophic as it would cause nonce reuse, which in MuSig2 allows attackers
+    // to recover the private key.
+
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
     crypto_hash_update(&hash_context.header, psbt_session->_rand_root, CX_SHA256_SIZE);
