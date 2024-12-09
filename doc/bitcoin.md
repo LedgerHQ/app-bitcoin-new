@@ -233,7 +233,7 @@ For a registered wallet, the hmac must be correct.
 
 For a default wallet, `hmac` must be equal to 32 bytes `0`.
 
-The data yielded has with a `<tag_or_input_index>`, represented as a bitcoin-style varint; the rest of the message depends on the value of `<tag_or_input_index>`, as specified in the following subsections.
+The data yielded begins with `<tag_or_input_index>`, represented as a bitcoin-style varint; the rest of the message depends on the value of `<tag_or_input_index>`, as specified in the following subsections.
 
 ##### If `<tag_or_input_index>` is at most 65535
 

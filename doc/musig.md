@@ -73,7 +73,7 @@ Storing the session in persistent memory only at the end of Phase 1, and deletin
 
 #### Security of synthetic randomness
 
-Generating $rand_{i, j}$ synthetically is not a problem, since the $rand\_root$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ not predictable for an attacker.
+Generating $rand_{i, j}$ synthetically is not a problem, since the $rand\_root$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ are not predictable for an attacker.
 
 #### Malleability of the PSBT
 If the optional parameters are passed to the _NonceGen_ function, they will depend on the transaction data present in the PSBT. Therefore, there is no guarantee that they will be unchanged the next time the PSBT is provided.
@@ -82,6 +82,6 @@ However, that does not constitute a security risk, as those parameters are only 
 
 ### Generalization to multiple PSBT signing sessions
 
-The approach described above assumes that no attempt to sign a PSBT containing for a wallet policy containing `musig()` keys is initiated while a session is already in progress.
+The approach described above assumes that no attempt to sign a PSBT for a wallet policy containing `musig()` keys is initiated while a session is already in progress.
 
-It is possible to generalize this to an arbitrary number of parallel signing sessions. Each session could be identified by a `psbt_session_id` computed by hashing together the transaction hashes,
+In order to generalize this to an arbitrary number of parallel signing sessions, one can identify each signing session with a `psbt_session_id`. Such `psbt_session_id` should deterministically depend on the transaction being signed (ignoring all the other PSBT fields), and the wallet policy being signed. In praticular, the computed `psbt_session_id` should be identical between Round 1 and Round 2 of the protocol. Note that malicious collisions of the `psbt_session_id` (for example by tampering with some details of the PSBT, like the SIGHASH flags) _are_ possible, but they do not constitute a security risk.

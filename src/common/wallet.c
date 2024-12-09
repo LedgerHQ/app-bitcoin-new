@@ -511,9 +511,9 @@ static int parse_keyexpr(buffer_t *in_buf,
         if (n_musig_keys < 2) {
             return WITH_ERROR(-1, "musig must have at least 2 key indexes");
         }
-        if (n_musig_keys > MAX_PUBKEYS_PER_MUSIG) {
-            return WITH_ERROR(-1, "Too many keys in musig");
-        }
+
+        // sanity check; the loop above should never exit with too many keys
+        LEDGER_ASSERT(n_musig_keys <= MAX_PUBKEYS_PER_MUSIG, "Too many keys in musig");
 
         // allocate musig structures
 
