@@ -1,28 +1,25 @@
 import pytest
 
-from typing import List, Union
+from typing import List
 
 import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from ledger_bitcoin import Client, MultisigWallet, AddressType
-from ledger_bitcoin.client_base import TransportClient
+from ledger_bitcoin import MultisigWallet, AddressType
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 
-from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
-
-from speculos.client import SpeculosClient
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
-from ragger.navigator import Navigator, NavInsID
+from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 
 from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
-from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
+from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, import_descriptors_with_privkeys, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
 
 
@@ -112,7 +109,7 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_keys(
+    n_internal_keys = count_internal_key_placeholders(
         speculos_globals.seed, "test", wallet_policy)
     # should be true as long as all inputs are internal
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)
@@ -121,6 +118,11 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
         psbt.inputs[i].partial_sigs[part_sig.pubkey] = part_sig.signature
 
     signed_psbt_hww_b64 = psbt.serialize()
+
+    # ==> import descriptor for each bitcoin-core wallet
+    for core_wallet_name in core_wallet_names:
+        import_descriptors_with_privkeys(
+            core_wallet_name, receive_descriptor_chk, change_descriptor_chk)
 
     # ==> sign it with bitcoin-core
     partial_psbts = [signed_psbt_hww_b64]

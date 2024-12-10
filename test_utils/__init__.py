@@ -1,10 +1,12 @@
+import re
+
 import hashlib
 from typing import Literal, Union
 
 from mnemonic import Mnemonic
 from bip32 import BIP32
 
-from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy
+from bitcoin_client.ledger_bitcoin.wallet import WalletPolicy, WalletType
 
 from .slip21 import Slip21Node
 
@@ -89,14 +91,16 @@ def get_internal_xpub(seed: str, path: str) -> str:
     return bip32.get_xpub_from_path(f"m/{path}") if path else bip32.get_xpub_from_path("m")
 
 
-def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy) -> int:
-    """Count how many of the keys in wallet_policy are indeed internal"""
+def count_internal_key_placeholders(seed: str, network: Union[Literal['main'], Literal['test']], wallet_policy: WalletPolicy, *, only_musig=False) -> int:
+    """Count how many of the key placeholders in wallet_policy are indeed internal.
+    musig() placeholders are counted as many times as there are internal keys in them."""
 
     bip32 = BIP32.from_seed(seed, network)
     master_key_fingerprint = hash160(bip32.pubkey)[0:4]
 
-    count = 0
+    is_key_internal = []
     for key_index, key_info in enumerate(wallet_policy.keys_info):
+        is_this_key_internal = False
         if "]" in key_info:
             key_orig_end_pos = key_info.index("]")
             fpr = key_info[1:9]
@@ -110,8 +114,30 @@ def count_internal_keys(seed: str, network: Union[Literal['main'], Literal['test
             if fpr == master_key_fingerprint.hex():
                 computed_xpub = get_internal_xpub(seed, path)
                 if computed_xpub == xpub:
-                    # there could be multiple placeholders using the same key; we must count all of them
-                    count += wallet_policy.descriptor_template.count(
-                        f"@{key_index}/")
+                    is_this_key_internal = True
+        is_key_internal.append(is_this_key_internal)
+
+    # enumerate all the key placeholders
+    # for simplicity, we look for all the following patterns using regular expressions:
+    # - Simple keys: @<key_index>/  (always with additional derivations, hence the final '/')
+    # - Musig expressions: musig(@k1, @k2, ...)
+
+    count = 0
+
+    if not only_musig:
+        simple_key_placeholders = re.findall(
+            r'@(\d+)/', wallet_policy.descriptor_template)
+        # for each match, count it if the corresponding key is internal
+        for key_index in simple_key_placeholders:
+            if is_key_internal[int(key_index)]:
+                count += 1
+
+    if wallet_policy.version != WalletType.WALLET_POLICY_V1:  # no musig in V1 policies
+        musig_key_placeholders = re.findall(
+            r'musig\(([^)]*)\)', wallet_policy.descriptor_template)
+        for musig_expr in musig_key_placeholders:
+            musig_keys_indices = [int(k[1:]) for k in musig_expr.split(",")]
+            # We count each musig placeholder as many times are there are internal keys in it
+            count += sum(int(is_key_internal[k]) for k in musig_keys_indices)
 
     return count

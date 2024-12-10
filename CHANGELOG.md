@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.4.0] - TBD
+
+### Added
+
+- Support for `musig()` key expressions in taproot wallet policies.
+
+### Changed
+
+- For wallet policies with multiple internal spending paths, the app will only sign for key expressions for which the corresponding `PSBT_IN_BIP32_DERIVATION` or `PSBT_IN_TAP_BIP32_DERIVATION` is present in the PSBT. This improves performance when signing for certain spending paths is not desired.
+
 ## [2.3.0] - 26-08-2024
 
 ### Added
