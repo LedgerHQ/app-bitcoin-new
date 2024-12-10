@@ -288,7 +288,7 @@ class TrDescriptorTemplate:
         self.tree: Optional[Tree] = tree
 
     @classmethod
-    def from_string(cls, input_string):
+    def from_string(cls, input_string: str) -> "TrDescriptorTemplate":
         parser = cls.Parser(input_string.replace("/**", "/<0;1>/*"))
         return parser.parse()
 
@@ -298,7 +298,7 @@ class TrDescriptorTemplate:
             self.index = 0
             self.length = len(input)
 
-        def parse(self):
+        def parse(self) -> "TrDescriptorTemplate":
             if self.input.startswith('tr('):
                 self.consume('tr(')
                 key = self.parse_keyplaceholder()
@@ -312,7 +312,7 @@ class TrDescriptorTemplate:
                 raise Exception(
                     "Syntax error: Input does not start with 'tr('")
 
-        def parse_keyplaceholder(self):
+        def parse_keyplaceholder(self) -> KeyPlaceholder:
             if self.peek() == '@':
                 self.consume('@')
                 key_index = self.parse_num()
@@ -357,7 +357,7 @@ class TrDescriptorTemplate:
                 self.index += 1
             return self.input[start:self.index]
 
-        def parse_key_indexes(self):
+        def parse_key_indexes(self) -> List[int]:
             nums = []
             self.consume('@')
             nums.append(self.parse_num())
@@ -366,13 +366,13 @@ class TrDescriptorTemplate:
                 nums.append(self.parse_num())
             return nums
 
-        def parse_num(self):
+        def parse_num(self) -> int:
             start = self.index
             while self.index < self.length and self.input[self.index].isdigit():
                 self.index += 1
             return int(self.input[start:self.index])
 
-        def consume(self, char):
+        def consume(self, char: str) -> None:
             if self.input[self.index:self.index+len(char)] == char:
                 self.index += len(char)
             else:
