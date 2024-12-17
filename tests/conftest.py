@@ -1,12 +1,5 @@
 
-import sys  # noqa: E402
-import os  # noqa: E402
-
-absolute_path = os.path.dirname(os.path.abspath(__file__))  # noqa: E402
-relative_bitcoin_path = ('../bitcoin_client')  # noqa: E402
-absolute_bitcoin_client_path = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), '../')   # noqa: E402
-sys.path.append(os.path.join(absolute_path, relative_bitcoin_path))  # noqa: E402
+import os
 
 from ragger_bitcoin import createRaggerClient, RaggerClient
 from ragger.backend import RaisePolicy
