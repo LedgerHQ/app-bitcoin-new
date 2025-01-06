@@ -156,10 +156,13 @@ jobs:
           name: bitcoin-app-${{matrix.model}}
           path: bin
 
+      - name: Install build dependencies
+        run: apt update && apt install -y build-essential          
+
       - name: Run tests
         run: |
-          cd tests_mainnet
           pip install -r requirements.txt
+          cd tests_mainnet
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=${{ matrix.model }} --timeout=300
 
   job_test_python_lib_legacyapp:
@@ -182,10 +185,13 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: apt update && apt install -y build-essential
+
       - name: Run tests
         run: |
-          cd bitcoin_client/tests
           pip install -r requirements.txt
+          cd bitcoin_client/tests
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --timeout=300 --model=nanos
 
   job_perftests:
@@ -215,10 +221,13 @@ jobs:
           name: bitcoin-testnet-perftest-app-nanosp
           path: bin
 
+      - name: Install build dependencies
+        run: apt update && apt install -y build-essential
+
       - name: Run tests
         run: |
-          cd tests_perf
           pip install -r requirements.txt
+          cd tests_perf
           PYTHONPATH=$PYTHONPATH:/speculos pytest --headless --model=nanosp --benchmark-json=benchmarks.json
       - name: Upload benchmarks summary
         uses: actions/upload-artifact@v4
