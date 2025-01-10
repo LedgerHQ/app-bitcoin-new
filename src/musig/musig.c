@@ -274,6 +274,12 @@ int musig_nonce_gen(const uint8_t *rand,
     musig_nonce_hash(rand, rand_len, pk, aggpk, 1, msg, 1, NULL, 0, secnonce->k_2);
     if (CX_OK != cx_math_modm_no_throw(secnonce->k_2, 32, secp256k1_n, 32)) return -1;
 
+    if (is_array_zero(secnonce->k_1, sizeof(secnonce->k_1)) ||
+        is_array_zero(secnonce->k_2, sizeof(secnonce->k_2))) {
+        // this can only happen with negligible probability
+        return -1;
+    }
+
     memcpy(secnonce->pk, pk, sizeof(secnonce->pk));
 
     point_t R_s1, R_s2;
