@@ -270,6 +270,7 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
     if (0 > musig_nonce_gen(rand_i_j,
+                            sizeof(rand_i_j),
                             keyexpr_info->internal_pubkey.compressed_pubkey,
                             musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
                             &secnonce,
@@ -401,6 +402,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     musig_pubnonce_t pubnonce;
 
     if (0 > musig_nonce_gen(rand_i_j,
+                            sizeof(rand_i_j),
                             keyexpr_info->internal_pubkey.compressed_pubkey,
                             musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
                             &secnonce,

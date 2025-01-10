@@ -73,9 +73,9 @@ static int point_negate(const point_t *P, point_t *out) {
         set_point_infinite(out);
         return 0;
     }
-    memmove(out->x, P->x, 32);
+    memmove(out->x, P->x, sizeof(out->x));
 
-    if (CX_OK != cx_math_sub_no_throw(out->y, secp256k1_p, P->y, 32)) return -1;
+    if (CX_OK != cx_math_sub_no_throw(out->y, secp256k1_p, P->y, sizeof(out->y))) return -1;
 
     out->prefix = 4;
     return 0;
@@ -114,9 +114,9 @@ static bool is_array_zero(const uint8_t buffer[], size_t buffer_len) {
     return acc == 0;
 }
 
-int cpoint_ext(const uint8_t x[static 33], point_t *out) {
+static int cpoint_ext(const uint8_t x[static sizeof(plain_pk_t)], point_t *out) {
     // Check if the point is at infinity (all bytes zero)
-    if (is_array_zero(x, 33)) {
+    if (is_array_zero(x, sizeof(plain_pk_t))) {
         set_point_infinite(out);
         return 0;
     }
@@ -135,7 +135,9 @@ static void musig_get_second_key(const plain_pk_t pubkeys[], size_t n_keys, plai
     memset(out, 0, sizeof(plain_pk_t));
 }
 
-static void musig_hash_keys(const plain_pk_t pubkeys[], size_t n_keys, uint8_t out[static 32]) {
+static void musig_hash_keys(const plain_pk_t pubkeys[],
+                            size_t n_keys,
+                            uint8_t out[static CX_SHA256_SIZE]) {
     cx_sha256_t hash_context;
     crypto_tr_tagged_hash_init(&hash_context,
                                BIP0327_keyagg_list_tag,
@@ -143,7 +145,7 @@ static void musig_hash_keys(const plain_pk_t pubkeys[], size_t n_keys, uint8_t o
     for (size_t i = 0; i < n_keys; i++) {
         crypto_hash_update(&hash_context.header, pubkeys[i], sizeof(plain_pk_t));
     }
-    crypto_hash_digest(&hash_context.header, out, 32);
+    crypto_hash_digest(&hash_context.header, out, CX_SHA256_SIZE);
 }
 
 static void musig_key_agg_coeff_internal(const plain_pk_t pubkeys[],
@@ -214,6 +216,7 @@ int musig_key_agg(const plain_pk_t pubkeys[], size_t n_keys, musig_keyagg_contex
 }
 
 static void musig_nonce_hash(const uint8_t *rand,
+                             size_t rand_len,
                              const plain_pk_t pk,
                              const xonly_pk_t aggpk,
                              uint8_t i,
@@ -226,7 +229,7 @@ static void musig_nonce_hash(const uint8_t *rand,
     crypto_tr_tagged_hash_init(&hash_context, BIP0327_nonce_tag, sizeof(BIP0327_nonce_tag));
 
     // rand
-    crypto_hash_update(&hash_context.header, rand, 32);
+    crypto_hash_update(&hash_context.header, rand, rand_len);
 
     // len(pk) + pk
     crypto_hash_update_u8(&hash_context.header, sizeof(plain_pk_t));
@@ -252,19 +255,20 @@ static void musig_nonce_hash(const uint8_t *rand,
 
 // same as nonce_gen_internal from the reference, removing the optional arguments sk, msg and
 // extra_in, and making aggpk compulsory
-int musig_nonce_gen(const uint8_t rand[32],
+int musig_nonce_gen(const uint8_t *rand,
+                    size_t rand_len,
                     const plain_pk_t pk,
                     const xonly_pk_t aggpk,
                     musig_secnonce_t *secnonce,
                     musig_pubnonce_t *pubnonce) {
     uint8_t msg[] = {0x00};
 
-    musig_nonce_hash(rand, pk, aggpk, 0, msg, 1, NULL, 0, secnonce->k_1);
+    musig_nonce_hash(rand, rand_len, pk, aggpk, 0, msg, 1, NULL, 0, secnonce->k_1);
     if (CX_OK != cx_math_modm_no_throw(secnonce->k_1, 32, secp256k1_n, 32)) return -1;
-    musig_nonce_hash(rand, pk, aggpk, 1, msg, 1, NULL, 0, secnonce->k_2);
+    musig_nonce_hash(rand, rand_len, pk, aggpk, 1, msg, 1, NULL, 0, secnonce->k_2);
     if (CX_OK != cx_math_modm_no_throw(secnonce->k_2, 32, secp256k1_n, 32)) return -1;
 
-    memcpy(secnonce->pk, pk, 33);
+    memcpy(secnonce->pk, pk, sizeof(secnonce->pk));
 
     point_t R_s1, R_s2;
 
@@ -283,7 +287,7 @@ int musig_nonce_agg(const musig_pubnonce_t pubnonces[], size_t n_keys, musig_pub
         set_point_infinite(&R_j);
         for (size_t i = 0; i < n_keys; i++) {
             point_t R_ij;
-            if (0 > cpoint(&pubnonces[i].raw[(j - 1) * 33], &R_ij)) {
+            if (0 > cpoint(&pubnonces[i].raw[(j - 1) * sizeof(plain_pk_t)], &R_ij)) {
                 PRINTF("Musig2 nonce aggregation: invalid contribution from cosigner %d\n", i);
                 return -i - 1;
             }
@@ -291,9 +295,9 @@ int musig_nonce_agg(const musig_pubnonce_t pubnonces[], size_t n_keys, musig_pub
         }
 
         if (is_point_infinite(&R_j)) {
-            memset(&out->raw[(j - 1) * 33], 0, 33);
+            memset(&out->raw[(j - 1) * sizeof(plain_pk_t)], 0, sizeof(plain_pk_t));
         } else {
-            crypto_get_compressed_pubkey(R_j.raw, &out->raw[(j - 1) * 33]);
+            crypto_get_compressed_pubkey(R_j.raw, &out->raw[(j - 1) * sizeof(plain_pk_t)]);
         }
     }
     return 0;
@@ -362,9 +366,9 @@ static int musig_get_session_values(const musig_session_context_t *session_ctx,
                                     point_t *Q,
                                     uint8_t gacc[static 32],
                                     uint8_t tacc[static 32],
-                                    uint8_t b[static 32],
+                                    uint8_t b[static CX_SHA256_SIZE],
                                     point_t *R,
-                                    uint8_t e[static 32]) {
+                                    uint8_t e[static CX_SHA256_SIZE]) {
     cx_sha256_t hash_context;
 
     // Perform key aggregation and tweaking
@@ -383,10 +387,12 @@ static int musig_get_session_values(const musig_session_context_t *session_ctx,
 
     // Calculate b
     crypto_tr_tagged_hash_init(&hash_context, BIP0327_noncecoef_tag, sizeof(BIP0327_noncecoef_tag));
-    crypto_hash_update(&hash_context.header, session_ctx->aggnonce->raw, 66);
-    crypto_hash_update(&hash_context.header, Q->x, 32);
+    crypto_hash_update(&hash_context.header,
+                       session_ctx->aggnonce->raw,
+                       sizeof(session_ctx->aggnonce->raw));
+    crypto_hash_update(&hash_context.header, Q->x, sizeof(Q->x));
     crypto_hash_update(&hash_context.header, session_ctx->msg, session_ctx->msg_len);
-    crypto_hash_digest(&hash_context.header, b, 32);
+    crypto_hash_digest(&hash_context.header, b, CX_SHA256_SIZE);
 
     // Calculate R
     point_t R_1, R_2;
@@ -411,10 +417,10 @@ static int musig_get_session_values(const musig_session_context_t *session_ctx,
 
     // Calculate e
     crypto_tr_tagged_hash_init(&hash_context, BIP0340_challenge_tag, sizeof(BIP0340_challenge_tag));
-    crypto_hash_update(&hash_context.header, R->x, 32);
-    crypto_hash_update(&hash_context.header, Q->x, 32);
+    crypto_hash_update(&hash_context.header, R->x, sizeof(R->x));
+    crypto_hash_update(&hash_context.header, Q->x, sizeof(Q->x));
     crypto_hash_update(&hash_context.header, session_ctx->msg, session_ctx->msg_len);
-    crypto_hash_digest(&hash_context.header, e, 32);
+    crypto_hash_digest(&hash_context.header, e, CX_SHA256_SIZE);
     return 0;
 }
 
@@ -448,9 +454,9 @@ int musig_sign(musig_secnonce_t *secnonce,
     point_t Q;
     uint8_t gacc[32];
     uint8_t tacc[32];
-    uint8_t b[32];
+    uint8_t b[CX_SHA256_SIZE];
     point_t R;
-    uint8_t e[32];
+    uint8_t e[CX_SHA256_SIZE];
 
     int diff;
 
@@ -460,8 +466,8 @@ int musig_sign(musig_secnonce_t *secnonce,
 
     uint8_t k_1[32];
     uint8_t k_2[32];
-    memcpy(k_1, secnonce->k_1, 32);
-    memcpy(k_2, secnonce->k_2, 32);
+    memcpy(k_1, secnonce->k_1, sizeof(k_1));
+    memcpy(k_2, secnonce->k_2, sizeof(k_2));
 
     // paranoia: since reusing nonces is catastrophic, we make sure that they are zeroed out and
     // work with a local copy instead
@@ -522,7 +528,7 @@ int musig_sign(musig_secnonce_t *secnonce,
         plain_pk_t pk;
         crypto_get_compressed_pubkey(secrets.P.raw, pk);
 
-        if (memcmp(pk, secnonce->pk, 33) != 0) {
+        if (memcmp(pk, secnonce->pk, sizeof(pk)) != 0) {
             err = true;
             PRINTF("Public key does not match nonce_gen argument\n");
             break;
