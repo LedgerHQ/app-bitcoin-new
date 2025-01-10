@@ -132,12 +132,12 @@ const musig_psbt_session_t *musigsession_round2_initialize(
 
 void musigsession_commit(musig_signing_state_t *musig_signing_state) {
     uint8_t acc = 0;
-    for (size_t i = 0; i < sizeof(musig_signing_state->_round1); i++) {
+    for (size_t i = 0; i < sizeof(musig_signing_state->_round1._id); i++) {
         acc |= musig_signing_state->_round1._id[i];
     }
     // If round 1 was not executed, then there is nothing to store.
-    // This assumes that musigsession_initialize_signing_state, therefore the field is zeroed out
-    // if it wasn't used.
+    // This assumes that musigsession_initialize_signing_state zeroes the id, therefore the field is
+    // zeroed out if and only if it wasn't used.
     if (acc != 0) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }
