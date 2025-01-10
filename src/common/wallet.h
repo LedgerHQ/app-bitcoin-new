@@ -290,7 +290,7 @@ typedef struct policy_node_ext_info_s {
 DEFINE_REL_PTR(uint16, uint16_t)
 
 typedef struct {
-    int16_t n;                  // number of key indexes
+    uint16_t n;                 // number of key indexes
     rptr_uint16_t key_indexes;  // pointer to an array of exactly n key indexes
 } musig_aggr_key_info_t;
 
@@ -323,14 +323,14 @@ typedef struct {
     union {
         // type == 0
         struct {
-            int16_t key_index;  // index of the key (common between V1 and V2)
+            uint16_t key_index;  // index of the key (common between V1 and V2)
         } k;
         // type == 1
         struct {
             rptr_musig_aggr_key_info_t musig_info;  // only used in V2
         } m;
     };
-    int16_t
+    uint16_t
         keyexpr_index;  // index of the key expression in the descriptor template, in parsing order
 } policy_node_keyexpr_t;
 
@@ -377,8 +377,8 @@ typedef struct {
 // 12 bytes
 typedef struct {
     struct policy_node_s base;        // type is TOKEN_MULTI or TOKEN_SORTEDMULTI
-    int16_t k;                        // threshold
-    int16_t n;                        // number of keys
+    uint16_t k;                       // threshold
+    uint16_t n;                       // number of keys
     rptr_policy_node_keyexpr_t keys;  // pointer to array of exactly n key expressions
 } policy_node_multisig_t;
 
@@ -395,8 +395,8 @@ typedef struct policy_node_scriptlist_s {
 // 12 bytes, (+ 8 bytes for every script)
 typedef struct {
     struct policy_node_s base;  // type is TOKEN_THRESH
-    int16_t k;                  // threshold
-    int16_t n;                  // number of child scripts
+    uint16_t k;                 // threshold
+    uint16_t n;                 // number of child scripts
     rptr_policy_node_scriptlist_t
         scriptlist;  // pointer to array of exactly n pointers to child scripts
 } policy_node_thresh_t;
