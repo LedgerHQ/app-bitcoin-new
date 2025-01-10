@@ -209,6 +209,12 @@ int musig_key_agg(const plain_pk_t pubkeys[], size_t n_keys, musig_keyagg_contex
 
         point_add(&ctx->Q, &P, &ctx->Q);
     }
+
+    if (is_point_infinite(&ctx->Q)) {
+        PRINTF("Musig key aggregation resulted in an infinite point\n");
+        return -1;
+    }
+
     memset(ctx->tacc, 0, sizeof(ctx->tacc));
     memset(ctx->gacc, 0, sizeof(ctx->gacc));
     ctx->gacc[31] = 1;
