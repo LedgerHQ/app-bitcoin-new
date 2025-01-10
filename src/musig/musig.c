@@ -385,7 +385,11 @@ static int musig_get_session_values(const musig_session_context_t *session_ctx,
 
     // Perform key aggregation and tweaking
     musig_keyagg_context_t keyagg_ctx;
-    musig_key_agg(session_ctx->pubkeys, session_ctx->n_keys, &keyagg_ctx);
+
+    if (0 > musig_key_agg(session_ctx->pubkeys, session_ctx->n_keys, &keyagg_ctx)) {
+        return -1;
+    }
+
     for (size_t i = 0; i < session_ctx->n_tweaks; i++) {
         if (0 > apply_tweak(&keyagg_ctx, session_ctx->tweaks[i], session_ctx->is_xonly[i])) {
             return -1;
