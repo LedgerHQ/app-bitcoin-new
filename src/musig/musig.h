@@ -14,15 +14,13 @@ typedef uint8_t xonly_pk_t[32];
 
 // An uncompressed pubkey, encoded as 04||x||y, where x and y are 32-byte big-endian coordinates.
 // If the first byte (prefix) is 0, encodes the point at infinity.
-typedef struct {
-    union {
-        uint8_t raw[65];
-        struct {
-            uint8_t prefix;  // 0 for the point at infinity, otherwise 4.
-            uint8_t x[32];
-            uint8_t y[32];
-        };
-    };
+typedef union {
+    uint8_t raw[65];
+    struct {
+        uint8_t prefix;  // 0 for the point at infinity, otherwise 4.
+        uint8_t x[32];
+        uint8_t y[32];
+    } __attribute__((packed));
 } point_t;
 
 typedef struct musig_keyagg_context_s {
@@ -37,14 +35,12 @@ typedef struct musig_secnonce_s {
     uint8_t pk[33];
 } musig_secnonce_t;
 
-typedef struct musig_pubnonce_s {
-    union {
-        struct {
-            uint8_t R_s1[33];
-            uint8_t R_s2[33];
-        };
-        uint8_t raw[66];
-    };
+typedef union {
+    struct {
+        uint8_t R_s1[33];
+        uint8_t R_s2[33];
+    } __attribute__((packed));
+    uint8_t raw[66];
 } musig_pubnonce_t;
 
 typedef struct musig_session_context_s {
@@ -83,6 +79,8 @@ int musig_key_agg(const plain_pk_t pubkeys[], size_t n_keys, musig_keyagg_contex
  *
  * @param[in]  rand
  *   The randomness to use.
+ * @param[in]  rand_len
+ *  The length of the randomness.
  * @param[in]  pk
  *   The 33-byte public key of the signer.
  * @param[in]  aggpk
@@ -94,7 +92,8 @@ int musig_key_agg(const plain_pk_t pubkeys[], size_t n_keys, musig_keyagg_contex
  *
  * @return 0 on success, a negative number in case of error.
  */
-int musig_nonce_gen(const uint8_t rand[32],
+int musig_nonce_gen(const uint8_t *rand,
+                    size_t rand_len,
                     const plain_pk_t pk,
                     const xonly_pk_t aggpk,
                     musig_secnonce_t *secnonce,

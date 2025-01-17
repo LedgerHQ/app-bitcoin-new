@@ -659,7 +659,9 @@ static bool fill_keyexpr_info_if_internal(dispatcher_context_t *dc,
             qsort(keys, musig_info->n, sizeof(plain_pk_t), compare_plain_pk);
 
             musig_keyagg_context_t musig_ctx;
-            musig_key_agg(keys, musig_info->n, &musig_ctx);
+            if (0 > musig_key_agg(keys, musig_info->n, &musig_ctx)) {
+                return false;
+            }
 
             // compute the aggregated extended pubkey
             memset(&keyexpr_info->pubkey, 0, sizeof(keyexpr_info->pubkey));

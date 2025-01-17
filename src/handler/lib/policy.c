@@ -489,7 +489,9 @@ __attribute__((warn_unused_result)) static int get_derived_pubkey(
         qsort(keys, musig_info->n, sizeof(plain_pk_t), compare_plain_pk);
 
         musig_keyagg_context_t musig_ctx;
-        musig_key_agg(keys, musig_info->n, &musig_ctx);
+        if (0 > musig_key_agg(keys, musig_info->n, &musig_ctx)) {
+            return -1;
+        }
 
         // compute the aggregated extended pubkey
         memset(&ext_pubkey, 0, sizeof(ext_pubkey));
