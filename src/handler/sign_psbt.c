@@ -2170,19 +2170,12 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
                              const keyexpr_info_t *keyexpr_info,
                              input_info_t *input,
                              unsigned int cur_input_index,
+                             uint32_t sign_path[],
+                             size_t sign_path_len,
                              uint8_t sighash[static 32]) {
+    UNUSED(keyexpr_info)
+
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
-
-    uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-    for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
-        sign_path[i] = keyexpr_info->key_derivation[i];
-    }
-    sign_path[keyexpr_info->key_derivation_length] =
-        input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
-                                : keyexpr_info->key_expression_ptr->num_first;
-    sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
-
-    int sign_path_len = keyexpr_info->key_derivation_length + 2;
 
     uint8_t sig[MAX_DER_SIG_LEN + 1];  // extra byte for the appended sighash-type
 
@@ -2214,6 +2207,8 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
                                                                      keyexpr_info_t *keyexpr_info,
                                                                      input_info_t *input,
                                                                      unsigned int cur_input_index,
+                                                                     uint32_t sign_path[],
+                                                                     size_t sign_path_len,
                                                                      uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -2239,18 +2234,6 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
 
         uint8_t *seckey =
             private_key.d;  // convenience alias (entirely within the private_key struct)
-
-        uint32_t sign_path[MAX_BIP32_PATH_STEPS];
-
-        for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
-            sign_path[i] = keyexpr_info->key_derivation[i];
-        }
-        sign_path[keyexpr_info->key_derivation_length] =
-            input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
-                                    : keyexpr_info->key_expression_ptr->num_first;
-        sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
-
-        int sign_path_len = keyexpr_info->key_derivation_length + 2;
 
         if (bip32_derive_init_privkey_256(CX_CURVE_256K1,
                                           sign_path,
@@ -2484,6 +2467,19 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         }
     }
 
+    // compute signing derivation path
+    uint32_t sign_path[MAX_BIP32_PATH_STEPS];
+
+    for (int i = 0; i < keyexpr_info->key_derivation_length; i++) {
+        sign_path[i] = keyexpr_info->key_derivation[i];
+    }
+    sign_path[keyexpr_info->key_derivation_length] =
+        input->in_out.is_change ? keyexpr_info->key_expression_ptr->num_second
+                                : keyexpr_info->key_expression_ptr->num_first;
+    sign_path[keyexpr_info->key_derivation_length + 1] = input->in_out.address_index;
+
+    int sign_path_len = keyexpr_info->key_derivation_length + 2;
+
     // Sign as segwit input iff it has a witness utxo
     if (!input->has_witnessUtxo) {
         LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
@@ -2511,7 +2507,15 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         uint8_t sighash[32];
         if (!compute_sighash_legacy(dc, st, input, cur_input_index, sighash)) return false;
 
-        if (!sign_sighash_ecdsa_and_yield(dc, st, keyexpr_info, input, cur_input_index, sighash))
+        if (!sign_sighash_ecdsa_and_yield(dc,
+                                          st,
+                                          keyexpr_info,
+                                          input,
+                                          cur_input_index,
+                                          sign_path,
+                                          sign_path_len,
+
+                                          sighash))
             return false;
     } else {
         {
@@ -2588,6 +2592,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                               keyexpr_info,
                                               input,
                                               cur_input_index,
+                                              sign_path,
+                                              sign_path_len,
                                               sighash))
                 return false;
         } else if (segwit_version == 1) {
@@ -2632,6 +2638,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                     keyexpr_info,
                                                     input,
                                                     cur_input_index,
+                                                    sign_path,
+                                                    sign_path_len,
                                                     sighash))
                     return false;
             } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
