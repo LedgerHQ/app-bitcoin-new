@@ -1840,7 +1840,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
         } else if (segwit_version == 1) {
             if (!input->has_sighash_type) {
-                // segwitv0 inputs default to SIGHASH_DEFAULT
+                // segwitv1 inputs default to SIGHASH_DEFAULT
                 input->sighash_type = SIGHASH_DEFAULT;
             }
 
