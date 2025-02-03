@@ -121,13 +121,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         }
     }
 
-    // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
-    uint8_t hmac_or = 0;
-    for (int i = 0; i < 32; i++) {
-        hmac_or = hmac_or | wallet_hmac[i];
-    }
-
-    if (hmac_or == 0) {
+    if (is_array_all_zeros(wallet_hmac, sizeof(wallet_hmac))) {
         // No hmac, verify that the policy is indeed a default one
 
         if (!is_wallet_policy_standard(dc, &wallet_header, &wallet_policy_map.parsed)) {

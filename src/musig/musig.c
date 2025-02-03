@@ -106,17 +106,9 @@ static int cpoint(const uint8_t x[33], point_t *out) {
     }
 }
 
-static bool is_array_zero(const uint8_t buffer[], size_t buffer_len) {
-    uint8_t acc = 0;
-    for (size_t i = 0; i < buffer_len; i++) {
-        acc |= buffer[i];
-    }
-    return acc == 0;
-}
-
 static int cpoint_ext(const uint8_t x[static sizeof(plain_pk_t)], point_t *out) {
     // Check if the point is at infinity (all bytes zero)
-    if (is_array_zero(x, sizeof(plain_pk_t))) {
+    if (is_array_all_zeros(x, sizeof(plain_pk_t))) {
         set_point_infinite(out);
         return 0;
     }
@@ -274,8 +266,8 @@ int musig_nonce_gen(const uint8_t *rand,
     musig_nonce_hash(rand, rand_len, pk, aggpk, 1, msg, 1, NULL, 0, secnonce->k_2);
     if (CX_OK != cx_math_modm_no_throw(secnonce->k_2, 32, secp256k1_n, 32)) return -1;
 
-    if (is_array_zero(secnonce->k_1, sizeof(secnonce->k_1)) ||
-        is_array_zero(secnonce->k_2, sizeof(secnonce->k_2))) {
+    if (is_array_all_zeros(secnonce->k_1, sizeof(secnonce->k_1)) ||
+        is_array_all_zeros(secnonce->k_2, sizeof(secnonce->k_2))) {
         // this can only happen with negligible probability
         return -1;
     }
@@ -493,14 +485,14 @@ int musig_sign(musig_secnonce_t *secnonce,
     if (CX_OK != cx_math_cmp_no_throw(k_1, secp256k1_n, 32, &diff)) {
         return -1;
     }
-    if (is_array_zero(k_1, sizeof(k_1)) || diff >= 0) {
+    if (is_array_all_zeros(k_1, sizeof(k_1)) || diff >= 0) {
         PRINTF("first secnonce value is out of range\n");
         return -1;
     }
     if (CX_OK != cx_math_cmp_no_throw(k_2, secp256k1_n, 32, &diff)) {
         return -1;
     }
-    if (is_array_zero(k_2, sizeof(k_2)) || diff >= 0) {
+    if (is_array_all_zeros(k_2, sizeof(k_2)) || diff >= 0) {
         PRINTF("second secnonce value is out of range\n");
         return -1;
     }
@@ -517,7 +509,7 @@ int musig_sign(musig_secnonce_t *secnonce,
     if (CX_OK != cx_math_cmp_no_throw(sk, secp256k1_n, 32, &diff)) {
         return -1;
     }
-    if (is_array_zero(sk, 32) || diff >= 0) {
+    if (is_array_all_zeros(sk, 32) || diff >= 0) {
         PRINTF("secret key value is out of range\n");
         return -1;
     }

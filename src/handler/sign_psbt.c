@@ -287,13 +287,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
     }
 
-    uint8_t hmac_or =
-        0;  // the binary OR of all the hmac bytes (so == 0 iff the hmac is identically 0)
-    for (int i = 0; i < 32; i++) {
-        hmac_or = hmac_or | wallet_hmac[i];
-    }
-
-    if (hmac_or != 0) {
+    if (!is_array_all_zeros(wallet_hmac, sizeof(wallet_hmac))) {
         // Verify hmac
         if (!check_wallet_hmac(wallet_id, wallet_hmac)) {
             PRINTF("Incorrect hmac\n");
