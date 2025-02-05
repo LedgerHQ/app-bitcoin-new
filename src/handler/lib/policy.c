@@ -13,7 +13,7 @@
 #include "../../common/segwit_addr.h"
 #include "../../common/wallet.h"
 
-#include "debug-helpers/debug.h"
+#include "../../debug-helpers/debug.h"
 
 #include "ledger_assert.h"
 

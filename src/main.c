@@ -31,7 +31,7 @@
 #include "boilerplate/constants.h"
 #include "boilerplate/dispatcher.h"
 
-#include "debug-helpers/debug.h"
+#include "../debug-helpers/debug.h"
 
 #include "handler/handlers.h"
 #include "commands.h"

@@ -35,7 +35,7 @@
 #include "common/read.h"
 #include "common/write.h"
 
-#include "debug-helpers/debug.h"
+#include "../debug-helpers/debug.h"
 
 #include "crypto.h"
 
