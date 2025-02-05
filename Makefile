@@ -15,21 +15,28 @@
 #   limitations under the License.
 # ****************************************************************************
 
+ifndef APPVERSION
+    $(error "APPVERSION is not defined")
+endif
+
+ifndef APPNAME
+    $(error "APPNAME is not defined")
+endif
+
+ifndef APP_DESCRIPTION
+    $(error "APP_DESCRIPTION is not defined")
+endif
+
+ifeq ($(filter mainnet testnet,$(BITCOIN_NETWORK)),)
+    $(error "BITCOIN_NETWORK must be either mainnet or testnet")
+endif
+
 ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
 # Application allowed derivation curves.
 CURVE_APP_LOAD_PARAMS = secp256k1
-
-# Allowed SLIP21 paths
-PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
-
-# Application version
-APPVERSION_M = 2
-APPVERSION_N = 4
-APPVERSION_P = 5
-APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
@@ -44,23 +51,13 @@ ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
     DEFINES += HAVE_AUTOAPPROVE_FOR_PERF_TESTS
 endif
 
-# Setting to allow building variant applications
-VARIANT_PARAM = COIN
-VARIANT_VALUES = bitcoin_testnet bitcoin bitcoin_recovery
-
-# simplify for tests
-ifndef COIN
-COIN=bitcoin_testnet
-endif
-
 ########################################
 #     Application custom permissions   #
 ########################################
 HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
 HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
-HAVE_APPLICATION_FLAG_LIBRARY = 1
 
-ifeq ($(COIN),bitcoin_testnet)
+ifeq ($(BITCOIN_NETWORK),testnet)
     # Application allowed derivation paths (testnet) + exception for Electrum + BIP-45 whole tree
     PATH_APP_LOAD_PARAMS = "*/1'" "4541509'" "45'"
 
@@ -72,9 +69,7 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
-    APPNAME = "Bitcoin Test"
-
-else ifeq ($(COIN),bitcoin)
+else ifeq ($(BITCOIN_NETWORK),mainnet)
     # Application allowed derivation paths (mainnet) + exception for Electrum + BIP-45 whole tree
     PATH_APP_LOAD_PARAMS = "*/0'" "4541509'" "45'"
 
@@ -94,49 +89,19 @@ else ifeq ($(COIN),bitcoin)
 
     APPNAME = "Bitcoin"
 
-else ifeq ($(COIN),bitcoin_recovery)
-    # Application allowed derivation paths (all paths are permitted).
-    PATH_APP_LOAD_PARAMS = ""
-    HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
-
-    # the version for performance tests automatically approves all requests
-    # there is no reason to ever compile the mainnet app with this flag
-    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
-        $(error Use testnet app for performance tests)
-    endif
-
-    # Bitcoin mainnet, no legacy support
-    DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
-    DEFINES   += BIP44_COIN_TYPE=0
-    DEFINES   += COIN_P2PKH_VERSION=0
-    DEFINES   += COIN_P2SH_VERSION=5
-    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
-    DEFINES   += COIN_COINID_SHORT=\"BTC\"
-    DEFINES   += BITCOIN_RECOVERY
-
-    APPNAME = "Bitcoin Recovery"
-
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
-        $(error Unsupported COIN - use bitcoin_testnet, bitcoin)
+        $(error Unsupported network)
     endif
 endif
 
 ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
   ifeq ($(TARGET_NAME),TARGET_NANOS)
-    $(error This branch is not compatible with the Nano S device. Checkout the 'nanos' branch for the latest code for Nano S.)
+    $(error This app is not compatible with the Nano S device.)
   endif
 endif
 
 ENABLE_NBGL_FOR_NANO_DEVICES = 1
-
-# Application icons following guidelines:
-# https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOX = icons/nanox_app_bitcoin.gif
-ICON_NANOSP = icons/nanox_app_bitcoin.gif
-ICON_STAX = icons/stax_app_bitcoin.gif
-ICON_FLEX = icons/flex_app_bitcoin.gif
-ICON_APEX_P = icons/apex_p_app_bitcoin.png
 
 ########################################
 # Application communication interfaces #
