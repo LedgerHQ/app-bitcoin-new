@@ -64,7 +64,7 @@ void decrease_streaming_index(void) {
 // This method also sets the UI state as "dirty" according to the SET_UX_DIRTY constant
 // so that the dispatcher refreshes resets the UI at the end of the command handler.
 // Returns true/false depending if the user accepted in the corresponding UX flow.
-static bool io_ui_process(dispatcher_context_t *context) {
+bool io_ui_process(dispatcher_context_t *context) {
     G_was_processing_screen_shown = false;
 
     g_ux_flow_ended = false;
