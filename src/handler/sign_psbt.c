@@ -1487,11 +1487,11 @@ static bool __attribute__((noinline)) display_transaction(
 
 static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
                                                       sign_psbt_state_t *st,
-                                                      unsigned int cur_input_index,
-                                                      uint8_t *pubkey,
+                                                      unsigned int input_index,
+                                                      const uint8_t *pubkey,
                                                       uint8_t pubkey_len,
-                                                      uint8_t *tapleaf_hash,
-                                                      uint8_t *sig,
+                                                      const uint8_t *tapleaf_hash,
+                                                      const uint8_t *sig,
                                                       size_t sig_len) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -1500,7 +1500,7 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     dc->add_to_response(&cmd, 1);
 
     uint8_t buf[9];
-    int input_index_varint_len = varint_write(buf, 0, cur_input_index);
+    int input_index_varint_len = varint_write(buf, 0, input_index);
     dc->add_to_response(&buf, input_index_varint_len);
 
     // for tapscript signatures, we concatenate the (x-only) pubkey with the tapleaf hash
@@ -1527,17 +1527,14 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     return true;
 }
 
-static bool __attribute__((noinline))
+bool __attribute__((noinline))
 sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
                              sign_psbt_state_t *st,
-                             const keyexpr_info_t *keyexpr_info,
-                             input_info_t *input,
-                             unsigned int cur_input_index,
-                             uint32_t sign_path[],
+                             unsigned int input_index,
+                             const uint32_t sign_path[],
                              size_t sign_path_len,
+                             uint8_t sighash_byte,
                              uint8_t sighash[static 32]) {
-    UNUSED(keyexpr_info)
-
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t sig[MAX_DER_SIG_LEN + 1];  // extra byte for the appended sighash-type
@@ -1557,22 +1554,23 @@ sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
     }
 
     // append the sighash type byte
-    uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     sig[sig_len++] = sighash_byte;
 
-    if (!yield_signature(dc, st, cur_input_index, pubkey, 33, NULL, sig, sig_len)) return false;
+    if (!yield_signature(dc, st, input_index, pubkey, 33, NULL, sig, sig_len)) return false;
 
     return true;
 }
 
-static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
-                                                                     sign_psbt_state_t *st,
-                                                                     keyexpr_info_t *keyexpr_info,
-                                                                     input_info_t *input,
-                                                                     unsigned int cur_input_index,
-                                                                     uint32_t sign_path[],
-                                                                     size_t sign_path_len,
-                                                                     uint8_t sighash[static 32]) {
+bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_context_t *dc,
+                                                              sign_psbt_state_t *st,
+                                                              unsigned int input_index,
+                                                              const uint32_t sign_path[],
+                                                              size_t sign_path_len,
+                                                              const uint8_t *tweak_data,
+                                                              size_t tweak_data_len,
+                                                              const uint8_t *tapleaf_hash,
+                                                              uint8_t sighash_byte,
+                                                              const uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     if (st->wallet_policy_map->type != TOKEN_TR) {
@@ -1584,8 +1582,6 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
     size_t sig_len = 0;
 
     cx_ecfp_public_key_t pubkey_tweaked;  // Pubkey corresponding to the key used for signing
-
-    uint8_t *tapleaf_hash = NULL;
 
     bool error = false;
     cx_ecfp_private_key_t private_key = {0};
@@ -1607,21 +1603,8 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
             break;
         }
 
-        policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
-
-        if (!keyexpr_info->is_tapscript) {
-            if (isnull_policy_node_tree(&policy->tree)) {
-                // tweak as specified in BIP-86 and BIP-386
-                crypto_tr_tweak_seckey(seckey, (uint8_t[]){}, 0, seckey);
-            } else {
-                // tweak with the taptree hash, per BIP-341
-                // The taptree hash is computed in sign_transaction_input in order to
-                // reduce stack usage.
-                crypto_tr_tweak_seckey(seckey, input->taptree_hash, 32, seckey);
-            }
-        } else {
-            // tapscript, we need to yield the tapleaf hash together with the pubkey
-            tapleaf_hash = keyexpr_info->tapleaf_hash;
+        if (tweak_data != NULL) {
+            crypto_tr_tweak_seckey(seckey, tweak_data, tweak_data_len, seckey);
         }
 
         // generate corresponding public key
@@ -1659,7 +1642,6 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
     }
 
     // only append the sighash type byte if it is non-zero
-    uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     if (sighash_byte != 0x00) {
         // only add the sighash byte if not 0
         sig[sig_len++] = sighash_byte;
@@ -1667,7 +1649,7 @@ static bool __attribute__((noinline)) sign_sighash_schnorr_and_yield(dispatcher_
 
     if (!yield_signature(dc,
                          st,
-                         cur_input_index,
+                         input_index,
                          pubkey_tweaked.W + 1,  // x-only pubkey, hence take only the x-coordinate
                          32,
                          tapleaf_hash,
@@ -1752,13 +1734,13 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
         if (!sign_sighash_ecdsa_and_yield(dc,
                                           st,
-                                          keyexpr_info,
-                                          input,
                                           cur_input_index,
                                           sign_path,
                                           sign_path_len,
-                                          sighash))
+                                          sighash_byte,
+                                          sighash)) {
             return false;
+        }
     } else {
         {
             uint64_t amount;
@@ -1832,11 +1814,10 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             if (!sign_sighash_ecdsa_and_yield(dc,
                                               st,
-                                              keyexpr_info,
-                                              input,
                                               cur_input_index,
                                               sign_path,
                                               sign_path_len,
+                                              sighash_byte,
                                               sighash))
                 return false;
         } else if (segwit_version == 1) {
@@ -1858,8 +1839,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
 
             policy_node_tr_t *policy = (policy_node_tr_t *) st->wallet_policy_map;
             if (!keyexpr_info->is_tapscript && !isnull_policy_node_tree(&policy->tree)) {
-                // keypath spend, we compute the taptree hash so that we find it ready
-                // later in sign_sighash_schnorr_and_yield (which has less available stack).
+                // keypath spend, we compute the taptree hash
                 if (0 > compute_taptree_hash(
                             dc,
                             &(wallet_derivation_info_t){
@@ -1877,14 +1857,35 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 }
             }
 
+            const uint8_t *tweak_data = NULL;
+            size_t tweak_data_len = 0;
+            const uint8_t *tapleaf_hash = NULL;
+            if (!keyexpr_info->is_tapscript) {
+                // keypath spend;
+                if (isnull_policy_node_tree(&policy->tree)) {
+                    // tweak as specified in BIP-86 and BIP-386
+                    tweak_data = (uint8_t[]){};
+                    tweak_data_len = 0;
+                } else {
+                    // tweak with the taptree hash, per BIP-341
+                    tweak_data = input->taptree_hash;
+                    tweak_data_len = 32;
+                }
+            } else {
+                // tapscript, we need to yield the tapleaf hash together with the pubkey
+                tapleaf_hash = keyexpr_info->tapleaf_hash;
+            }
+
             if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL) {
                 if (!sign_sighash_schnorr_and_yield(dc,
                                                     st,
-                                                    keyexpr_info,
-                                                    input,
                                                     cur_input_index,
                                                     sign_path,
                                                     sign_path_len,
+                                                    tweak_data,
+                                                    tweak_data_len,
+                                                    tapleaf_hash,
+                                                    sighash_byte,
                                                     sighash))
                     return false;
             } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
