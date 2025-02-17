@@ -249,8 +249,12 @@ compute_tx_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, tx_hashes_t *
 
 bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
                                                       const sign_psbt_state_t *st,
-                                                      const input_info_t *input,
+                                                      const merkleized_map_commitment_t *input_map,
                                                       unsigned int input_index,
+                                                      bool has_redeemScript,
+                                                      const uint8_t *scriptPubKey,
+                                                      size_t scriptPubKey_len,
+                                                      uint8_t sighash_byte,
                                                       uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -276,7 +280,7 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
         } else {
             // Avoid requesting the same map unnecessarily
             // (might be removed once a caching mechanism is implemented)
-            memcpy(&ith_map, &input->in_out.map, sizeof(input->in_out.map));
+            memcpy(&ith_map, input_map, sizeof(merkleized_map_commitment_t));
         }
 
         // get prevout hash and output index for the i-th input
@@ -310,19 +314,24 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
             // empty scriptcode
             crypto_hash_update_u8(&sighash_context.header, 0x00);
         } else {
-            if (!input->has_redeemScript) {
-                // P2PKH, the script_code is the prevout's scriptPubKey
-                crypto_hash_update_varint(&sighash_context.header, input->in_out.scriptPubKey_len);
+            if (!has_redeemScript) {
+                if (scriptPubKey == NULL) {
+                    SEND_SW(dc, SW_BAD_STATE); // we should never reach here
+                    return false;
+                }
+
+                // P2PKH, the script_code is the prevout's scriptPubKey, and is provided by the caller
+                crypto_hash_update_varint(&sighash_context.header, scriptPubKey_len);
                 crypto_hash_update(&sighash_context.header,
-                                   input->in_out.scriptPubKey,
-                                   input->in_out.scriptPubKey_len);
+                                   scriptPubKey,
+                                   scriptPubKey_len);
             } else {
-                // P2SH, the script_code is the redeemScript
+                // P2SH, the script_code is the redeemScript; we read it from the psbt
 
                 // update sighash_context with the length-prefixed redeem script
                 int redeemScript_len =
                     update_hashes_with_map_value(dc,
-                                                 &input->in_out.map,
+                                                 input_map,
                                                  (uint8_t[]){PSBT_IN_REDEEM_SCRIPT},
                                                  1,
                                                  NULL,
@@ -362,7 +371,7 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // hash type
-    write_u32_le(tmp, 0, input->sighash_type);
+    write_u32_le(tmp, 0, (uint32_t)sighash_byte);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // compute sighash
@@ -375,8 +384,11 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
 bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc,
                                                         const sign_psbt_state_t *st,
                                                         const tx_hashes_t *hashes,
-                                                        const input_info_t *input,
+                                                        const merkleized_map_commitment_t *input_map,
                                                         unsigned int input_index,
+                                                        const uint8_t *script,
+                                                        size_t script_len,
+                                                        uint8_t sighash_byte,
                                                         uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -384,7 +396,6 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
     cx_sha256_init(&sighash_context);
 
     uint8_t tmp[8];
-    uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
 
     // nVersion
     write_u32_le(tmp, 0, st->tx_version);
@@ -416,7 +427,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
         // get prevout hash and output index for the current input
         uint8_t prevout_hash[32];
         if (32 != call_get_merkleized_map_value(dc,
-                                                &input->in_out.map,
+                                                input_map,
                                                 (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 prevout_hash,
@@ -429,7 +440,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
 
         uint8_t prevout_n_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
-                                               &input->in_out.map,
+                                               input_map,
                                                (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                1,
                                                prevout_n_raw,
@@ -442,12 +453,12 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
     }
 
     // scriptCode
-    if (is_p2wpkh(input->script, input->script_len)) {
+    if (is_p2wpkh(script, script_len)) {
         // P2WPKH(script[2:22])
         crypto_hash_update_u32(&sighash_context.header, 0x1976a914);
-        crypto_hash_update(&sighash_context.header, input->script + 2, 20);
+        crypto_hash_update(&sighash_context.header, script + 2, 20);
         crypto_hash_update_u16(&sighash_context.header, 0x88ac);
-    } else if (is_p2wsh(input->script, input->script_len)) {
+    } else if (is_p2wsh(script, script_len)) {
         // P2WSH
 
         // update sighash_context.header with the length-prefixed witnessScript,
@@ -456,7 +467,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
         cx_sha256_init(&witnessScript_hash_context);
 
         int witnessScript_len = update_hashes_with_map_value(dc,
-                                                             &input->in_out.map,
+                                                             input_map,
                                                              (uint8_t[]){PSBT_IN_WITNESS_SCRIPT},
                                                              1,
                                                              &witnessScript_hash_context.header,
@@ -472,8 +483,8 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
         crypto_hash_digest(&witnessScript_hash_context.header, witnessScript_hash, 32);
 
         // check that script == P2WSH(witnessScript)
-        if (input->script_len != 2 + 32 || input->script[0] != 0x00 || input->script[1] != 0x20 ||
-            memcmp(input->script + 2, witnessScript_hash, 32) != 0) {
+        if (script_len != 2 + 32 || script[0] != 0x00 || script[1] != 0x20 ||
+            memcmp(script + 2, witnessScript_hash, 32) != 0) {
             PRINTF("Mismatching witnessScript\n");
 
             SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_MISMATCHING_WITNESS_SCRIPT);
@@ -490,7 +501,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
         uint8_t witness_utxo[8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN];
 
         int witness_utxo_len = call_get_merkleized_map_value(dc,
-                                                             &input->in_out.map,
+                                                             input_map,
                                                              (uint8_t[]){PSBT_IN_WITNESS_UTXO},
                                                              1,
                                                              witness_utxo,
@@ -509,7 +520,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
     {
         uint8_t nSequence_raw[4];
         if (4 != call_get_merkleized_map_value(dc,
-                                               &input->in_out.map,
+                                               input_map,
                                                (uint8_t[]){PSBT_IN_SEQUENCE},
                                                1,
                                                nSequence_raw,
@@ -547,7 +558,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // sighash type
-    write_u32_le(tmp, 0, input->sighash_type);
+    write_u32_le(tmp, 0, sighash_byte);
     crypto_hash_update(&sighash_context.header, tmp, 4);
 
     // compute sighash
@@ -560,9 +571,12 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
 bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc,
                                                         const sign_psbt_state_t *st,
                                                         const tx_hashes_t *hashes,
-                                                        const input_info_t *input,
+                                                        const merkleized_map_commitment_t *input_map,
                                                         unsigned int input_index,
+                                                        const uint8_t *scriptPubKey,
+                                                        size_t scriptPubKey_len,
                                                         const uint8_t *tapleaf_hash,
+                                                        uint8_t sighash_byte,
                                                         uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -574,7 +588,6 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc
     uint8_t tmp[MAX(32, 8 + 1 + MAX_PREVOUT_SCRIPTPUBKEY_LEN)];
 
     // hash type
-    uint8_t sighash_byte = (uint8_t) (input->sighash_type & 0xFF);
     crypto_hash_update_u8(&sighash_context.header, sighash_byte);
 
     // nVersion
@@ -606,7 +619,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc
     if ((sighash_byte & 0x80) == SIGHASH_ANYONECANPAY) {
         // outpoint (hash)
         if (32 != call_get_merkleized_map_value(dc,
-                                                &input->in_out.map,
+                                                input_map,
                                                 (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 tmp,
@@ -618,7 +631,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc
 
         // outpoint (output index)
         if (4 != call_get_merkleized_map_value(dc,
-                                               &input->in_out.map,
+                                               input_map,
                                                (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                1,
                                                tmp,
@@ -629,7 +642,7 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc
         crypto_hash_update(&sighash_context.header, tmp, 4);
 
         if (8 > call_get_merkleized_map_value(dc,
-                                              &input->in_out.map,
+                                              input_map,
                                               (uint8_t[]){PSBT_IN_WITNESS_UTXO},
                                               1,
                                               tmp,
@@ -642,15 +655,14 @@ bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc
         crypto_hash_update(&sighash_context.header, tmp, 8);
 
         // scriptPubKey
-        crypto_hash_update_varint(&sighash_context.header, input->in_out.scriptPubKey_len);
-
+        crypto_hash_update_varint(&sighash_context.header, scriptPubKey_len);
         crypto_hash_update(&sighash_context.header,
-                           input->in_out.scriptPubKey,
-                           input->in_out.scriptPubKey_len);
+                           scriptPubKey,
+                           scriptPubKey_len);
 
         // nSequence
         if (4 != call_get_merkleized_map_value(dc,
-                                               &input->in_out.map,
+                                               input_map,
                                                (uint8_t[]){PSBT_IN_SEQUENCE},
                                                1,
                                                tmp,

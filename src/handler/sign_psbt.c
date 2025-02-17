@@ -1735,13 +1735,20 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             return false;
         }
 
-        if (!input->has_sighash_type) {
-            // legacy input default to SIGHASH_ALL
-            input->sighash_type = SIGHASH_ALL;
-        }
+        uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_ALL;
 
         uint8_t sighash[32];
-        if (!compute_sighash_legacy(dc, st, input, cur_input_index, sighash)) return false;
+        if (!compute_sighash_legacy(dc,
+                                    st,
+                                    &input->in_out.map,
+                                    cur_input_index,
+                                    input->has_redeemScript,
+                                    input->in_out.scriptPubKey,
+                                    input->in_out.scriptPubKey_len,
+                                    sighash_byte,
+                                    sighash)) {
+            return false;
+        }
 
         if (!sign_sighash_ecdsa_and_yield(dc,
                                           st,
@@ -1750,7 +1757,6 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                           cur_input_index,
                                           sign_path,
                                           sign_path_len,
-
                                           sighash))
             return false;
     } else {
@@ -1810,16 +1816,17 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         if (segwit_version == 0) {
             LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
                           "Only plain key expressions are valid for SegwitV0 inputs");
-            if (!input->has_sighash_type) {
-                // segwitv0 inputs default to SIGHASH_ALL
-                input->sighash_type = SIGHASH_ALL;
-            }
+            // segwitv0 inputs default to SIGHASH_ALL
+            uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_ALL;
 
             if (!compute_sighash_segwitv0(dc,
                                           st,
                                           &signing_state->tx_hashes,
-                                          input,
+                                          &input->in_out.map,
                                           cur_input_index,
+                                          input->script,
+                                          input->script_len,
+                                          sighash_byte,
                                           sighash))
                 return false;
 
@@ -1833,18 +1840,19 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                               sighash))
                 return false;
         } else if (segwit_version == 1) {
-            if (!input->has_sighash_type) {
-                // segwitv1 inputs default to SIGHASH_DEFAULT
-                input->sighash_type = SIGHASH_DEFAULT;
-            }
+            // segwitv1 inputs default to SIGHASH_DEFAULT
+            uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_DEFAULT;
 
             if (!compute_sighash_segwitv1(
                     dc,
                     st,
                     &signing_state->tx_hashes,
-                    input,
+                    &input->in_out.map,
                     cur_input_index,
+                    input->in_out.scriptPubKey,
+                    input->in_out.scriptPubKey_len,
                     keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL,
+                    sighash_byte,
                     sighash))
                 return false;
 
