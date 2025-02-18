@@ -22,7 +22,8 @@ compute_tx_hashes(dispatcher_context_t *dc, sign_psbt_state_t *st, tx_hashes_t *
  * @param[in] input_map Pointer to the map commitment of the input being signed for.
  * @param[in] input_index Index of the input for which the sighash is being computed.
  * @param[in] has_redeemScript Whether the input has a redeemScript.
- * @param[in] scriptPubKey Pointer to the scriptPubKey of the input being signed for (which should be obtained from the non-witness UTXO)
+ * @param[in] scriptPubKey Pointer to the scriptPubKey of the input being signed for (which should
+ * be obtained from the non-witness UTXO)
  * @param[in] scriptPubKey_len Length of the scriptPubKey.
  * @param[in] sighash_byte The sighash type byte.
  * @param[out] sighash Array where the computed sighash will be stored (must be at least 32 bytes).
@@ -46,22 +47,24 @@ bool __attribute__((noinline)) compute_sighash_legacy(dispatcher_context_t *dc,
  * @param[in] hashes Pointer to the structure containing the precomputed transaction hashes.
  * @param[in] input_map Pointer to the map commitment of the input being signed for.
  * @param[in] input_index Index of the input for which the sighash is being computed.
- * @param[in] script Pointer to the script used for signing. It is the redeemScript if this input has one; otherwise
- * it is the scriptPubKey of the input being signed for (which should be obtained from the witness UTXO).
+ * @param[in] script Pointer to the script used for signing. It is the redeemScript if this input
+ * has one; otherwise it is the scriptPubKey of the input being signed for (which should be obtained
+ * from the witness UTXO).
  * @param[in] script_len Length of the script.
  * @param[in] sighash_byte The sighash type byte.
  * @param[out] sighash Array where the computed sighash will be stored (must be at least 32 bytes).
  * @return true if the computation is successful, false otherwise.
  */
-bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc,
-                                                        const sign_psbt_state_t *st,
-                                                        const tx_hashes_t *hashes,
-                                                        const merkleized_map_commitment_t *input_map,
-                                                        unsigned int input_index,
-                                                        const uint8_t *script,
-                                                        size_t script_len,
-                                                        uint8_t sighash_byte,
-                                                        uint8_t sighash[static 32]);
+bool __attribute__((noinline))
+compute_sighash_segwitv0(dispatcher_context_t *dc,
+                         const sign_psbt_state_t *st,
+                         const tx_hashes_t *hashes,
+                         const merkleized_map_commitment_t *input_map,
+                         unsigned int input_index,
+                         const uint8_t *script,
+                         size_t script_len,
+                         uint8_t sighash_byte,
+                         uint8_t sighash[static 32]);
 
 /**
  * Computes the SegWit v1 (Taproot) sighash for a given input.
@@ -71,7 +74,8 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
  * @param[in] hashes Pointer to the structure containing the precomputed transaction hashes.
  * @param[in] input_map Pointer to the map commitment of the input being signed for.
  * @param[in] input_index Index of the input for which the sighash is being computed.
- * @param[in] scriptPubKey Pointer to the scriptPubKey of the input being signed for (which should be obtained from the non-witness UTXO)
+ * @param[in] scriptPubKey Pointer to the scriptPubKey of the input being signed for (which should
+ * be obtained from the non-witness UTXO)
  * @param[in] scriptPubKey_len Length of the scriptPubKey.
  * @param[in] tapleaf_hash Array containing the Taproot leaf hash. It must be NULL if spending using
  * the key path; otherwise, it is a pointer to a 32-byte array.
@@ -79,13 +83,14 @@ bool __attribute__((noinline)) compute_sighash_segwitv0(dispatcher_context_t *dc
  * @param[out] sighash Array where the computed sighash will be stored (must be at least 32 bytes).
  * @return true if the computation is successful, false otherwise.
  */
-bool __attribute__((noinline)) compute_sighash_segwitv1(dispatcher_context_t *dc,
-                                                        const sign_psbt_state_t *st,
-                                                        const tx_hashes_t *hashes,
-                                                        const merkleized_map_commitment_t *input_map,
-                                                        unsigned int input_index,
-                                                        const uint8_t *scriptPubKey,
-                                                        size_t scriptPubKey_len,
-                                                        const uint8_t *tapleaf_hash,
-                                                        uint8_t sighash_byte,
-                                                        uint8_t sighash[static 32]);
+bool __attribute__((noinline))
+compute_sighash_segwitv1(dispatcher_context_t *dc,
+                         const sign_psbt_state_t *st,
+                         const tx_hashes_t *hashes,
+                         const merkleized_map_commitment_t *input_map,
+                         unsigned int input_index,
+                         const uint8_t *scriptPubKey,
+                         size_t scriptPubKey_len,
+                         const uint8_t *tapleaf_hash,
+                         uint8_t sighash_byte,
+                         uint8_t sighash[static 32]);

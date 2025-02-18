@@ -1527,14 +1527,13 @@ static bool __attribute__((noinline)) yield_signature(dispatcher_context_t *dc,
     return true;
 }
 
-bool __attribute__((noinline))
-sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
-                             sign_psbt_state_t *st,
-                             unsigned int input_index,
-                             const uint32_t sign_path[],
-                             size_t sign_path_len,
-                             uint8_t sighash_byte,
-                             uint8_t sighash[static 32]) {
+bool __attribute__((noinline)) sign_sighash_ecdsa_and_yield(dispatcher_context_t *dc,
+                                                            sign_psbt_state_t *st,
+                                                            unsigned int input_index,
+                                                            const uint32_t sign_path[],
+                                                            size_t sign_path_len,
+                                                            uint8_t sighash_byte,
+                                                            uint8_t sighash[static 32]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t sig[MAX_DER_SIG_LEN + 1];  // extra byte for the appended sighash-type
@@ -1717,7 +1716,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             return false;
         }
 
-        uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_ALL;
+        uint8_t sighash_byte =
+            input->has_sighash_type ? (uint8_t) input->sighash_type : SIGHASH_ALL;
 
         uint8_t sighash[32];
         if (!compute_sighash_legacy(dc,
@@ -1799,7 +1799,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
             LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
                           "Only plain key expressions are valid for SegwitV0 inputs");
             // segwitv0 inputs default to SIGHASH_ALL
-            uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_ALL;
+            uint8_t sighash_byte =
+                input->has_sighash_type ? (uint8_t) input->sighash_type : SIGHASH_ALL;
 
             if (!compute_sighash_segwitv0(dc,
                                           st,
@@ -1822,7 +1823,8 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                 return false;
         } else if (segwit_version == 1) {
             // segwitv1 inputs default to SIGHASH_DEFAULT
-            uint8_t sighash_byte = input->has_sighash_type ? (uint8_t)input->sighash_type : SIGHASH_DEFAULT;
+            uint8_t sighash_byte =
+                input->has_sighash_type ? (uint8_t) input->sighash_type : SIGHASH_DEFAULT;
 
             if (!compute_sighash_segwitv1(
                     dc,
