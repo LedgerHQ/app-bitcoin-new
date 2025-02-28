@@ -32,3 +32,5 @@ jobs:
     with:
       download_app_binaries_artifact: "compiled_app_binaries"
       container_image: "ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-musig2:latest"
+      # when merging a PR, we run the tests with the --enableslowtests flag
+      test_options: ${{ github.event_name == 'push' && '--enableslowtests' || '' }}
