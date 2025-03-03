@@ -202,8 +202,8 @@ def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: R
     # Largest supported quorum in a multisig.
     # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
 
-    # slow test, only run it if --enableslowtests is set
-    if not enable_slow_tests:
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
         pytest.skip()
 
     core_wallet_names: List[str] = []

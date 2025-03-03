@@ -52,13 +52,13 @@ def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
     parser.addoption(
-        "--enableslowtests",
+        "--enable_slow_tests",
         action="store",
         nargs="?",
         const=1,  # Default to 1 if the flag is provided without a value
         default=0,  # Default to 0 if the flag is not provided
         type=int,
-        help="Enable slow tests: 0 (default), 1 if flag is present, or specify an integer",
+        help="If 0, skip slow tests. If set or equal to 1, enable some slow tests. Greater values enable even slower tests.",
     )
     parser.addoption("--model", action="store", default="nanosp")
 
@@ -99,7 +99,7 @@ def headless(pytestconfig) -> bool:
 
 @pytest.fixture
 def enable_slow_tests(pytestconfig) -> int:
-    return pytestconfig.getoption("enableslowtests")
+    return pytestconfig.getoption("enable_slow_tests")
 
 
 @pytest.fixture
