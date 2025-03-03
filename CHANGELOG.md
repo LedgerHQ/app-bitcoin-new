@@ -16,6 +16,7 @@ Dates are in `dd-mm-yyyy` format.
 ### Changed
 
 - For wallet policies with multiple internal spending paths, the app will only sign for key expressions for which the corresponding `PSBT_IN_BIP32_DERIVATION` or `PSBT_IN_TAP_BIP32_DERIVATION` is present in the PSBT. This improves performance when signing for certain spending paths is not desired.
+- Increased the maximum supported number of cosigners in a wallet policy to 15.
 
 ## [2.3.0] - 26-08-2024
 
