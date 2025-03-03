@@ -15,7 +15,7 @@ static const char *confirmed_status;  // text displayed in confirmation page (af
 static const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
 static bool show_message_start_page;
 
-#define N_UX_PAIRS 13
+#define N_UX_PAIRS 18
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static nbgl_layoutTagValueList_t pairList;

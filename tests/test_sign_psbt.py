@@ -572,11 +572,11 @@ def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmwa
 
 
 def test_sign_psbt_singlesig_wpkh_512to256(navigator: Navigator, firmware: Firmware, client:
-                                           RaggerClient, test_name: str, enable_slow_tests: bool):
+                                           RaggerClient, test_name: str, enable_slow_tests: int):
     # PSBT for a transaction with 512 inputs and 256 outputs (maximum currently supported in the app)
-    # Very slow test (esp. with DEBUG enabled), so disabled unless the --enableslowtests option is used
+    # Very slow test (esp. with DEBUG enabled), so disabled unless the --enable_slow_tests option is used
 
-    if not enable_slow_tests:
+    if enable_slow_tests < 2:  # not running by default or in the CI
         pytest.skip()
 
     wallet = WalletPolicy(
