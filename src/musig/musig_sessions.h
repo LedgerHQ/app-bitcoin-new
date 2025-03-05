@@ -32,6 +32,15 @@ typedef struct musig_signing_state_s {
 /**
  * Given a musig psbt session, computes the synthetic randomness for a given
  * (input_index, placeholder_index) pair.
+ *
+ * @param[in]  psbt_session
+ *   Pointer to the musig psbt session.
+ * @param[in]  input_index
+ *   The index of the input.
+ * @param[in]  placeholder_index
+ *   The index of the key placeholder.
+ * @param[out] out
+ *   Pointer to receive the synthetic randomness.
  */
 void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
                       int input_index,

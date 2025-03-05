@@ -67,7 +67,7 @@ static inline int compare_plain_pk(const void *a, const void *b) {
  *   Pointer to a list of pubkeys.
  * @param[in]  n_keys
  *   Number of pubkeys.
- * @param[out]  musig_keyagg_context_t
+ * @param[out]  ctx
  *   Pointer to receive the musig KeyAgg Context.
  *
  * @return 0 on success, a negative number in case of error.
@@ -102,7 +102,7 @@ int musig_nonce_gen(const uint8_t *rand,
 /**
  * Generates the aggregate nonce (nonce_agg in the reference implementation).
  *
- * @param[in]  rand
+ * @param[in]  pubnonces
  *   A list of musig_pubnonce_t, the pubnonces of all the participants.
  * @param[in]  n_keys
  *   Number of pubkeys.
@@ -120,6 +120,8 @@ int musig_nonce_agg(const musig_pubnonce_t pubnonces[], size_t n_keys, musig_pub
  *
  * @param[in]  secnonce
  *   The secret nonce.
+ * @param[in]  sk
+ *   The secret key.
  * @param[in]  session_ctx
  *   The session context.
  * @param[out] psig
