@@ -54,7 +54,7 @@ void compute_rand_i_j(const musig_psbt_session_t *psbt_session,
  * musigsession_round2_initialize are called in the code.
  *
  * This allows the calling code to not make any assumption about how
- * the inialization of the musig signing state is done.
+ * the initialization of the musig signing state is done.
  *
  * @param[in]  musig_signing_state
  *   Pointer to the musig signing state.
