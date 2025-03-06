@@ -321,9 +321,13 @@ def test_e2e_musig2_3of3keypath_decaying_scriptpath(navigator: Navigator, firmwa
 
 
 def test_e2e_musig2_5of5(navigator: Navigator, firmware: Firmware, client: RaggerClient,
-                         test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals):
+                         test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
     # 5 is the maximum number of keys we support have in a musig2 policy
     # In this test, we have a musig with 5 keys in both the keypath and the script path
+
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
 
     path = "48'/1'/0'/2'"
     internal_xpub = get_internal_xpub(speculos_globals.seed, path)
