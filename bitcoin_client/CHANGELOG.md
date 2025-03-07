@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [0.4.0] - 06-03-2025
+
+### Added
+
+- Support for MuSig2.
+
 ## [0.3.0] - 15-02-2024
 
 ### Changed

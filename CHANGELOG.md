@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.4.0] - TBD
+## [2.4.0] - 07-03-2025
 
 ### Added
 
@@ -17,6 +17,7 @@ Dates are in `dd-mm-yyyy` format.
 
 - For wallet policies with multiple internal spending paths, the app will only sign for key expressions for which the corresponding `PSBT_IN_BIP32_DERIVATION` or `PSBT_IN_TAP_BIP32_DERIVATION` is present in the PSBT. This improves performance when signing for certain spending paths is not desired.
 - Increased the maximum supported number of cosigners in a wallet policy to 15.
+- Some common errors now return an [error code](src/error_codes.h) in addition to the usual status word.
 
 ## [2.3.0] - 26-08-2024
 

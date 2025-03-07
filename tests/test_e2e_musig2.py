@@ -320,6 +320,46 @@ def test_e2e_musig2_3of3keypath_decaying_scriptpath(navigator: Navigator, firmwa
                         e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
 
 
+def test_e2e_musig2_5of5(navigator: Navigator, firmware: Firmware, client: RaggerClient,
+                         test_name: str, rpc, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
+    # 5 is the maximum number of keys we support have in a musig2 policy
+    # In this test, we have a musig with 5 keys in both the keypath and the script path
+
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
+        pytest.skip()
+
+    path = "48'/1'/0'/2'"
+    internal_xpub = get_internal_xpub(speculos_globals.seed, path)
+
+    num_core_wallets = 8
+    core_wallet_names = []
+    core_xpubs_orig = []
+
+    for _ in range(num_core_wallets):
+        name, xpub = create_new_wallet()
+        core_wallet_names.append(name)
+        core_xpubs_orig.append(xpub)
+
+    wallet_policy = WalletPolicy(
+        name="MuSig Take 5",
+        descriptor_template="tr(musig(@0,@1,@2,@3,@4)/**,pk(musig(@5,@6,@7,@1,@8)/**))",
+        keys_info=[
+            f"{core_xpubs_orig[0]}",
+            f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}",
+            f"{core_xpubs_orig[1]}",
+            f"{core_xpubs_orig[2]}",
+            f"{core_xpubs_orig[3]}",
+            f"{core_xpubs_orig[4]}",
+            f"{core_xpubs_orig[5]}",
+            f"{core_xpubs_orig[6]}",
+            f"{core_xpubs_orig[7]}",
+        ])
+
+    run_test_e2e_musig2(navigator, client, wallet_policy, core_wallet_names, rpc, rpc_test_wallet, speculos_globals,
+                        e2e_register_wallet_instruction(firmware, wallet_policy.n_keys), e2e_sign_psbt_instruction(firmware), test_name)
+
+
 def test_e2e_musig_invalid(client: RaggerClient, speculos_globals: SpeculosGlobals):
     path = "48'/1'/0'/2'"
     text_xpub_1 = "tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT"
