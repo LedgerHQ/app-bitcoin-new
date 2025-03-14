@@ -7,7 +7,7 @@
 #include "../../crypto.h"
 #include "../client_commands.h"
 
-#include "debug-helpers/debug.h"
+#include "../../debug-helpers/debug.h"
 
 // TODO: refactor common code with stream_preimage.c
 

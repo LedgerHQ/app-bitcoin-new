@@ -15,15 +15,6 @@ typedef struct {
 const musig_persistent_storage_t N_musig_storage_real;
 #define N_musig_storage (*(const volatile musig_persistent_storage_t *) PIC(&N_musig_storage_real))
 
-static bool is_all_zeros(const uint8_t *array, size_t size) {
-    for (size_t i = 0; i < size; ++i) {
-        if (array[i] != 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static bool musigsession_pop(const uint8_t psbt_session_id[static 32], musig_psbt_session_t *out) {
     for (int i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
         if (memcmp(psbt_session_id, (const void *) N_musig_storage.sessions[i]._id, 32) == 0) {
@@ -56,7 +47,8 @@ static void musigsession_store(const uint8_t psbt_session_id[static 32],
 
     int i;
     for (i = 0; i < MAX_N_MUSIG_SESSIONS; i++) {
-        if (is_all_zeros((uint8_t *) &N_musig_storage.sessions[i], sizeof(musig_psbt_session_t))) {
+        if (is_array_all_zeros((uint8_t *) &N_musig_storage.sessions[i],
+                               sizeof(musig_psbt_session_t))) {
             break;
         }
     }
@@ -131,14 +123,11 @@ const musig_psbt_session_t *musigsession_round2_initialize(
 }
 
 void musigsession_commit(musig_signing_state_t *musig_signing_state) {
-    uint8_t acc = 0;
-    for (size_t i = 0; i < sizeof(musig_signing_state->_round1._id); i++) {
-        acc |= musig_signing_state->_round1._id[i];
-    }
     // If round 1 was not executed, then there is nothing to store.
     // This assumes that musigsession_initialize_signing_state zeroes the id, therefore the field is
     // zeroed out if and only if it wasn't used.
-    if (acc != 0) {
+    if (!is_array_all_zeros(musig_signing_state->_round1._id,
+                            sizeof(musig_signing_state->_round1._id))) {
         musigsession_store(musig_signing_state->_round1._id, &musig_signing_state->_round1);
     }
 }

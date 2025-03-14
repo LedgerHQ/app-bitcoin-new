@@ -31,6 +31,26 @@ typedef struct {
 } serialized_extended_pubkey_check_t;
 
 /**
+ * Checks if the provided buffer is fully zeroed.
+ *
+ * It guarantees that the running time is constant for all the buffers of the same length,
+ * as a protection against timing attacks.
+ * However, it DOES leak the length of the buffer.
+ *
+ * @param[in] buffer       Pointer to the array.
+ * @param[in] buffer_len   The number of bytes in the array.
+ *
+ * @return true if the buffer is entirely zeroed, false otherwise.
+ */
+static inline bool is_array_all_zeros(const uint8_t buffer[], size_t buffer_len) {
+    uint8_t acc = 0;
+    for (size_t i = 0; i < buffer_len; i++) {
+        acc |= buffer[i];
+    }
+    return acc == 0;
+}
+
+/**
  * Generates the child extended public key, from a parent extended public key and non-hardened
  * index.
  *
