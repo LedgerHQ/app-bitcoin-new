@@ -1,28 +1,25 @@
 import pytest
 
-from typing import List, Union
+from typing import List
 
 import hmac
 from hashlib import sha256
 from decimal import Decimal
 
-from ledger_bitcoin import Client, MultisigWallet, AddressType
-from ledger_bitcoin.client_base import TransportClient
+from ledger_bitcoin import MultisigWallet, AddressType
 from ledger_bitcoin.psbt import PSBT
 from ledger_bitcoin.wallet import WalletPolicy
 
-from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_keys
-
-from speculos.client import SpeculosClient
+from test_utils import SpeculosGlobals, get_internal_xpub, count_internal_key_placeholders
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import Instructions
-from ragger.navigator import Navigator, NavInsID
+from ragger.navigator import Navigator
 from ragger.firmware import Firmware
 
 from .instructions import e2e_register_wallet_instruction, e2e_sign_psbt_instruction
 
-from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, testnet_to_regtest_addr as T
+from .conftest import create_new_wallet, generate_blocks, get_unique_wallet_name, get_wallet_rpc, import_descriptors_with_privkeys, testnet_to_regtest_addr as T
 from .conftest import AuthServiceProxy
 
 
@@ -112,7 +109,7 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
                                 instructions=instructions_sign_psbt,
                                 testname=f"{test_name}_sign")
 
-    n_internal_keys = count_internal_keys(
+    n_internal_keys = count_internal_key_placeholders(
         speculos_globals.seed, "test", wallet_policy)
     # should be true as long as all inputs are internal
     assert len(hww_sigs) == n_internal_keys * len(psbt.inputs)
@@ -121,6 +118,11 @@ def run_test(navigator: Navigator, client: RaggerClient, wallet_policy: WalletPo
         psbt.inputs[i].partial_sigs[part_sig.pubkey] = part_sig.signature
 
     signed_psbt_hww_b64 = psbt.serialize()
+
+    # ==> import descriptor for each bitcoin-core wallet
+    for core_wallet_name in core_wallet_names:
+        import_descriptors_with_privkeys(
+            core_wallet_name, receive_descriptor_chk, change_descriptor_chk)
 
     # ==> sign it with bitcoin-core
     partial_psbts = [signed_psbt_hww_b64]
@@ -196,17 +198,17 @@ def test_e2e_multisig_multiple_internal_keys(navigator: Navigator, firmware: Fir
 
 
 @pytest.mark.timeout(0)  # disable timeout
-def test_e2e_multisig_16_of_16(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: bool):
-    # Largest supported multisig with sortedmulti.
+def test_e2e_multisig_15keys(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str, rpc: AuthServiceProxy, rpc_test_wallet, speculos_globals: SpeculosGlobals, enable_slow_tests: int):
+    # Largest supported quorum in a multisig.
     # The time for an end-to-end execution on a real Ledger Nano S (including user's input) is about 520 seconds.
 
-    # slow test, disabled by default
-    if not enable_slow_tests:
+    # slow test, only run it if --enable_slow_tests is set to a value greater than 0
+    if enable_slow_tests < 1:
         pytest.skip()
 
     core_wallet_names: List[str] = []
     core_xpub_origs: List[str] = []
-    for _ in range(15):
+    for _ in range(14):
         name, xpub_orig = create_new_wallet()
         core_wallet_names.append(name)
         core_xpub_origs.append(xpub_orig)
@@ -223,7 +225,7 @@ def test_e2e_multisig_16_of_16(navigator: Navigator, firmware: Firmware, client:
         [f"[{speculos_globals.master_key_fingerprint.hex()}/{path}]{internal_xpub}"],
     )
 
-    run_test(navigator, client, wallet_policy, core_wallet_names, rpc, rpc_test_wallet,
-             speculos_globals. e2e_register_wallet_instruction(
-                 firmware, wallet_policy.n_keys),
+    run_test(navigator, client, wallet_policy, core_wallet_names,
+             rpc, rpc_test_wallet, speculos_globals,
+             e2e_register_wallet_instruction(firmware, wallet_policy.n_keys),
              e2e_sign_psbt_instruction(firmware), test_name)

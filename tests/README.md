@@ -4,7 +4,7 @@ These tests are implemented in Python and can be executed either using the [Spec
 
 All the commands in this folder are meant to be ran from the `tests` folder, not from the root.
 
-Python dependencies are listed in [requirements.txt](requirements.txt), install them using [pip](https://pypi.org/project/pip/)
+Python dependencies are listed in [requirements.txt](../requirements.txt), install them using [pip](https://pypi.org/project/pip/) from the root of the repository:
 
 ```
 pip install -r requirements.txt

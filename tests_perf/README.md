@@ -4,7 +4,7 @@ The tests in this folder are meant to measure the performance of various app ope
 
 These tests are implemented in Python and can be executed either using the [Speculos](https://github.com/LedgerHQ/speculos) emulator or a Ledger Nano S+, Nano X, or Stax.
 
-Python dependencies are listed in [requirements.txt](requirements.txt), install them using [pip](https://pypi.org/project/pip/)
+Python dependencies are listed in [requirements.txt](../requirements.txt), install them using [pip](https://pypi.org/project/pip/) from the root of the repository:
 
 ```
 pip install -r requirements.txt

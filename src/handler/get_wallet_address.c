@@ -1,6 +1,6 @@
 /*****************************************************************************
  *   Ledger App Bitcoin.
- *   (c) 2024 Ledger SAS.
+ *   (c) 2025 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"
+#include "../error_codes.h"
 #include "../ui/display.h"
 #include "../ui/menu.h"
 
@@ -162,7 +163,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     // Swap feature: check that the wallet policy is a default one
     if (G_swap_state.called_from_swap && !is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
-        SEND_SW(dc, SW_FAIL_SWAP);
+        SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
     }
 
