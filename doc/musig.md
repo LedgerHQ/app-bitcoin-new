@@ -20,7 +20,7 @@ This section describes implementation details that allow to minimize the amount 
 
 BIP-0327 discusses at length the necessity to keep some state during a signing session. However, a "signing session" in BIP-0327 only refers to the production of a single signature.
 
-In the typical signing flow of a wallet, it's more logical to consider a _session_ at the level of an entire transaction. All transaction inputs are likely obtained from the same [descriptor containing musig()](https://github.com/bitcoin/bips/pull/1540), with the signer producing the pubnonce/signature for all the inputs at once.
+In the typical signing flow of a wallet, it's more logical to consider a _session_ at the level of an entire transaction. All transaction inputs are likely obtained from the same [descriptor containing musig()](https://github.com/bitcoin/bips/blob/master/bip-0390.mediawiki), with the signer producing the pubnonce/signature for all the inputs at once.
 
 Therefore, in the flow of BIP-0327, you would expect at least _one MuSig2 signing session per input_ to be active at the same time. In the context of hardware signing device support, that's somewhat problematic: it would require to persist state for an unbounded number of signing sessions, for example for a wallet that received a large number of small UTXOs. Persistent storage is often a scarce resource in embedded signing devices, and a naive approach would likely impose a maximum limit on the number of inputs of the transactions, depending on the hardware limitations.
 
@@ -34,9 +34,9 @@ This section presents the core idea, while the next section makes it more precis
 
 In BIP-0327, the internal state that is kept by the signing device is essentially the *secnonce*, which in turn is computed from a random number _rand'_, and optionally from other parameters of _NonceGen_ which depend on the transaction being signed.
 
-The core idea for state minimization is to compute a global random `rand_root`; then, for the *i*-th input and for the *j*-th `musig()`  key that the device is signing for in the [wallet policy](https://github.com/bitcoin/bips/pull/1389), one defines the *rand'* in _NonceGen_ as:
+The core idea for state minimization is to compute a global random `rand_root`; then, for the *i*-th input and for the *j*-th `musig()`  key that the device is signing for in the [wallet policy](https://github.com/bitcoin/bips/blob/master/bip-0388.mediawiki), one defines the *rand'* in _NonceGen_ as:
 
-$\qquad rand_{i,j} = SHA256(rand\_root || i || j)$
+$\qquad rand_{i,j} = SHA256(rand\_{root} \| i \| j)$
 
 In the concatenation, a fixed-length encoding of $i$ and $j$ is used in order to avoid collisions. That is used as the *rand'* value in the *NonceGen* algorithm for that input/KEY pair.
 
@@ -55,10 +55,10 @@ The term *persistent memory* refers to secure storage that is not wiped out when
 **Phase 1: pubnonce generation:** A PSBT is sent to the signing device, and it does not contain any pubnonce.
 - If a session already exists, it is deleted from the persistent memory.
 - A new session is created in volatile memory.
-- The device produces a fresh random number $rand\_root$, and saves it in the current session.
-- The device generates the randomness for the $i$-th input and for the $j$-th key as: $rand_{i,j} = SHA256(rand\_root || i || j)$.
+- The device produces a fresh random number $rand\_{root}$, and saves it in the current session.
+- The device generates the randomness for the $i$-th input and for the $j$-th key as: $rand_{i,j} = SHA256(rand\_{root} \| i \| j)$.
 - Compute each *(secnonce, pubnonce)* as per the `NonceGen` algorithm.
-- At completion (after all the pubnonces are returned), the session secret $rand\_root$ is copied into the persistent memory.
+- At completion (after all the pubnonces are returned), the session secret $rand\_{root}$ is copied into the persistent memory.
 
 **Phase 2: partial signature generation:** A PSBT containing all the pubnonces is sent to the device.
 - *A copy of the session is stored in the volatile memory, and the session is deleted from the persistent memory*.
@@ -73,7 +73,7 @@ Storing the session in persistent memory only at the end of Phase 1, and deletin
 
 #### Security of synthetic randomness
 
-Generating $rand_{i, j}$ synthetically is not a problem, since the $rand\_root$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ are not predictable for an attacker.
+Generating $rand_{i, j}$ synthetically is not a problem, since the $rand\_{root}$ value is kept secret and never leaves the device. This ensures that all the values produced for different $i$ and $j$ are not predictable for an attacker.
 
 #### Malleability of the PSBT
 If the optional parameters are passed to the _NonceGen_ function, they will depend on the transaction data present in the PSBT. Therefore, there is no guarantee that they will be unchanged the next time the PSBT is provided.
