@@ -37,7 +37,7 @@ static void exit(void) {
 
 void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_Bitcoin_64px,
+                                &C_App_64px,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
@@ -48,9 +48,9 @@ void ui_menu_main_flow_bitcoin(void) {
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
-        "Bitcoin Testnet",
-        &C_Bitcoin_64px,
-        "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+        APPNAME,
+        &C_App_64px,
+        APP_DESCRIPTION,
         INIT_HOME_PAGE,
         NULL,
         &infoList,
