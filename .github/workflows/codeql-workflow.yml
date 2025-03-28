@@ -14,7 +14,7 @@ on:
 jobs:
   analyse:
     name: CodeQL Analyse of boilerplate application
-    strategy: 
+    strategy:
       matrix:
         include:
           - SDK: "$NANOX_SDK"
@@ -24,7 +24,7 @@ jobs:
         language: [ 'cpp' ]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-legacy:latest
+      image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
 
     steps:
       - name: Clone
@@ -35,11 +35,11 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-and-quality
-    
+
       - name: Build
         run: |
           make BOLOS_SDK=${{ matrix.SDK }}
-        
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
 
