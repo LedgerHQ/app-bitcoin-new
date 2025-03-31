@@ -45,9 +45,7 @@
 #include "swap/handle_get_printable_amount.h"
 #include "swap/handle_check_address.h"
 
-#ifdef HAVE_NBGL
 #include "nbgl_use_case.h"
-#endif
 
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;
@@ -270,11 +268,7 @@ static void swap_library_main_helper(libargs_t *args) {
 
                 io_seproxyhal_init();
                 UX_INIT();
-#ifdef HAVE_BAGL
-                ux_stack_push();
-#elif defined(HAVE_NBGL)
                 nbgl_useCaseSpinner("Signing");
-#endif  // HAVE_BAGL
 
                 USB_power(0);
                 USB_power(1);

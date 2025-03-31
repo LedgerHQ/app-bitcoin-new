@@ -1200,7 +1200,7 @@ display_output(dispatcher_context_t *dc,
                const uint8_t out_scriptPubKey[static MAX_OUTPUT_SCRIPTPUBKEY_LEN],
                size_t out_scriptPubKey_len,
                uint64_t out_amount) {
-    (void) cur_output_index;
+    UNUSED(cur_output_index);
 
     // show this output's address
     char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
@@ -1381,7 +1381,6 @@ static bool __attribute__((noinline)) display_transaction(
     // if the value of fees is 10% or more of the amount, and it's more than 100000
     st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
 
-#ifdef HAVE_NBGL
     if (st->n_external_outputs == 0 || st->n_external_outputs == 1) {
         // A simplified flow for most transactions: show everything in a single screen if there is
         // exactly 0 (self-transfer) or 1 external output to show to the user
@@ -1416,39 +1415,16 @@ static bool __attribute__((noinline)) display_transaction(
             SEND_SW(dc, SW_DENY);
             return false;
         }
-    }
-#else
-    if (st->n_external_outputs == 0) {
-        // self-transfer: all the outputs are going to change addresses.
-        // No output to show, the user only needs to validate the fees.
-
-        if (!display_warnings(dc, st)) {
-            return false;
-        }
-
-        if (st->warnings.high_fee && !ui_warn_high_fee(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, true)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-    }
-#endif
-    else {
+    } else {
         // Transactions with more than one external output; show one output per page,
         // using the streaming NBGL API.
 
-#ifdef HAVE_NBGL
         // On NBGL devices, show the pre-approval screen
         // "Review transaction to send Bitcoin"
         if (!ui_transaction_prompt(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
-#endif
         // If it's not a default wallet policy, ask the user for confirmation, and abort if they
         // deny
         if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {

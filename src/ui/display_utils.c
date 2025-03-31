@@ -37,7 +37,6 @@ void format_sats_amount(const char *coin_name,
     }
     integral_str[integral_part_digit_count] = '\0';
 
-#ifdef SCREEN_SIZE_WALLET
     // on large screens, format as "<amount> TICKER"
     snprintf(out,
              MAX_AMOUNT_LENGTH + 1,
@@ -46,15 +45,4 @@ void format_sats_amount(const char *coin_name,
              fractional_part ? "." : "",
              fractional_part ? fractional_str : "",
              coin_name);
-
-#else
-    // on nanos, format as "TICKER <amount>"
-    snprintf(out,
-             MAX_AMOUNT_LENGTH + 1,
-             "%s %s%s%s",
-             coin_name,
-             integral_str,
-             fractional_part ? "." : "",
-             fractional_part ? fractional_str : "");
-#endif
 }

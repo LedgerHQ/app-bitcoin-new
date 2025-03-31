@@ -20,6 +20,14 @@
 #define MESSAGE_MAX_DISPLAY_SIZE \
     (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
 
+#ifdef SCREEN_SIZE_WALLET
+#define ICON_APP_IMPORTANT C_Important_Circle_64px
+#define ICON_APP_LOGO      C_Bitcoin_64px
+#else
+#define ICON_APP_IMPORTANT C_icon_warning
+#define ICON_APP_LOGO      C_bitcoin_logo
+#endif
+
 typedef struct tx_ux_warning_s {
     bool missing_nonwitnessutxo : 1;
     bool non_default_sighash : 1;
@@ -112,10 +120,8 @@ typedef union {
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
     ui_validate_output_state_t validate_output;
     ui_validate_transaction_state_t validate_transaction;
-#ifdef HAVE_NBGL
     ui_register_wallet_policy_state_t register_wallet_policy;
     ui_validate_transaction_simplified_state_t validate_transaction_simplified;
-#endif
 } ui_state_t;
 extern ui_state_t g_ui_state;
 
@@ -149,26 +155,12 @@ bool ui_display_address(dispatcher_context_t *dispatcher_context,
                         bool is_path_suspicious,
                         const char *bip32_path_str);
 
-#ifdef HAVE_BAGL
-bool ui_display_register_wallet(dispatcher_context_t *context,
-                                const policy_map_wallet_header_t *wallet_header,
-                                const char *policy_descriptor);
-
-bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *dispatcher_context,
-                                           const char *pubkey,
-                                           uint8_t cosigner_index,
-                                           uint8_t n_keys,
-                                           key_type_e key_type);
-#endif
-
-#ifdef HAVE_NBGL
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
     const char *descriptor_template,
     const char (*keys_info)[MAX_N_KEYS_IN_WALLET_POLICY][MAX_POLICY_KEY_INFO_LEN + 1],
     const key_type_e (*keys_type)[MAX_N_KEYS_IN_WALLET_POLICY]);
-#endif
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
@@ -198,7 +190,6 @@ bool ui_validate_transaction(dispatcher_context_t *context,
                              uint64_t fee,
                              bool is_self_transfer);
 
-#ifdef HAVE_NBGL
 bool ui_validate_transaction_simplified(dispatcher_context_t *context,
                                         const char *coin_name,
                                         const char *wallet_policy_name,  // can be NULL
@@ -206,7 +197,6 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
                                         const char *address_or_description,
                                         tx_ux_warning_t warnings,
                                         uint64_t fee);
-#endif
 
 void set_ux_flow_response(bool approved);
 
@@ -219,12 +209,6 @@ void ui_sign_message_path_hash_and_confirm_flow(void);
 void ui_sign_message_content_flow(void);
 
 void ui_sign_message_confirm_flow(void);
-
-#ifdef HAVE_BAGL
-void ui_display_register_wallet_flow(void);
-
-void ui_display_policy_map_cosigner_pubkey_flow(void);
-#endif
 
 void ui_display_receive_in_wallet_flow(void);
 
@@ -246,10 +230,8 @@ void ui_warn_high_fee_flow(void);
 
 void ui_accept_transaction_flow(bool is_self_transfer);
 
-#ifdef HAVE_NBGL
 void ui_display_register_wallet_policy_flow(void);
 void ui_accept_transaction_simplified_flow(void);
-#endif
 
 void ui_display_transaction_prompt(void);
 
@@ -261,15 +243,10 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
 
 void ui_pre_processing_message(void);
 
-#ifdef HAVE_NBGL
 bool ui_transaction_prompt(dispatcher_context_t *context);
 void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);
 void ui_set_display_prompt(void);
-#else
-#define ux_layout_custom_params_t ux_layout_paging_params_t
-void ux_layout_custom_init(unsigned int stack_slot);
-#endif
 
 uint8_t get_streaming_index(void);
 void reset_streaming_index(void);
