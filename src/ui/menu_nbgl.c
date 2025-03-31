@@ -15,10 +15,10 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#ifdef HAVE_NBGL
 #include "nbgl_use_case.h"
 
 #include "../globals.h"
+#include "./display.h"
 #include "menu.h"
 
 #define SETTING_INFO_NB 3
@@ -37,7 +37,7 @@ static void exit(void) {
 
 void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_Bitcoin_64px,
+                                &ICON_APP_LOGO,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
@@ -49,13 +49,15 @@ void ui_menu_main_flow_bitcoin(void) {
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
         "Bitcoin Testnet",
-        &C_Bitcoin_64px,
+        &ICON_APP_LOGO,
+#ifdef SCREEN_SIZE_WALLET
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+#else
+        NULL,
+#endif
         INIT_HOME_PAGE,
         NULL,
         &infoList,
         NULL,
         exit);
 }
-
-#endif  // HAVE_NBGL
