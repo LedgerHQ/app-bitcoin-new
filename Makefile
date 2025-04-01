@@ -19,8 +19,6 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
-include $(BOLOS_SDK)/Makefile.defines
-
 # TODO: Compile with the right path restrictions
 #
 #       The right path restriction would be something like
@@ -118,6 +116,8 @@ ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
     $(error This branch is not compatible with the Nano S device. Checkout the 'nanos' branch for the latest code for Nano S.)
   endif
 endif
+
+ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon

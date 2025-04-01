@@ -1,3 +1,5 @@
+import pytest
+
 from ragger.navigator import NavInsID
 from ragger.firmware import Firmware
 
@@ -9,7 +11,7 @@ def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instru
 
     if model.name.startswith("nano"):
         instructions.nano_skip_screen("Path", save_screenshot=save_screenshot)
-        instructions.same_request("Sign", save_screenshot=save_screenshot)
+        instructions.same_request("Approve", save_screenshot=save_screenshot)
     else:
         instructions.review_message(save_screenshot=save_screenshot)
         instructions.confirm_message(save_screenshot=save_screenshot)
@@ -26,7 +28,7 @@ def message_instruction_approve_long(model: Firmware) -> Instructions:
         instructions.new_request("Processing")
         instructions.new_request("Processing")
         instructions.new_request("Processing")
-        instructions.new_request("Sign")
+        instructions.new_request("Approve")
     else:
         instructions.review_message(page_count=5)
         instructions.confirm_message()
@@ -58,8 +60,11 @@ def pubkey_instruction_approve(model: Firmware) -> Instructions:
 def pubkey_instruction_reject_early(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
+    # It does not make sense for Nano devices
+    # as with them it is possible to reject only on the
+    # last step.
     if model.name.startswith("nano"):
-        instructions.new_request("Reject")
+        pytest.skip()
     else:
         instructions.footer_cancel()
     return instructions
@@ -69,8 +74,7 @@ def pubkey_reject(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.nano_skip_screen("Reject")
-        instructions.same_request("Reject")
+        instructions.new_request("Cancel")
     else:
         instructions.choice_reject()
         instructions.status_dismiss("rejected", status_on_same_request=False)
@@ -93,8 +97,6 @@ def register_wallet_instruction_approve(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.same_request("Approve")
-        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -107,9 +109,6 @@ def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.same_request("Approve")
-        instructions.same_request("Approve")
-        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -123,7 +122,6 @@ def register_wallet_instruction_approve_unusual(model: Firmware) -> Instructions
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve")
-        instructions.same_request("Approve")
     else:
         instructions.choice_confirm()
         instructions.choice_confirm()
@@ -156,13 +154,7 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Continue", save_screenshot=save_screenshot)
-        for has_step in [has_spend_from_wallet, has_unverifiedwarning, has_sighashwarning, has_feewarning]:
-            if has_step:
-                instructions.same_request(
-                    "Continue", save_screenshot=save_screenshot)
-
-        instructions.same_request("Sign", save_screenshot=save_screenshot)
+        instructions.new_request("Approve", save_screenshot=save_screenshot)
     else:
         instructions.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                  save_screenshot=save_screenshot)
@@ -194,7 +186,7 @@ def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Sign")
+        instructions.new_request("Approve")
     else:
         instructions.new_request(
             "Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP)
@@ -208,13 +200,7 @@ def sign_psbt_instruction_approve_streaming(model: Firmware, output_count: int, 
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Continue")  # first output
-        for output_index in range(1, output_count):
-            if output_index < 2:
-                instructions.same_request("Continue")
-            else:
-                instructions.new_request("Continue")
-        instructions.same_request("Sign", save_screenshot=save_screenshot)
+        instructions.new_request("Approve", save_screenshot=save_screenshot)
     else:
         instructions.review_start(
             output_count=output_count, save_screenshot=save_screenshot)
@@ -228,12 +214,12 @@ def sign_psbt_instruction_approve_external_inputs(model: Firmware, output_count)
 
     if model.name.startswith("nano"):
         instructions.new_request("Continue")
-        for output_index in range(output_count):
-            if output_index < 2:
-                instructions.same_request("Continue")
+        for output_index in range(output_count - 2):
+            if output_index < 1:
+                instructions.same_request("Processing")
             else:
-                instructions.new_request("Continue")
-        instructions.same_request("Sign")
+                instructions.new_request("Processing")
+        instructions.new_request("Approve")
     else:
         instructions.review_start(output_count=output_count, has_warning=True)
         instructions.review_fees(fees_on_same_request=True)
@@ -246,8 +232,6 @@ def e2e_register_wallet_instruction(model: Firmware, n_keys) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.new_request("Approve", save_screenshot=False)
-        for _ in range(n_keys):
-            instructions.same_request("Approve", save_screenshot=False)
     else:
         for _ in range(n_keys + 1):
             instructions.choice_confirm(save_screenshot=False)
