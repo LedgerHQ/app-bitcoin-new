@@ -14,21 +14,21 @@ static const struct {
     uint64_t amount;
     const char *expected;
 } sats_testcases[] = {
-    {.coin = "BTC", .amount = 0LLU, .expected = "BTC 0"},
-    {.coin = "BTC", .amount = 1LLU, .expected = "BTC 0.00000001"},
-    {.coin = "BTC", .amount = 10LLU, .expected = "BTC 0.0000001"},
-    {.coin = "BTC", .amount = 100LLU, .expected = "BTC 0.000001"},
-    {.coin = "BTC", .amount = 1000LLU, .expected = "BTC 0.00001"},
-    {.coin = "BTC", .amount = 10000LLU, .expected = "BTC 0.0001"},
-    {.coin = "BTC", .amount = 100000LLU, .expected = "BTC 0.001"},
-    {.coin = "BTC", .amount = 1000000LLU, .expected = "BTC 0.01"},
-    {.coin = "BTC", .amount = 10000000LLU, .expected = "BTC 0.1"},
-    {.coin = "BTC", .amount = 100000000LLU, .expected = "BTC 1"},
-    {.coin = "TEST", .amount = 234560000LLU, .expected = "TEST 2.3456"},
-    {.coin = "TEST", .amount = 21000000LLU * 100000000LLU, .expected = "TEST 21000000"},
+    {.coin = "BTC", .amount = 0LLU, .expected = "0 BTC"},
+    {.coin = "BTC", .amount = 1LLU, .expected = "0.00000001 BTC"},
+    {.coin = "BTC", .amount = 10LLU, .expected = "0.0000001 BTC"},
+    {.coin = "BTC", .amount = 100LLU, .expected = "0.000001 BTC"},
+    {.coin = "BTC", .amount = 1000LLU, .expected = "0.00001 BTC"},
+    {.coin = "BTC", .amount = 10000LLU, .expected = "0.0001 BTC"},
+    {.coin = "BTC", .amount = 100000LLU, .expected = "0.001 BTC"},
+    {.coin = "BTC", .amount = 1000000LLU, .expected = "0.01 BTC"},
+    {.coin = "BTC", .amount = 10000000LLU, .expected = "0.1 BTC"},
+    {.coin = "BTC", .amount = 100000000LLU, .expected = "1 BTC"},
+    {.coin = "TEST", .amount = 234560000LLU, .expected = "2.3456 TEST"},
+    {.coin = "TEST", .amount = 21000000LLU * 100000000LLU, .expected = "21000000 TEST"},
     {.coin = "TICKR",  // ticker supported up to 5 characters
      .amount = 18446744073709551615LLU,
-     .expected = "TICKR 184467440737.09551615"},  // largest possible uint64_t
+     .expected = "184467440737.09551615 TICKR"},  // largest possible uint64_t
 };
 
 static void test_format_sats_amount(void **state) {
