@@ -45,7 +45,7 @@
 #include "client_commands.h"
 
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_version) {
-    (void) protocol_version;
+    UNUSED(protocol_version);
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -213,7 +213,6 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
 
         SEND_RESPONSE(dc, address, address_len, SW_OK);
 
-#ifdef HAVE_NBGL
         // Workaround for a glitch when get_wallet_address is called right after a UX flow that has
         // a long confirmation screen (e.g. register_wallet), as processing this command sometimes
         // lead to the "Processing..." screen not being cleared at the end of the command.
@@ -224,6 +223,5 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         if (!is_wallet_default) {
             ui_menu_main();
         }
-#endif
     }
 }

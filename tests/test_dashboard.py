@@ -12,7 +12,6 @@ def test_dashboard(navigator: Navigator, firmware: Firmware, test_name: str):
         instructions = [
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK
         ]
     else:
         instructions = [

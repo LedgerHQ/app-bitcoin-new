@@ -11,12 +11,6 @@
 
 #include "./display.h"
 
-#ifdef HAVE_BAGL
-#define SET_UX_DIRTY true
-#else
-#define SET_UX_DIRTY false
-#endif
-
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
 
@@ -61,17 +55,12 @@ void decrease_streaming_index(void) {
 }
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
-// This method also sets the UI state as "dirty" according to the SET_UX_DIRTY constant
-// so that the dispatcher refreshes resets the UI at the end of the command handler.
 // Returns true/false depending if the user accepted in the corresponding UX flow.
 static bool io_ui_process(dispatcher_context_t *context) {
+    UNUSED(context);
     G_was_processing_screen_shown = false;
 
     g_ux_flow_ended = false;
-
-    if (SET_UX_DIRTY) {
-        context->set_ui_dirty();
-    }
 
     // We are not waiting for the client's input, nor we are doing computations on the device
     io_clear_processing_timeout();
@@ -154,70 +143,12 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_sign_message_confirm_flow();
 
     return io_ui_process(context);
 }
 
-#ifdef HAVE_BAGL
-bool ui_display_register_wallet(dispatcher_context_t *context,
-                                const policy_map_wallet_header_t *wallet_header,
-                                const char *policy_descriptor) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
-
-    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
-    state->wallet_name[wallet_header->name_len] = 0;
-    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
-    state->descriptor_template[wallet_header->descriptor_template_len] = 0;
-
-    ui_display_register_wallet_flow();
-
-    return io_ui_process(context);
-}
-
-bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
-                                           const char *pubkey,
-                                           uint8_t cosigner_index,
-                                           uint8_t n_keys,
-                                           key_type_e key_type) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    (void) (n_keys);
-
-    ui_cosigner_pubkey_and_index_state_t *state =
-        (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
-
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
-
-    if (key_type == PUBKEY_TYPE_INTERNAL) {
-        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u, ours", cosigner_index);
-    } else if (key_type == PUBKEY_TYPE_EXTERNAL) {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u, theirs",
-                 cosigner_index);
-    } else if (key_type == PUBKEY_TYPE_UNSPENDABLE) {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u, dummy",
-                 cosigner_index);
-    } else {
-        LEDGER_ASSERT(false, "Unreachable code");
-    }
-    ui_display_policy_map_cosigner_pubkey_flow();
-
-    return io_ui_process(context);
-}
-#endif
-
-#ifdef HAVE_NBGL
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
@@ -238,24 +169,32 @@ bool ui_display_register_wallet_policy(
     state->descriptor_template = descriptor_template;
     for (size_t i = 0; i < wallet_header->n_keys; i++) {
         state->keys_info[i] = (*keys_info)[i];
+#ifdef SCREEN_SIZE_WALLET
+        const char labels[3][20] = {"internal", "external", "unspendable"};
+#else
+        const char labels[3][20] = {"ours", "theirs", "dummy"};
+#endif
         switch ((*keys_type)[i]) {
             case PUBKEY_TYPE_INTERNAL:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, internal",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[0]);
                 break;
             case PUBKEY_TYPE_EXTERNAL:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, external",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[1]);
                 break;
             case PUBKEY_TYPE_UNSPENDABLE:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, unspendable",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[2]);
                 break;
             default:
                 LEDGER_ASSERT(false, "Unreachable code");
@@ -266,8 +205,6 @@ bool ui_display_register_wallet_policy(
 
     return io_ui_process(context);
 }
-
-#endif  // HAVE_NBGL
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
@@ -392,7 +329,6 @@ bool ui_validate_transaction(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-#ifdef HAVE_NBGL
 bool ui_validate_transaction_simplified(dispatcher_context_t *context,
                                         const char *coin_name,
                                         const char *wallet_policy_name,
@@ -430,35 +366,13 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
 
     return io_ui_process(context);
 }
-#endif  // HAVE_NBGL
-
-#ifdef HAVE_BAGL
-
-bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
-
-bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
-
-void ui_pre_processing_message(void) {
-    return;
-}
-#endif  // HAVE_BAGL
-
-#ifdef HAVE_NBGL
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_display_post_processing_confirm_transaction(success);
 
     return true;
@@ -469,7 +383,7 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_display_post_processing_confirm_message(success);
 
     return true;
@@ -478,4 +392,3 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
 void ui_pre_processing_message(void) {
     ui_set_display_prompt();
 }
-#endif  // HAVE_NBGL

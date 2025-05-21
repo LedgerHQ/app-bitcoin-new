@@ -2,14 +2,14 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Spend from|Account name|Review|Amount|Address|Fees",
+      "regexp": "Review transaction|From|Amount|To|Fees",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]
       ]
     },
     {
-      "regexp": "Approve|Continue|Sign",
+      "regexp": "Continue|Sign transaction",
       "actions": [
         [ "button", 1, true ],
         [ "button", 2, true ],

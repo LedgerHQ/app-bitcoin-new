@@ -1,5 +1,3 @@
-#ifdef HAVE_NBGL
-
 #include <stdint.h>
 
 #include "nbgl_use_case.h"
@@ -14,6 +12,21 @@
 static const char *confirmed_status;  // text displayed in confirmation page (after long press)
 static const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
 static bool show_message_start_page;
+
+/* Graphical resources (GA) used by the application and NBGL */
+#ifdef SCREEN_SIZE_WALLET
+const char GA_SIGN_TRANSACTION[] = "Sign transaction\nto send Bitcoin?";
+const char GA_SIGN_MESSAGE[] = "Sign message?";
+const char GA_REGISTER_ACCOUNT[] = "Register account?";
+#else
+const char GA_SIGN_TRANSACTION[] = "Sign transaction";
+const char GA_SIGN_MESSAGE[] = "Sign message";
+const char GA_REGISTER_ACCOUNT[] = "Register account";
+#endif /* #ifdef SCREEN_SIZE_WALLET */
+
+const char GA_UNVERIFIED_INPUTS[] = "Unverified inputs\nUpdate your wallet software";
+const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send Bitcoin";
+const char GA_REVIEW_MESSAGE[] = "Review message";
 
 #define N_UX_PAIRS 18
 
@@ -102,8 +115,8 @@ static void start_transaction_callback(bool confirm) {
 }
 
 static void generic_content_callback(int token, uint8_t index, int page) {
-    (void) index;
-    (void) page;
+    UNUSED(index);
+    UNUSED(page);
     switch (token) {
         case REVIEW_CONFIRM:
             status_operation_callback(true);
@@ -115,7 +128,7 @@ static void generic_content_callback(int token, uint8_t index, int page) {
 
 static void finish_transaction_flow(bool choice) {
     if (choice) {
-        nbgl_useCaseReviewStreamingFinish("Sign transaction\nto send Bitcoin?",
+        nbgl_useCaseReviewStreamingFinish(GA_SIGN_TRANSACTION,
                                           start_processing_transaction_callback);
     } else {
         status_transaction_cancel();
@@ -161,25 +174,24 @@ void ui_accept_transaction_simplified_flow(void) {
 
     // Add warning screens for unverified inputs, external inputs or non-default sighash
     if (g_ui_state.validate_transaction_simplified.warnings.missing_nonwitnessutxo) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t){
-            .centeredInfo = true,
-            .item = "Unverified inputs\nUpdate Ledger Live or\nthird party wallet software",
-            .value = "",
-            .valueIcon = &C_Important_Circle_64px};
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = GA_UNVERIFIED_INPUTS,
+                                                    .value = "",
+                                                    .centeredInfo = true,
+                                                    .valueIcon = &ICON_APP_IMPORTANT};
     }
     if (g_ui_state.validate_transaction_simplified.warnings.external_inputs) {
         pairs[n_pairs++] =
-            (nbgl_contentTagValue_t){.centeredInfo = true,
-                                     .item = "There are external inputs\nReject if not sure",
+            (nbgl_contentTagValue_t){.item = "There are external inputs\nReject if not sure",
                                      .value = "",
-                                     .valueIcon = &C_Important_Circle_64px};
+                                     .centeredInfo = true,
+                                     .valueIcon = &ICON_APP_IMPORTANT};
     }
     if (g_ui_state.validate_transaction_simplified.warnings.non_default_sighash) {
         pairs[n_pairs++] =
-            (nbgl_contentTagValue_t){.centeredInfo = true,
-                                     .item = "Non-default sighash\nReject if not sure",
+            (nbgl_contentTagValue_t){.item = "Non-default sighash\nReject if not sure",
                                      .value = "",
-                                     .valueIcon = &C_Important_Circle_64px};
+                                     .centeredInfo = true,
+                                     .valueIcon = &ICON_APP_IMPORTANT};
     }
 
     if (g_ui_state.validate_transaction_simplified.has_wallet_policy) {
@@ -210,27 +222,27 @@ void ui_accept_transaction_simplified_flow(void) {
     };
 
     if (g_ui_state.validate_transaction_simplified.warnings.high_fee) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t){.centeredInfo = true,
-                                                    .item = "Fees are above 10%\n of total amount",
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = "Fees are above 10%\n of total amount",
                                                     .value = "",
-                                                    .valueIcon = &C_Important_Circle_64px};
+                                                    .centeredInfo = true,
+                                                    .valueIcon = &ICON_APP_IMPORTANT};
     }
 
     pairList.nbPairs = n_pairs;
 
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &pairList,
-                       &C_Bitcoin_64px,
-                       "Review transaction\nto send Bitcoin",
+                       &ICON_APP_LOGO,
+                       GA_REVIEW_TRANSACTION,
                        NULL,
-                       "Sign transaction\nto send Bitcoin?",
+                       GA_SIGN_TRANSACTION,
                        start_transaction_callback);
 }
 
 void ui_display_transaction_prompt(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
-                                     &C_Bitcoin_64px,
-                                     "Review transaction\nto send Bitcoin",
+                                     &ICON_APP_LOGO,
+                                     GA_REVIEW_TRANSACTION,
                                      NULL,
                                      start_transaction_callback);
 }
@@ -259,7 +271,7 @@ void ui_display_output_address_amount_flow(int index) {
 }
 
 void ui_display_output_address_amount_no_index_flow(int index) {
-    (void) index;
+    UNUSED(index);
 
     pairs[0].item = "Amount";
     pairs[0].value = g_ui_state.validate_output.amount;
@@ -293,7 +305,7 @@ void ui_display_pubkey_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Bitcoin_64px,
+                            &ICON_APP_LOGO,
                             "Confirm public key",
                             NULL,
                             "Approve public key",
@@ -312,13 +324,11 @@ void ui_display_receive_in_wallet_flow(void) {
 
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               &pairList,
-                              &C_Bitcoin_64px,
+                              &ICON_APP_LOGO,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);
 }
-
-#ifdef HAVE_NBGL
 
 void ui_display_register_wallet_policy_flow(void) {
     _Static_assert(N_UX_PAIRS >= 3 + MAX_N_KEYS_IN_WALLET_POLICY,
@@ -338,7 +348,11 @@ void ui_display_register_wallet_policy_flow(void) {
     };
 
     pairs[n_pairs++] = (nbgl_layoutTagValue_t){
+#ifdef SCREEN_SIZE_WALLET
         .item = "Descriptor template",
+#else
+        .item = "Wallet policy",
+#endif
         .value = g_ui_state.register_wallet_policy.descriptor_template,
     };
 
@@ -356,14 +370,12 @@ void ui_display_register_wallet_policy_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Bitcoin_64px,
+                            &ICON_APP_LOGO,
                             "Review account\nto register",
                             NULL,
-                            "Register account?",
+                            GA_REGISTER_ACCOUNT,
                             status_operation_callback);
 }
-
-#endif  // HAVE_NBGL
 
 void ui_display_pubkey_suspicious_flow(void) {
     confirmed_status = "Public key\napproved";
@@ -381,21 +393,29 @@ void ui_display_pubkey_suspicious_flow(void) {
     pairList.pairs = pairs;
 
     contentList[0].type = CENTERED_INFO;
-    contentList[0].content.centeredInfo.icon = &C_Bitcoin_64px;
+    contentList[0].content.centeredInfo.icon = &ICON_APP_LOGO;
     contentList[0].content.centeredInfo.text1 = "Confirm public key";
     contentList[0].content.centeredInfo.text2 = NULL;
+#ifdef SCREEN_SIZE_WALLET
     contentList[0].content.centeredInfo.text3 = NULL;
     contentList[0].content.centeredInfo.style = LARGE_CASE_BOLD_INFO;
     contentList[0].content.centeredInfo.offsetY = 0;
+#else
+    contentList[0].content.centeredInfo.style = BOLD_TEXT1_INFO;
+#endif
     contentList[0].contentActionCallback = NULL;
 
     contentList[1].type = CENTERED_INFO;
-    contentList[1].content.centeredInfo.icon = &C_Important_Circle_64px;
+    contentList[1].content.centeredInfo.icon = &ICON_APP_IMPORTANT;
     contentList[1].content.centeredInfo.text1 = "WARNING";
     contentList[1].content.centeredInfo.text2 = "The derivation path\nis unusual";
+#ifdef SCREEN_SIZE_WALLET
     contentList[1].content.centeredInfo.text3 = NULL;
     contentList[1].content.centeredInfo.style = LARGE_CASE_BOLD_INFO;
     contentList[1].content.centeredInfo.offsetY = 0;
+#else
+    contentList[1].content.centeredInfo.style = BOLD_TEXT1_INFO;
+#endif
     contentList[1].contentActionCallback = NULL;
 
     contentList[2].type = TAG_VALUE_LIST;
@@ -404,10 +424,16 @@ void ui_display_pubkey_suspicious_flow(void) {
 
     contentList[3].type = INFO_BUTTON;
     contentList[3].content.infoButton.text = "Approve public key";
-    contentList[3].content.infoButton.icon = &C_Bitcoin_64px;
+    contentList[3].content.infoButton.icon = &ICON_APP_LOGO;
+#ifdef SCREEN_SIZE_WALLET
     contentList[3].content.infoButton.buttonText = "Approve";
+#else
+    contentList[3].content.infoButton.buttonText = "";
+#endif
     contentList[3].content.infoButton.buttonToken = REVIEW_CONFIRM;
+#ifdef HAVE_PIEZO_SOUND
     contentList[3].content.infoButton.tuneId = TUNE_TAP_CASUAL;
+#endif
     contentList[3].contentActionCallback = generic_content_callback;
 
     genericContent.callbackCallNeeded = false;
@@ -419,7 +445,7 @@ void ui_display_pubkey_suspicious_flow(void) {
 
 static void message_finish_callback(bool confirm) {
     if (confirm) {
-        nbgl_useCaseReviewStreamingFinish("Sign message?", start_processing_message_callback);
+        nbgl_useCaseReviewStreamingFinish(GA_SIGN_MESSAGE, start_processing_message_callback);
     } else {
         status_message_cancel();
     }
@@ -445,7 +471,11 @@ static void message_display_content(bool confirm) {
             pairList.nbPairs = 1;
         }
 
+#ifdef SCREEN_SIZE_WALLET
         pairs[pairList.nbPairs].item = "Message content";
+#else
+        pairs[pairList.nbPairs].item = "Message";
+#endif
         pairs[pairList.nbPairs].value = g_ui_state.path_and_message.message;
 
         pairList.wrapping = true;
@@ -478,8 +508,8 @@ void ui_sign_message_content_flow(void) {
     if (show_message_start_page == true) {
         show_message_start_page = false;
         nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                         &C_Bitcoin_64px,
-                                         "Review message",
+                                         &ICON_APP_LOGO,
+                                         GA_REVIEW_MESSAGE,
                                          NULL,
                                          message_display_content);
     } else {
@@ -489,14 +519,14 @@ void ui_sign_message_content_flow(void) {
 
 void ui_sign_message_path_hash_and_confirm_flow(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                     &C_Bitcoin_64px,
-                                     "Review message",
+                                     &ICON_APP_LOGO,
+                                     GA_REVIEW_MESSAGE,
                                      NULL,
                                      message_display_path);
 }
 
 void ui_sign_message_confirm_flow(void) {
-    nbgl_useCaseReviewStreamingFinish("Sign message?", start_processing_message_callback);
+    nbgl_useCaseReviewStreamingFinish(GA_SIGN_MESSAGE, start_processing_message_callback);
 }
 
 void ui_set_display_prompt(void) {
@@ -518,7 +548,7 @@ void ui_display_spend_from_wallet_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &C_Bitcoin_64px,
+                            &ICON_APP_LOGO,
                             "Spend from\nknown account",
                             NULL,
                             "Confirm account name",
@@ -529,7 +559,7 @@ void ui_display_spend_from_wallet_flow(void) {
 void ui_display_default_wallet_address_flow(void) {
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
-                              &C_Bitcoin_64px,
+                              &ICON_APP_LOGO,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);
@@ -537,7 +567,7 @@ void ui_display_default_wallet_address_flow(void) {
 
 // Warning Flows
 void ui_warn_high_fee_flow(void) {
-    nbgl_useCaseChoice(&C_Important_Circle_64px,
+    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
                        "Warning",
                        "Fees are above 10%\n of total amount",
                        "Continue",
@@ -546,7 +576,7 @@ void ui_warn_high_fee_flow(void) {
 }
 
 void ui_display_warning_external_inputs_flow(void) {
-    nbgl_useCaseChoice(&C_Important_Circle_64px,
+    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
                        "Warning",
                        "There are external inputs",
                        "Continue",
@@ -555,16 +585,16 @@ void ui_display_warning_external_inputs_flow(void) {
 }
 
 void ui_display_unverified_segwit_inputs_flows(void) {
-    nbgl_useCaseChoice(&C_Important_Circle_64px,
+    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
                        "Warning",
-                       "Unverified inputs\nUpdate Ledger Live or\nthird party wallet software",
+                       GA_UNVERIFIED_INPUTS,
                        "Continue",
                        "Reject if not sure",
                        start_transaction_callback);
 }
 
 void ui_display_nondefault_sighash_flow(void) {
-    nbgl_useCaseChoice(&C_Important_Circle_64px,
+    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
                        "Warning",
                        "Non-default sighash",
                        "Continue",
@@ -592,4 +622,3 @@ void ui_display_post_processing_confirm_transaction(bool success) {
         nbgl_useCaseReviewStatus(STATUS_TYPE_TRANSACTION_REJECTED, ui_menu_main);
     }
 }
-#endif  // HAVE_NBGL

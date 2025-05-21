@@ -18,10 +18,10 @@ tests/.test_bitcoin
 # Fuzzing
 fuzzing/build/
 
-
 # Editors
 .idea/
 .vscode/c_cpp_properties.json
+*.swp
 
 # Python
 *.pyc[cod]
