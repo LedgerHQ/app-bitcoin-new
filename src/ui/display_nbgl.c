@@ -27,6 +27,8 @@ const char GA_REGISTER_ACCOUNT[] = "Register account";
 const char GA_UNVERIFIED_INPUTS[] = "Unverified inputs\nUpdate your wallet software";
 const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send Bitcoin";
 const char GA_REVIEW_MESSAGE[] = "Review message";
+const char GA_LOADING_TRANSACTION[] = "Loading transaction";
+const char GA_LOADING_MESSAGE[] = "Loading message";
 
 #define N_UX_PAIRS 18
 
@@ -89,7 +91,7 @@ static void status_address_callback(bool confirm) {
 static void start_processing_transaction_callback(bool confirm) {
     if (confirm) {
         G_was_processing_screen_shown = true;
-        nbgl_useCaseSpinner("Processing");
+        nbgl_useCaseSpinner(ui_get_processing_screen_text());
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
@@ -99,7 +101,7 @@ static void start_processing_transaction_callback(bool confirm) {
 static void start_processing_message_callback(bool confirm) {
     if (confirm) {
         G_was_processing_screen_shown = true;
-        nbgl_useCaseSpinner("Processing");
+        nbgl_useCaseSpinner(ui_get_processing_screen_text());
         ux_flow_response_true();
     } else {
         status_message_cancel();

@@ -252,3 +252,9 @@ uint8_t get_streaming_index(void);
 void reset_streaming_index(void);
 void increase_streaming_index(void);
 void decrease_streaming_index(void);
+
+/**
+ * Functions to get and set the text to be shown when processing.
+ */
+char const *ui_get_processing_screen_text(void);
+void ui_set_processing_screen_text(const char *text);

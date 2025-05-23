@@ -24,6 +24,13 @@ extern dispatcher_context_t G_dispatcher_context;
 
 ui_state_t g_ui_state;
 
+/*
+ * Pointer to the text to be shown when processing.
+ * If set to NULL, a default message is shown,
+ * otherwise it must be a pointer to a valid 0-terminated string.
+ */
+char const *G_processing_screen_text;
+
 void send_deny_sw(dispatcher_context_t *dc) {
     SEND_SW(dc, SW_DENY);
 }
@@ -391,4 +398,12 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
 
 void ui_pre_processing_message(void) {
     ui_set_display_prompt();
+}
+
+char const *ui_get_processing_screen_text(void) {
+    return (G_processing_screen_text != NULL) ? G_processing_screen_text : "Loading";
+}
+
+void ui_set_processing_screen_text(const char *text) {
+    G_processing_screen_text = text;
 }
