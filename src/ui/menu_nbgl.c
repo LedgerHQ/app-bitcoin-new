@@ -35,7 +35,7 @@ extern void app_exit(void);
 
 void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &ICON_APP_LOGO,
+                                &ICON_APP_HOME,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
@@ -47,7 +47,7 @@ void ui_menu_main_flow_bitcoin(void) {
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
         "Bitcoin Testnet",
-        &ICON_APP_LOGO,
+        &ICON_APP_HOME,
 #ifdef SCREEN_SIZE_WALLET
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
 #else
