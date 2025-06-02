@@ -31,25 +31,23 @@ static const nbgl_contentInfoList_t infoList = {
     .infoContents = INFO_CONTENTS,
 };
 
-static void exit(void) {
-    os_sched_exit(-1);
-}
+extern void app_exit(void);
 
 void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &ICON_APP_LOGO,
+                                &ICON_APP_HOME,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
                                 &infoList,
                                 NULL,
-                                exit);
+                                app_exit);
 }
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
         "Bitcoin Testnet",
-        &ICON_APP_LOGO,
+        &ICON_APP_HOME,
 #ifdef SCREEN_SIZE_WALLET
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
 #else
@@ -59,5 +57,5 @@ void ui_menu_main_flow_bitcoin_testnet(void) {
         NULL,
         &infoList,
         NULL,
-        exit);
+        app_exit);
 }

@@ -22,10 +22,12 @@
 
 #ifdef SCREEN_SIZE_WALLET
 #define ICON_APP_IMPORTANT C_Important_Circle_64px
-#define ICON_APP_LOGO      C_Bitcoin_64px
+#define ICON_APP_HOME      C_Bitcoin_64px
+#define ICON_APP_ACTION    C_Bitcoin_64px
 #else
 #define ICON_APP_IMPORTANT C_icon_warning
-#define ICON_APP_LOGO      C_bitcoin_logo
+#define ICON_APP_HOME      C_bitcoin_logo
+#define ICON_APP_ACTION    C_bitcoin_logo_inv
 #endif
 
 typedef struct tx_ux_warning_s {
@@ -252,3 +254,9 @@ uint8_t get_streaming_index(void);
 void reset_streaming_index(void);
 void increase_streaming_index(void);
 void decrease_streaming_index(void);
+
+/**
+ * Functions to get and set the text to be shown when processing.
+ */
+char const *ui_get_processing_screen_text(void);
+void ui_set_processing_screen_text(const char *text);

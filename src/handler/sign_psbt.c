@@ -84,6 +84,8 @@ typedef struct {
     uint32_t key_origin[MAX_BIP32_PATH_STEPS];
 } derivation_info_t;
 
+extern const char GA_LOADING_TRANSACTION[];
+
 // Convenience function to share common logic when parsing the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields from inputs or outputs.
 // Note: This function must return -1 only on errors (causing signing to abort).
@@ -2092,6 +2094,9 @@ sign_psbt_cache_t G_sign_psbt_cache;
 void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
+    /* Setting transaction loading information screen */
+    ui_set_processing_screen_text(GA_LOADING_TRANSACTION);
+
     sign_psbt_state_t st;
     memset(&st, 0, sizeof(st));
 
@@ -2113,7 +2118,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
     /** Inputs verification flow
      *
-     *  Go though all the inputs:
+     *  Go through all the inputs:
      *  - verify the non_witness_utxo
      *  - compute value spent
      *  - detect internal inputs that should be signed, and if there are external inputs or unusual

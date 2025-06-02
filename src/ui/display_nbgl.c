@@ -27,6 +27,8 @@ const char GA_REGISTER_ACCOUNT[] = "Register account";
 const char GA_UNVERIFIED_INPUTS[] = "Unverified inputs\nUpdate your wallet software";
 const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send Bitcoin";
 const char GA_REVIEW_MESSAGE[] = "Review message";
+const char GA_LOADING_TRANSACTION[] = "Loading transaction";
+const char GA_LOADING_MESSAGE[] = "Loading message";
 
 #define N_UX_PAIRS 18
 
@@ -89,7 +91,7 @@ static void status_address_callback(bool confirm) {
 static void start_processing_transaction_callback(bool confirm) {
     if (confirm) {
         G_was_processing_screen_shown = true;
-        nbgl_useCaseSpinner("Processing");
+        nbgl_useCaseSpinner(ui_get_processing_screen_text());
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
@@ -99,7 +101,7 @@ static void start_processing_transaction_callback(bool confirm) {
 static void start_processing_message_callback(bool confirm) {
     if (confirm) {
         G_was_processing_screen_shown = true;
-        nbgl_useCaseSpinner("Processing");
+        nbgl_useCaseSpinner(ui_get_processing_screen_text());
         ux_flow_response_true();
     } else {
         status_message_cancel();
@@ -232,7 +234,7 @@ void ui_accept_transaction_simplified_flow(void) {
 
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &pairList,
-                       &ICON_APP_LOGO,
+                       &ICON_APP_ACTION,
                        GA_REVIEW_TRANSACTION,
                        NULL,
                        GA_SIGN_TRANSACTION,
@@ -241,7 +243,7 @@ void ui_accept_transaction_simplified_flow(void) {
 
 void ui_display_transaction_prompt(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
-                                     &ICON_APP_LOGO,
+                                     &ICON_APP_ACTION,
                                      GA_REVIEW_TRANSACTION,
                                      NULL,
                                      start_transaction_callback);
@@ -305,7 +307,7 @@ void ui_display_pubkey_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &ICON_APP_LOGO,
+                            &ICON_APP_ACTION,
                             "Confirm public key",
                             NULL,
                             "Approve public key",
@@ -324,7 +326,7 @@ void ui_display_receive_in_wallet_flow(void) {
 
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               &pairList,
-                              &ICON_APP_LOGO,
+                              &ICON_APP_ACTION,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);
@@ -370,7 +372,7 @@ void ui_display_register_wallet_policy_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &ICON_APP_LOGO,
+                            &ICON_APP_ACTION,
                             "Review account\nto register",
                             NULL,
                             GA_REGISTER_ACCOUNT,
@@ -393,7 +395,7 @@ void ui_display_pubkey_suspicious_flow(void) {
     pairList.pairs = pairs;
 
     contentList[0].type = CENTERED_INFO;
-    contentList[0].content.centeredInfo.icon = &ICON_APP_LOGO;
+    contentList[0].content.centeredInfo.icon = &ICON_APP_ACTION;
     contentList[0].content.centeredInfo.text1 = "Confirm public key";
     contentList[0].content.centeredInfo.text2 = NULL;
 #ifdef SCREEN_SIZE_WALLET
@@ -424,7 +426,7 @@ void ui_display_pubkey_suspicious_flow(void) {
 
     contentList[3].type = INFO_BUTTON;
     contentList[3].content.infoButton.text = "Approve public key";
-    contentList[3].content.infoButton.icon = &ICON_APP_LOGO;
+    contentList[3].content.infoButton.icon = &ICON_APP_ACTION;
 #ifdef SCREEN_SIZE_WALLET
     contentList[3].content.infoButton.buttonText = "Approve";
 #else
@@ -508,7 +510,7 @@ void ui_sign_message_content_flow(void) {
     if (show_message_start_page == true) {
         show_message_start_page = false;
         nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                         &ICON_APP_LOGO,
+                                         &ICON_APP_ACTION,
                                          GA_REVIEW_MESSAGE,
                                          NULL,
                                          message_display_content);
@@ -519,7 +521,7 @@ void ui_sign_message_content_flow(void) {
 
 void ui_sign_message_path_hash_and_confirm_flow(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                     &ICON_APP_LOGO,
+                                     &ICON_APP_ACTION,
                                      GA_REVIEW_MESSAGE,
                                      NULL,
                                      message_display_path);
@@ -548,7 +550,7 @@ void ui_display_spend_from_wallet_flow(void) {
 
     nbgl_useCaseReviewLight(TYPE_OPERATION,
                             &pairList,
-                            &ICON_APP_LOGO,
+                            &ICON_APP_ACTION,
                             "Spend from\nknown account",
                             NULL,
                             "Confirm account name",
@@ -559,7 +561,7 @@ void ui_display_spend_from_wallet_flow(void) {
 void ui_display_default_wallet_address_flow(void) {
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
-                              &ICON_APP_LOGO,
+                              &ICON_APP_ACTION,
                               "Verify Bitcoin\naddress",
                               NULL,
                               status_address_callback);

@@ -24,10 +24,10 @@ def message_instruction_approve_long(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.nano_skip_screen("Path")
-        instructions.same_request("Processing")
-        instructions.new_request("Processing")
-        instructions.new_request("Processing")
-        instructions.new_request("Processing")
+        instructions.same_request("Loading message")
+        instructions.new_request("Loading message")
+        instructions.new_request("Loading message")
+        instructions.new_request("Loading message")
         instructions.new_request("Sign message")
     else:
         instructions.review_message(page_count=5)
@@ -216,9 +216,9 @@ def sign_psbt_instruction_approve_external_inputs(model: Firmware, output_count)
         instructions.new_request("Continue")
         for output_index in range(output_count - 2):
             if output_index < 1:
-                instructions.same_request("Processing")
+                instructions.same_request("Loading transaction")
             else:
-                instructions.new_request("Processing")
+                instructions.new_request("Loading transaction")
         instructions.new_request("Sign transaction")
     else:
         instructions.review_start(output_count=output_count, has_warning=True)

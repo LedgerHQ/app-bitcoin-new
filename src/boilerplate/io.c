@@ -31,6 +31,7 @@
 
 #include "dispatcher.h"
 #include "../swap/swap_globals.h"
+#include "../ui/display.h"
 
 uint16_t G_output_len = 0;
 
@@ -78,7 +79,7 @@ void io_show_processing_screen() {
     if (!G_was_processing_screen_shown) {
         G_was_processing_screen_shown = true;
         if (!G_swap_state.called_from_swap) {
-            nbgl_useCaseSpinner("Processing");
+            nbgl_useCaseSpinner(ui_get_processing_screen_text());
         }
     }
 }

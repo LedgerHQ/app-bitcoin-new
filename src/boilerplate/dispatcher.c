@@ -30,6 +30,8 @@ extern dispatcher_context_t G_dispatcher_context;
 
 extern bool G_was_processing_screen_shown;
 
+extern char const *G_processing_screen_text;
+
 // Private state that is not made accessible from the dispatcher context
 struct {
     void (*termination_cb)(void);
@@ -161,7 +163,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         handler(&G_dispatcher_context, cmd->p2);
     }
 
-    // Here a response (either success or error) should have been send.
+    // Here a response (either success or error) should have been sent.
     // Failure to do so indicates a bug in the last command processors.
     if (G_dispatcher_state.sw == 0) {
         PRINTF("No response before terminating\n");
@@ -173,8 +175,12 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     // - background processing took long enough that the "Processing..." screen was shown.
     bool is_ux_dirty = G_dispatcher_state.had_ux_flow || G_was_processing_screen_shown;
     if (G_dispatcher_state.termination_cb != NULL && is_ux_dirty) {
+        G_dispatcher_state.termination_cb();
         G_was_processing_screen_shown = 0;
     }
 
     io_clear_processing_timeout();
+
+    /* Resetting loading information screen */
+    G_processing_screen_text = NULL;
 }
