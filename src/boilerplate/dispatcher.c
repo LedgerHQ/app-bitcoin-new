@@ -170,11 +170,15 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         io_send_sw(SW_BAD_STATE);
     }
 
-    // We call the termination callback if given, but only if the UX is "dirty", that is either
-    // - there was some kind of UX flow with user interaction;
-    // - background processing took long enough that the "Processing..." screen was shown.
+    // We call the termination callback if given, but only if
+    // - the UX is "dirty", that is either
+    //     - there was some kind of UX flow with user interaction;
+    //     - background processing took long enough that the "Processing..." screen was shown.
+    // - and there has been an error and corresponding response has been sent
+    // Otherwise this is NBGL status callback that will be called
     bool is_ux_dirty = G_dispatcher_state.had_ux_flow || G_was_processing_screen_shown;
-    if (G_dispatcher_state.termination_cb != NULL && is_ux_dirty) {
+    if (G_dispatcher_state.termination_cb != NULL && is_ux_dirty &&
+        G_dispatcher_state.sw != SW_OK) {
         G_dispatcher_state.termination_cb();
         G_was_processing_screen_shown = 0;
     }
