@@ -7,14 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.4.1] - XX-XX-2025
+## [2.4.1] - 09-06-2025
 
 ### Added
 
-
 ### Changed
 
-- UX rehaul on Nano X and Nano S Plus devices.
+- UX rehaul, especially on Nano X and Nano S Plus devices.
 
 ## [2.4.0] - 07-03-2025
 
