@@ -67,6 +67,10 @@ static bool io_ui_process(dispatcher_context_t *context) {
     UNUSED(context);
     G_was_processing_screen_shown = false;
 
+    // Setting `had_ux_flow` flag meaning that the UI interaction is launched
+    // This is now UI/NBGL that is responsible to return to Home screen
+    G_dispatcher_context.set_ui_dirty();
+
     g_ux_flow_ended = false;
 
     // We are not waiting for the client's input, nor we are doing computations on the device
