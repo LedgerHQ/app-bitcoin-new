@@ -221,6 +221,10 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         // This only happens on Flex and Stax, and only for complex policies. Therefore,
         // we use the workaround for non-default wallets, and only on NBGL devices.
         if (!is_wallet_default) {
+#ifdef REVAMPED_IO
+            io_seproxyhal_io_heartbeat();
+            io_seproxyhal_io_heartbeat();
+#endif  // REVAMPED_IO
             ui_menu_main();
         }
     }
