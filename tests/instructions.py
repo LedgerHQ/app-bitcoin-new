@@ -104,6 +104,18 @@ def register_wallet_instruction_approve(model: Firmware) -> Instructions:
     return instructions
 
 
+def register_wallet_instruction_approve_no_save(model: Firmware) -> Instructions:
+    instructions = Instructions(model)
+
+    if model.name.startswith("nano"):
+        instructions.new_request("Register account", save_screenshot=False)
+    else:
+        instructions.choice_confirm(save_screenshot=False)
+        instructions.choice_confirm(save_screenshot=False)
+        instructions.choice_confirm(save_screenshot=False)
+    return instructions
+
+
 def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
