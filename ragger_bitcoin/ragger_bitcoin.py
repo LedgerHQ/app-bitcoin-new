@@ -11,6 +11,7 @@ from ledger_bitcoin.client_base import print_response, print_apdu, ApduException
 
 from ragger.navigator import Navigator
 from ragger_bitcoin.ragger_instructions import Instructions
+from ragger.utils import pack_APDU
 
 TESTS_ROOT_DIR = Path(__file__).parent
 
@@ -75,10 +76,10 @@ class RaggerClient(NewClient):
             instruction_on_text = []
             save_screenshot = []
 
-        try:
-            sw, response = self._apdu_exchange(apdu, tick_timeout=1)
-        except TimeoutError:
-            with self.transport_client.exchange_async(**apdu):
+        cla, ins, p1, p2, data = apdu.values()
+        self.transport_client.apdu_timeout = 1.0;
+        with self.transport_client.exchange_async_raw(pack_APDU(cla, ins, p1, p2, data)) as done:
+            if not done:
                 for t, instr_approve, instr_next, compare in zip(text[index],
                                                                  instruction_on_text[index],
                                                                  instruction_until_text[index],
@@ -99,9 +100,8 @@ class RaggerClient(NewClient):
                                                       screen_change_after_last_instruction=False,
                                                       screen_change_before_first_instruction=True)
                     sub_index += 1
-
-            sw, response = self.last_async_response()
-            index += 1
+                index += 1
+        sw, response = self.last_async_response()
         return sw, response, index
 
     def _make_request_with_navigation(self, navigator: Navigator, apdu: dict, client_intepreter:
