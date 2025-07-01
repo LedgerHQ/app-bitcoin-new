@@ -217,7 +217,7 @@ class NewClient(Client):
         wallet_id = response[0:32]
         wallet_hmac = response[32:64]
 
-        # sanity check: for miniscripts, derive the first address independently with python-bip380
+        # sanity check: for miniscripts, derive the first address independently
         first_addr_device = self.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
 
         if first_addr_device != self._derive_address_for_policy(wallet, False, 0):
@@ -259,7 +259,7 @@ class NewClient(Client):
 
         result = response.decode()
 
-        # sanity check: for miniscripts, derive the address independently with python-bip380
+        # sanity check: for miniscripts, derive the address independently
 
         if result != self._derive_address_for_policy(wallet, change, address_index):
             raise RuntimeError("Invalid address. Please update your Bitcoin app. If the problem persists, report a bug at https://github.com/LedgerHQ/app-bitcoin-new")
