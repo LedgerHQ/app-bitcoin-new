@@ -1869,13 +1869,15 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
                                                     sighash))
                     return false;
             } else if (keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_MUSIG) {
-                if (!sign_sighash_musig_and_yield(dc,
-                                                  st,
-                                                  signing_state,
-                                                  keyexpr_info,
-                                                  input,
-                                                  cur_input_index,
-                                                  sighash))
+                // we only execute MuSig2 round 2 if there are pubnonces in the PSBT
+                // (otherwise, we are only here just for the other non-musig2 partial signatures)
+                if (st->has_musig2_pub_nonces && !sign_sighash_musig_and_yield(dc,
+                                                                               st,
+                                                                               signing_state,
+                                                                               keyexpr_info,
+                                                                               input,
+                                                                               cur_input_index,
+                                                                               sighash))
                     return false;
             } else {
                 LEDGER_ASSERT(false, "Unreachable");
