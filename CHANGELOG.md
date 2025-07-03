@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.4.1] - 09-06-2025
+## [2.4.1] - 03-07-2025
 
 ### Added
 
 ### Changed
 
 - UX rehaul, especially on Nano X and Nano S Plus devices.
+
+### Fixed
+
+- Signing failure for certain PSBTs with wallet policies containing both `musig()` and script paths.
 
 ## [2.4.0] - 07-03-2025
 

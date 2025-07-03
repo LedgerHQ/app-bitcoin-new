@@ -3,7 +3,7 @@ import pytest
 
 from pathlib import Path
 
-from ledger_bitcoin import WalletPolicy, MultisigWallet, AddressType, PartialSignature
+from ledger_bitcoin import MusigPubNonce, WalletPolicy, MultisigWallet, AddressType, PartialSignature
 from ledger_bitcoin.exception.errors import IncorrectDataError, NotSupportedError
 from ledger_bitcoin.exception.device_exception import DeviceException
 
@@ -1005,3 +1005,38 @@ def test_sign_psbt_multiple_derivation_paths(navigator: Navigator, firmware: Fir
                               testname=test_name)
 
     assert len(result) == 1
+
+def test_sign_psbt_musig_round1_and_other_sig(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Round 1 of MuSig for a policy with a musig and a normal script spending path, while signing it with
+    # a PSBT that contains enough info for both MuSig2 round 1, and the normal script path signature.
+    # Previously, the app would incorrectly attempt MuSig2 round 2, and fail to sign with an error.
+    #
+    # Note that in practice, we might expect wallets to either only do round 1 of MuSig2, or only the
+    # final signatures (possibly in conjunction with MuSig2 round 2, if anything).
+    # However, failure was nevertheless a logical error.
+
+    wallet = WalletPolicy(
+        name="musig with fallback",
+        descriptor_template="tr(musig(@0,@1)/**,{and_v(v:pk(@0/**),older(144)),and_v(v:pk(@1/**),older(432))})",
+        keys_info=[
+            "tpubD6NzVbkrYhZ4YAPXpMw61GrdqXJJEiYhHo6wxVkfwZgUged5qXm6Df4NLf8ZTFXxW1UhxDKGeKdAVxZtmodC8KfR7SqmW6LGQfDGfnFLmQ6",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+        ]
+    )
+    wallet_hmac = bytes.fromhex(
+        "d1fc94cc30046a53ff4e7d3ae4c6273f7f47f2477198b25d029b7f3caf97c089")
+
+    psbt_full_b64 = "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"
+
+    psbt = PSBT()
+    psbt.deserialize(psbt_full_b64)
+
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve(
+                                  firmware, has_spend_from_wallet=True, save_screenshot=False),
+                              testname=test_name)
+
+    # the result should contain exactly one MusigPubNonce and one PartialSignature,
+    assert len(result) == 2
+    assert any(isinstance(result[i][1], MusigPubNonce) for i in range(len(result)))
+    assert any(isinstance(result[i][1], PartialSignature) for i in range(len(result)))
