@@ -103,7 +103,8 @@ else ifeq ($(BITCOIN_NETWORK),mainnet)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
-    APPNAME = "Bitcoin"
+    # Setting APPNAME if not already set
+    APPNAME ?= "Bitcoin"
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
