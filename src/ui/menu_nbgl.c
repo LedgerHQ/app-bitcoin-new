@@ -33,18 +33,8 @@ static const nbgl_contentInfoList_t infoList = {
 
 extern void app_exit(void);
 
-void ui_menu_main_flow_bitcoin(void) {
-    nbgl_useCaseHomeAndSettings(APPNAME,
-                                &ICON_APP_HOME,
-                                NULL,
-                                INIT_HOME_PAGE,
-                                NULL,
-                                &infoList,
-                                NULL,
-                                app_exit);
-}
-
-void ui_menu_main_flow_bitcoin_testnet(void) {
+static void ui_menu_flow_bitcoin(void)
+{
     nbgl_useCaseHomeAndSettings(
         APPNAME,
         &ICON_APP_HOME,
@@ -58,4 +48,12 @@ void ui_menu_main_flow_bitcoin_testnet(void) {
         &infoList,
         NULL,
         app_exit);
+}
+
+void ui_menu_main_flow_bitcoin(void) {
+    ui_menu_flow_bitcoin();
+}
+
+void ui_menu_main_flow_bitcoin_testnet(void) {
+    ui_menu_flow_bitcoin();
 }
