@@ -6,6 +6,9 @@ from hashlib import sha256
 from .common import ByteStreamParser, sha256, write_varint
 from .merkle import MerkleTree, element_hash
 
+import logging
+LOG = logging.getLogger("ledger_bitcoin.client_command")
+
 
 class ClientCommandCode(IntEnum):
     YIELD = 0x10
@@ -58,6 +61,8 @@ class GetPreimageCommand(ClientCommand):
 
         req_hash = req.read_bytes(32)
         req.assert_empty()
+
+        LOG.debug("GetPreimageCommand")
 
         if req_hash in self.known_preimages:
             known_preimage = self.known_preimages[req_hash]
@@ -120,6 +125,8 @@ class GetMerkleLeafProofCommand(ClientCommand):
                 "This command should not execute when the queue is not empty."
             )
 
+        LOG.debug("GetMerkleLeafProofCommand leaf_index=%d", leaf_index)
+
         proof = mt.prove_leaf(leaf_index)
 
         # Compute how many elements we can fit in 255 - 32 - 1 - 1 = 221 bytes
@@ -158,12 +165,16 @@ class GetMerkleLeafIndexCommand(ClientCommand):
         if root not in self.known_trees:
             raise ValueError(f"Unknown Merkle root: {root.hex()}.")
 
+        LOG.debug("GetMerkleLeafIndexCommand root=%s, leaf=%s", root.hex(), leaf_hash.hex())
+
         try:
             leaf_index = self.known_trees[root].leaf_index(leaf_hash)
             found = 1
         except ValueError:
             leaf_index = 0
             found = 0
+
+        LOG.debug("found=%d", found)
 
         return found.to_bytes(1, byteorder="big") + write_varint(leaf_index)
 
@@ -197,6 +208,8 @@ class GetMoreElementsCommand(ClientCommand):
         while len(self.queue) > 0 and len(response_elements) + element_len <= 253:
             response_elements.extend(self.queue.popleft())
             n_added_elements += 1
+
+        LOG.debug("GetMoreElementsCommand n_added_elements=%d", n_added_elements)
 
         return b"".join(
             [
