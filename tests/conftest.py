@@ -16,7 +16,7 @@ import shutil
 from test_utils import segwit_addr
 from test_utils.authproxy import AuthServiceProxy, JSONRPCException
 from test_utils.fixtures import *
-from typing import Tuple
+from typing import List, Tuple
 import random
 from bip32 import BIP32
 
@@ -32,6 +32,16 @@ MNEMONIC = "glory promote mansion idle axis finger extra february uncover one tr
 configuration.OPTIONAL.CUSTOM_SEED = MNEMONIC
 configuration.OPTIONAL.BACKEND_SCOPE = "function"
 
+
+@pytest.fixture
+def additional_speculos_arguments(request) -> List[str]:
+    # if the --speculos_port argument is given, instruct ragger to use the given port
+    # instead of using a dynamically allocated port
+    speculos_port = request.config.getoption("--speculos_port")
+    if speculos_port is None:
+        return []
+    else:
+        return ["--api-port", str(speculos_port)]
 
 #########################
 ### CONFIGURATION END ###
