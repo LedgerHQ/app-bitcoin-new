@@ -57,7 +57,7 @@ static const uint8_t BIP0341_NUMS_PUBKEY[] = {0x02, 0x50, 0x92, 0x9b, 0x74, 0xc1
  * it.
  */
 void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version) {
-    (void) protocol_version;
+    UNUSED(protocol_version);
 
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -224,24 +224,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         return;
     }
 
-#ifdef HAVE_BAGL
-    // show wallet header
-    if (!ui_display_register_wallet(dc, &wallet_header, (char *) policy_map_descriptor)) {
-        SEND_SW(dc, SW_DENY);
-        return;
-    }
-    // show each cosigner
-    for (size_t cosigner_index = 0; cosigner_index < wallet_header.n_keys; cosigner_index++) {
-        if (!ui_display_policy_map_cosigner_pubkey(dc,
-                                                   keys_info[cosigner_index],
-                                                   cosigner_index,  // 1-indexed for the UI
-                                                   wallet_header.n_keys,
-                                                   keys_type[cosigner_index])) {
-            SEND_SW(dc, SW_DENY);
-            return;
-        }
-    }
-#else
     // show wallet policy
     if (!ui_display_register_wallet_policy(dc,
                                            &wallet_header,
@@ -251,7 +233,6 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
         SEND_SW(dc, SW_DENY);
         return;
     }
-#endif
 
     struct {
         uint8_t wallet_id[32];

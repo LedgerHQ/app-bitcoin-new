@@ -2,30 +2,15 @@
   "version": 1,
   "rules": [
     {
-      "regexp": "Path|Message hash|Message content",
+      "regexp": "Review message|Path|Message hash|Message",
       "actions": [
         ["button", 2, true],
         ["button", 2, false]
       ]
     },
     {
-      "regexp": "Sign",
-      "conditions": [
-        [ "seen", false ]
-      ],
+      "regexp": "Sign message",
       "actions": [
-        ["setbool", "seen", true],
-        ["button", 2, true],
-        ["button", 2, false]
-      ]
-    },
-    {
-      "regexp": "Sign",
-      "conditions": [
-        [ "seen", true ]
-      ],
-      "actions": [
-        ["setbool", "seen", true],
         [ "button", 1, true ],
         [ "button", 2, true ],
         [ "button", 2, false ],

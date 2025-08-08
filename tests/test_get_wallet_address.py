@@ -6,10 +6,12 @@ from ledger_bitcoin import Client, AddressType, MultisigWallet, WalletPolicy
 from ledger_bitcoin.exception.errors import IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from ragger.error import ExceptionRAPDU
+from ragger.navigator import Navigator
+from ragger.firmware import Firmware
 from ragger_bitcoin import RaggerClient
 
 from .conftest import testnet_to_regtest_addr as T
-
+from .instructions import register_wallet_instruction_approve_no_save
 import pytest
 
 from test_utils import SpeculosGlobals
@@ -466,3 +468,22 @@ def test_get_wallet_address_miniscript_all_fragments(client: Client, speculos_gl
         desc_tmpl = f"tr(@{n_keys}/**,and_b(pk(@{n_keys+1}/**),{prepend_a(fr)}))"
 
         generate_address_and_compare_with_core(desc_tmpl)
+
+
+def test_get_wallet_address_with_register_complex_policy(navigator: Navigator, firmware: Firmware, client: RaggerClient):
+    wallet = WalletPolicy(
+        name="Large vault",
+        descriptor_template="wsh(or_d(pk(@0/**),andor(thresh(1,utv:thresh(1,pkh(@1/**),a:pkh(@2/**)),autv:thresh(1,pkh(@3/**),a:pkh(@4/**))),after(1685577600),and_v(v:and_v(v:pkh(@5/**),thresh(1,pkh(@6/**))),after(1685318400)))))",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm",
+            "tpubDBG4243k8CoMT4ww2YRXqt7JuNmokyhnGuafJbfS23tRKV4781VVkKk1ixpng8YBGwjUET5GNosFm3hzHNaWF42yT2ecePKjMQzaXXJZyAW",
+            "tpubDAiWEbC7QuJJotVogJ2RAvPN1CvusLxjy3TcDqNvMmq9GYbfFMNJz8RnfoJ9G3LrzaRGUvQhhd4hcxAJeFnvqtHC7QZjZmLcc6JLHjeGMEV",
+            "tpubDBkRcZC1RC7AV25Tj5ryqHVb5R49yFCTY6RF2SLeH3V1uoYSpCKFx9Qm3oc6VZrkZjxbzqpPD9jZ37Damsi52TcAHYrKMw8V8h28SCZhnBa",
+            "tpubDBFTZUd84kqqQrrn5oiWKYiGvLJ1wRH5mf9cDJYGQ3mrXugLhkDmzgxatAta893Mfi7TJxW3kvbST3Vzzc5PWXxFxoWRiy1WkyaWMbFHHDb",
+            "tpubDBZc4zT3Mg1BB6abm3DvuPN9ok4wVARc4qWgE6FYqKjMFXGRvt6mYj7iPBc57egyv5Rfqs1YhiDwAzyGK7AnAaeLFkH92Phso4aXWej7rub",
+            "tpubDAmmxPiLsNJEmR7dxWyMrQEW8QjaKF2GufGSoDuKHQHyXozuZpAdgY3JQBsoGFA9MtjySbZfhgbtJzMZXvisBwymPcpWY5XuWMtscKTHUZc",
+        ])
+    _, wallet_hmac = client.register_wallet(wallet, navigator, instructions=register_wallet_instruction_approve_no_save(firmware))
+
+    res = client.get_wallet_address(wallet, wallet_hmac, 0, 0, False)
+    assert res != None

@@ -15,10 +15,10 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#ifdef HAVE_NBGL
 #include "nbgl_use_case.h"
 
 #include "../globals.h"
+#include "./display.h"
 #include "menu.h"
 
 #define SETTING_INFO_NB 3
@@ -31,31 +31,31 @@ static const nbgl_contentInfoList_t infoList = {
     .infoContents = INFO_CONTENTS,
 };
 
-static void exit(void) {
-    os_sched_exit(-1);
-}
+extern void app_exit(void);
 
 void ui_menu_main_flow_bitcoin(void) {
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_Bitcoin_64px,
+                                &ICON_APP_HOME,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,
                                 &infoList,
                                 NULL,
-                                exit);
+                                app_exit);
 }
 
 void ui_menu_main_flow_bitcoin_testnet(void) {
     nbgl_useCaseHomeAndSettings(
         "Bitcoin Testnet",
-        &C_Bitcoin_64px,
+        &ICON_APP_HOME,
+#ifdef SCREEN_SIZE_WALLET
         "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+#else
+        NULL,
+#endif
         INIT_HOME_PAGE,
         NULL,
         &infoList,
         NULL,
-        exit);
+        app_exit);
 }
-
-#endif  // HAVE_NBGL

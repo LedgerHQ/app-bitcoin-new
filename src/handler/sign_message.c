@@ -33,6 +33,8 @@
 #define MAX_DISPLAYBLE_CHUNK_NUMBER \
     (5 * MESSAGE_CHUNK_PER_DISPLAY)  // If the message is too long we will not display it
 
+extern const char GA_LOADING_MESSAGE[];
+
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
@@ -122,6 +124,9 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return;
     }
+
+    /* Setting message loading information screen */
+    ui_set_processing_screen_text(GA_LOADING_MESSAGE);
 
     char path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1] = "(Master key)";
     if (bip32_path_len > 0) {

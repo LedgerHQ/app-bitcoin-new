@@ -20,10 +20,8 @@
 
 #include "os.h"
 #include "ux.h"
-#ifdef HAVE_NBGL
 #include "nbgl_touch.h"
 #include "nbgl_use_case.h"
-#endif  // HAVE_NBGL
 
 #include "io.h"
 #include "globals.h"
@@ -33,6 +31,7 @@
 
 #include "dispatcher.h"
 #include "../swap/swap_globals.h"
+#include "../ui/display.h"
 
 uint16_t G_output_len = 0;
 
@@ -51,15 +50,6 @@ bool G_was_processing_screen_shown;
 
 uint16_t G_interruption_timeout_start_tick;
 uint16_t G_processing_timeout_start_tick;
-
-#ifdef HAVE_BAGL
-UX_STEP_NOCB(ux_processing_flow_1_step, pn, {&C_icon_processing, "Processing..."});
-UX_FLOW(ux_processing_flow, &ux_processing_flow_1_step);
-
-void io_seproxyhal_display(const bagl_element_t *element) {
-    io_seproxyhal_display_default((bagl_element_t *) element);
-}
-#endif  // HAVE_BAGL
 
 void io_start_interruption_timeout() {
     G_interruption_timeout_start_tick = G_ticks;
@@ -89,24 +79,17 @@ void io_show_processing_screen() {
     if (!G_was_processing_screen_shown) {
         G_was_processing_screen_shown = true;
         if (!G_swap_state.called_from_swap) {
-#ifdef HAVE_BAGL
-            ux_flow_init(0, ux_processing_flow, NULL);
-#endif  // HAVE_BAGL
-#ifdef HAVE_NBGL
-            nbgl_useCaseSpinner("Processing");
-#endif  // HAVE_NBGL
+            nbgl_useCaseSpinner(ui_get_processing_screen_text());
         }
     }
 }
 
 uint8_t io_event(uint8_t channel) {
-    (void) channel;
+    UNUSED(channel);
 
     switch (G_io_seproxyhal_spi_buffer[0]) {
         case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
-#ifdef HAVE_BAGL
             UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
-#endif  // HAVE_BAGL
             break;
         case SEPROXYHAL_TAG_STATUS_EVENT:
             if (G_io_apdu_media == IO_APDU_MEDIA_USB_HID &&  //
@@ -116,18 +99,13 @@ uint8_t io_event(uint8_t channel) {
             }
             __attribute__((fallthrough));
         case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
-#ifdef HAVE_BAGL
-            UX_DISPLAYED_EVENT({});
-#endif  // HAVE_BAGL
-#ifdef HAVE_NBGL
             UX_DEFAULT_EVENT();
-#endif  // HAVE_NBGL
             break;
-#ifdef HAVE_NBGL
+#ifdef SCREEN_SIZE_WALLET
         case SEPROXYHAL_TAG_FINGER_EVENT:
             UX_FINGER_EVENT(G_io_seproxyhal_spi_buffer);
             break;
-#endif  // HAVE_NBGL
+#endif  // SCREEN_SIZE_WALLET
         case SEPROXYHAL_TAG_TICKER_EVENT:
             ++G_ticks;
 

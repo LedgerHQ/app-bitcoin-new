@@ -11,12 +11,6 @@
 
 #include "./display.h"
 
-#ifdef HAVE_BAGL
-#define SET_UX_DIRTY true
-#else
-#define SET_UX_DIRTY false
-#endif
-
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
 
@@ -29,6 +23,13 @@ static int g_current_streaming_index;
 extern dispatcher_context_t G_dispatcher_context;
 
 ui_state_t g_ui_state;
+
+/*
+ * Pointer to the text to be shown when processing.
+ * If set to NULL, a default message is shown,
+ * otherwise it must be a pointer to a valid 0-terminated string.
+ */
+char const *G_processing_screen_text;
 
 void send_deny_sw(dispatcher_context_t *dc) {
     SEND_SW(dc, SW_DENY);
@@ -61,17 +62,16 @@ void decrease_streaming_index(void) {
 }
 
 // Process UI events until the current flow terminates; does not handle any APDU exchange
-// This method also sets the UI state as "dirty" according to the input parameter
-// so that the dispatcher refreshes resets the UI at the end of the command handler.
 // Returns true/false depending if the user accepted in the corresponding UX flow.
-static bool io_ui_process(dispatcher_context_t *context, bool set_dirty) {
+static bool io_ui_process(dispatcher_context_t *context) {
+    UNUSED(context);
     G_was_processing_screen_shown = false;
 
-    g_ux_flow_ended = false;
+    // Setting `had_ux_flow` flag meaning that the UI interaction is launched
+    // This is now UI/NBGL that is responsible to return to Home screen
+    G_dispatcher_context.set_ui_dirty();
 
-    if (set_dirty) {
-        context->set_ui_dirty();
-    }
+    g_ux_flow_ended = false;
 
     // We are not waiting for the client's input, nor we are doing computations on the device
     io_clear_processing_timeout();
@@ -114,7 +114,7 @@ bool ui_display_pubkey(dispatcher_context_t *context,
         ui_display_pubkey_suspicious_flow();
     }
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_display_path_and_message_content(dispatcher_context_t *context,
@@ -130,7 +130,7 @@ bool ui_display_path_and_message_content(dispatcher_context_t *context,
 
     ui_sign_message_content_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
@@ -146,7 +146,7 @@ bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
 
     ui_sign_message_path_hash_and_confirm_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_display_message_confirm(dispatcher_context_t *context) {
@@ -154,70 +154,12 @@ bool ui_display_message_confirm(dispatcher_context_t *context) {
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_sign_message_confirm_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
-#ifdef HAVE_BAGL
-bool ui_display_register_wallet(dispatcher_context_t *context,
-                                const policy_map_wallet_header_t *wallet_header,
-                                const char *policy_descriptor) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    ui_wallet_state_t *state = (ui_wallet_state_t *) &g_ui_state;
-
-    strncpy(state->wallet_name, wallet_header->name, sizeof(state->wallet_name));
-    state->wallet_name[wallet_header->name_len] = 0;
-    strncpy(state->descriptor_template, policy_descriptor, sizeof(state->descriptor_template));
-    state->descriptor_template[wallet_header->descriptor_template_len] = 0;
-
-    ui_display_register_wallet_flow();
-
-    return io_ui_process(context, SET_UX_DIRTY);
-}
-
-bool ui_display_policy_map_cosigner_pubkey(dispatcher_context_t *context,
-                                           const char *pubkey,
-                                           uint8_t cosigner_index,
-                                           uint8_t n_keys,
-                                           key_type_e key_type) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    (void) (n_keys);
-
-    ui_cosigner_pubkey_and_index_state_t *state =
-        (ui_cosigner_pubkey_and_index_state_t *) &g_ui_state;
-
-    strncpy(state->pubkey, pubkey, sizeof(state->pubkey));
-
-    if (key_type == PUBKEY_TYPE_INTERNAL) {
-        snprintf(state->signer_index, sizeof(state->signer_index), "Key @%u, ours", cosigner_index);
-    } else if (key_type == PUBKEY_TYPE_EXTERNAL) {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u, theirs",
-                 cosigner_index);
-    } else if (key_type == PUBKEY_TYPE_UNSPENDABLE) {
-        snprintf(state->signer_index,
-                 sizeof(state->signer_index),
-                 "Key @%u, dummy",
-                 cosigner_index);
-    } else {
-        LEDGER_ASSERT(false, "Unreachable code");
-    }
-    ui_display_policy_map_cosigner_pubkey_flow();
-
-    return io_ui_process(context, SET_UX_DIRTY);
-}
-#endif
-
-#ifdef HAVE_NBGL
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
     const policy_map_wallet_header_t *wallet_header,
@@ -238,24 +180,32 @@ bool ui_display_register_wallet_policy(
     state->descriptor_template = descriptor_template;
     for (size_t i = 0; i < wallet_header->n_keys; i++) {
         state->keys_info[i] = (*keys_info)[i];
+#ifdef SCREEN_SIZE_WALLET
+        const char labels[3][20] = {"internal", "external", "unspendable"};
+#else
+        const char labels[3][20] = {"ours", "theirs", "dummy"};
+#endif
         switch ((*keys_type)[i]) {
             case PUBKEY_TYPE_INTERNAL:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, internal",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[0]);
                 break;
             case PUBKEY_TYPE_EXTERNAL:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, external",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[1]);
                 break;
             case PUBKEY_TYPE_UNSPENDABLE:
                 snprintf(state->keys_label[i],
                          sizeof(state->keys_label[i]),
-                         "Key @%u, unspendable",
-                         i);
+                         "Key @%u, %s",
+                         i,
+                         labels[2]);
                 break;
             default:
                 LEDGER_ASSERT(false, "Unreachable code");
@@ -264,10 +214,8 @@ bool ui_display_register_wallet_policy(
 
     ui_display_register_wallet_policy_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
-
-#endif  // HAVE_NBGL
 
 bool ui_display_wallet_address(dispatcher_context_t *context,
                                const char *wallet_name,
@@ -287,7 +235,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
         ui_display_receive_in_wallet_flow();
     }
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name) {
@@ -300,7 +248,7 @@ bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet
     strncpy(state->wallet_name, wallet_name, sizeof(state->wallet_name));
     ui_display_spend_from_wallet_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
@@ -309,7 +257,7 @@ bool ui_warn_external_inputs(dispatcher_context_t *context) {
 #endif
 
     ui_display_warning_external_inputs_flow();
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
@@ -318,7 +266,7 @@ bool ui_warn_unverified_segwit_inputs(dispatcher_context_t *context) {
 #endif
 
     ui_display_unverified_segwit_inputs_flows();
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
@@ -327,7 +275,7 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
 #endif
 
     ui_display_nondefault_sighash_flow();
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_transaction_prompt(dispatcher_context_t *context) {
@@ -336,7 +284,7 @@ bool ui_transaction_prompt(dispatcher_context_t *context) {
 #endif
 
     ui_display_transaction_prompt();
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_validate_output(dispatcher_context_t *context,
@@ -362,7 +310,7 @@ bool ui_validate_output(dispatcher_context_t *context,
         ui_display_output_address_amount_flow(index);
     }
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_warn_high_fee(dispatcher_context_t *context) {
@@ -372,7 +320,7 @@ bool ui_warn_high_fee(dispatcher_context_t *context) {
 
     ui_warn_high_fee_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
 bool ui_validate_transaction(dispatcher_context_t *context,
@@ -389,10 +337,9 @@ bool ui_validate_transaction(dispatcher_context_t *context,
 
     ui_accept_transaction_flow(is_self_transfer);
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
 
-#ifdef HAVE_NBGL
 bool ui_validate_transaction_simplified(dispatcher_context_t *context,
                                         const char *coin_name,
                                         const char *wallet_policy_name,
@@ -428,37 +375,15 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
 
     ui_accept_transaction_simplified_flow();
 
-    return io_ui_process(context, SET_UX_DIRTY);
+    return io_ui_process(context);
 }
-#endif  // HAVE_NBGL
-
-#ifdef HAVE_BAGL
-
-bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
-
-bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success) {
-    (void) context;
-    (void) success;
-    return true;
-}
-
-void ui_pre_processing_message(void) {
-    return;
-}
-#endif  // HAVE_BAGL
-
-#ifdef HAVE_NBGL
 
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_display_post_processing_confirm_transaction(success);
 
     return true;
@@ -469,7 +394,7 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     return true;
 #endif
 
-    (void) context;
+    UNUSED(context);
     ui_display_post_processing_confirm_message(success);
 
     return true;
@@ -478,4 +403,11 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
 void ui_pre_processing_message(void) {
     ui_set_display_prompt();
 }
-#endif  // HAVE_NBGL
+
+char const *ui_get_processing_screen_text(void) {
+    return (G_processing_screen_text != NULL) ? G_processing_screen_text : "Loading";
+}
+
+void ui_set_processing_screen_text(const char *text) {
+    G_processing_screen_text = text;
+}

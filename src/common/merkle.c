@@ -24,7 +24,7 @@
 
 #include "merkle.h"
 
-#include "debug-helpers/debug.h"
+#include "../debug-helpers/debug.h"
 
 #include "ledger_assert.h"
 

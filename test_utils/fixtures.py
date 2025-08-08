@@ -48,6 +48,8 @@ def get_app_version() -> str:
     return f"{assignments['APPVERSION_M']}.{assignments['APPVERSION_N']}.{assignments['APPVERSION_P']}"
 
 
+DEFAULT_SPECULOS_PORT = 5000
+
 def pytest_addoption(parser):
     parser.addoption("--hid", action="store_true")
     parser.addoption("--headless", action="store_true")
@@ -61,7 +63,21 @@ def pytest_addoption(parser):
         help="If 0, skip slow tests. If set or equal to 1, enable some slow tests. Greater values enable even slower tests.",
     )
     parser.addoption("--model", action="store", default="nanosp")
-
+    parser.addoption(
+        "--speculos_port",
+        action="store",
+        nargs="?",
+        const=DEFAULT_SPECULOS_PORT, # Use the default speculos port if the option is given without a value
+        default=None,                # None when option not given at all
+        type=int,
+        metavar="N",
+        help=(
+            "port number to use for speculos. Useful to run tests against a running speculos instance. If you pass "
+            f"--speculos_port with no value the default ({DEFAULT_SPECULOS_PORT}) is used; omit the flag entirely "
+            "to let ragger launch speculos and manage the port automatically. The option is useful to run tests "
+            "against a running speculos instance."
+        ),
+    )
 
 @pytest.fixture(scope="module")
 def sw_h_path() -> Path:
