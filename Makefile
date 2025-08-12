@@ -35,6 +35,11 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
+ifndef APP_DEVELOPER
+APP_DEVELOPER = "Ledger"
+endif
+
+
 # TODO: Compile with the right path restrictions
 #
 #       The right path restriction would be something like
@@ -79,6 +84,8 @@ HAVE_APPLICATION_FLAG_LIBRARY = 0
 $(info APP_DESCRIPTION is $(APP_DESCRIPTION))
 
 CFLAGS += -DAPP_DESCRIPTION=\"$(APP_DESCRIPTION)\"
+
+CFLAGS += -DAPP_DEVELOPER=\"$(APP_DEVELOPER)\"
 
 ifeq ($(BITCOIN_NETWORK),testnet)
     # Bitcoin testnet, no legacy support
