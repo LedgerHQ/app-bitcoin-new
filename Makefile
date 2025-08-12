@@ -35,6 +35,10 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
+ifndef APP_DEVELOPER
+APP_DEVELOPER = "Ledger"
+endif
+
 # Application allowed derivation curves.
 CURVE_APP_LOAD_PARAMS = secp256k1
 
@@ -56,6 +60,12 @@ endif
 ########################################
 HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
 HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
+
+$(info APP_DESCRIPTION is $(APP_DESCRIPTION))
+
+CFLAGS += -DAPP_DESCRIPTION=\"$(APP_DESCRIPTION)\"
+
+CFLAGS += -DAPP_DEVELOPER=\"$(APP_DEVELOPER)\"
 
 ifeq ($(BITCOIN_NETWORK),testnet)
     # Application allowed derivation paths (testnet) + exception for Electrum + BIP-45 whole tree
