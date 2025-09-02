@@ -1,6 +1,6 @@
 # Ledger Bitcoin Application
 
-This is the Bitcoin application for Ledger Nano X/SP, Stax and Flex.
+This is the Bitcoin application for Ledger devices.
 
 ## Quick start guide
 
@@ -78,6 +78,8 @@ You can choose which device to compile and load for by setting the `BOLOS_SDK` e
 * `BOLOS_SDK=$NANOX_SDK`
 * `BOLOS_SDK=$NANOSP_SDK`
 * `BOLOS_SDK=$STAX_SDK`
+* `BOLOS_SDK=$FLEX_SDK`
+* `BOLOS_SDK=$APEX_P_SDK`
 
 By default this variable is set to build/load for Nano S+.
 

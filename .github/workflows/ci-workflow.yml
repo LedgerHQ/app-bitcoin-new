@@ -13,7 +13,7 @@ on:
 
 jobs:
   job_build:
-    name: Compilation for X, S+, Stax and Flex
+    name: Compilation for X, S+, Stax, Flex and Apex P
 
     strategy:
       matrix:
@@ -26,6 +26,8 @@ jobs:
             SDK: "$STAX_SDK"
           - model: flex
             SDK: "$FLEX_SDK"
+          - model: apex_p
+            SDK: "$APEX_P_SDK"
 
     runs-on: ubuntu-latest
 
@@ -113,7 +115,7 @@ jobs:
           name: codecov-app-bitcoin
           fail_ci_if_error: true
           verbose: true
-      
+
       - name: HTML documentation
         run: doxygen .doxygen/Doxyfile
 
@@ -131,6 +133,7 @@ jobs:
           - model: nanosp
           - model: stax
           - model: flex
+          - model: apex_p
 
     needs: job_build
     runs-on: ubuntu-latest
@@ -157,7 +160,7 @@ jobs:
           path: bin
 
       - name: Install build dependencies
-        run: apt update && apt install -y build-essential          
+        run: apt update && apt install -y build-essential
 
       - name: Run tests
         run: |
