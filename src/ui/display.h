@@ -20,10 +20,14 @@
 #define MESSAGE_MAX_DISPLAY_SIZE \
     (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
 
-#ifdef SCREEN_SIZE_WALLET
+#if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT C_Important_Circle_64px
 #define ICON_APP_HOME      C_Bitcoin_64px
 #define ICON_APP_ACTION    C_Bitcoin_64px
+#elif defined(TARGET_APEX_P)
+#define ICON_APP_IMPORTANT C_Important_Circle_48px
+#define ICON_APP_HOME      C_Bitcoin_48px
+#define ICON_APP_ACTION    C_Bitcoin_48px
 #else
 #define ICON_APP_IMPORTANT C_icon_warning
 #define ICON_APP_HOME      C_bitcoin_logo
