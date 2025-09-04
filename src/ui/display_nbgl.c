@@ -179,21 +179,21 @@ void ui_accept_transaction_simplified_flow(void) {
         pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = GA_UNVERIFIED_INPUTS,
                                                     .value = "",
                                                     .centeredInfo = true,
-                                                    .valueIcon = &ICON_APP_IMPORTANT};
+                                                    .valueIcon = &IMPORTANT_CIRCLE_ICON};
     }
     if (g_ui_state.validate_transaction_simplified.warnings.external_inputs) {
         pairs[n_pairs++] =
             (nbgl_contentTagValue_t){.item = "There are external inputs\nReject if not sure",
                                      .value = "",
                                      .centeredInfo = true,
-                                     .valueIcon = &ICON_APP_IMPORTANT};
+                                     .valueIcon = &IMPORTANT_CIRCLE_ICON};
     }
     if (g_ui_state.validate_transaction_simplified.warnings.non_default_sighash) {
         pairs[n_pairs++] =
             (nbgl_contentTagValue_t){.item = "Non-default sighash\nReject if not sure",
                                      .value = "",
                                      .centeredInfo = true,
-                                     .valueIcon = &ICON_APP_IMPORTANT};
+                                     .valueIcon = &IMPORTANT_CIRCLE_ICON};
     }
 
     if (g_ui_state.validate_transaction_simplified.has_wallet_policy) {
@@ -227,7 +227,7 @@ void ui_accept_transaction_simplified_flow(void) {
         pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = "Fees are above 10%\n of total amount",
                                                     .value = "",
                                                     .centeredInfo = true,
-                                                    .valueIcon = &ICON_APP_IMPORTANT};
+                                                    .valueIcon = &IMPORTANT_CIRCLE_ICON};
     }
 
     pairList.nbPairs = n_pairs;
@@ -408,7 +408,7 @@ void ui_display_pubkey_suspicious_flow(void) {
     contentList[0].contentActionCallback = NULL;
 
     contentList[1].type = CENTERED_INFO;
-    contentList[1].content.centeredInfo.icon = &ICON_APP_IMPORTANT;
+    contentList[1].content.centeredInfo.icon = &IMPORTANT_CIRCLE_ICON;
     contentList[1].content.centeredInfo.text1 = "WARNING";
     contentList[1].content.centeredInfo.text2 = "The derivation path\nis unusual";
 #ifdef SCREEN_SIZE_WALLET
@@ -569,7 +569,7 @@ void ui_display_default_wallet_address_flow(void) {
 
 // Warning Flows
 void ui_warn_high_fee_flow(void) {
-    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
+    nbgl_useCaseChoice(&IMPORTANT_CIRCLE_ICON,
                        "Warning",
                        "Fees are above 10%\n of total amount",
                        "Continue",
@@ -578,7 +578,7 @@ void ui_warn_high_fee_flow(void) {
 }
 
 void ui_display_warning_external_inputs_flow(void) {
-    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
+    nbgl_useCaseChoice(&IMPORTANT_CIRCLE_ICON,
                        "Warning",
                        "There are external inputs",
                        "Continue",
@@ -587,7 +587,7 @@ void ui_display_warning_external_inputs_flow(void) {
 }
 
 void ui_display_unverified_segwit_inputs_flows(void) {
-    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
+    nbgl_useCaseChoice(&IMPORTANT_CIRCLE_ICON,
                        "Warning",
                        GA_UNVERIFIED_INPUTS,
                        "Continue",
@@ -596,7 +596,7 @@ void ui_display_unverified_segwit_inputs_flows(void) {
 }
 
 void ui_display_nondefault_sighash_flow(void) {
-    nbgl_useCaseChoice(&ICON_APP_IMPORTANT,
+    nbgl_useCaseChoice(&IMPORTANT_CIRCLE_ICON,
                        "Warning",
                        "Non-default sighash",
                        "Continue",

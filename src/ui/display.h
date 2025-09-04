@@ -20,14 +20,12 @@
 #define MESSAGE_MAX_DISPLAY_SIZE \
     (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
 
-#ifdef SCREEN_SIZE_WALLET
-#define ICON_APP_IMPORTANT C_Important_Circle_64px
+#if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_HOME      C_App_64px
 #define ICON_APP_ACTION    C_App_64px
-#else
-#define ICON_APP_IMPORTANT C_icon_warning
-#define ICON_APP_HOME      C_app_logo
-#define ICON_APP_ACTION    C_app_logo_inv
+#elif defined(TARGET_APEX_P)
+#define ICON_APP_HOME      C_App_48px
+#define ICON_APP_ACTION    C_App_48px
 #endif
 
 typedef struct tx_ux_warning_s {
