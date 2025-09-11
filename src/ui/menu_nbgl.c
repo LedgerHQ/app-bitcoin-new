@@ -23,7 +23,7 @@
 
 #define SETTING_INFO_NB 3
 static const char* const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer", "Copyright"};
-static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Ledger", "(c) 2025 Ledger"};
+static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, APP_DEVELOPER, "(c) 2025 Ledger"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = SETTING_INFO_NB,
@@ -33,23 +33,13 @@ static const nbgl_contentInfoList_t infoList = {
 
 extern void app_exit(void);
 
-void ui_menu_main_flow_bitcoin(void) {
-    nbgl_useCaseHomeAndSettings(APPNAME,
-                                &ICON_APP_HOME,
-                                NULL,
-                                INIT_HOME_PAGE,
-                                NULL,
-                                &infoList,
-                                NULL,
-                                app_exit);
-}
-
-void ui_menu_main_flow_bitcoin_testnet(void) {
+static void ui_menu_flow_bitcoin(void)
+{
     nbgl_useCaseHomeAndSettings(
-        "Bitcoin Testnet",
+        APPNAME,
         &ICON_APP_HOME,
 #ifdef SCREEN_SIZE_WALLET
-        "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+        APP_DESCRIPTION,
 #else
         NULL,
 #endif
@@ -58,4 +48,12 @@ void ui_menu_main_flow_bitcoin_testnet(void) {
         &infoList,
         NULL,
         app_exit);
+}
+
+void ui_menu_main_flow_bitcoin(void) {
+    ui_menu_flow_bitcoin();
+}
+
+void ui_menu_main_flow_bitcoin_testnet(void) {
+    ui_menu_flow_bitcoin();
 }

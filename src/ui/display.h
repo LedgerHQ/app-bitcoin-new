@@ -22,16 +22,16 @@
 
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
-#define ICON_APP_HOME      C_Bitcoin_64px
-#define ICON_APP_ACTION    C_Bitcoin_64px
+#define ICON_APP_HOME      C_App_64px
+#define ICON_APP_ACTION    C_App_64px
 #elif defined(TARGET_APEX_P)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
-#define ICON_APP_HOME      C_Bitcoin_48px
-#define ICON_APP_ACTION    C_Bitcoin_48px
+#define ICON_APP_HOME      C_App_48px
+#define ICON_APP_ACTION    C_App_48px
 #else
 #define ICON_APP_IMPORTANT C_icon_warning
-#define ICON_APP_HOME      C_bitcoin_logo
-#define ICON_APP_ACTION    C_bitcoin_logo_inv
+#define ICON_APP_HOME      C_app_logo
+#define ICON_APP_ACTION    C_app_logo_inv
 #endif
 
 typedef struct tx_ux_warning_s {
@@ -135,6 +135,13 @@ extern ui_state_t g_ui_state;
  * Callback to reuse action with approve/reject in step FLOW.
  */
 typedef void (*action_validate_cb)(dispatcher_context_t *dispatcher_context, bool);
+
+/** 
+ * Process UI events until the current flow terminates; it does not handle any APDU exchange.
+ * Used to allow a command handler to process UX events to allow for user interaction during
+ * the execution of a command.
+ */
+bool io_ui_process(dispatcher_context_t *context);
 
 /**
  * Display the derivation path and pubkey, and asks the confirmation to export.
