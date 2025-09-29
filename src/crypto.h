@@ -300,7 +300,7 @@ int get_extended_pubkey_at_path(const uint32_t bip32_path[],
  * @param[in]  label
  *   Pointer to the label. The first byte of the label must be 0x00 to comply with SLIP-0021.
  * @param[in]  label_len
- *   Length of the label.
+ *   Length of the label. It must be at most 32 bytes.
  * @param[out] key
  *   Pointer to a 32-byte output buffer that will contain the generated key.
  */

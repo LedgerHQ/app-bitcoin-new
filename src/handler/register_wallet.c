@@ -250,7 +250,10 @@ void handler_register_wallet(dispatcher_context_t *dc, uint8_t protocol_version)
     //       And the signature would be on the concatenation of the wallet id and the metadata.
     //       The client must persist the metadata, together with the signature.
 
-    compute_wallet_hmac(wallet_id, response.hmac);
+    if (!compute_wallet_hmac(wallet_id, response.hmac)) {
+        SEND_SW(dc, SW_BAD_STATE);  // this should never fail
+        return;
+    }
 
     SEND_RESPONSE(dc, &response, sizeof(response), SW_OK);
 }
