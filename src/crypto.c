@@ -275,11 +275,17 @@ uint32_t crypto_get_master_key_fingerprint() {
 }
 
 bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]) {
-    // TODO: is there a better way?
-    //       The label is a byte string in SLIP-0021, but os_derive_bip32_with_seed_no_throw
-    //       accesses the `path` argument as an array of uint32_t, causing a device freeze if memory
-    //       is not aligned.
+    // The label is a byte string in SLIP-0021, but os_derive_bip32_with_seed_no_throw
+    // accesses the `path` argument as an array of uint32_t, causing a device freeze if memory
+    // is not aligned.
+    // As a workaround, we copy the label into a local buffer aligned to 4 bytes.
+
     uint8_t label_copy[32] __attribute__((aligned(4)));
+
+    // Fail if the length of the buffer is longer than the local buffer
+    if (label_len > sizeof(label_copy)) {
+        return false;
+    }
 
     memcpy(label_copy, label, label_len);
 
