@@ -30,9 +30,10 @@ const char GA_REVIEW_MESSAGE[] = "Review message";
 const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
 
-#define N_UX_PAIRS 18
+#define N_UX_PAIRS 36
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
+static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
 
 static nbgl_genericContents_t genericContent;
@@ -165,30 +166,33 @@ void ui_accept_transaction_flow(bool is_self_transfer) {
 // create the string "0 <coind_id> (self-transfer)"
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
-void ui_accept_transaction_simplified_flow(void) {
-    _Static_assert(N_UX_PAIRS >= 9, "Insufficient pairs for this flow");
-
+void ui_accept_transaction_simplified_flow_init(void) {
+    /* 3 warnings + 1 From + MAX_EXT_OUTPUT_NUMBER*3 + 1 Fees + 1 High fees */
+    _Static_assert(N_UX_PAIRS >= (3 + 1 + MAX_EXT_OUTPUT_NUMBER * 3 + 1 + 1),
+                   "Insufficient pairs for this flow");
     // Setup list
     pairList.nbMaxLinesForValue = 0;
     pairList.pairs = pairs;
+    n_pairs = 0;
 
-    int n_pairs = 0;
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
 
     // Add warning screens for unverified inputs, external inputs or non-default sighash
-    if (g_ui_state.validate_transaction_simplified.warnings.missing_nonwitnessutxo) {
+    if (state->warnings.missing_nonwitnessutxo) {
         pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = GA_UNVERIFIED_INPUTS,
                                                     .value = "",
                                                     .centeredInfo = true,
                                                     .valueIcon = &ICON_APP_IMPORTANT};
     }
-    if (g_ui_state.validate_transaction_simplified.warnings.external_inputs) {
+    if (state->warnings.external_inputs) {
         pairs[n_pairs++] =
             (nbgl_contentTagValue_t){.item = "There are external inputs\nReject if not sure",
                                      .value = "",
                                      .centeredInfo = true,
                                      .valueIcon = &ICON_APP_IMPORTANT};
     }
-    if (g_ui_state.validate_transaction_simplified.warnings.non_default_sighash) {
+    if (state->warnings.non_default_sighash) {
         pairs[n_pairs++] =
             (nbgl_contentTagValue_t){.item = "Non-default sighash\nReject if not sure",
                                      .value = "",
@@ -196,34 +200,53 @@ void ui_accept_transaction_simplified_flow(void) {
                                      .valueIcon = &ICON_APP_IMPORTANT};
     }
 
-    if (g_ui_state.validate_transaction_simplified.has_wallet_policy) {
+    if (state->has_wallet_policy) {
         pairs[n_pairs++] = (nbgl_layoutTagValue_t){
             .item = "From",
-            .value = g_ui_state.validate_transaction_simplified.wallet_policy_name,
+            .value = state->wallet_policy_name,
         };
     }
+}
 
-    if (!g_ui_state.validate_transaction_simplified.is_self_transfer) {
-        pairs[n_pairs++] = (nbgl_layoutTagValue_t){
-            .item = "Amount",
-            .value = g_ui_state.validate_transaction_simplified.amount,
-        };
+void ui_accept_transaction_simplified_flow_add(void) {
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
+
+    unsigned int output_index = state->output_index;
+    if (!state->is_self_transfer) {
+        bool forcePageStart = true;
+        if (state->n_outputs > 1) {
+            pairs[n_pairs++] =
+                (nbgl_layoutTagValue_t){.item = "Transaction output",
+                                        .value = state->output_index_str[output_index],
+                                        .forcePageStart = forcePageStart};
+            forcePageStart = false;
+        }
+        pairs[n_pairs++] = (nbgl_layoutTagValue_t){.item = "Amount",
+                                                   .value = state->amount[output_index],
+                                                   .forcePageStart = forcePageStart};
 
         pairs[n_pairs++] = (nbgl_layoutTagValue_t){
             .item = "To",
-            .value = g_ui_state.validate_transaction_simplified.address_or_description,
+            .value = state->address_or_description[output_index],
         };
     } else {
         pairs[n_pairs++] =
             (nbgl_layoutTagValue_t){.item = "Amount", .value = SELF_TRANSFER_DESCRIPTION};
     }
+}
 
-    pairs[n_pairs++] = (nbgl_layoutTagValue_t){
-        .item = "Fees",
-        .value = g_ui_state.validate_transaction_simplified.fee,
+void ui_accept_transaction_simplified_flow_start(void) {
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
+
+    pairs[n_pairs++] = (nbgl_layoutTagValue_t){.item = "Fees",
+                                               .value = state->fee,
+                                               .forcePageStart = state->n_outputs > 1 ? 1 : 0
+
     };
 
-    if (g_ui_state.validate_transaction_simplified.warnings.high_fee) {
+    if (state->warnings.high_fee) {
         pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = "Fees are above 10%\n of total amount",
                                                     .value = "",
                                                     .centeredInfo = true,
@@ -339,7 +362,7 @@ void ui_display_register_wallet_policy_flow(void) {
     confirmed_status = "Account registered";
     rejected_status = "Account rejected";
 
-    int n_pairs = 0;
+    n_pairs = 0;
 
     pairList.nbMaxLinesForValue = 0;
     pairList.pairs = pairs;

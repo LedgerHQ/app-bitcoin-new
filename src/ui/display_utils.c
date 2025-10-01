@@ -46,3 +46,9 @@ void format_sats_amount(const char *coin_name,
              fractional_part ? fractional_str : "",
              coin_name);
 }
+
+void format_output_index(const unsigned int output_index,
+                         const unsigned int n_outputs,
+                         char out[static MAX_OUTPUT_INDEX_LENGTH + 1]) {
+    snprintf(out, MAX_OUTPUT_INDEX_LENGTH + 1, "%u of %u", output_index + 1, n_outputs);
+}

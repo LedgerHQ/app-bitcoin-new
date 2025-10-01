@@ -744,7 +744,7 @@ preprocess_inputs(dispatcher_context_t *dc,
             return false;
         } else if (is_internal == 0) {
             ++st->n_external_inputs;
-
+            st->warnings.external_inputs = true;
             PRINTF("INPUT %d is external\n", cur_input_index);
             continue;
         }
@@ -1383,37 +1383,48 @@ static bool __attribute__((noinline)) display_transaction(
     // if the value of fees is 10% or more of the amount, and it's more than 100000
     st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
 
-    if (st->n_external_outputs == 0 || st->n_external_outputs == 1) {
-        // A simplified flow for most transactions: show everything in a single screen if there is
-        // exactly 0 (self-transfer) or 1 external output to show to the user
+    if (st->n_external_outputs <= MAX_EXT_OUTPUT_NUMBER) {
+        // A simplified flow for most transactions: show it using the classical review if there is
+        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_NUMBER external outputs to show to the user
 
         bool is_self_transfer = st->n_external_outputs == 0;
-
-        // show this output's address
-        char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+        char output_description[MAX_EXT_OUTPUT_NUMBER][MAX_OUTPUT_SCRIPT_DESC_SIZE];
 
         if (!is_self_transfer) {
-            if (!format_script(st->outputs.output_scripts[0],
-                               st->outputs.output_script_lengths[0],
-                               output_description)) {
-                PRINTF("Invalid or unsupported script for external output\n");
-                SEND_SW(dc, SW_NOT_SUPPORTED);
-                return false;
+            // checking and formatting output addresses
+
+            for (unsigned int i = 0; i < st->n_external_outputs; i++) {
+                if (!format_script(st->outputs.output_scripts[i],
+                                   st->outputs.output_script_lengths[i],
+                                   output_description[i])) {
+                    PRINTF("Invalid or unsupported script for external output\n");
+                    SEND_SW(dc, SW_NOT_SUPPORTED);
+                    return false;
+                }
             }
         }
 
-        /** TRANSACTION CONFIRMATION
-         *
-         *  Show transaction amount, destination and fees, ask for final confirmation
-         */
-        if (!ui_validate_transaction_simplified(
-                dc,
-                COIN_COINID_SHORT,
-                st->is_wallet_default ? NULL : st->wallet_header.name,
-                is_self_transfer ? 0 : st->outputs.output_amounts[0],
-                is_self_transfer ? NULL : output_description,
-                st->warnings,
-                fee)) {
+        /** TRANSACTION CONFIRMATION */
+        /* Init*/
+        ui_validate_transaction_simplified_init(
+            st->is_wallet_default ? NULL : st->wallet_header.name,
+            is_self_transfer ? 1 : st->n_external_outputs,
+            st->warnings);
+
+        /* Adding outputs */
+        if (!is_self_transfer) {
+            for (unsigned int i = 0; i < st->n_external_outputs; i++) {
+                ui_validate_transaction_simplified_add(
+                    COIN_COINID_SHORT,
+                    is_self_transfer ? 0 : st->outputs.output_amounts[i],
+                    is_self_transfer ? NULL : output_description[i]);
+            }
+        } else {
+            ui_validate_transaction_simplified_add(COIN_COINID_SHORT, 0, NULL);
+        }
+
+        /* Start the review */
+        if (!ui_validate_transaction_simplified_start(COIN_COINID_SHORT, dc, fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }

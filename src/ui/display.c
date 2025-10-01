@@ -340,15 +340,11 @@ bool ui_validate_transaction(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-bool ui_validate_transaction_simplified(dispatcher_context_t *context,
-                                        const char *coin_name,
-                                        const char *wallet_policy_name,
-                                        uint64_t amount,
-                                        const char *address_or_description,
-                                        tx_ux_warning_t warnings,
-                                        uint64_t fee) {
+void ui_validate_transaction_simplified_init(const char *wallet_policy_name,
+                                             unsigned int outputs_num,
+                                             tx_ux_warning_t warnings) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
+    return;
 #endif
 
     ui_validate_transaction_simplified_state_t *state =
@@ -362,18 +358,49 @@ bool ui_validate_transaction_simplified(dispatcher_context_t *context,
     } else {
         memset(state->wallet_policy_name, 0, sizeof(state->wallet_policy_name));
     }
-    format_sats_amount(coin_name, amount, state->amount);
+    state->n_outputs = outputs_num;
+    state->warnings = warnings;
+
+    ui_accept_transaction_simplified_flow_init();
+}
+
+void ui_validate_transaction_simplified_add(const char *coin_name,
+                                            uint64_t amount,
+                                            const char *address_or_description) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return;
+#endif
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
+
+    format_sats_amount(coin_name, amount, state->amount[state->output_index]);
     if (address_or_description == NULL) {
         state->is_self_transfer = true;
     } else {
-        strncpy(state->address_or_description,
+        strncpy(state->address_or_description[state->output_index],
                 address_or_description,
-                sizeof(state->address_or_description));
+                sizeof(state->address_or_description[state->output_index]));
     }
-    state->warnings = warnings;
+    format_output_index(state->output_index,
+                        state->n_outputs,
+                        state->output_index_str[state->output_index]);
+
+    ui_accept_transaction_simplified_flow_add();
+    state->output_index++;
+}
+
+bool ui_validate_transaction_simplified_start(const char *coin_name,
+                                              dispatcher_context_t *context,
+                                              uint64_t fee) {
+#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    return true;
+#endif
+    ui_validate_transaction_simplified_state_t *state =
+        (ui_validate_transaction_simplified_state_t *) &g_ui_state;
+
     format_sats_amount(coin_name, fee, state->fee);
 
-    ui_accept_transaction_simplified_flow();
+    ui_accept_transaction_simplified_flow_start();
 
     return io_ui_process(context);
 }

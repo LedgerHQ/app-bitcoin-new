@@ -20,6 +20,7 @@
 #define MESSAGE_MAX_DISPLAY_SIZE \
     (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
 
+<<<<<<< HEAD
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
 #define ICON_APP_HOME      C_Bitcoin_64px
@@ -28,10 +29,16 @@
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
 #define ICON_APP_HOME      C_Bitcoin_48px
 #define ICON_APP_ACTION    C_Bitcoin_48px
+=======
+#ifdef SCREEN_SIZE_WALLET
+#define ICON_APP_IMPORTANT C_Important_Circle_64px
+#define ICON_APP_HOME      C_App_64px
+#define ICON_APP_ACTION    C_App_64px
+>>>>>>> c21914c (Modify Makefile and app dashboard to be generic)
 #else
 #define ICON_APP_IMPORTANT C_icon_warning
-#define ICON_APP_HOME      C_bitcoin_logo
-#define ICON_APP_ACTION    C_bitcoin_logo_inv
+#define ICON_APP_HOME      C_app_logo
+#define ICON_APP_ACTION    C_app_logo_inv
 #endif
 
 typedef struct tx_ux_warning_s {
@@ -106,17 +113,13 @@ typedef struct {
 } ui_validate_transaction_state_t;
 
 typedef struct {
-    tx_ux_warning_t warnings;
     bool has_wallet_policy;
-    char wallet_policy_name[MAX_WALLET_NAME_LENGTH + 1];
     bool is_self_transfer;
-    unsigned int n_outputs;
-    unsigned int output_index;
-    char output_index_str[MAX_EXT_OUTPUT_NUMBER][MAX_OUTPUT_INDEX_LENGTH + 1];
-    char address_or_description[MAX_EXT_OUTPUT_NUMBER]
-                               [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    char amount[MAX_EXT_OUTPUT_NUMBER][MAX_AMOUNT_LENGTH + 1];
+    char wallet_policy_name[MAX_WALLET_NAME_LENGTH + 1];
+    char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
+    char amount[MAX_AMOUNT_LENGTH + 1];
     char fee[MAX_AMOUNT_LENGTH + 1];
+    tx_ux_warning_t warnings;
 } ui_validate_transaction_simplified_state_t;
 
 /**
@@ -200,15 +203,13 @@ bool ui_validate_transaction(dispatcher_context_t *context,
                              uint64_t fee,
                              bool is_self_transfer);
 
-void ui_validate_transaction_simplified_init(const char *wallet_policy_name,
-                                             unsigned int outputs_num,
-                                             tx_ux_warning_t warnings);
-void ui_validate_transaction_simplified_add(const char *coin_name,
-                                            uint64_t amount,
-                                            const char *address_or_description);
-bool ui_validate_transaction_simplified_start(const char *coin_name,
-                                              dispatcher_context_t *context,
-                                              uint64_t fee);
+bool ui_validate_transaction_simplified(dispatcher_context_t *context,
+                                        const char *coin_name,
+                                        const char *wallet_policy_name,  // can be NULL
+                                        uint64_t amount,
+                                        const char *address_or_description,
+                                        tx_ux_warning_t warnings,
+                                        uint64_t fee);
 
 void set_ux_flow_response(bool approved);
 
@@ -243,10 +244,7 @@ void ui_warn_high_fee_flow(void);
 void ui_accept_transaction_flow(bool is_self_transfer);
 
 void ui_display_register_wallet_policy_flow(void);
-
-void ui_accept_transaction_simplified_flow_init(void);
-void ui_accept_transaction_simplified_flow_add(void);
-void ui_accept_transaction_simplified_flow_start(void);
+void ui_accept_transaction_simplified_flow(void);
 
 void ui_display_transaction_prompt(void);
 
