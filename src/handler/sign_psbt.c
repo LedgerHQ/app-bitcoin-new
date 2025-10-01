@@ -1385,7 +1385,8 @@ static bool __attribute__((noinline)) display_transaction(
 
     if (st->n_external_outputs <= MAX_EXT_OUTPUT_NUMBER) {
         // A simplified flow for most transactions: show it using the classical review if there is
-        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_NUMBER external outputs to show to the user
+        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_NUMBER external outputs to show to the
+        // user
 
         bool is_self_transfer = st->n_external_outputs == 0;
         char output_description[MAX_EXT_OUTPUT_NUMBER][MAX_OUTPUT_SCRIPT_DESC_SIZE];
