@@ -5,11 +5,21 @@ name: Build and run functional tests using ragger through reusable workflow
 # resulting binaries.
 # It then calls another reusable workflow to run the Ragger tests on the compiled application binary.
 #
-# While this workflow is optional, having functional testing on your application is mandatory and this workflow and
+# The build part of this workflow is mandatory, this ensures that the app will be deployable in the Ledger App Store.
+# While the test part of this workflow is optional, having functional testing on your application is mandatory and this workflow and
 # tooling environment is meant to be easy to use and adapt after forking your application
 
 on:
   workflow_dispatch:
+    inputs:
+      golden_run:
+        type: choice
+        required: true
+        default: 'Raise an error (default)'
+        description: CI behavior if the test snapshots are different than expected.
+        options:
+          - 'Raise an error (default)'
+          - 'Open a PR'
   push:
     branches:
       - master
@@ -34,3 +44,4 @@ jobs:
       container_image: "ghcr.io/ledgerhq/app-bitcoin-new/speculos-bitcoin-musig2:latest"
       # when merging a PR, we run the tests with the --enable_slow_tests parameter
       test_options: ${{ github.event_name == 'push' && '--enable_slow_tests' || '' }}
+      regenerate_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
