@@ -180,22 +180,22 @@ void ui_accept_transaction_simplified_flow_init(void) {
 
     // Add warning screens for unverified inputs, external inputs or non-default sighash
     if (state->warnings.missing_nonwitnessutxo) {
-        pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = GA_UNVERIFIED_INPUTS,
-                                                    .value = "",
+        pairs[n_pairs++] = (nbgl_contentTagValue_t){.item = "Security risk detected",
+                                                    .value = GA_UNVERIFIED_INPUTS,
                                                     .centeredInfo = true,
                                                     .valueIcon = &ICON_APP_IMPORTANT};
     }
     if (state->warnings.external_inputs) {
         pairs[n_pairs++] =
-            (nbgl_contentTagValue_t){.item = "There are external inputs\nReject if not sure",
-                                     .value = "",
+            (nbgl_contentTagValue_t){.item = "Security risk detected",
+                                     .value = "There are external inputs\nReject if not sure",
                                      .centeredInfo = true,
                                      .valueIcon = &ICON_APP_IMPORTANT};
     }
     if (state->warnings.non_default_sighash) {
         pairs[n_pairs++] =
-            (nbgl_contentTagValue_t){.item = "Non-default sighash\nReject if not sure",
-                                     .value = "",
+            (nbgl_contentTagValue_t){.item = "Security risk detected",
+                                     .value = "Non-default sighash\nReject if not sure",
                                      .centeredInfo = true,
                                      .valueIcon = &ICON_APP_IMPORTANT};
     }
@@ -214,17 +214,15 @@ void ui_accept_transaction_simplified_flow_add(void) {
 
     unsigned int output_index = state->output_index;
     if (!state->is_self_transfer) {
-        bool forcePageStart = true;
         if (state->n_outputs > 1) {
             pairs[n_pairs++] =
                 (nbgl_layoutTagValue_t){.item = "Transaction output",
                                         .value = state->output_index_str[output_index],
-                                        .forcePageStart = forcePageStart};
-            forcePageStart = false;
+                                        .forcePageStart = true};
         }
         pairs[n_pairs++] = (nbgl_layoutTagValue_t){.item = "Amount",
                                                    .value = state->amount[output_index],
-                                                   .forcePageStart = forcePageStart};
+                                                   .forcePageStart = false};
 
         pairs[n_pairs++] = (nbgl_layoutTagValue_t){
             .item = "To",
