@@ -43,12 +43,12 @@ class Instructions:
                         save_screenshot=save_screenshot)
 
         if has_warning:
-            self.same_request("Warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
+            self.same_request("Security risk detected", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                             save_screenshot=save_screenshot)
 
         for output_index in range(0, output_count):
             # the initial 2 outputs are cached; that depends on the N_CACHED_EXTERNAL_OUTPUTS constant
-            if output_index < 2:
+            if output_index < 10:
                 self.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                             save_screenshot=save_screenshot)
             else:
