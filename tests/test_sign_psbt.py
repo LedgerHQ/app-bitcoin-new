@@ -16,6 +16,7 @@ from ragger.firmware import Firmware
 from test_utils import bip0340, txmaker
 
 from ragger_bitcoin import RaggerClient
+from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_NUMBER
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -543,10 +544,65 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_streaming(firmware, output_count=2, save_screenshot=False),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_ins
+
+def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name, n_outs):
+    # PSBT for a segwit 4-input N-outputs spend (including 1 change address)
+    # this test also checks that addresses, amounts and fees shown on screen are correct
+
+    # Define account
+    wallet = WalletPolicy(
+        "Me and Bob or me and Carl",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/84'/1'/0']tpubDCtKfsNyRhULjZ9XMS4VKKtVcPdVDi8MKUbcSD9MJDyjRu1A2ND5MiipozyyspBT9bg8upEp7a8EAgFxNxXn1d7QkdbL52Ty5jiSLcxPt1P"
+        ],
+    )
+
+    n_ins = 4
+
+    in_amounts = [100000 + 10000 * i for i in range(n_ins)]
+    total_in = sum(in_amounts)
+    # Make sure that the fees are at least 10% of the total amount
+    out_amounts = [int(total_in * 0.89 // n_outs) - i for i in range(n_outs)]
+
+    print(f"total_in = {total_in}")
+    print(f"out_amounts = {out_amounts}")
+
+    change_index = 1
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        in_amounts,
+        out_amounts,
+        [i == change_index for i in range(n_outs)]
+    )
+
+    sum_in = sum(in_amounts)
+    sum_out = sum(out_amounts)
+
+    assert sum_out < sum_in
+
+    wallet_hmac = bytes.fromhex(
+        "297a8fb8516307dfe24649ce8940b014966cc3d1173da985ee92fba062785125"
+    )
+
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve_streaming(firmware, output_count=n_outs-1, save_screenshot=True),
+                              testname=test_name)
+
+    assert len(result) == n_ins
+
+def test_sign_psbt_singlesig_wpkh_4to11(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1)
+
+def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 2)
 
 
 def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmware, client:
@@ -760,9 +816,9 @@ def test_sign_psbt_with_segwit_v16(navigator: Navigator, firmware: Firmware, cli
 def test_sign_psbt_with_external_inputs(navigator: Navigator, firmware: Firmware, client:
                                         RaggerClient, test_name: str):
 
-    instructions = [sign_psbt_instruction_approve_external_inputs(firmware, output_count=5),
-                    sign_psbt_instruction_approve_external_inputs(firmware, output_count=4),
-                    sign_psbt_instruction_approve_external_inputs(firmware, output_count=4)]
+    instructions = [sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                    sign_psbt_instruction_approve(firmware, has_external_inputs=True),
+                    sign_psbt_instruction_approve(firmware, has_external_inputs=True)]
     # PSBT obtained by joining pkh-1to1.psbt, tr-1to2.psbt, wpkh-1to2.psbt.
     # We sign it with each of the respective wallets; therefore it must show the "external inputs" warning each time.
     psbt_b64 = "cHNidP8BAP0yAQIAAAADobgj0jNtaUtJNO+bblt94XoFUT2oop2wKi7Lx6mm/m0BAAAAAP3///9RIsLN5oI+VXVBdbksnFegqOGsg8OOF4f9Oh/zNI6VEwEAAAAA/f///3oqmXlWwJ+Op/0oGcGph7sU4iv5rc2vIKiXY3Is7uJkAQAAAAD9////BaCGAQAAAAAAFgAUE5m4oJhHoDmwNS9Y0hLBgLqxf3dV/6cAAAAAACJRIAuOdIa8MGoK77enwArwQFVC2xrNc+7MqCdxzPX+XrYPeEEPAAAAAAAZdqkUE9fVgWaUbD7AIpNAZtjA0RHRu0GIrHQ4IwAAAAAAFgAU6zj6m4Eo+B8m6V7bDF/66oNpD+Sguw0AAAAAABl2qRQ0Sg9IyhUOwrkDgXZgubaLE6ZwJoisAAAAAAABASunhqkAAAAAACJRINj08dGJltthuxyvVCPeJdih7unJUNN+b/oCMBLV5i4NIRYhLqKFalzxEOZqK+nXNTFHk/28s4iyuPE/K2remC569RkA9azC/VYAAIABAACAAAAAgAEAAAAAAAAAARcgIS6ihWpc8RDmaivp1zUxR5P9vLOIsrjxPytq3pguevUAAQCMAgAAAAHsIw5TCVJWBSokKCcO7ASYlEsQ9vHFePQxwj0AmLSuWgEAAAAXFgAUKBU5gg4t6XOuQbpgBLQxySHE2G3+////AnJydQAAAAAAF6kUyLkGrymMcOYDoow+/C+uGearKA+HQEIPAAAAAAAZdqkUy65bUM+Tnm9TG4prer14j+FLApeIrITyHAAiBgLuhgggfiEChCb2nnZEfX49XgdwSfXmg8MTbCMUdipHGBj1rML9LAAAgAEAAIAAAACAAAAAAAAAAAAAAQB9AgAAAAGvv64GWQ90H/GvWbasRhEmM2pMSoLbVT32/vq3N6wz8wEAAAAA/f///wJwEQEAAAAAACIAIP3uRBxW5bBtDfgsEkxwcBSlyhlli+C5hWvKFvHtMln3pfQwAAAAAAAWABQ6+EKa1ZVKpe6KM8mD/YoehnmSSwAAAAABAR+l9DAAAAAAABYAFDr4QprVlUql7oozyYP9ih6GeZJLIgYD7iw9mOsfk8Chqo5aQAm3Dre0Tq0V8WZvE2sBKtWNMGgY9azC/VQAAIABAACAAAAAgAEAAAAIAAAAAAABBSACkIHs5WFqocuZMZ/Eh07+5H8IzrpfYARjbIxDQJpfCiEHApCB7OVhaqHLmTGfxIdO/uR/CM66X2AEY2yMQ0CaXwoZAPWswv1WAACAAQAAgAAAAIABAAAAAgAAAAAAIgICKexHcnEx7SWIogxG7amrt9qm9J/VC6/nC5xappYcTswY9azC/VQAAIABAACAAAAAgAEAAAAKAAAAAAA="
