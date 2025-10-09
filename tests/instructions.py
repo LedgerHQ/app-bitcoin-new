@@ -3,7 +3,7 @@ import pytest
 from ragger.navigator import NavInsID
 from ragger.firmware import Firmware
 
-from ragger_bitcoin.ragger_instructions import Instructions
+from ragger_bitcoin.ragger_instructions import Instructions, MAX_EXT_OUTPUT_NUMBER
 
 
 def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
@@ -162,35 +162,94 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False) -> Instructions:
+def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False, has_external_inputs: bool = False, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
 
+    funcdict = {
+      'new_request': instructions.new_request,
+      'same_request': instructions.same_request
+    }
+    which_func = 'new_request'
+
+    # It is probably possibile to factorize between Nano and touch screen devices
     if model.name.startswith("nano"):
-        instructions.new_request("Sign transaction", save_screenshot=save_screenshot)
-    else:
-        instructions.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                 save_screenshot=save_screenshot)
         if has_sighashwarning:
-            instructions.same_request(
-                "Non-default sighash", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+            # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
+            funcdict[which_func]("Continue anyway", save_screenshot=save_screenshot)
+            which_func = 'same_request'
+
+        if has_external_inputs:
+            # This transaction has external inputs- actually clicking "Continue anyway"
+            funcdict[which_func]("Continue anyway", save_screenshot=save_screenshot)
+            which_func = 'same_request'
 
         if has_unverifiedwarning:
-            instructions.same_request(
-                "Unverified inputs", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+            # Non-default sighash - actually clicking "Continue anyway"
+            funcdict[which_func]("Continue anyway", save_screenshot=save_screenshot)
+            which_func = 'same_request'
 
-        instructions.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                  save_screenshot=save_screenshot)
-        if to_on_next_page:
-            instructions.same_request("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                      save_screenshot=save_screenshot)
-        if fees_on_next_page:
-            instructions.same_request("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                      save_screenshot=save_screenshot)
+        run_num = 1
+        # if go_back is True then
+        #     1. we go forward once until "Sign transaction" screen
+        #     2. then back until "Review" screen
+        #     3. then again forwar signing finaly the transaction
+        while True:
+            if not go_back or run_num >= 2:
+               funcdict[which_func]("Sign transaction", save_screenshot=save_screenshot)
+               break
+            else:
+                funcdict[which_func]("Sign transaction", NavInsID.RIGHT_CLICK, NavInsID.LEFT_CLICK,
+                                     save_screenshot=save_screenshot)
+                which_func = 'same_request'
+                funcdict[which_func]("Review", NavInsID.LEFT_CLICK, NavInsID.RIGHT_CLICK,
+                                     save_screenshot=save_screenshot)
+            run_num = run_num + 1
 
-        if has_feewarning:
-            instructions.same_request(
-                "Fees are above", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
-        instructions.confirm_transaction(save_screenshot=save_screenshot)
+    else:
+        if has_sighashwarning:
+            # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
+            instructions.choice_reject("Continue anyway")
+            which_func = 'same_request'
+
+        if has_external_inputs:
+            # This transaction has external inputs- actually clicking "Continue anyway"
+            instructions.choice_reject("Continue anyway")
+            which_func = 'same_request'
+
+        if has_unverifiedwarning:
+            # Non-default sighash - actually clicking "Continue anyway"
+            instructions.choice_reject("Continue anyway")
+            which_func = 'same_request'
+
+        funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                 save_screenshot=save_screenshot)
+        which_func = 'same_request'
+
+        run_num = 1
+        while True:
+            funcdict[which_func]("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                      save_screenshot=save_screenshot)
+            if to_on_next_page:
+                funcdict[which_func]("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                          save_screenshot=save_screenshot)
+            if fees_on_next_page:
+                funcdict[which_func]("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                          save_screenshot=save_screenshot)
+            if has_feewarning:
+                funcdict[which_func](
+                    "High fees warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+
+            if not go_back or run_num >= 2:
+                instructions.confirm_transaction(save_screenshot=save_screenshot)
+                break
+            else:
+                funcdict[which_func]("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_PREVIOUS,
+                          save_screenshot=save_screenshot)
+                which_func = 'same_request'
+                funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_PREVIOUS, NavInsID.USE_CASE_REVIEW_TAP,
+                                     save_screenshot=save_screenshot)
+            run_num = run_num + 1
+
     return instructions
 
 
@@ -208,34 +267,21 @@ def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve_streaming(model: Firmware, output_count: int, save_screenshot: bool = True) -> Instructions:
+def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, save_screenshot: bool = True, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
+    if (output_count <= MAX_EXT_OUTPUT_NUMBER):
+       # Classical case
+       return sign_psbt_instruction_approve(model, save_screenshot, has_feewarning = True, go_back = go_back);
 
+    # Streaming case
     if model.name.startswith("nano"):
+        instructions.new_request("Loading transaction")
         instructions.new_request("Sign transaction", save_screenshot=save_screenshot)
     else:
         instructions.review_start(
             output_count=output_count, save_screenshot=save_screenshot)
         instructions.review_fees(save_screenshot=save_screenshot)
         instructions.confirm_transaction(save_screenshot=save_screenshot)
-    return instructions
-
-
-def sign_psbt_instruction_approve_external_inputs(model: Firmware, output_count) -> Instructions:
-    instructions = Instructions(model)
-
-    if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        for output_index in range(output_count - 2):
-            if output_index < 1:
-                instructions.same_request("Loading transaction")
-            else:
-                instructions.new_request("Loading transaction")
-        instructions.new_request("Sign transaction")
-    else:
-        instructions.review_start(output_count=output_count, has_warning=True)
-        instructions.review_fees(fees_on_same_request=True)
-        instructions.confirm_transaction()
     return instructions
 
 
