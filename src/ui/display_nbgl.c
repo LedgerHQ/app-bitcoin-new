@@ -62,6 +62,8 @@ static nbgl_content_t contentList[4];
 
 extern bool G_was_processing_screen_shown;
 
+static void finish_transaction_flow(bool choice);
+
 // ux_flow_response
 static void ux_flow_response_false(void) {
     set_ux_flow_response(false);
