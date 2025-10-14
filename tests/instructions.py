@@ -189,7 +189,7 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
 
         if has_feewarning:
             instructions.same_request(
-                "Fees are above", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+                "High fees warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
         instructions.confirm_transaction(save_screenshot=save_screenshot)
     return instructions
 
