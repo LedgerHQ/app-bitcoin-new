@@ -225,12 +225,14 @@ def sign_psbt_instruction_approve_external_inputs(model: Firmware, output_count)
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Continue")
-        for output_index in range(output_count - 2):
-            if output_index < 1:
-                instructions.same_request("Loading transaction")
-            else:
-                instructions.new_request("Loading transaction")
+# Not needed anymore after unstreaming
+# But let's keep it here in preparation to streaming tests
+#        instructions.new_request("Continue")
+#        for output_index in range(output_count - 2):
+#            if output_index < 1:
+#                instructions.same_request("Loading transaction")
+#            else:
+#                instructions.new_request("Loading transaction")
         instructions.new_request("Sign transaction")
     else:
         instructions.review_start(output_count=output_count, has_warning=True)
