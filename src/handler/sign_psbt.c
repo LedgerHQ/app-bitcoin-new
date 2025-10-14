@@ -1343,7 +1343,7 @@ static bool __attribute__((noinline)) display_external_outputs(
 static bool __attribute__((noinline))
 display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If there are external inputs, it is unsafe to sign, therefore we warn the user
-    if (st->n_external_inputs > 0 && !ui_warn_external_inputs(dc)) {
+    if (st->warnings.external_inputs && !ui_warn_external_inputs(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
