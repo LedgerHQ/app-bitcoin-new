@@ -197,17 +197,17 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
 
         if has_sighashwarning:
             # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
-            instructions.choice_reject()
+            instructions.choice_reject("Continue anyway")
             which_func = 'same_request'
 
         if has_external_inputs:
             # This transaction has external inputs- actually clicking "Continue anyway"
-            instructions.choice_reject()
+            instructions.choice_reject("Continue anyway")
             which_func = 'same_request'
 
         if has_unverifiedwarning:
             # Non-default sighash - actually clicking "Continue anyway"
-            instructions.choice_reject()
+            instructions.choice_reject("Continue anyway")
             which_func = 'same_request'
 
         funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
