@@ -99,16 +99,6 @@ typedef struct {
 } ui_cosigner_pubkey_and_index_state_t;
 
 typedef struct {
-    char index[sizeof("output #999")];
-    char address_or_description[MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    char amount[MAX_AMOUNT_LENGTH + 1];
-} ui_validate_output_state_t;
-
-typedef struct {
-    char fee[MAX_AMOUNT_LENGTH + 1];
-} ui_validate_transaction_state_t;
-
-typedef struct {
     tx_ux_warning_t warnings;
     bool has_wallet_policy;
     char wallet_policy_name[MAX_WALLET_NAME_LENGTH + 1];
@@ -120,7 +110,7 @@ typedef struct {
                                [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
     char amount[MAX_EXT_OUTPUT_NUMBER][MAX_AMOUNT_LENGTH + 1];
     char fee[MAX_AMOUNT_LENGTH + 1];
-} ui_validate_transaction_simplified_state_t;
+} ui_validate_transaction_state_t;
 
 /**
  * Union of all the states for each of the UI screens, in order to save memory.
@@ -131,10 +121,8 @@ typedef union {
     ui_path_and_message_state_t path_and_message;
     ui_wallet_state_t wallet;
     ui_cosigner_pubkey_and_index_state_t cosigner_pubkey_and_index;
-    ui_validate_output_state_t validate_output;
-    ui_validate_transaction_state_t validate_transaction;
     ui_register_wallet_policy_state_t register_wallet_policy;
-    ui_validate_transaction_simplified_state_t validate_transaction_simplified;
+    ui_validate_transaction_state_t validate_transaction_simplified;
 } ui_state_t;
 extern ui_state_t g_ui_state;
 
@@ -181,7 +169,7 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
 
 bool ui_display_unusual_path(dispatcher_context_t *context, const char *bip32_path_str);
 
-bool ui_authorize_wallet_spend(dispatcher_context_t *context, const char *wallet_name);
+bool ui_authorize_wallet_spend(const char *wallet_name);
 
 bool ui_warn_external_inputs(dispatcher_context_t *context);
 
@@ -201,6 +189,7 @@ bool ui_warn_high_fee(dispatcher_context_t *context);
 bool ui_validate_transaction(dispatcher_context_t *context,
                              const char *coin_name,
                              uint64_t fee,
+                             tx_ux_warning_t warnings,
                              bool is_self_transfer);
 
 void ui_validate_transaction_simplified_init(const char *wallet_policy_name,
@@ -237,9 +226,7 @@ void ui_display_unverified_segwit_inputs_flows(void);
 
 void ui_display_nondefault_sighash_flow(void);
 
-void ui_display_output_address_amount_flow(int index);
-
-void ui_display_output_address_amount_no_index_flow(int index);
+void ui_display_output_address_amount_flow(void);
 
 void ui_warn_high_fee_flow(void);
 

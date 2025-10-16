@@ -1342,6 +1342,12 @@ static bool __attribute__((noinline)) display_external_outputs(
 
 static bool __attribute__((noinline))
 display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    // If any input has non-default sighash, we warn the user
+    if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+
     // If there are external inputs, it is unsafe to sign, therefore we warn the user
     if (st->warnings.external_inputs && !ui_warn_external_inputs(dc)) {
         SEND_SW(dc, SW_DENY);
@@ -1351,12 +1357,6 @@ display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If any segwitv0 input is missing the non-witness-utxo, we warn the user and ask for
     // confirmation
     if (st->warnings.missing_nonwitnessutxo && !ui_warn_unverified_segwit_inputs(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-
-    // If any input has non-default sighash, we warn the user
-    if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1382,6 +1382,12 @@ static bool __attribute__((noinline)) display_transaction(
 
     // if the value of fees is 10% or more of the amount, and it's more than 100000
     st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
+
+    // Display warnings/risks information before the transaction title
+    // for the both classical and streaming cases.
+    if (!display_warnings(dc, st)) {
+        return false;
+    }
 
     if (st->n_external_outputs <= MAX_EXT_OUTPUT_NUMBER) {
         // A simplified flow for most transactions: show it using the classical review if there is
@@ -1433,20 +1439,17 @@ static bool __attribute__((noinline)) display_transaction(
         // Transactions with more than one external output; show one output per page,
         // using the streaming NBGL API.
 
-        // On NBGL devices, show the pre-approval screen
-        // "Review transaction to send Bitcoin"
-        if (!ui_transaction_prompt(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-        // If it's not a default wallet policy, ask the user for confirmation, and abort if they
-        // deny
-        if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {
+        // If it's not a default wallet policy, let's save this info to ask the user for
+        // confirmation
+        if (!st->is_wallet_default && !ui_authorize_wallet_spend(st->wallet_header.name)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
 
-        if (!display_warnings(dc, st)) {
+        // On NBGL devices, show the pre-approval screen
+        // "Review transaction to send Bitcoin"
+        if (!ui_transaction_prompt(dc)) {
+            SEND_SW(dc, SW_DENY);
             return false;
         }
 
@@ -1456,17 +1459,12 @@ static bool __attribute__((noinline)) display_transaction(
          */
         if (!display_external_outputs(dc, st, internal_outputs)) return false;
 
-        if (st->warnings.high_fee && !ui_warn_high_fee(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-
         /** TRANSACTION CONFIRMATION
          *
          *  Show summary info to the user (transaction fees), ask for final confirmation
          */
         // Show final user validation UI
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, false)) {
+        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
