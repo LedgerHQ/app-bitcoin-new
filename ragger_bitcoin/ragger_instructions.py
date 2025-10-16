@@ -108,11 +108,11 @@ class Instructions:
                 save_screenshot=save_screenshot)
 
     def choice_confirm(self, save_screenshot=True):
-        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
+        self.new_request("Back to safety", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM,
                          save_screenshot=save_screenshot)
 
     def choice_reject(self, save_screenshot=True):
-        self.new_request("Approve", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_REJECT,
+        self.new_request("Continue anyway", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_REJECT,
                          save_screenshot=save_screenshot)
 
     def footer_cancel(self, save_screenshot=True):
