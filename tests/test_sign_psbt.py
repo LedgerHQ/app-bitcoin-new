@@ -544,7 +544,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
     assert sum_out < sum_in
 
     result = client.sign_psbt(psbt, wallet, None, navigator,
-                              instructions=sign_psbt_instruction_approve_streaming(firmware, output_count=2, save_screenshot=False),
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
                               testname=test_name)
 
     assert len(result) == n_ins
