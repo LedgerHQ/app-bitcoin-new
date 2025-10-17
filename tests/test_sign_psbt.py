@@ -16,6 +16,7 @@ from ragger.firmware import Firmware
 from test_utils import bip0340, txmaker
 
 from ragger_bitcoin import RaggerClient
+from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_NUMBER
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -597,11 +598,11 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
 
 def test_sign_psbt_singlesig_wpkh_4to11(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, 11)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1)
 
-#def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
-#                                       RaggerClient, test_name: str):
-#    singlesig_wpkh_4toN(navigator, firmware, client, test_name, 12)
+def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 2)
 
 
 def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmware, client:
