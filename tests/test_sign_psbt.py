@@ -601,6 +601,7 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
 def test_sign_psbt_singlesig_wpkh_4to11(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
     singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1)
+    assert False
 
 def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
