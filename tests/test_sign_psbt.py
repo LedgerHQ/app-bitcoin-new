@@ -581,6 +581,8 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
         [i == change_index for i in range(n_outs)]
     )
 
+    print(f"psbt={psbt.serialize()}")
+
     sum_in = sum(in_amounts)
     sum_out = sum(out_amounts)
 
