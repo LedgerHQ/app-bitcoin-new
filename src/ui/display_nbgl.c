@@ -244,7 +244,7 @@ void ui_display_transaction_prompt(void) {
 
     if (state->has_wallet_policy) {
         pairs[0] = (nbgl_layoutTagValue_t){
-            .item = "Account name",
+            .item = "From",
             .value = state->wallet_policy_name,
         };
         // Setup list
