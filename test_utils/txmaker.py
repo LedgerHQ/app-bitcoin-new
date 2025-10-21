@@ -30,6 +30,7 @@ from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKe
 SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
 master_key = HDKey.from_seed(mnemonic_to_seed(SPECULOS_SEED))
 master_key_fpr = master_key.derive("m/0'").fingerprint
+privkey_initial = bytearray(32)
 
 
 def random_numbers_with_sum(n: int, s: int) -> List[int]:
@@ -54,7 +55,6 @@ def random_txid() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
     return random_bytes(32)
 
-privkey_initial = bytearray([0xB6] * 100)
 def random_p2tr() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
     global privkey_initial
@@ -278,6 +278,8 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
     tx.wit = CTxWitness()
 
     change_address_index = randint(0, 10_000)
+    global privkey_initial
+    privkey_initial = bytearray([0xB6] * 32)
     for i, output_amount in enumerate(output_amounts):
         tx.vout[i].nValue = output_amount
         if output_is_change[i]:
