@@ -20,6 +20,8 @@ from embit.script import Script
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
 
+from hashlib import sha256
+
 from ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340
 from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
@@ -52,11 +54,13 @@ def random_txid() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
     return random_bytes(32)
 
-
+privkey_initial = bytearray([0xB6] * 100)
 def random_p2tr() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
-    privkey = random_bytes(32)
-    pubkey = bip0340.point_mul(bip0340.G, int.from_bytes(privkey, 'big'))
+    global privkey_initial
+    # Using non-random sequence for the sake of tests
+    privkey_initial = sha256(privkey_initial).digest()
+    pubkey = bip0340.point_mul(bip0340.G, int.from_bytes(privkey_initial, 'big'))
 
     return b'\x51\x20' + (pubkey[0]).to_bytes(32, 'big')
 
