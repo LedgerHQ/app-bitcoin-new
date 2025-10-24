@@ -21,3 +21,14 @@
 void format_sats_amount(const char *coin_name,
                         uint64_t amount,
                         char out[static MAX_AMOUNT_LENGTH + 1]);
+
+/**
+ * Formats output index string ("101 of 203").
+ *
+ * @param output_index current output index
+ * @param n_outputs total number of outputs
+ * @param out the output array which must fit to MAX_OUTPUT_INDEX_LENGTH + 1 bytes length
+ */
+void format_output_index(const unsigned int output_index,
+                         const unsigned int n_outputs,
+                         char out[static MAX_OUTPUT_INDEX_LENGTH + 1]);

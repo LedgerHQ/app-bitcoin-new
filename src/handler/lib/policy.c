@@ -1542,6 +1542,11 @@ bool check_wallet_hmac(const uint8_t wallet_id[static 32], const uint8_t wallet_
     // to avoid timing-attack that could be exploited to extract it.
     result = os_secure_memcmp((void *) wallet_hmac, (void *) correct_hmac, 32) == 0;
 
+    PRINTF("%s: correct_hmac\n", __func__);
+    for (int i = 0; i < 32; i++) {
+        PRINTF("%02X", correct_hmac[i]);
+    }
+    PRINTF("\n");
 end:
     explicit_bzero(key, sizeof(key));
     explicit_bzero(correct_hmac, sizeof(correct_hmac));
