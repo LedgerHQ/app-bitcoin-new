@@ -574,32 +574,33 @@ void ui_display_default_wallet_address_flow(void) {
                               status_address_callback);
 }
 
-// Warning/Security risks flows
-void ui_display_warning_external_inputs_flow(void) {
+void ui_display_warning_generic(const char *msg)
+{
     nbgl_useCaseChoice(&ICON_APP_WARNING,
                        GA_SECURITY_RISK_TITLE,
-                       GA_RISK_EXTERNAL_INPUTS,
+                       msg,
+#ifdef SCREEN_SIZE_WALLET
                        GA_BACK_TO_SAFETY,
                        GA_CONTINUE_ANYWAY,
                        start_transaction_callback_inverted);
+#else
+                       GA_BACK_TO_SAFETY,
+                       GA_CONTINUE_ANYWAY,
+                       start_transaction_callback_inverted);
+#endif
+}
+
+// Warning/Security risks flows
+void ui_display_warning_external_inputs_flow(void) {
+    ui_display_warning_generic(GA_RISK_EXTERNAL_INPUTS);
 }
 
 void ui_display_unverified_segwit_inputs_flows(void) {
-    nbgl_useCaseChoice(&ICON_APP_WARNING,
-                       GA_SECURITY_RISK_TITLE,
-                       GA_RISK_UNVERIFIED_INPUTS,
-                       GA_BACK_TO_SAFETY,
-                       GA_CONTINUE_ANYWAY,
-                       start_transaction_callback_inverted);
+    ui_display_warning_generic(GA_RISK_UNVERIFIED_INPUTS);
 }
 
 void ui_display_nondefault_sighash_flow(void) {
-    nbgl_useCaseChoice(&ICON_APP_WARNING,
-                       GA_SECURITY_RISK_TITLE,
-                       GA_RISK_NON_STD_SIGHASH,
-                       GA_BACK_TO_SAFETY,
-                       GA_CONTINUE_ANYWAY,
-                       start_transaction_callback_inverted);
+    ui_display_warning_generic(GA_RISK_NON_STD_SIGHASH);
 }
 
 // Statuses
