@@ -549,7 +549,7 @@ def test_sign_psbt_singlesig_wpkh_4to3(navigator: Navigator, firmware: Firmware,
 
     assert len(result) == n_ins
 
-def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name, n_outs):
+def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name, n_outs: int, go_back: bool = False):
     # PSBT for a segwit 4-input N-outputs spend (including 1 change address)
     # this test also checks that addresses, amounts and fees shown on screen are correct
 
@@ -593,7 +593,7 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
     )
 
     result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
-                              instructions=sign_psbt_instruction_approve_streaming(firmware, output_count=n_outs-1, save_screenshot=True),
+                              instructions=sign_psbt_instruction_approve_generic(firmware, output_count=n_outs-1, save_screenshot=True, go_back=go_back),
                               testname=test_name)
 
     assert len(result) == n_ins
@@ -601,6 +601,10 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
 def test_sign_psbt_singlesig_wpkh_4to11(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
     singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1)
+
+def test_sign_psbt_singlesig_wpkh_4to11_go_back(navigator: Navigator, firmware: Firmware, client:
+                                       RaggerClient, test_name: str):
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1, True)
 
 def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):

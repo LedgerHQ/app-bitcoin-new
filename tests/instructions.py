@@ -162,16 +162,17 @@ def sign_psbt_instruction_tap(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False, has_external_inputs: bool = False) -> Instructions:
+def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True, *, has_spend_from_wallet: bool = False, to_on_next_page: bool = False, fees_on_next_page: bool = False, has_unverifiedwarning: bool = False, has_sighashwarning: bool = False, has_feewarning: bool = False, has_external_inputs: bool = False, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
 
-    if model.name.startswith("nano"):
-        funcdict = {
-          'new_request': instructions.new_request,
-          'same_request': instructions.same_request
-        }
-        which_func = 'new_request'
+    funcdict = {
+      'new_request': instructions.new_request,
+      'same_request': instructions.same_request
+    }
+    which_func = 'new_request'
 
+    # It is probably possibile to factorize between Nano and touch screen devices
+    if model.name.startswith("nano"):
         if has_sighashwarning:
             # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
             funcdict[which_func]("Continue anyway", save_screenshot=save_screenshot)
@@ -187,14 +188,24 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
             funcdict[which_func]("Continue anyway", save_screenshot=save_screenshot)
             which_func = 'same_request'
 
-        funcdict[which_func]("Sign transaction", save_screenshot=save_screenshot)
-    else:
-        funcdict = {
-          'new_request': instructions.new_request,
-          'same_request': instructions.same_request
-        }
-        which_func = 'new_request'
+        run_num = 1
+        # if go_back is True then
+        #     1. we go forward once until "Sign transaction" screen
+        #     2. then back until "Review" screen
+        #     3. then again forwar signing finaly the transaction
+        while True:
+            if not go_back or run_num >= 2:
+               funcdict[which_func]("Sign transaction", save_screenshot=save_screenshot)
+               break
+            else:
+                funcdict[which_func]("Sign transaction", NavInsID.RIGHT_CLICK, NavInsID.LEFT_CLICK,
+                                     save_screenshot=save_screenshot)
+                which_func = 'same_request'
+                funcdict[which_func]("Review", NavInsID.LEFT_CLICK, NavInsID.RIGHT_CLICK,
+                                     save_screenshot=save_screenshot)
+            run_num = run_num + 1
 
+    else:
         if has_sighashwarning:
             # This transaction uses non-standard signing rules- actually clicking "Continue anyway"
             instructions.choice_reject("Continue anyway")
@@ -214,18 +225,31 @@ def sign_psbt_instruction_approve(model: Firmware, save_screenshot: bool = True,
                                  save_screenshot=save_screenshot)
         which_func = 'same_request'
 
-        funcdict[which_func]("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                  save_screenshot=save_screenshot)
-        if to_on_next_page:
-            funcdict[which_func]("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+        run_num = 1
+        while True:
+            funcdict[which_func]("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                                       save_screenshot=save_screenshot)
-        if fees_on_next_page:
-            funcdict[which_func]("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
-                                      save_screenshot=save_screenshot)
-        if has_feewarning:
-            funcdict[which_func](
-                "High fees warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
-        instructions.confirm_transaction(save_screenshot=save_screenshot)
+            if to_on_next_page:
+                funcdict[which_func]("To", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                          save_screenshot=save_screenshot)
+            if fees_on_next_page:
+                funcdict[which_func]("Fees", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
+                                          save_screenshot=save_screenshot)
+            if has_feewarning:
+                funcdict[which_func](
+                    "High fees warning", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
+
+            if not go_back or run_num >= 2:
+                instructions.confirm_transaction(save_screenshot=save_screenshot)
+                break
+            else:
+                funcdict[which_func]("Sign", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_PREVIOUS,
+                          save_screenshot=save_screenshot)
+                which_func = 'same_request'
+                funcdict[which_func]("Review", NavInsID.USE_CASE_REVIEW_PREVIOUS, NavInsID.USE_CASE_REVIEW_TAP,
+                                     save_screenshot=save_screenshot)
+            run_num = run_num + 1
+
     return instructions
 
 
@@ -243,11 +267,13 @@ def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
     return instructions
 
 
-def sign_psbt_instruction_approve_streaming(model: Firmware, output_count: int, save_screenshot: bool = True) -> Instructions:
+def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, save_screenshot: bool = True, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
     if (output_count <= MAX_EXT_OUTPUT_NUMBER):
-        return sign_psbt_instruction_approve(model, save_screenshot, has_feewarning = True);
+       # Classical case
+       return sign_psbt_instruction_approve(model, save_screenshot, has_feewarning = True, go_back = go_back);
 
+    # Streaming case
     if model.name.startswith("nano"):
         instructions.new_request("Loading transaction")
         instructions.new_request("Sign transaction", save_screenshot=save_screenshot)
