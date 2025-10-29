@@ -20,6 +20,8 @@ from embit.script import Script
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
 
+from hashlib import sha256
+
 from ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340
 from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
@@ -28,6 +30,7 @@ from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKe
 SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
 master_key = HDKey.from_seed(mnemonic_to_seed(SPECULOS_SEED))
 master_key_fpr = master_key.derive("m/0'").fingerprint
+privkey_initial = bytearray(32)
 
 
 def random_numbers_with_sum(n: int, s: int) -> List[int]:
@@ -52,11 +55,12 @@ def random_txid() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
     return random_bytes(32)
 
-
 def random_p2tr() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
-    privkey = random_bytes(32)
-    pubkey = bip0340.point_mul(bip0340.G, int.from_bytes(privkey, 'big'))
+    global privkey_initial
+    # Using non-random sequence for the sake of tests
+    privkey_initial = sha256(privkey_initial).digest()
+    pubkey = bip0340.point_mul(bip0340.G, int.from_bytes(privkey_initial, 'big'))
 
     return b'\x51\x20' + (pubkey[0]).to_bytes(32, 'big')
 
@@ -274,6 +278,8 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
     tx.wit = CTxWitness()
 
     change_address_index = randint(0, 10_000)
+    global privkey_initial
+    privkey_initial = bytearray([0xB6] * 32)
     for i, output_amount in enumerate(output_amounts):
         tx.vout[i].nValue = output_amount
         if output_is_change[i]:
