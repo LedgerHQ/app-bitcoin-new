@@ -1,6 +1,6 @@
 from ragger.navigator import NavInsID
 
-MAX_EXT_OUTPUT_NUMBER = 10
+MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER = 16
 
 class Instructions:
     def __init__(self, model):
@@ -49,7 +49,7 @@ class Instructions:
 
         for output_index in range(0, output_count):
             # the initial 10 outputs are cached; that depends on the N_CACHED_EXTERNAL_OUTPUTS constant
-            if output_index < MAX_EXT_OUTPUT_NUMBER:
+            if output_index < MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER:
                 self.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                             save_screenshot=save_screenshot)
             else:

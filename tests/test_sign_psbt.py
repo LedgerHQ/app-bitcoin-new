@@ -16,7 +16,7 @@ from ragger.firmware import Firmware
 from test_utils import bip0340, txmaker
 
 from ragger_bitcoin import RaggerClient
-from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_NUMBER
+from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -598,17 +598,17 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
 
     assert len(result) == n_ins
 
-def test_sign_psbt_singlesig_wpkh_4to11(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4to17(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 1)
 
-def test_sign_psbt_singlesig_wpkh_4to11_go_back(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4to17_go_back(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 1, True)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 1, True)
 
-def test_sign_psbt_singlesig_wpkh_4to12(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4to18(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_NUMBER + 2)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 2)
 
 
 def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmware, client:
