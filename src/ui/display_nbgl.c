@@ -49,6 +49,7 @@ const char GA_RISK_UNVERIFIED_INPUTS[] = "Unverified inputs\nUpdate your wallet 
 const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send Bitcoin";
 const char GA_REVIEW_MESSAGE[] = "Review message";
 const char GA_LOADING_TRANSACTION[] = "Loading transaction";
+const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
 
 #define N_UX_PAIRS 36
