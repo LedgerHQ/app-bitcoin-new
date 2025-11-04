@@ -105,10 +105,10 @@ typedef struct {
     bool is_self_transfer;
     unsigned int n_outputs;
     unsigned int output_index;
-    char output_index_str[MAX_EXT_OUTPUT_NUMBER][MAX_OUTPUT_INDEX_LENGTH + 1];
-    char address_or_description[MAX_EXT_OUTPUT_NUMBER]
+    char output_index_str[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_OUTPUT_INDEX_LENGTH + 1];
+    char address_or_description[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER]
                                [MAX(MAX_ADDRESS_LENGTH_STR + 1, MAX_OPRETURN_OUTPUT_DESC_SIZE)];
-    char amount[MAX_EXT_OUTPUT_NUMBER][MAX_AMOUNT_LENGTH + 1];
+    char amount[MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER][MAX_AMOUNT_LENGTH + 1];
     char fee[MAX_AMOUNT_LENGTH + 1];
 } ui_validate_transaction_state_t;
 

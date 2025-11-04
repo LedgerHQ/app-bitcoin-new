@@ -44,7 +44,7 @@
 /**
  * Maximum number of external outputs handled simultaneously.
  */
-#define MAX_EXT_OUTPUT_NUMBER 10
+#define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 16
 
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.

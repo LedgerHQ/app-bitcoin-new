@@ -102,10 +102,10 @@ typedef struct signing_state_s {
     musig_signing_state_t musig;
 } signing_state_t;
 
-// We cache the first MAX_EXT_OUTPUT_NUMBER external outputs;
+// We cache the first MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs;
 // This is used by the code for the simplified UX for transactions;
 // Moreover, that is needed for the swap checks.
-#define N_CACHED_EXTERNAL_OUTPUTS MAX_EXT_OUTPUT_NUMBER
+#define N_CACHED_EXTERNAL_OUTPUTS MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 
 typedef struct {
     uint32_t master_key_fingerprint;

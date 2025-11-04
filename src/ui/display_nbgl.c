@@ -52,7 +52,7 @@ const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
 const char GA_LOADING_MESSAGE[] = "Loading message";
 
-#define N_UX_PAIRS 36
+#define N_UX_PAIRS 51
 
 static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
@@ -167,8 +167,8 @@ static void generic_content_callback(int token, uint8_t index, int page) {
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
 void ui_accept_transaction_simplified_flow_init(void) {
-    /* 1 From + MAX_EXT_OUTPUT_NUMBER*3 + 1 Fees + 1 High fees */
-    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_NUMBER * 3 + 1 + 1),
+    /* 1 From + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees */
+    _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1),
                    "Insufficient pairs for this flow");
     // Setup list
     pairList.nbMaxLinesForValue = 0;

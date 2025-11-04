@@ -1390,9 +1390,9 @@ static bool __attribute__((noinline)) display_transaction(
         return false;
     }
 
-    if (st->n_external_outputs <= MAX_EXT_OUTPUT_NUMBER) {
+    if (st->n_external_outputs <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER) {
         // A simplified flow for most transactions: show it using the classical review if there is
-        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_NUMBER external outputs to show to the
+        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs to show to the
         // user
 
         bool is_self_transfer = st->n_external_outputs == 0;
