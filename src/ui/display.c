@@ -238,17 +238,11 @@ bool ui_display_wallet_address(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-bool ui_authorize_wallet_spend(const char *wallet_name) {
+void ui_prepare_authorize_wallet_spend(const char *wallet_name) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
-
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
 
     strncpy(state->wallet_policy_name, wallet_name, sizeof(state->wallet_policy_name));
     state->has_wallet_policy = true;
-
-    return true;
 }
 
 bool ui_warn_external_inputs(dispatcher_context_t *context) {
@@ -278,21 +272,20 @@ bool ui_warn_nondefault_sighash(dispatcher_context_t *context) {
     return io_ui_process(context);
 }
 
-bool ui_transaction_prompt(dispatcher_context_t *context) {
+bool ui_transaction_streaming_prompt(dispatcher_context_t *context) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
-    ui_display_transaction_prompt();
+    ui_display_transaction_streaming_prompt();
     return io_ui_process(context);
 }
 
-bool ui_validate_output(dispatcher_context_t *context,
-                        int index,
-                        int total_count,
-                        const char *address_or_description,
-                        const char *coin_name,
-                        uint64_t amount) {
+bool ui_transaction_streaming_validate_output(dispatcher_context_t *context,
+                                              int index,
+                                              int total_count,
+                                              const char *address_or_description,
+                                              uint64_t amount) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
@@ -304,28 +297,27 @@ bool ui_validate_output(dispatcher_context_t *context,
     strncpy(state->address_or_description[0],
             address_or_description,
             sizeof(state->address_or_description[0]));
-    format_sats_amount(coin_name, amount, state->amount[0]);
+    format_sats_amount(COIN_COINID_SHORT, amount, state->amount[0]);
 
-    ui_display_output_address_amount_flow();
+    ui_display_transaction_streaming_output_address_amount();
 
     return io_ui_process(context);
 }
 
-bool ui_validate_transaction(dispatcher_context_t *context,
-                             const char *coin_name,
-                             uint64_t fee,
-                             tx_ux_warning_t warnings,
-                             bool is_self_transfer) {
+bool ui_transaction_streaming_validate(dispatcher_context_t *context,
+                                       uint64_t fee,
+                                       tx_ux_warning_t warnings,
+                                       bool is_self_transfer) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(coin_name, fee, state->fee);
+    format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
     state->warnings = warnings;
 
-    ui_accept_transaction_flow(is_self_transfer);
+    ui_display_transaction_streaming_flow(is_self_transfer);
 
     return io_ui_process(context);
 }
@@ -333,10 +325,6 @@ bool ui_validate_transaction(dispatcher_context_t *context,
 void ui_validate_transaction_simplified_init(const char *wallet_policy_name,
                                              unsigned int outputs_num,
                                              tx_ux_warning_t warnings) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return;
-#endif
-
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     memset(state, 0, sizeof(ui_validate_transaction_state_t));
@@ -350,18 +338,13 @@ void ui_validate_transaction_simplified_init(const char *wallet_policy_name,
     state->n_outputs = outputs_num;
     state->warnings = warnings;
 
-    ui_accept_transaction_simplified_flow_init();
+    ui_display_transaction_simplified_flow_init();
 }
 
-void ui_validate_transaction_simplified_add(const char *coin_name,
-                                            uint64_t amount,
-                                            const char *address_or_description) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return;
-#endif
+void ui_validate_transaction_simplified_add(uint64_t amount, const char *address_or_description) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(coin_name, amount, state->amount[state->output_index]);
+    format_sats_amount(COIN_COINID_SHORT, amount, state->amount[state->output_index]);
     if (address_or_description == NULL) {
         state->is_self_transfer = true;
     } else {
@@ -373,21 +356,19 @@ void ui_validate_transaction_simplified_add(const char *coin_name,
                         state->n_outputs,
                         state->output_index_str[state->output_index]);
 
-    ui_accept_transaction_simplified_flow_add();
+    ui_display_transaction_simplified_flow_add();
     state->output_index++;
 }
 
-bool ui_validate_transaction_simplified_start(const char *coin_name,
-                                              dispatcher_context_t *context,
-                                              uint64_t fee) {
+bool ui_validate_transaction_simplified_show(dispatcher_context_t *context, uint64_t fee) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
-    format_sats_amount(coin_name, fee, state->fee);
+    format_sats_amount(COIN_COINID_SHORT, fee, state->fee);
 
-    ui_accept_transaction_simplified_flow_start();
+    ui_display_transaction_simplified_flow_show();
 
     return io_ui_process(context);
 }

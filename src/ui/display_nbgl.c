@@ -134,15 +134,11 @@ static void start_processing_message_callback(bool confirm) {
 }
 
 static void start_transaction_callback(bool confirm) {
-    if (confirm) {
-        ux_flow_response_true();
-    } else {
-        status_transaction_cancel();
-    }
-}
-
-static void start_transaction_callback_inverted(bool confirm) {
+#ifdef SCREEN_SIZE_WALLET
     if (!confirm) {
+#else
+    if (confirm) {
+#endif /* #ifdef SCREEN_SIZE_WALLET */
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
@@ -166,7 +162,7 @@ static void generic_content_callback(int token, uint8_t index, int page) {
 // create the string "0 <coind_id> (self-transfer)"
 #define SELF_TRANSFER_DESCRIPTION COMBINE("0 ", COMBINE(COIN_COINID_SHORT, " (self-transfer)"))
 
-void ui_accept_transaction_simplified_flow_init(void) {
+void ui_display_transaction_simplified_flow_init(void) {
     /* 1 From + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER*3 + 1 Fees + 1 High fees */
     _Static_assert(N_UX_PAIRS >= (1 + MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER * 3 + 1 + 1),
                    "Insufficient pairs for this flow");
@@ -185,7 +181,7 @@ void ui_accept_transaction_simplified_flow_init(void) {
     }
 }
 
-void ui_accept_transaction_simplified_flow_add(void) {
+void ui_display_transaction_simplified_flow_add(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     unsigned int output_index = state->output_index;
@@ -210,7 +206,7 @@ void ui_accept_transaction_simplified_flow_add(void) {
     }
 }
 
-void ui_accept_transaction_simplified_flow_start(void) {
+void ui_display_transaction_simplified_flow_show(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     if (state->warnings.high_fee) {
@@ -235,7 +231,7 @@ void ui_accept_transaction_simplified_flow_start(void) {
                        start_transaction_callback);
 }
 
-void ui_display_transaction_prompt(void) {
+void ui_display_transaction_streaming_prompt(void) {
     nbgl_useCaseReviewStreamingStart(TYPE_TRANSACTION,
                                      &ICON_APP_ACTION,
                                      GA_REVIEW_TRANSACTION,
@@ -257,7 +253,7 @@ void ui_display_transaction_prompt(void) {
     }
 }
 
-void ui_display_output_address_amount_flow(void) {
+void ui_display_transaction_streaming_output_address_amount(void) {
     ui_validate_transaction_state_t *state = (ui_validate_transaction_state_t *) &g_ui_state;
 
     pairs[0].item = "Transaction output";
@@ -277,7 +273,7 @@ void ui_display_output_address_amount_flow(void) {
     nbgl_useCaseReviewStreamingContinue(&pairList, start_transaction_callback);
 }
 
-void ui_accept_transaction_flow(bool is_self_transfer) {
+void ui_display_transaction_streaming_flow(bool is_self_transfer) {
     // Setup list
     pairList.nbMaxLinesForValue = 0;
     pairList.pairs = pairs;
@@ -582,12 +578,11 @@ void ui_display_warning_generic(const char *msg) {
 #ifdef SCREEN_SIZE_WALLET
                        GA_BACK_TO_SAFETY,
                        GA_CONTINUE_ANYWAY,
-                       start_transaction_callback_inverted);
 #else
-                       GA_BACK_TO_SAFETY,
                        GA_CONTINUE_ANYWAY,
-                       start_transaction_callback_inverted);
-#endif
+                       GA_BACK_TO_SAFETY,
+#endif /* #ifdef SCREEN_SIZE_WALLET */
+                       start_transaction_callback);
 }
 
 // Warning/Security risks flows

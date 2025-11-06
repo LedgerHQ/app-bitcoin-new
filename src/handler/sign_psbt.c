@@ -1215,12 +1215,11 @@ display_output(dispatcher_context_t *dc,
     }
 
     // Show address to the user
-    if (!ui_validate_output(dc,
-                            external_outputs_count,
-                            st->n_external_outputs,
-                            output_description,
-                            COIN_COINID_SHORT,
-                            out_amount)) {
+    if (!ui_transaction_streaming_validate_output(dc,
+                                                  external_outputs_count,
+                                                  st->n_external_outputs,
+                                                  output_description,
+                                                  out_amount)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1392,8 +1391,8 @@ static bool __attribute__((noinline)) display_transaction(
 
     if (st->n_external_outputs <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER) {
         // A simplified flow for most transactions: show it using the classical review if there is
-        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs to show to the
-        // user
+        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs to show
+        // to the user
 
         bool is_self_transfer = st->n_external_outputs == 0;
 
@@ -1420,17 +1419,16 @@ static bool __attribute__((noinline)) display_transaction(
                 }
 
                 ui_validate_transaction_simplified_add(
-                    COIN_COINID_SHORT,
                     is_self_transfer ? 0 : st->outputs.output_amounts[i],
                     is_self_transfer ? NULL : output_description);
             }
         } else {
-            ui_validate_transaction_simplified_add(COIN_COINID_SHORT, 0, NULL);
+            ui_validate_transaction_simplified_add(0, NULL);
         }
 
         /* Start the review */
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_validate_transaction_simplified_start(COIN_COINID_SHORT, dc, fee)) {
+        if (!ui_validate_transaction_simplified_show(dc, fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -1440,14 +1438,12 @@ static bool __attribute__((noinline)) display_transaction(
 
         // If it's not a default wallet policy, let's save this info to ask the user for
         // confirmation
-        if (!st->is_wallet_default && !ui_authorize_wallet_spend(st->wallet_header.name)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
+        if (!st->is_wallet_default) {
+            ui_prepare_authorize_wallet_spend(st->wallet_header.name);
         }
 
-        // On NBGL devices, show the pre-approval screen
         // "Review transaction to send Bitcoin"
-        if (!ui_transaction_prompt(dc)) {
+        if (!ui_transaction_streaming_prompt(dc)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -1464,7 +1460,7 @@ static bool __attribute__((noinline)) display_transaction(
          */
         // Show final user validation UI
         ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, st->warnings, false)) {
+        if (!ui_transaction_streaming_validate(dc, fee, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
