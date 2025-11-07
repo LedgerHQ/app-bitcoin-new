@@ -134,11 +134,7 @@ static void start_processing_message_callback(bool confirm) {
 }
 
 static void start_transaction_callback(bool confirm) {
-#ifdef SCREEN_SIZE_WALLET
-    if (!confirm) {
-#else
     if (confirm) {
-#endif /* #ifdef SCREEN_SIZE_WALLET */
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
@@ -571,6 +567,14 @@ void ui_display_default_wallet_address_flow(void) {
                               status_address_callback);
 }
 
+static void display_warning_generic_callback(bool confirm) {
+    if (!confirm) {
+        ux_flow_response_true();
+    } else {
+        status_transaction_cancel();
+    }
+}
+
 void ui_display_warning_generic(const char *msg) {
     nbgl_useCaseChoice(&ICON_APP_WARNING,
                        GA_SECURITY_RISK_TITLE,
@@ -578,11 +582,12 @@ void ui_display_warning_generic(const char *msg) {
 #ifdef SCREEN_SIZE_WALLET
                        GA_BACK_TO_SAFETY,
                        GA_CONTINUE_ANYWAY,
+                       display_warning_generic_callback);
 #else
                        GA_CONTINUE_ANYWAY,
                        GA_BACK_TO_SAFETY,
-#endif /* #ifdef SCREEN_SIZE_WALLET */
                        start_transaction_callback);
+#endif /* #ifdef SCREEN_SIZE_WALLET */
 }
 
 // Warning/Security risks flows
