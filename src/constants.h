@@ -37,6 +37,16 @@
 #define MAX_WALLET_NAME_LENGTH 64
 
 /**
+ * Maximum length of output index string
+ */
+#define MAX_OUTPUT_INDEX_LENGTH sizeof("101 of 203")
+
+/**
+ * Maximum number of external outputs handled simultaneously.
+ */
+#define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 16
+
+/**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
  */
 #define MAX_SERIALIZED_PUBKEY_LENGTH 113

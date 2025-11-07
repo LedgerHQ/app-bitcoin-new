@@ -85,6 +85,7 @@ typedef struct {
 } derivation_info_t;
 
 extern const char GA_LOADING_TRANSACTION[];
+extern const char GA_SIGNING_TRANSACTION[];
 
 // Convenience function to share common logic when parsing the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields from inputs or outputs.
@@ -744,7 +745,7 @@ preprocess_inputs(dispatcher_context_t *dc,
             return false;
         } else if (is_internal == 0) {
             ++st->n_external_inputs;
-
+            st->warnings.external_inputs = true;
             PRINTF("INPUT %d is external\n", cur_input_index);
             continue;
         }
@@ -1214,12 +1215,11 @@ display_output(dispatcher_context_t *dc,
     }
 
     // Show address to the user
-    if (!ui_validate_output(dc,
-                            external_outputs_count,
-                            st->n_external_outputs,
-                            output_description,
-                            COIN_COINID_SHORT,
-                            out_amount)) {
+    if (!ui_transaction_streaming_validate_output(dc,
+                                                  external_outputs_count,
+                                                  st->n_external_outputs,
+                                                  output_description,
+                                                  out_amount)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1342,8 +1342,14 @@ static bool __attribute__((noinline)) display_external_outputs(
 
 static bool __attribute__((noinline))
 display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+    // If any input has non-default sighash, we warn the user
+    if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
+        SEND_SW(dc, SW_DENY);
+        return false;
+    }
+
     // If there are external inputs, it is unsafe to sign, therefore we warn the user
-    if (st->n_external_inputs > 0 && !ui_warn_external_inputs(dc)) {
+    if (st->warnings.external_inputs && !ui_warn_external_inputs(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1351,12 +1357,6 @@ display_warnings(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     // If any segwitv0 input is missing the non-witness-utxo, we warn the user and ask for
     // confirmation
     if (st->warnings.missing_nonwitnessutxo && !ui_warn_unverified_segwit_inputs(dc)) {
-        SEND_SW(dc, SW_DENY);
-        return false;
-    }
-
-    // If any input has non-default sighash, we warn the user
-    if (st->warnings.non_default_sighash && !ui_warn_nondefault_sighash(dc)) {
         SEND_SW(dc, SW_DENY);
         return false;
     }
@@ -1383,37 +1383,50 @@ static bool __attribute__((noinline)) display_transaction(
     // if the value of fees is 10% or more of the amount, and it's more than 100000
     st->warnings.high_fee = 10 * fee >= st->inputs_total_amount && st->inputs_total_amount > 100000;
 
-    if (st->n_external_outputs == 0 || st->n_external_outputs == 1) {
-        // A simplified flow for most transactions: show everything in a single screen if there is
-        // exactly 0 (self-transfer) or 1 external output to show to the user
+    // Display warnings/risks information before the transaction title
+    // for the both classical and streaming cases.
+    if (!display_warnings(dc, st)) {
+        return false;
+    }
+
+    if (st->n_external_outputs <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER) {
+        // A simplified flow for most transactions: show it using the classical review if there is
+        // exactly 0 (self-transfer) or <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER external outputs to show
+        // to the user
 
         bool is_self_transfer = st->n_external_outputs == 0;
 
-        // show this output's address
-        char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+        /** TRANSACTION CONFIRMATION */
+        /* Init*/
+        ui_transaction_simplified_init(st->is_wallet_default ? NULL : st->wallet_header.name,
+                                       is_self_transfer ? 1 : st->n_external_outputs,
+                                       st->warnings);
 
+        /* Adding outputs */
         if (!is_self_transfer) {
-            if (!format_script(st->outputs.output_scripts[0],
-                               st->outputs.output_script_lengths[0],
-                               output_description)) {
-                PRINTF("Invalid or unsupported script for external output\n");
-                SEND_SW(dc, SW_NOT_SUPPORTED);
-                return false;
+            for (unsigned int i = 0; i < st->n_external_outputs; i++) {
+                char output_description[MAX_OUTPUT_SCRIPT_DESC_SIZE];
+                /* It is possible to return the following error in the middle of
+                 * already shown screens of previous outputs
+                 */
+                if (!format_script(st->outputs.output_scripts[i],
+                                   st->outputs.output_script_lengths[i],
+                                   output_description)) {
+                    PRINTF("Invalid or unsupported script for external output\n");
+                    SEND_SW(dc, SW_NOT_SUPPORTED);
+                    return false;
+                }
+
+                ui_transaction_simplified_add(is_self_transfer ? 0 : st->outputs.output_amounts[i],
+                                              is_self_transfer ? NULL : output_description);
             }
+        } else {
+            ui_transaction_simplified_add(0, NULL);
         }
 
-        /** TRANSACTION CONFIRMATION
-         *
-         *  Show transaction amount, destination and fees, ask for final confirmation
-         */
-        if (!ui_validate_transaction_simplified(
-                dc,
-                COIN_COINID_SHORT,
-                st->is_wallet_default ? NULL : st->wallet_header.name,
-                is_self_transfer ? 0 : st->outputs.output_amounts[0],
-                is_self_transfer ? NULL : output_description,
-                st->warnings,
-                fee)) {
+        /* Start the review */
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
+        if (!ui_transaction_simplified_show(dc, fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
@@ -1421,20 +1434,15 @@ static bool __attribute__((noinline)) display_transaction(
         // Transactions with more than one external output; show one output per page,
         // using the streaming NBGL API.
 
-        // On NBGL devices, show the pre-approval screen
-        // "Review transaction to send Bitcoin"
-        if (!ui_transaction_prompt(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-        // If it's not a default wallet policy, ask the user for confirmation, and abort if they
-        // deny
-        if (!st->is_wallet_default && !ui_authorize_wallet_spend(dc, st->wallet_header.name)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
+        // If it's not a default wallet policy, let's save this info to ask the user for
+        // confirmation
+        if (!st->is_wallet_default) {
+            ui_prepare_authorize_wallet_spend(st->wallet_header.name);
         }
 
-        if (!display_warnings(dc, st)) {
+        // "Review transaction to send Bitcoin"
+        if (!ui_transaction_streaming_prompt(dc)) {
+            SEND_SW(dc, SW_DENY);
             return false;
         }
 
@@ -1444,17 +1452,13 @@ static bool __attribute__((noinline)) display_transaction(
          */
         if (!display_external_outputs(dc, st, internal_outputs)) return false;
 
-        if (st->warnings.high_fee && !ui_warn_high_fee(dc)) {
-            SEND_SW(dc, SW_DENY);
-            return false;
-        }
-
         /** TRANSACTION CONFIRMATION
          *
          *  Show summary info to the user (transaction fees), ask for final confirmation
          */
         // Show final user validation UI
-        if (!ui_validate_transaction(dc, COIN_COINID_SHORT, fee, false)) {
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
+        if (!ui_transaction_streaming_validate(dc, fee, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
         }
