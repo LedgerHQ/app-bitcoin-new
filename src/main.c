@@ -57,6 +57,8 @@ bolos_ux_params_t G_ux_params;
 
 dispatcher_context_t G_dispatcher_context;
 
+extern const char GA_SIGNING_TRANSACTION[];
+
 // clang-format off
 const command_descriptor_t COMMAND_DESCRIPTORS[] = {
     {
@@ -268,7 +270,7 @@ static void swap_library_main_helper(libargs_t *args) {
 
                 io_seproxyhal_init();
                 UX_INIT();
-                nbgl_useCaseSpinner("Signing");
+                nbgl_useCaseSpinner(GA_SIGNING_TRANSACTION);
 
                 USB_power(0);
                 USB_power(1);

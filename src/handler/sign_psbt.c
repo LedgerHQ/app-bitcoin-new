@@ -85,6 +85,7 @@ typedef struct {
 } derivation_info_t;
 
 extern const char GA_LOADING_TRANSACTION[];
+extern const char GA_SIGNING_TRANSACTION[];
 
 // Convenience function to share common logic when parsing the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields from inputs or outputs.
@@ -1424,6 +1425,7 @@ static bool __attribute__((noinline)) display_transaction(
         }
 
         /* Start the review */
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
         if (!ui_transaction_simplified_show(dc, fee)) {
             SEND_SW(dc, SW_DENY);
             return false;
@@ -1455,6 +1457,7 @@ static bool __attribute__((noinline)) display_transaction(
          *  Show summary info to the user (transaction fees), ask for final confirmation
          */
         // Show final user validation UI
+        ui_set_processing_screen_text(GA_SIGNING_TRANSACTION);
         if (!ui_transaction_streaming_validate(dc, fee, st->warnings, false)) {
             SEND_SW(dc, SW_DENY);
             return false;
