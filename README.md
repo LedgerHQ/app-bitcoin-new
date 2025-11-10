@@ -2,6 +2,8 @@
 
 This is the Bitcoin application for Ledger devices.
 
+The latest version for Nano S is in the [nanos](https://github.com/LedgerHQ/app-bitcoin-new/tree/nanos) branch.
+
 ## Quick start guide
 
 ### With VSCode
