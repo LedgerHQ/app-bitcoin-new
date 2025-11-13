@@ -117,45 +117,19 @@ bool ui_display_pubkey(dispatcher_context_t *context,
     return io_ui_process(context);
 }
 
-bool ui_display_path_and_message_content(dispatcher_context_t *context,
-                                         const char *path_str,
-                                         const char *message_content) {
+bool ui_display_message_and_confirm(dispatcher_context_t *context,
+                                    const char *path_str,
+                                    const char *message,
+                                    bool is_hash) {
 #ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
     return true;
 #endif
 
     ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
     strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-    strncpy(state->message, message_content, sizeof(state->message));
+    strncpy(state->message, message, sizeof(state->message));
 
-    ui_sign_message_content_flow();
-
-    return io_ui_process(context);
-}
-
-bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
-                                              const char *path_str,
-                                              const char *message_hash) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    ui_path_and_message_state_t *state = (ui_path_and_message_state_t *) &g_ui_state;
-    strncpy(state->bip32_path_str, path_str, sizeof(state->bip32_path_str));
-    strncpy(state->message, message_hash, sizeof(state->message));
-
-    ui_sign_message_path_hash_and_confirm_flow();
-
-    return io_ui_process(context);
-}
-
-bool ui_display_message_confirm(dispatcher_context_t *context) {
-#ifdef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    return true;
-#endif
-
-    UNUSED(context);
-    ui_sign_message_confirm_flow();
+    ui_sign_message_and_confirm_flow(is_hash);
 
     return io_ui_process(context);
 }
@@ -393,10 +367,6 @@ bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool succ
     ui_display_post_processing_confirm_message(success);
 
     return true;
-}
-
-void ui_pre_processing_message(void) {
-    ui_set_display_prompt();
 }
 
 char const *ui_get_processing_screen_text(void) {

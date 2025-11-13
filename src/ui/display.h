@@ -15,10 +15,9 @@
 #include "../common/script.h"
 #include "../constants.h"
 
-#define MESSAGE_CHUNK_SIZE        64  // Protocol specific
-#define MESSAGE_CHUNK_PER_DISPLAY 2   // This could be changed depending on screen sizes
-#define MESSAGE_MAX_DISPLAY_SIZE \
-    (MESSAGE_CHUNK_SIZE * MESSAGE_CHUNK_PER_DISPLAY + 2 * sizeof("...") - 1)
+#define MESSAGE_CHUNK_SIZE 64  // Protocol specific
+// Displayed message length - if the message is too long we will not display it
+#define MAX_DISPLAYBLE_MESSAGE_LENGTH (10 * MESSAGE_CHUNK_SIZE)
 
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_IMPORTANT IMPORTANT_CIRCLE_ICON
@@ -69,7 +68,7 @@ typedef struct {
 
 typedef struct {
     char bip32_path_str[MAX_SERIALIZED_BIP32_PATH_LENGTH + 1];
-    char message[MESSAGE_MAX_DISPLAY_SIZE];
+    char message[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
 } ui_path_and_message_state_t;
 
 typedef struct {
@@ -141,15 +140,10 @@ bool ui_display_pubkey(dispatcher_context_t *context,
                        bool is_path_suspicious,
                        const char *pubkey);
 
-bool ui_display_path_and_message_content(dispatcher_context_t *context,
-                                         const char *path_str,
-                                         const char *message_content);
-
-bool ui_display_message_path_hash_and_confirm(dispatcher_context_t *context,
-                                              const char *path_str,
-                                              const char *message_hash);
-
-bool ui_display_message_confirm(dispatcher_context_t *context);
+bool ui_display_message_and_confirm(dispatcher_context_t *context,
+                                    const char *path_str,
+                                    const char *message,
+                                    bool is_hash);
 
 bool ui_display_address(dispatcher_context_t *dispatcher_context,
                         const char *address,
@@ -211,11 +205,7 @@ void ui_display_pubkey_flow(void);
 
 void ui_display_pubkey_suspicious_flow(void);
 
-void ui_sign_message_path_hash_and_confirm_flow(void);
-
-void ui_sign_message_content_flow(void);
-
-void ui_sign_message_confirm_flow(void);
+void ui_sign_message_and_confirm_flow(bool is_hash);
 
 void ui_display_receive_in_wallet_flow(void);
 
@@ -246,8 +236,6 @@ bool ui_post_processing_confirm_wallet_spend(dispatcher_context_t *context, bool
 bool ui_post_processing_confirm_transaction(dispatcher_context_t *context, bool success);
 
 bool ui_post_processing_confirm_message(dispatcher_context_t *context, bool success);
-
-void ui_pre_processing_message(void);
 
 void ui_display_post_processing_confirm_message(bool success);
 void ui_display_post_processing_confirm_transaction(bool success);

@@ -30,80 +30,12 @@
 
 #include "handlers.h"
 
-#define MAX_DISPLAYBLE_CHUNK_NUMBER \
-    (5 * MESSAGE_CHUNK_PER_DISPLAY)  // If the message is too long we will not display it
-
 extern const char GA_LOADING_MESSAGE[];
 
 static unsigned char const BSM_SIGN_MAGIC[] = {'\x18', 'B', 'i', 't', 'c', 'o', 'i', 'n', ' ',
                                                'S',    'i', 'g', 'n', 'e', 'd', ' ', 'M', 'e',
                                                's',    's', 'a', 'g', 'e', ':', '\n'};
-
-static bool display_message_content_and_confirm(dispatcher_context_t* dc,
-                                                uint8_t* message_merkle_root,
-                                                size_t n_chunks,
-                                                uint8_t* path_str) {
-    reset_streaming_index();
-    while (get_streaming_index() <= (n_chunks - 1) / MESSAGE_CHUNK_PER_DISPLAY) {
-        uint8_t message_chunk[MESSAGE_MAX_DISPLAY_SIZE];
-
-        int total_chunk_len = 0;
-        uint8_t offset = 0;
-
-        if (get_streaming_index() > 0) {
-            message_chunk[offset++] = '.';
-            message_chunk[offset++] = '.';
-            message_chunk[offset++] = '.';
-        }
-
-        total_chunk_len += offset;
-
-        // each UX display will show MESSAGE_CHUNK_PER_DISPLAY chunks
-        size_t group_start_index = get_streaming_index() * MESSAGE_CHUNK_PER_DISPLAY;
-
-        for (int j = 0;
-             j < MESSAGE_CHUNK_PER_DISPLAY &&
-             (group_start_index + j) < (unsigned int) n_chunks;  // make sure not to overflow
-             j++) {
-            offset += j * MESSAGE_CHUNK_SIZE;
-
-            int chunk_len =
-                call_get_merkle_leaf_element(dc,
-                                             message_merkle_root,
-                                             n_chunks,
-                                             get_streaming_index() * MESSAGE_CHUNK_PER_DISPLAY + j,
-                                             message_chunk + offset,
-                                             MESSAGE_CHUNK_SIZE);
-
-            total_chunk_len += chunk_len;
-
-            if (chunk_len < MESSAGE_CHUNK_SIZE) {
-                break;
-            }
-        }
-
-        if ((get_streaming_index() + 1) * MESSAGE_CHUNK_PER_DISPLAY < n_chunks) {
-            message_chunk[total_chunk_len] = '.';
-            message_chunk[total_chunk_len + 1] = '.';
-            message_chunk[total_chunk_len + 2] = '.';
-            message_chunk[total_chunk_len + 3] = '\0';
-        } else {
-            message_chunk[total_chunk_len] = '\0';
-        }
-
-        if (!ui_display_path_and_message_content(dc, (char*) path_str, (char*) message_chunk)) {
-            return false;
-        }
-    }
-
-    if (!ui_display_message_confirm(dc)) {
-        return false;
-    }
-
-    return true;
-}
-
-void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
+void handler_sign_message(dispatcher_context_t *dc, uint8_t protocol_version) {
     (void) protocol_version;
 
     uint8_t bip32_path_len;
@@ -141,24 +73,33 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
     crypto_hash_update(&bsm_digest_context.header, BSM_SIGN_MAGIC, sizeof(BSM_SIGN_MAGIC));
     crypto_hash_update_varint(&bsm_digest_context.header, message_length);
 
-    size_t n_chunks = (message_length + MESSAGE_CHUNK_SIZE - 1) / MESSAGE_CHUNK_SIZE;
-
-    if (n_chunks > MAX_DISPLAYBLE_CHUNK_NUMBER) {
+    // Just a flag indicating if we use only one chunk in the case of long message
+    unsigned int not_long_message = 1;
+    if (message_length > MAX_DISPLAYBLE_MESSAGE_LENGTH) {
         printable = false;
+        not_long_message = 0;
     }
 
+    uint8_t message_full[MAX_DISPLAYBLE_MESSAGE_LENGTH + 1];
+    size_t n_chunks = (message_length + MESSAGE_CHUNK_SIZE - 1) / MESSAGE_CHUNK_SIZE;
     for (unsigned int i = 0; i < n_chunks; i++) {
-        uint8_t message_chunk[MESSAGE_CHUNK_SIZE];
+        uint8_t *message_chunk = &message_full[i * MESSAGE_CHUNK_SIZE * not_long_message];
+
         int chunk_len = call_get_merkle_leaf_element(dc,
                                                      message_merkle_root,
                                                      n_chunks,
                                                      i,
                                                      message_chunk,
-                                                     sizeof(message_chunk));
+                                                     MESSAGE_CHUNK_SIZE);
 
         if (chunk_len < 0 || (chunk_len != MESSAGE_CHUNK_SIZE && i != n_chunks - 1)) {
             SEND_SW(dc, SW_BAD_STATE);  // should never happen
             return;
+        }
+
+        if (i == n_chunks - 1) {
+            // Last chunk - let's add null terminator at the end
+            message_chunk[chunk_len] = '\0';
         }
 
         if (printable) {
@@ -186,17 +127,13 @@ void handler_sign_message(dispatcher_context_t* dc, uint8_t protocol_version) {
     }
 
 #ifndef HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-    ui_pre_processing_message();
     if (printable) {
-        if (!display_message_content_and_confirm(dc,
-                                                 message_merkle_root,
-                                                 n_chunks,
-                                                 (uint8_t*) path_str)) {
+        if (!ui_display_message_and_confirm(dc, path_str, (const char *) message_full, false)) {
             SEND_SW(dc, SW_DENY);
             return;
         }
     } else {
-        if (!ui_display_message_path_hash_and_confirm(dc, path_str, message_hash_str)) {
+        if (!ui_display_message_and_confirm(dc, path_str, message_hash_str, true)) {
             SEND_SW(dc, SW_DENY);
             return;
         }

@@ -11,7 +11,6 @@
 
 static const char *confirmed_status;  // text displayed in confirmation page (after long press)
 static const char *rejected_status;   // text displayed in rejection page (after reject confirmed)
-static bool show_message_start_page;
 
 /* Graphical resources (GA) used by the application and NBGL */
 #ifdef SCREEN_SIZE_WALLET
@@ -467,94 +466,33 @@ void ui_display_pubkey_suspicious_flow(void) {
     nbgl_useCaseGenericReview(&genericContent, "Cancel", status_operation_cancel);
 }
 
-static void message_finish_callback(bool confirm) {
-    if (confirm) {
-        nbgl_useCaseReviewStreamingFinish(GA_SIGN_MESSAGE, start_processing_message_callback);
-    } else {
-        status_message_cancel();
-    }
-}
+void ui_sign_message_and_confirm_flow(bool is_hash) {
+    pairs[0].item = "Path";
+    pairs[0].value = g_ui_state.path_and_message.bip32_path_str;
 
-static void message_display_content_continue(bool confirm) {
-    if (confirm) {
-        increase_streaming_index();
-        ux_flow_response_true();
-    } else {
-        status_message_cancel();
-    }
-}
-
-static void message_display_content(bool confirm) {
-    if (confirm) {
-        pairList.pairs = pairs;
-        pairList.nbPairs = 0;
-
-        if (get_streaming_index() == 0) {
-            pairs[0].item = "Path";
-            pairs[0].value = g_ui_state.path_and_message.bip32_path_str;
-            pairList.nbPairs = 1;
-        }
-
+    if (!is_hash) {
 #ifdef SCREEN_SIZE_WALLET
-        pairs[pairList.nbPairs].item = "Message content";
+        pairs[1].item = "Message content";
 #else
-        pairs[pairList.nbPairs].item = "Message";
+        pairs[1].item = "Message";
 #endif
-        pairs[pairList.nbPairs].value = g_ui_state.path_and_message.message;
-
-        pairList.wrapping = true;
-        pairList.nbPairs++;
-
-        nbgl_useCaseReviewStreamingContinue(&pairList, message_display_content_continue);
     } else {
-        status_message_cancel();
-    }
-}
-
-static void message_display_path(bool confirm) {
-    if (confirm) {
-        pairs[0].item = "Path";
-        pairs[0].value = g_ui_state.path_and_message.bip32_path_str;
-
         pairs[1].item = "Message hash";
-        pairs[1].value = g_ui_state.path_and_message.message;
-
-        pairList.nbPairs = 2;
-        pairList.pairs = pairs;
-
-        nbgl_useCaseReviewStreamingContinue(&pairList, message_finish_callback);
-    } else {
-        status_message_cancel();
     }
-}
 
-void ui_sign_message_content_flow(void) {
-    if (show_message_start_page == true) {
-        show_message_start_page = false;
-        nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                         &ICON_APP_ACTION,
-                                         GA_REVIEW_MESSAGE,
-                                         NULL,
-                                         message_display_content);
-    } else {
-        message_display_content(true);
-    }
-}
+    pairs[1].value = g_ui_state.path_and_message.message;
 
-void ui_sign_message_path_hash_and_confirm_flow(void) {
-    nbgl_useCaseReviewStreamingStart(TYPE_MESSAGE,
-                                     &ICON_APP_ACTION,
-                                     GA_REVIEW_MESSAGE,
-                                     NULL,
-                                     message_display_path);
-}
+    pairList.wrapping = true;
+    pairList.nbPairs = 2;
+    pairList.pairs = pairs;
 
-void ui_sign_message_confirm_flow(void) {
-    nbgl_useCaseReviewStreamingFinish(GA_SIGN_MESSAGE, start_processing_message_callback);
-}
-
-void ui_set_display_prompt(void) {
-    show_message_start_page = true;
+    nbgl_useCaseReview(TYPE_MESSAGE,
+                       &pairList,
+                       &ICON_APP_ACTION,
+                       GA_REVIEW_MESSAGE,
+                       NULL,
+                       GA_SIGN_MESSAGE,
+                       start_processing_message_callback);
 }
 
 // Address flow
