@@ -167,7 +167,7 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
         bip32_path_format(bip32_path, bip32_path_len, path_str, sizeof(path_str));
     }
 
-    if (display && !ui_display_pubkey(dc, path_str, !is_safe, pubkey_str)) {
+    if (display && !ui_display_pubkey(dc, path_str, pubkey_str)) {
         SEND_SW(dc, SW_DENY);
         return;
     }

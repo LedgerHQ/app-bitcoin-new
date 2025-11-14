@@ -57,9 +57,6 @@ static nbgl_layoutTagValue_t pairs[N_UX_PAIRS];
 static unsigned int n_pairs;
 static nbgl_layoutTagValueList_t pairList;
 
-static nbgl_genericContents_t genericContent;
-static nbgl_content_t contentList[4];
-
 extern bool G_was_processing_screen_shown;
 
 static void finish_transaction_flow(bool choice);
@@ -137,18 +134,6 @@ static void start_transaction_callback(bool confirm) {
         ux_flow_response_true();
     } else {
         status_transaction_cancel();
-    }
-}
-
-static void generic_content_callback(int token, uint8_t index, int page) {
-    UNUSED(index);
-    UNUSED(page);
-    switch (token) {
-        case REVIEW_CONFIRM:
-            status_operation_callback(true);
-            break;
-        default:
-            PRINTF("Unhandled token : %d", token);
     }
 }
 
@@ -398,72 +383,6 @@ void ui_display_register_wallet_policy_flow(void) {
                             NULL,
                             GA_REGISTER_ACCOUNT,
                             status_operation_callback);
-}
-
-void ui_display_pubkey_suspicious_flow(void) {
-    confirmed_status = "Public key\napproved";
-    rejected_status = "Public key rejected";
-
-    pairs[0].item = "Path";
-    pairs[0].value = g_ui_state.path_and_pubkey.bip32_path_str;
-
-    pairs[1].item = "Public key";
-    pairs[1].value = g_ui_state.path_and_pubkey.pubkey;
-
-    // Setup list
-    pairList.nbMaxLinesForValue = 0;
-    pairList.nbPairs = 2;
-    pairList.pairs = pairs;
-
-    contentList[0].type = CENTERED_INFO;
-    contentList[0].content.centeredInfo.icon = &ICON_APP_ACTION;
-    contentList[0].content.centeredInfo.text1 = "Confirm public key";
-    contentList[0].content.centeredInfo.text2 = NULL;
-#ifdef SCREEN_SIZE_WALLET
-    contentList[0].content.centeredInfo.text3 = NULL;
-    contentList[0].content.centeredInfo.style = LARGE_CASE_BOLD_INFO;
-    contentList[0].content.centeredInfo.offsetY = 0;
-#else
-    contentList[0].content.centeredInfo.style = BOLD_TEXT1_INFO;
-#endif
-    contentList[0].contentActionCallback = NULL;
-
-    contentList[1].type = CENTERED_INFO;
-    contentList[1].content.centeredInfo.icon = &ICON_APP_IMPORTANT;
-    contentList[1].content.centeredInfo.text1 = "WARNING";
-    contentList[1].content.centeredInfo.text2 = "The derivation path\nis unusual";
-#ifdef SCREEN_SIZE_WALLET
-    contentList[1].content.centeredInfo.text3 = NULL;
-    contentList[1].content.centeredInfo.style = LARGE_CASE_BOLD_INFO;
-    contentList[1].content.centeredInfo.offsetY = 0;
-#else
-    contentList[1].content.centeredInfo.style = BOLD_TEXT1_INFO;
-#endif
-    contentList[1].contentActionCallback = NULL;
-
-    contentList[2].type = TAG_VALUE_LIST;
-    memcpy(&contentList[2].content.tagValueList, &pairList, sizeof(nbgl_layoutTagValueList_t));
-    contentList[2].contentActionCallback = NULL;
-
-    contentList[3].type = INFO_BUTTON;
-    contentList[3].content.infoButton.text = "Approve public key";
-    contentList[3].content.infoButton.icon = &ICON_APP_ACTION;
-#ifdef SCREEN_SIZE_WALLET
-    contentList[3].content.infoButton.buttonText = "Approve";
-#else
-    contentList[3].content.infoButton.buttonText = "";
-#endif
-    contentList[3].content.infoButton.buttonToken = REVIEW_CONFIRM;
-#ifdef HAVE_PIEZO_SOUND
-    contentList[3].content.infoButton.tuneId = TUNE_TAP_CASUAL;
-#endif
-    contentList[3].contentActionCallback = generic_content_callback;
-
-    genericContent.callbackCallNeeded = false;
-    genericContent.contentsList = contentList;
-    genericContent.nbContents = 4;
-
-    nbgl_useCaseGenericReview(&genericContent, "Cancel", status_operation_cancel);
 }
 
 void ui_sign_message_and_confirm_flow(bool is_hash) {
