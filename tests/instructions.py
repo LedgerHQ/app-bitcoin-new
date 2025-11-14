@@ -1,7 +1,8 @@
 import pytest
 
-from ragger.navigator import NavInsID
+from ragger.navigator import NavInsID, NavIns
 from ragger.firmware import Firmware
+from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
 
 from ragger_bitcoin.ragger_instructions import Instructions, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 
@@ -24,13 +25,26 @@ def message_instruction_approve_long(model: Firmware) -> Instructions:
 
     if model.name.startswith("nano"):
         instructions.nano_skip_screen("Path")
-        instructions.same_request("Loading message")
-        instructions.new_request("Loading message")
-        instructions.new_request("Loading message")
-        instructions.new_request("Loading message")
-        instructions.new_request("Sign message")
+        instructions.same_request("Sign message")
     else:
-        instructions.review_message(page_count=5)
+        # TODO: to wrap below to review_message_long() and
+        # to use coordinates from positions.py when available in Ragger
+        if (model.name == "apex_p"):
+            MORE_POS = (APEX_P_X_CENTER, 250)
+            CROSS_POS = (28, 370)
+        elif model.name == "stax":
+            MORE_POS = (STAX_X_CENTER, 425)
+            CROSS_POS =(40, 625)
+        elif model.name == "flex":
+            MORE_POS = (FLEX_X_CENTER, 365)
+            CROSS_POS = (50, 550)
+
+        instructions.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavInsID.USE_CASE_REVIEW_TAP)
+        instructions.same_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavIns(NavInsID.TOUCH, MORE_POS))
+        instructions.same_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
+                         NavIns(NavInsID.TOUCH, CROSS_POS))
         instructions.confirm_message()
     return instructions
 

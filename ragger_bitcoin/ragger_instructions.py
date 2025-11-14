@@ -70,13 +70,10 @@ class Instructions:
                          NavInsID.USE_CASE_STATUS_DISMISS,
                          save_screenshot=save_screenshot)
 
-    def review_message(self, page_count=1, save_screenshot=True):
+    def review_message(self, save_screenshot=True):
         self.new_request("Review", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
         self.same_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
-                         NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
-        for _ in range(1, page_count):
-            self.new_request("Message", NavInsID.USE_CASE_REVIEW_TAP,
                          NavInsID.USE_CASE_REVIEW_TAP, save_screenshot=save_screenshot)
 
     def confirm_message(self, save_screenshot=True):
