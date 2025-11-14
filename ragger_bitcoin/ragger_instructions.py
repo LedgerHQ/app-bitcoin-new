@@ -113,12 +113,6 @@ class Instructions:
         self.new_request(reject_text, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_REJECT,
                          save_screenshot=save_screenshot)
 
-    def footer_cancel(self, save_screenshot=True):
-        self.new_request("Confirm", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,
-                         save_screenshot=save_screenshot)
-        self.new_request("rejected", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_STATUS_DISMISS,
-                         save_screenshot=save_screenshot)
-
     def status_dismiss(self, text, status_on_same_request=True, save_screenshot=True):
         if status_on_same_request:
             self.same_request(text, NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP,

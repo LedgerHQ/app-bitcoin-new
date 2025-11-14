@@ -80,7 +80,9 @@ def pubkey_instruction_reject_early(model: Firmware) -> Instructions:
     if model.name.startswith("nano"):
         pytest.skip()
     else:
-        instructions.footer_cancel()
+        instructions.new_request("Path", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.CANCEL_FOOTER_TAP)
+        instructions.same_request("Reject", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM)
+        instructions.status_dismiss("rejected", status_on_same_request=False)
     return instructions
 
 
@@ -88,9 +90,10 @@ def pubkey_reject(model: Firmware) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Cancel")
+        instructions.new_request("Reject")
     else:
         instructions.choice_reject()
+        instructions.same_request("Reject", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_CHOICE_CONFIRM)
         instructions.status_dismiss("rejected", status_on_same_request=False)
 
     return instructions
