@@ -13,7 +13,7 @@ RUN apt install -y bsdmainutils build-essential cmake pkg-config ccache git libb
 RUN cd / && \
     git clone --depth=1 https://github.com/bitcoin/bitcoin.git && \
     cd bitcoin && \
-    cmake -B build && \
+    cmake -B build -DENABLE_IPC=OFF && \
     cmake --build build && \
     cmake --install build
 
