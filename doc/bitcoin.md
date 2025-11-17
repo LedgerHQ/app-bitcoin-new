@@ -60,7 +60,7 @@ Once the user approves, the `REGISTER_WALLET` returns to the client a 32-byte HM
 | 0x6D00 | `SW_INS_NOT_SUPPORTED`       | No command exists with `INS` |
 | 0x6E00 | `SW_CLA_NOT_SUPPORTED`       | Bad `CLA` used for this application |
 | 0xB000 | `SW_WRONG_RESPONSE_LENGTH`   | Wrong response length (buffer size problem) |
-| 0xB007 | `SW_BAD_STATE`               | Abrted because unexpected state reached |
+| 0xB007 | `SW_BAD_STATE`               | Aborted because unexpected state reached |
 | 0xB008 | `SW_SIGNATURE_FAIL`          | Invalid signature or HMAC |
 | 0xE000 | `SW_INTERRUPTED_EXECUTION`   | The command is interrupted, and requires the client's response |
 | 0x9000 | `SW_OK`                      | Success |
@@ -300,7 +300,11 @@ User interaction is not required for this command.
 
 Signs a message, according to the standard Bitcoin Message Signing.
 
-The device shows on its secure screen the BIP-32 path used for signing, and the SHA256 hash of the message; the hash should be verified by the user using an external tool if the client is untrusted.
+The device shows on its secure screen the BIP-32 path used for signing and the message information:
+- either the content of the message (if its length does not overpass 640 bytes in current version and contains only ASCII printable characters plus Line Feed);
+- or the SHA256 hash of the message.
+
+The information should be verified (using an external tool in the case of hash if the client is untrusted).
 
 #### Encoding
 
