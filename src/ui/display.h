@@ -137,18 +137,12 @@ typedef void (*action_validate_cb)(dispatcher_context_t *dispatcher_context, boo
  */
 bool ui_display_pubkey(dispatcher_context_t *context,
                        const char *bip32_path_str,
-                       bool is_path_suspicious,
                        const char *pubkey);
 
 bool ui_display_message_and_confirm(dispatcher_context_t *context,
                                     const char *path_str,
                                     const char *message,
                                     bool is_hash);
-
-bool ui_display_address(dispatcher_context_t *dispatcher_context,
-                        const char *address,
-                        bool is_path_suspicious,
-                        const char *bip32_path_str);
 
 bool ui_display_register_wallet_policy(
     dispatcher_context_t *context,
@@ -202,8 +196,6 @@ void set_ux_flow_response(bool approved);
  * TODO: to merge display.c and display_nbgl.c
  */
 void ui_display_pubkey_flow(void);
-
-void ui_display_pubkey_suspicious_flow(void);
 
 void ui_sign_message_and_confirm_flow(bool is_hash);
 
