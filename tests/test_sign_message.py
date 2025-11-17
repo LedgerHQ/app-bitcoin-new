@@ -19,6 +19,27 @@ def test_sign_message(navigator: Navigator, firmware: Firmware, client: RaggerCl
     assert result == "IOR4YRVlmJGMx+H7PgQvHzWAF0HAgrUggQeRdnoWKpypfaAberpvF+XbOCM5Cd/ljogNyU3w2OIL8eYCyZ6Ru2k="
 
 
+def test_sign_message_eol_1(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    msg = "The Times 03/Jan/2009 Chancellor\non brink of second bailout for banks."
+    path = "m/44'/1'/0'/0/0"
+    result = client.sign_message(msg, path, navigator,
+                                 instructions=message_instruction_approve(firmware),
+                                 testname=test_name)
+
+    print(f"result = {result}")
+    assert result == "Hz07YuQ7XRk6vUd5O43GP63nZAYYF8P/LEFMN6GbBDKvTRKkXobnlPoa90HpF40xIX/+sReTqqMuIKPQlyy14wE="
+
+def test_sign_message_eol_2(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    msg = "\nThe Times 03/Jan/2009 Chancellor\non brink of second bailout for banks."
+    path = "m/44'/1'/0'/0/0"
+    result = client.sign_message(msg, path, navigator,
+                                 instructions=message_instruction_approve(firmware),
+                                 testname=test_name)
+
+    print(f"result = {result}")
+    assert result == "ILMgIpFxqZwrB5bgR/seis2N48jS7pmHViKcRYisIPBdDjhAzGDGP3HiLPcrYMlEOXJvdJ9/Mud/+fslM2KtKaM="
+
+
 def test_sign_message_64bytes(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Version 2.2.2 introduced a bug where signing a 64 bytes message would fail; this test is to avoid regressions
     msg = "a" * 64
