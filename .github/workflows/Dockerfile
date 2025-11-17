@@ -21,8 +21,11 @@ RUN cd / && \
 FROM ghcr.io/ledgerhq/speculos:latest
 COPY --from=0 /usr/local/bin/ /usr/local/bin/
 
+# install essential tools
+RUN apt update -y && apt install -y build-essential curl git
+
 # install runtime dependencies for bitcoind
-RUN apt update -y && apt install -y libminiupnpc-dev libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev
+RUN apt install -y libminiupnpc-dev libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev
 
 # Add bitcoin binaries to path
 ENV PATH=/usr/local/bin/:$PATH
