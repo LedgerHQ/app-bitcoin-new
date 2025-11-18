@@ -104,7 +104,9 @@ void handler_sign_message(dispatcher_context_t *dc, uint8_t protocol_version) {
 
         if (printable) {
             for (int j = 0; j < chunk_len; j++) {
-                if (message_chunk[j] < 0x20 || message_chunk[j] > 0x7E) {
+                // Line Feed (LF) character is handled by NBGL - let's allow it
+                if ((message_chunk[j] < 0x20 || message_chunk[j] > 0x7E) &&
+                    (message_chunk[j] != '\n')) {
                     printable = false;
                     break;
                 }

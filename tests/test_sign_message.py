@@ -19,6 +19,16 @@ def test_sign_message(navigator: Navigator, firmware: Firmware, client: RaggerCl
     assert result == "IOR4YRVlmJGMx+H7PgQvHzWAF0HAgrUggQeRdnoWKpypfaAberpvF+XbOCM5Cd/ljogNyU3w2OIL8eYCyZ6Ru2k="
 
 
+def test_sign_message_eol(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    msg = "\nThe Times 03/Jan/2009 Chancellor\non brink of second bailout for banks."
+    path = "m/44'/1'/0'/0/0"
+    result = client.sign_message(msg, path, navigator,
+                                 instructions=message_instruction_approve(firmware),
+                                 testname=test_name)
+
+    assert result == "ILMgIpFxqZwrB5bgR/seis2N48jS7pmHViKcRYisIPBdDjhAzGDGP3HiLPcrYMlEOXJvdJ9/Mud/+fslM2KtKaM="
+
+
 def test_sign_message_64bytes(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Version 2.2.2 introduced a bug where signing a 64 bytes message would fail; this test is to avoid regressions
     msg = "a" * 64
@@ -71,7 +81,7 @@ def test_sign_message_reject(navigator: Navigator, firmware: Firmware, client: R
 
 def test_sign_message_accept_non_ascii(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     # Test with a message that contains non ascii char
-    message = "Hello\nworld!"
+    message = "Hello\rworld!"
 
     res = client.sign_message(
         message,
@@ -81,7 +91,7 @@ def test_sign_message_accept_non_ascii(navigator: Navigator, firmware: Firmware,
         testname=test_name
     )
 
-    assert res == 'IGGk2UM12aQGtigJ7XCLJEXQl3bdKgx0G3CIt0ADSWknfAHqs+9+9OPZSjGrjyp46GjztGzUAnCa/DDMrSIAfbg='
+    assert res == 'ILXQPJapQ/OEy9f/ggRouI6HuAleQveIOBphNUCLlWNVQAml2Yx+885tsU0DKIxggsVq53o/fQRlosTPTQE/keE='
 
 
 def test_sign_message_accept_too_long(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
@@ -101,7 +111,7 @@ def test_sign_message_accept_too_long(navigator: Navigator, firmware: Firmware, 
 
 def test_sign_message_hash_reject(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
     with pytest.raises(ExceptionRAPDU) as e:
-        client.sign_message("Hello\nworld!",
+        client.sign_message("Hello\rworld!",
                             "m/44'/1'/0'/0/0",
                             navigator,
                             instructions=message_instruction_reject(firmware),
