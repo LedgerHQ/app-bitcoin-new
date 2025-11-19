@@ -289,16 +289,21 @@ bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 
     memcpy(label_copy, label, label_len);
 
+    /* The SDK function below requires the output key array to be 64 bytes long */
+    uint8_t tmp_key[64] = {0};
     if (os_derive_bip32_with_seed_no_throw(HDW_SLIP21,
                                            CX_CURVE_SECP256K1,
                                            (uint32_t *) label_copy,
                                            label_len,
-                                           key,
+                                           tmp_key,
                                            NULL,
                                            NULL,
                                            0) != CX_OK) {
         return false;
     }
+    /* It is assumed that with chain_code and seed equal to NULL the output key length is 32 bytes
+     */
+    memcpy(key, tmp_key, 32);
 
     return true;
 }
