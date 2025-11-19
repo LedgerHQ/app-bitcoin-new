@@ -52,7 +52,7 @@ const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 cx_err_t cx_ecfp_scalar_mult_unsafe(cx_curve_t curve, uint8_t *P, const uint8_t *k, size_t k_len) {
     size_t size;
     cx_ecpoint_t ecP;
-    cx_err_t error;
+    cx_err_t error = CX_OK;
 
     CX_CHECK(cx_ecdomain_parameters_length(curve, &size));
     CX_CHECK(cx_bn_lock(size, 0));
