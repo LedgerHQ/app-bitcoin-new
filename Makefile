@@ -45,7 +45,7 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 4
-APPVERSION_P = 1
+APPVERSION_P = 2
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -125,6 +125,7 @@ ICON_NANOX = icons/nanox_app_bitcoin.gif
 ICON_NANOSP = icons/nanox_app_bitcoin.gif
 ICON_STAX = icons/stax_app_bitcoin.gif
 ICON_FLEX = icons/flex_app_bitcoin.gif
+ICON_APEX_P = icons/apex_p_app_bitcoin.png
 
 ########################################
 # Application communication interfaces #
