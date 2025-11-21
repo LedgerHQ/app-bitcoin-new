@@ -79,7 +79,7 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: RaggerClient):
         assert DeviceException.exc.get(e.value.status) == NotSupportedError
         assert len(e.value.data) == 0
 
-
+@pytest.mark.skip(reason="derives key at root level - now prohibited")
 def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmware, client:
                                           RaggerClient,
                                           test_name: str):
@@ -97,6 +97,7 @@ def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmwa
     assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
 
 
+@pytest.mark.skip(reason="derives key at non standard path - now prohibited")
 def test_get_extended_pubkey_non_standard_reject_early(navigator: Navigator, firmware: Firmware,
                                                        client: RaggerClient, test_name: str):
     # Test rejecting after the "Reject if you're not sure" warning
@@ -114,6 +115,7 @@ def test_get_extended_pubkey_non_standard_reject_early(navigator: Navigator, fir
     assert len(e.value.data) == 0
 
 
+@pytest.mark.skip(reason="derives key at non standard path - now prohibited")
 def test_get_extended_pubkey_non_standard_reject(navigator: Navigator, firmware: Firmware, client:
                                                  RaggerClient, test_name: str):
     # Test rejecting at the end

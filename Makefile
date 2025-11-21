@@ -19,25 +19,8 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
-# TODO: Compile with the right path restrictions
-#
-#       The right path restriction would be something like
-#         --path "*'/0'"
-#       for mainnet, and
-#         --path "*'/1'"
-#       for testnet.
-#
-#       That is, restrict the BIP-44 coin_type, but not the purpose.
-#       However, such wildcards are not currently supported by the OS.
-#
-#       Note that the app still requires explicit user approval before exporting
-#       any xpub outside of a small set of allowed standard paths.
-
 # Application allowed derivation curves.
 CURVE_APP_LOAD_PARAMS = secp256k1
-
-# Application allowed derivation paths.
-PATH_APP_LOAD_PARAMS = ""
 
 # Allowed SLIP21 paths
 PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
@@ -73,12 +56,14 @@ endif
 ########################################
 #     Application custom permissions   #
 ########################################
-HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
 HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
 HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
 HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ifeq ($(COIN),bitcoin_testnet)
+    # Application allowed derivation paths (testnet).
+    PATH_APP_LOAD_PARAMS = "*/1'"
+
     # Bitcoin testnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
     DEFINES   += BIP44_COIN_TYPE=1
@@ -89,6 +74,9 @@ ifeq ($(COIN),bitcoin_testnet)
 
     APPNAME = "Bitcoin Test"
 else ifeq ($(COIN),bitcoin)
+    # Application allowed derivation paths (mainnet).
+    PATH_APP_LOAD_PARAMS = "*/0'"
+
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
     ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)

@@ -355,6 +355,7 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
     # miniscript policy size; otherwise it would be worth to add tests for them, too.
 
 
+@pytest.mark.skip(reason="derives key at non standard path - now prohibited")
 def test_register_unusual_singlesig_accounts(navigator: Navigator, firmware: Firmware, client:
                                              RaggerClient, test_name: str, speculos_globals):
     # Tests that it is possible to register policies for single-signature using unusual paths
