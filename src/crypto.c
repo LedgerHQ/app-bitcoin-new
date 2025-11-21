@@ -49,10 +49,13 @@ const uint8_t BIP0341_tapleaf_tag[] = {'T', 'a', 'p', 'L', 'e', 'a', 'f'};
 // Copy of cx_ecfp_scalar_mult_no_throw, but without using randomization for the scalar
 // multiplication. Therefore, it is faster, but not safe to use on private data, as it is vulnerable
 // to timing attacks.
-cx_err_t cx_ecfp_scalar_mult_unsafe(cx_curve_t curve, uint8_t *P, const uint8_t *k, size_t k_len) {
+static cx_err_t cx_ecfp_scalar_mult_unsafe(cx_curve_t curve,
+                                           uint8_t *P,
+                                           const uint8_t *k,
+                                           size_t k_len) {
     size_t size;
     cx_ecpoint_t ecP;
-    cx_err_t error;
+    cx_err_t error = CX_OK;
 
     CX_CHECK(cx_ecdomain_parameters_length(curve, &size));
     CX_CHECK(cx_bn_lock(size, 0));
@@ -289,18 +292,23 @@ bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 
     memcpy(label_copy, label, label_len);
 
-    if (os_derive_bip32_with_seed_no_throw(HDW_SLIP21,
-                                           CX_CURVE_SECP256K1,
-                                           (uint32_t *) label_copy,
-                                           label_len,
-                                           key,
-                                           NULL,
-                                           NULL,
-                                           0) != CX_OK) {
-        return false;
+    // The SDK function below requires the output key array to be 64 bytes long
+    uint8_t tmp_key[64] = {0};
+    cx_err_t ret = os_derive_bip32_with_seed_no_throw(HDW_SLIP21,
+                                                      CX_CURVE_SECP256K1,
+                                                      (uint32_t *) label_copy,
+                                                      label_len,
+                                                      tmp_key,
+                                                      NULL,
+                                                      NULL,
+                                                      0);
+    if (ret == CX_OK) {
+        // Only the first 32 bytes are used for SLIP21
+        memcpy(key, tmp_key, 32);
     }
+    explicit_bzero(tmp_key, sizeof(tmp_key));
 
-    return true;
+    return ret == CX_OK;
 }
 
 int get_extended_pubkey_at_path(const uint32_t bip32_path[],
