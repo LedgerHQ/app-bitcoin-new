@@ -2,6 +2,7 @@ import pytest
 
 from ragger_bitcoin import RaggerClient
 from ragger.navigator import Navigator
+from ragger.backend import SpeculosBackend
 from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 
@@ -79,33 +80,62 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: RaggerClient):
         assert DeviceException.exc.get(e.value.status) == NotSupportedError
         assert len(e.value.data) == 0
 
-@pytest.mark.skip(reason="derives key at root level - now prohibited")
+
 def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmware, client:
                                           RaggerClient,
                                           test_name: str):
     # Test the successful UX flow for a non-standard path (here, root path)
     # (Slow test, not feasible to repeat it for many paths)
 
-    pub_key = client.get_extended_pubkey(
-        path="m",  # root pubkey
-        display=True,
-        navigator=navigator,
-        instructions=pubkey_instruction_approve(firmware),
-        testname=test_name
-    )
+    # The test will be re-enabled for Speculos once the installation parameters are supported
+    if isinstance(client.transport_client, SpeculosBackend):
+        pytest.skip("The test derives key at root level - now prohibited and the reinforcement is not yet implemented in Speculos.")
 
-    assert pub_key == "tpubD6NzVbkrYhZ4YgUx2ZLNt2rLYAMTdYysCRzKoLu2BeSHKvzqPaBDvf17GeBPnExUVPkuBpx4kniP964e2MxyzzazcXLptxLXModSVCVEV1T"
+    # Deriving a key at root level without HAVE_APPLICATION_FLAG_DERIVE_MASTER permission
+    with pytest.raises(ExceptionRAPDU) as e:
+        pub_key = client.get_extended_pubkey(
+            path="m",  # root pubkey
+            display=True,
+            navigator=navigator,
+            instructions=pubkey_instruction_approve(firmware),
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
+    # Deriving a key at unauthorized path
+    with pytest.raises(ExceptionRAPDU) as e:
+        pub_key = client.get_extended_pubkey(
+            path="m/44'/2'/333'",  # root pubkey
+            display=True,
+            navigator=navigator,
+            instructions=pubkey_instruction_approve(firmware),
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
 
 
-@pytest.mark.skip(reason="derives key at non standard path - now prohibited")
 def test_get_extended_pubkey_non_standard_reject_early(navigator: Navigator, firmware: Firmware,
                                                        client: RaggerClient, test_name: str):
     # Test rejecting after the "Reject if you're not sure" warning
     # (Slow test, not feasible to repeat it for many paths)
 
+    # Deriving with a suspicious path without displaying
     with pytest.raises(ExceptionRAPDU) as e:
         client.get_extended_pubkey(
-            path="m/111'/222'/333'",
+            path="m/46'/1'/333'",
+            display=False,
+            navigator=navigator,
+            instructions=pubkey_instruction_reject_early(firmware),
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == NotSupportedError
+    assert len(e.value.data) == 0
+
+    # Deriving with a suspicious path with displaying, but rejecting as early as the path is displayed
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.get_extended_pubkey(
+            path="m/46'/1'/333'",
             display=True,
             navigator=navigator,
             instructions=pubkey_instruction_reject_early(firmware),
@@ -115,15 +145,15 @@ def test_get_extended_pubkey_non_standard_reject_early(navigator: Navigator, fir
     assert len(e.value.data) == 0
 
 
-@pytest.mark.skip(reason="derives key at non standard path - now prohibited")
 def test_get_extended_pubkey_non_standard_reject(navigator: Navigator, firmware: Firmware, client:
                                                  RaggerClient, test_name: str):
     # Test rejecting at the end
     # (Slow test, not feasible to repeat it for many paths)
 
+    # Deriving with a suspicious path with displaying, but rejecting on the last screen
     with pytest.raises(ExceptionRAPDU) as e:
         client.get_extended_pubkey(
-            path="m/111'/222'/333'",
+            path="m/46'/1'/333'",
             display=True,
             navigator=navigator,
             instructions=pubkey_reject(firmware),
