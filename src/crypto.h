@@ -252,10 +252,10 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
  *
  * @return true on success, false in case of error.
  */
-bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
-                                          uint8_t bip32_path_len,
-                                          uint8_t pubkey[static 33],
-                                          uint8_t chain_code[]);
+cx_err_t crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
+                                              uint8_t bip32_path_len,
+                                              uint8_t pubkey[static 33],
+                                              uint8_t chain_code[]);
 
 /**
  * Computes the fingerprint of a compressed key as per BIP32; that is, the first 4 bytes of the
@@ -289,10 +289,10 @@ uint32_t crypto_get_master_key_fingerprint();
  *
  * @return 0 on success, or -1 on error.
  */
-int get_extended_pubkey_at_path(const uint32_t bip32_path[],
-                                uint8_t bip32_path_len,
-                                uint32_t bip32_pubkey_version,
-                                serialized_extended_pubkey_t *out_pubkey);
+cx_err_t get_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                     uint8_t bip32_path_len,
+                                     uint32_t bip32_pubkey_version,
+                                     serialized_extended_pubkey_t *out_pubkey);
 
 /**
  * Derives the level-1 symmetric key at the given label using SLIP-0021.

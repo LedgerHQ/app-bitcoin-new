@@ -137,12 +137,33 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
     }
 
     serialized_extended_pubkey_check_t pubkey_check;
-    if (0 > get_extended_pubkey_at_path(bip32_path,
-                                        bip32_path_len,
-                                        BIP32_PUBKEY_VERSION,
-                                        &pubkey_check.serialized_extended_pubkey)) {
-        PRINTF("Failed getting bip32 pubkey\n");
-        SEND_SW(dc, SW_BAD_STATE);
+    cx_err_t error = get_extended_pubkey_at_path(bip32_path,
+                                                 bip32_path_len,
+                                                 BIP32_PUBKEY_VERSION,
+                                                 &pubkey_check.serialized_extended_pubkey);
+    if (error != CX_OK) {
+        uint16_t sw = SW_NOT_SUPPORTED;
+        switch (error) {
+            case 0x4212: {
+                PRINTF(
+                    "Attempt to derive a key at root level without "
+                    "HAVE_APPLICATION_FLAG_DERIVE_MASTER permission.\n");
+                break;
+            }
+            case 0x4215: {
+                PRINTF("Attempt to derive a key at unauthorized path.\n");
+                break;
+            }
+            case 0x4214: {
+                PRINTF("Attempt to derive with incorrect curve.\n");
+                break;
+            }
+            default: {
+                sw = SW_BAD_STATE;
+                PRINTF("Failed getting bip32 pubkey, error = 0x%08X\n", error);
+            }
+        }
+        SEND_SW(dc, sw);
         return;
     }
 

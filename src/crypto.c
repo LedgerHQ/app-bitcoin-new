@@ -241,26 +241,28 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     memmove(out, buffer, 4);
 }
 
-bool crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
-                                          uint8_t bip32_path_len,
-                                          uint8_t pubkey[static 33],
-                                          uint8_t chain_code[]) {
+cx_err_t crypto_get_compressed_pubkey_at_path(const uint32_t bip32_path[],
+                                              uint8_t bip32_path_len,
+                                              uint8_t pubkey[static 33],
+                                              uint8_t chain_code[]) {
     uint8_t raw_public_key[65];
+    cx_err_t error = CX_OK;
 
-    if (bip32_derive_get_pubkey_256(CX_CURVE_256K1,
-                                    bip32_path,
-                                    bip32_path_len,
-                                    raw_public_key,
-                                    chain_code,
-                                    CX_SHA512) != CX_OK) {
-        return false;
+    error = bip32_derive_get_pubkey_256(CX_CURVE_256K1,
+                                        bip32_path,
+                                        bip32_path_len,
+                                        raw_public_key,
+                                        chain_code,
+                                        CX_SHA512);
+    if (error != CX_OK) {
+        return error;
     }
 
     if (crypto_get_compressed_pubkey(raw_public_key, pubkey) < 0) {
-        return false;
+        return CX_INTERNAL_ERROR;
     }
 
-    return true;
+    return error;
 }
 
 uint32_t crypto_get_key_fingerprint(const uint8_t pub_key[static 33]) {
@@ -315,23 +317,26 @@ bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
     return ret == CX_OK;
 }
 
-int get_extended_pubkey_at_path(const uint32_t bip32_path[],
-                                uint8_t bip32_path_len,
-                                uint32_t bip32_pubkey_version,
-                                serialized_extended_pubkey_t *out_pubkey) {
+cx_err_t get_extended_pubkey_at_path(const uint32_t bip32_path[],
+                                     uint8_t bip32_path_len,
+                                     uint32_t bip32_pubkey_version,
+                                     serialized_extended_pubkey_t *out_pubkey) {
     // find parent key's fingerprint and child number
     uint32_t parent_fingerprint = 0;
     uint32_t child_number = 0;
+    cx_err_t error = CX_OK;
+
     if (bip32_path_len > 0) {
         // here we reuse the storage for the parent keys that we will later use
         // for the response, in order to save memory
 
         uint8_t parent_pubkey[33];
-        if (!crypto_get_compressed_pubkey_at_path(bip32_path,
-                                                  bip32_path_len - 1,
-                                                  parent_pubkey,
-                                                  NULL)) {
-            return -1;
+        error = crypto_get_compressed_pubkey_at_path(bip32_path,
+                                                     bip32_path_len - 1,
+                                                     parent_pubkey,
+                                                     NULL);
+        if (error != CX_OK) {
+            return error;
         }
 
         parent_fingerprint = crypto_get_key_fingerprint(parent_pubkey);
@@ -343,14 +348,10 @@ int get_extended_pubkey_at_path(const uint32_t bip32_path[],
     write_u32_be(out_pubkey->parent_fingerprint, 0, parent_fingerprint);
     write_u32_be(out_pubkey->child_number, 0, child_number);
 
-    if (!crypto_get_compressed_pubkey_at_path(bip32_path,
-                                              bip32_path_len,
-                                              out_pubkey->compressed_pubkey,
-                                              out_pubkey->chain_code)) {
-        return -1;
-    }
-
-    return 0;
+    return crypto_get_compressed_pubkey_at_path(bip32_path,
+                                                bip32_path_len,
+                                                out_pubkey->compressed_pubkey,
+                                                out_pubkey->chain_code);
 }
 
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len) {
