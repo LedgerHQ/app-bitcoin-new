@@ -244,6 +244,11 @@ static int parse_rawtxoutput_scriptpubkey(parse_rawtxoutput_state_t *state, buff
                                 // MAX_PREVOUT_SCRIPTPUBKEY_LEN
                 }
 
+                if (state->scriptpubkey_counter + data_len > MAX_PREVOUT_SCRIPTPUBKEY_LEN) {
+                    return -1;  // exceeding MAX_PREVOUT_SCRIPTPUBKEY_LEN with scriptpubkey_counter
+                                // offset
+                }
+
                 memcpy(state->parent_state->parser_outputs->vout_scriptpubkey +
                            state->scriptpubkey_counter,
                        data,
@@ -342,11 +347,11 @@ static int parse_rawtx_inputs_init(parse_rawtx_state_t *state, buffer_t *buffers
 static int parse_rawtx_inputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     while (state->in_counter < state->n_inputs) {
         while (true) {
-            bool result = parser_run(parse_rawtxinput_steps,
-                                     n_parse_rawtxinput_steps,
-                                     &state->input_parser_context,
-                                     buffers,
-                                     pic);
+            int result = parser_run(parse_rawtxinput_steps,
+                                    n_parse_rawtxinput_steps,
+                                    &state->input_parser_context,
+                                    buffers,
+                                    pic);
             if (result != 1) {
                 return result;  // stream exhausted, or error
             } else {
@@ -384,11 +389,11 @@ static int parse_rawtx_outputs_init(parse_rawtx_state_t *state, buffer_t *buffer
 static int parse_rawtx_outputs(parse_rawtx_state_t *state, buffer_t *buffers[2]) {
     while (state->out_counter < state->n_outputs) {
         while (true) {
-            bool result = parser_run(parse_rawtxoutput_steps,
-                                     n_parse_rawtxoutput_steps,
-                                     &state->output_parser_context,
-                                     buffers,
-                                     pic);
+            int result = parser_run(parse_rawtxoutput_steps,
+                                    n_parse_rawtxoutput_steps,
+                                    &state->output_parser_context,
+                                    buffers,
+                                    pic);
             if (result != 1) {
                 return result;  // stream exhausted, or error
             } else {
