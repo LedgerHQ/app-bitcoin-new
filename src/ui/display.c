@@ -168,7 +168,7 @@ bool ui_display_register_wallet_policy(
             default:
                 LEDGER_ASSERT(false, "Unreachable code");
         }
-        snprintf(state->keys_label[i], sizeof(state->keys_label[i]), "%s key @%u", labels[num], i);
+        snprintf(state->keys_label[i], sizeof(state->keys_label[i]), "%s key@%u", labels[num], i);
     }
 
     ui_display_register_wallet_policy_flow();
