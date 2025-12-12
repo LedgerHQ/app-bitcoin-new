@@ -423,11 +423,11 @@ export class AppClient {
     let network;
     if (appAndVer.name === 'Bitcoin Test') {
       network = networks.testnet;
-    } else if (appAndVer.name === 'Bitcoin') {
+    } else if (appAndVer.name === 'Bitcoin' || appAndVer.name === 'Bitcoin Recovery') {
       network = networks.bitcoin;
     } else {
       throw new Error(
-        `Invalid network: ${appAndVer.name}. Expected 'Bitcoin Test' or 'Bitcoin'.`
+        `Invalid network: ${appAndVer.name}. Expected 'Bitcoin Test', 'Bitcoin' or 'Bitcoin Recovery'.`
       );
     }
     let expression = walletPolicy.descriptorTemplate;
