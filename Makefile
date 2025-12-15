@@ -63,6 +63,10 @@ HAVE_APPLICATION_FLAG_LIBRARY = 1
 ifeq ($(COIN),bitcoin_testnet)
     # Application allowed derivation paths (testnet).
     PATH_APP_LOAD_PARAMS = "*/1'"
+    # Exception for Electrum
+    PATH_APP_LOAD_PARAMS += "4541509'"
+    # BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS += "45'"
 
     # Bitcoin testnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
@@ -77,6 +81,10 @@ ifeq ($(COIN),bitcoin_testnet)
 else ifeq ($(COIN),bitcoin)
     # Application allowed derivation paths (mainnet).
     PATH_APP_LOAD_PARAMS = "*/0'"
+    # Exception for Electrum
+    PATH_APP_LOAD_PARAMS += "4541509'"
+    # BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS += "45'"
 
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
