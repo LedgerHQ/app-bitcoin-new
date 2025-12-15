@@ -21,6 +21,8 @@ def test_get_extended_pubkey_standard_display(navigator: Navigator, firmware: Fi
         "m/49'/1'/1'/1/3": "tpubDGnetmJDCL18TyaaoyRAYbkSE9wbHktSdTS4mfsR6inC8c2r6TjdBt3wkqEQhHYPtXpa46xpxDaCXU2PRNUGVvDzAHPG6hHRavYbwAGfnFr",
         "m/84'/1'/2'/0/10": "tpubDG9YpSUwScWJBBSrhnAT47NcT4NZGLcY18cpkaiWHnkUCi19EtCh8Heeox268NaFF6o56nVeSXuTyK6jpzTvV1h68Kr3edA8AZp27MiLUNt",
         "m/86'/1'/4'/1/12": "tpubDHTZ815MvTaRmo6Qg1rnU6TEU4ZkWyA56jA1UgpmMcBGomnSsyo34EZLoctzZY9MTJ6j7bhccceUeXZZLxZj5vgkVMYfcZ7DNPsyRdFpS3f",
+        # the following path tests compatibility with Unchained Capital's multisig setup
+        "m/45'/2'/0'/1'": "tpubDFL11pFAgsKed5bv9Tkxe51xyB4qo1cPDwK6c8WZ4wiVEjtGDg5YuMXNk9yZcB6b47k2oaSWADJF3CRmk97qAwnaiRieT2ocWzh4rq2b3F3",
     }
 
     for path, pubkey in testcases.items():
@@ -56,6 +58,20 @@ def test_get_extended_pubkey_standard_nodisplay(client: RaggerClient):
         )
 
 
+def test_get_extended_pubkey_exception_nodisplay(client: RaggerClient):
+    # as these paths are not standard, the app should reject immediately if display=False
+    testcases = {
+        # Electrum path exception
+        "m/4541509'/1112098098'": "tpubDAs3mrkQXkGyzp7Yo9SXiZNW7Tmia5EmdUpXjuBQvBDDGGr9CnVHehSB6P5RZFY3bwkYBweXir8MhmvPXqYHHVxKrFkm3mfZ5UkjG5ZH8Ui",
+    }
+
+    for path, pubkey in testcases.items():
+        assert pubkey == client.get_extended_pubkey(
+            path=path,
+            display=False
+        )
+
+
 def test_get_extended_pubkey_nonstandard_nodisplay(client: RaggerClient):
     # as these paths are not standard, the app should reject immediately if display=False
     testcases = [
@@ -69,6 +85,8 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: RaggerClient):
         "m/48'/1'/0'/0'",  # script_type is 1' or 2' for BIP-0048
         "m/48'/1'/0'/3'",  # script_type is 1' or 2' for BIP-0048
         "m/999'/1'/0'",  # no standard with this purpose
+        "m/45'/2'/0'",  # BIP-45 path with wrong COIN_TYPE
+        "m/45'/1'" # BIP-45 too short path
     ]
 
     for path in testcases:
@@ -103,7 +121,7 @@ def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmwa
     # The below part does not raise exception when built with COIN=bitcoin_recovery as all paths are permitted
     with pytest.raises(ExceptionRAPDU) as e:
         pub_key = client.get_extended_pubkey(
-            path="m/44'/2'/333'",  # root pubkey
+            path="m/44'/2'/333'",
             display=True,
             navigator=navigator,
             instructions=pubkey_instruction_approve(firmware),
