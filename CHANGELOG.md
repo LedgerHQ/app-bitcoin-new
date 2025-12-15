@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.4.4] - 15-12-2025
+
+### Changed
+
+- Derivation Path Hardening - 2 more allowed paths added:
+    - Electrum one
+    - BIP-45 tree
+
 ## [2.4.3] - 25-11-2025
 
 ### Changed
@@ -19,7 +27,7 @@ Dates are in `dd-mm-yyyy` format.
     - Ticker moved to the right for swap operations, other minor UI updates
 - Derivation Path Hardening:
     - New master key fingerprint syscall use, `HAVE_APPLICATION_FLAG_DERIVE_MASTER` is removed
-    - BIP-32  derivation paths is reinforced
+    - BIP-32 derivation paths is reinforced using wildcard syntax (`m/*/<COIN_TYPE>`)
 
 ## [2.4.2] - 08-09-2025
 
