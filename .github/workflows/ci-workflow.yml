@@ -6,6 +6,8 @@ on:
     branches:
     - master
     - develop
+    tags:
+    - '*'
   pull_request:
     branches:
     - master
@@ -280,6 +282,35 @@ jobs:
           yarn install
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
 
+
+  deploy_js_client_check_tag:
+    name: Check that tag matches version in package.json prior to deploying on JFrog
+    needs: job_test_js_lib
+    runs-on: ubuntu-latest
+    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Check that tag matches semver in CHANGELOG.md
+        run: |
+            cd bitcoin_client_js
+            package_version=$(sed -r -n -e '/"version":/s/^\s+"version": "([[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+)",$/\1/p' package.json)
+            tag_version=${GITHUB_REF#refs/tags/jsclient-}
+            if [[ $package_version == $tag_version ]]; then
+                echo "[INFO] Tag matches version in package.json. Continuing."
+            else
+                echo "[ERROR] mismatch between version in tag and package.json. Aborting."
+                exit 1
+            fi
+
+  deploy_js_client:
+    name: Deploy
+    needs: deploy_js_client_check_tag
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
+    if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/jsclient')
+    with:
+      package_directory: "bitcoin_client_js"
 
   job_test_rust_client:
     name: Tests for rust client library
