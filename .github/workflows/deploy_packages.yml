@@ -9,6 +9,6 @@ on:
 jobs:
   deploy_js_client:
     name: Deploy js client to jfrog and npmjs.com
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_deployment_npm.yml@mbr/reusable-workflow-jfrog-npm
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_npm_deployment.yml@v1
     with:
       package_directory: "bitcoin_client_js"
