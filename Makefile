@@ -97,6 +97,7 @@ else ifeq ($(COIN),bitcoin)
 else ifeq ($(COIN),bitcoin_recovery)
     # Application allowed derivation paths (all paths are permitted).
     PATH_APP_LOAD_PARAMS = ""
+    HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
 
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
