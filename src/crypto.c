@@ -328,19 +328,22 @@ cx_err_t get_extended_pubkey_at_path(const uint32_t bip32_path[],
     cx_err_t error = CX_OK;
 
     if (bip32_path_len > 0) {
-        // here we reuse the storage for the parent keys that we will later use
-        // for the response, in order to save memory
+        if (bip32_path_len == 1) {
+            // In te case of L1 path the parent is the master key so we use special function
+            parent_fingerprint = crypto_get_master_key_fingerprint();
+        } else {
+            uint8_t parent_pubkey[33];
+            error = crypto_get_compressed_pubkey_at_path(bip32_path,
+                                                         bip32_path_len - 1,
+                                                         parent_pubkey,
+                                                         NULL);
+            if (error != CX_OK) {
+                PRINTF("%s: returning %u\n", __func__, error);
+                return error;
+            }
 
-        uint8_t parent_pubkey[33];
-        error = crypto_get_compressed_pubkey_at_path(bip32_path,
-                                                     bip32_path_len - 1,
-                                                     parent_pubkey,
-                                                     NULL);
-        if (error != CX_OK) {
-            return error;
+            parent_fingerprint = crypto_get_key_fingerprint(parent_pubkey);
         }
-
-        parent_fingerprint = crypto_get_key_fingerprint(parent_pubkey);
         child_number = bip32_path[bip32_path_len - 1];
     }
 
