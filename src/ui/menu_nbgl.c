@@ -33,26 +33,22 @@ static const nbgl_contentInfoList_t infoList = {
 
 extern void app_exit(void);
 
-void ui_menu_main_flow_bitcoin(void) {
-    nbgl_useCaseHomeAndSettings(APPNAME,
-                                &ICON_APP_HOME,
-                                NULL,
-                                INIT_HOME_PAGE,
-                                NULL,
-                                &infoList,
-                                NULL,
-                                app_exit);
-}
-
-void ui_menu_main_flow_bitcoin_testnet(void) {
+void ui_menu_main(void) {
     nbgl_useCaseHomeAndSettings(
+#if BIP44_COIN_TYPE == 1
         "Bitcoin Testnet",
+#else
+        APPNAME,
+#endif /* #if BIP44_COIN_TYPE == 1 */
         &ICON_APP_HOME,
-#ifdef SCREEN_SIZE_WALLET
-        "This app enables signing\ntransactions on all the Bitcoin\ntest networks.",
+#ifdef BITCOIN_RECOVERY
+        "This is a recovery tool.\nNot for day-to-day operations!",
+#elif BIP44_COIN_TYPE == 1 && defined(SCREEN_SIZE_WALLET)
+        "This app enables signing\ntransactions on all the Bitcoin\ntest "
+        "networks.",
 #else
         NULL,
-#endif
+#endif /* #ifdef BITCOIN_RECOVERY */
         INIT_HOME_PAGE,
         NULL,
         &infoList,
