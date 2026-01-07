@@ -112,6 +112,7 @@ else ifeq ($(COIN),bitcoin_recovery)
     DEFINES   += COIN_P2SH_VERSION=5
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
+    DEFINES   += BITCOIN_RECOVERY
 
     APPNAME = "Bitcoin Recovery"
 
