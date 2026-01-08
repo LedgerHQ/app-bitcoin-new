@@ -98,6 +98,21 @@ def test_get_extended_pubkey_nonstandard_nodisplay(client: RaggerClient):
         assert DeviceException.exc.get(e.value.status) == NotSupportedError
         assert len(e.value.data) == 0
 
+def test_get_extended_pubkey_nonstandard_display(navigator: Navigator, firmware: Firmware, client:
+                                              RaggerClient, test_name: str):
+    testcases = {
+        "m/45'": "tpubDA4runSouWhEn4C36dL1PwpMhWi1LCgc7EkYJXLExjVr3eWNE5p5ZRUe7LN7cY8YwCroQsLECcv9ufij8EUpDHM2WQM9Cba8Ztf6Zo8jpFf",
+    }
+
+    for path, pubkey in testcases.items():
+        assert pubkey == client.get_extended_pubkey(
+            path=path,
+            display=True,
+            navigator=navigator,
+            instructions=pubkey_instruction_approve(firmware),
+            testname=f"{test_name}_{path}"
+        )
+
 
 def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmware, client:
                                           RaggerClient,
