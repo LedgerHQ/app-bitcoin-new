@@ -1,10 +1,14 @@
 {
-  "name": "ledger-bitcoin",
+  "name": "@ledgerhq/ledger-bitcoin",
   "version": "0.3.0",
   "description": "Ledger Hardware Wallet Bitcoin Application Client",
   "main": "build/main/index.js",
+  "types": "build/main/index.d.ts",
   "typings": "build/main/index.d.ts",
-  "repository": "https://github.com/LedgerHQ/app-bitcoin-new",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LedgerHQ/app-bitcoin-new.git"
+  },
   "license": "Apache-2.0",
   "keywords": [
     "Ledger",
@@ -17,6 +21,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf build .tsbuildinfo",
     "fix": "run-s fix:*",
     "fix:prettier": "prettier \"src/**/*.ts\" --write",
     "fix:lint": "eslint src --ext .ts --fix",
@@ -45,12 +50,6 @@
     "@typescript-eslint/parser": "^5.62.0",
     "babel-jest": "^27.5.1",
     "cspell": "^4.2.8",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.10.0",
-    "eslint-plugin-eslint-comments": "^3.2.0",
-    "eslint-plugin-functional": "^3.7.2",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-jest": "^26.9.0",
     "jest": "^27.5.1",
     "npm-run-all": "^4.1.5",
     "open-cli": "^7.2.0",
@@ -62,13 +61,9 @@
     "typescript": "^4.9.5"
   },
   "files": [
-    "build/main",
-    "!**/*.spec.*",
-    "!**/*.test.*",
-    "!**/*.json",
-    "!**/__tests__/*",
-    "CHANGELOG.md",
-    "README.md"
+    "build/",
+    "README.md",
+    "package.json"
   ],
   "prettier": {
     "singleQuote": true

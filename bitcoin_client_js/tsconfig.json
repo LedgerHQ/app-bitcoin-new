@@ -41,7 +41,8 @@
     "typeRoots": [
       "node_modules/@types",
       "src/types"
-    ]
+    ],
+    "tsBuildInfoFile": ".tsbuildinfo"
   },
   "include": [
     "src/**/*.ts"
