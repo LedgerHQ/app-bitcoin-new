@@ -249,7 +249,7 @@ jobs:
       package_name: ledger_bitcoin
       package_directory: ./bitcoin_client/
       jfrog_deployment: true
-      release: true
+      release: false
       publish: true
     secrets:
       pypi_token: ${{ secrets.PYPI_PUBLIC_API_TOKEN }}
