@@ -13,7 +13,7 @@ Dates are in `dd-mm-yyyy` format.
 
 - for `bitcoin_recovery`
     - `HAVE_APPLICATION_FLAG_DERIVE_MASTER` enabled so fully non-hardened paths can be used
-    -  A warning dispalyed on jome screen
+    -  A warning dispalyed on home screen
 
 ### Fixed
 

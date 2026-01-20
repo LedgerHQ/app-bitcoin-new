@@ -329,7 +329,7 @@ cx_err_t get_extended_pubkey_at_path(const uint32_t bip32_path[],
 
     if (bip32_path_len > 0) {
         if (bip32_path_len == 1) {
-            // In te case of L1 path the parent is the master key so we use special function
+            // In the case of L1 path the parent is the master key so we use special function
             parent_fingerprint = crypto_get_master_key_fingerprint();
         } else {
             uint8_t parent_pubkey[33];
