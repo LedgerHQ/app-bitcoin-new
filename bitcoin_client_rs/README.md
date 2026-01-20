@@ -71,3 +71,7 @@ derivation path and display it on the device screen:
 cargo run --package ledger_hwi -- \
 get-extended-pubkey --derivation-path "m/44'/0'/0'/0/0" --display
 ```
+
+## Acknowledgements
+
+The initial version of this client was contributed by Edouard PARIS.
