@@ -1,8 +1,11 @@
 #include <stdint.h>
-#include "../common/wallet.h"
-#include "../musig/musig.h"
-#include "../boilerplate/dispatcher.h"
-#include "../sign_psbt.h"
+
+
+/* Local headers */
+#include "dispatcher.h"
+#include "musig.h"
+#include "sign_psbt.h"
+#include "wallet.h"
 
 // Struct to hold the info computed for a given input in either of the two rounds
 typedef struct {

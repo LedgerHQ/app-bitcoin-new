@@ -2,10 +2,13 @@
 
 #include "get_merkleized_map.h"
 
-#include "get_merkle_leaf_element.h"
-#include "check_merkle_tree_sorted.h"
+/* SDK headers */
+#include "buffer.h"
 
-#include "../../common/buffer.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "check_merkle_tree_sorted.h"
+#include "get_merkle_leaf_element.h"
 
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
                                           void *callback_state,

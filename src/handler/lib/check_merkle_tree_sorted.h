@@ -1,8 +1,10 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
-#include "../../common/wallet.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
+#include "wallet.h"
 
 // this flow aborts if any element is larger than this size
 // TODO: we might remove this limitation altogether with a more careful implementation.

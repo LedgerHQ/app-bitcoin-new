@@ -1,15 +1,16 @@
 #pragma GCC diagnostic ignored "-Wformat-invalid-specifier"  // snprintf
 #pragma GCC diagnostic ignored "-Wformat-extra-args"         // snprintf
 
-#include <stdbool.h>  // bool
-#include <stdio.h>    // snprintf
-#include <string.h>   // memset
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
+#include "display.h"
+
+/* SDK headers */
 #include "os.h"
 #include "ux.h"
-
-#include "./display.h"
 
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.

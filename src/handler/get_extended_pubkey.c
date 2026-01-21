@@ -17,16 +17,19 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io.h"
-#include "boilerplate/dispatcher.h"
-#include "boilerplate/sw.h"
-#include "../common/base58.h"
-#include "../common/bip32.h"
-#include "../commands.h"
-#include "../constants.h"
-#include "../crypto.h"
-#include "../ui/display.h"
-#include "../ui/menu.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+
+/* Local headers */
+#include "commands.h"
+#include "constants.h"
+#include "crypto.h"
+#include "dispatcher.h"
+#include "display.h"
+#include "io_ext.h"
+#include "menu.h"
+#include "sw.h"
 
 #define H 0x80000000ul
 
@@ -124,9 +127,11 @@ void handler_get_extended_pubkey(dispatcher_context_t *dc, uint8_t protocol_vers
     }
 
     uint32_t bip32_path[MAX_BIP32_PATH_STEPS];
-    if (!buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len)) {
-        SEND_SW(dc, SW_WRONG_DATA_LENGTH);
-        return;
+    if (bip32_path_len > 0) {
+        if (!buffer_read_bip32_path(&dc->read_buffer, bip32_path, bip32_path_len)) {
+            SEND_SW(dc, SW_WRONG_DATA_LENGTH);
+            return;
+        }
     }
 
     bool is_safe = is_path_safe_for_pubkey_export(bip32_path, bip32_path_len);

@@ -1,12 +1,12 @@
 #include "txhashes.h"
+
+/* Local headers */
 #include "amount_from_psbt.h"
-
-#include "../../common/psbt.h"
-#include "../../error_codes.h"
-
-#include "../lib/get_merkleized_map.h"
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/stream_merkleized_map_value.h"
+#include "error_codes.h"
+#include "get_merkleized_map.h"
+#include "get_merkleized_map_value.h"
+#include "psbt.h"
+#include "stream_merkleized_map_value.h"
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
 static const uint8_t BIP0341_sighash_tag[] = {'T', 'a', 'p', 'S', 'i', 'g', 'h', 'a', 's', 'h'};
@@ -28,7 +28,7 @@ static void cb_process_data(buffer_t *data, void *cb_state) {
     callback_state_t *state = (callback_state_t *) cb_state;
 
     size_t data_len = data->size - data->offset;
-    uint8_t *data_start_ptr = data->ptr + data->offset;
+    uint8_t *data_start_ptr = (uint8_t *) data->ptr + data->offset;
 
     if (state->hash_prefixed != NULL) {
         crypto_hash_update(state->hash_prefixed, data_start_ptr, data_len);

@@ -1,7 +1,9 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow find out the index of the

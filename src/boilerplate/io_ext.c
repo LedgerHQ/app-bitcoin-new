@@ -18,20 +18,22 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "os.h"
-#include "ux.h"
+#include "io_ext.h"
+
+/* SDK headers */
+#include "buffer.h"
 #include "nbgl_touch.h"
 #include "nbgl_use_case.h"
+#include "os.h"
+#include "ux.h"
+#include "write.h"
 
-#include "io.h"
+/* Local headers */
+#include "dispatcher.h"
+#include "display.h"
 #include "globals.h"
 #include "sw.h"
-#include "common/buffer.h"
-#include "common/write.h"
-
-#include "dispatcher.h"
-#include "../swap/swap_globals.h"
-#include "../ui/display.h"
+#include "swap_globals.h"
 
 uint16_t G_output_len = 0;
 

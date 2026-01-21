@@ -1,9 +1,9 @@
 #include "amount_from_psbt.h"
 
-#include "../../common/psbt.h"
-
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/psbt_parse_rawtx.h"
+/* Local headers */
+#include "get_merkleized_map_value.h"
+#include "psbt.h"
+#include "psbt_parse_rawtx.h"
 
 /*
  Convenience function to get the amount and scriptpubkey from the non-witness-utxo of a certain

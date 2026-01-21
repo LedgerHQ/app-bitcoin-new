@@ -1,7 +1,10 @@
+#include "handle_get_printable_amount.h"
+
+/* SDK headers */
 #include "read.h"
 
+/* Local headers */
 #include "display_utils.h"
-#include "handle_get_printable_amount.h"
 
 #define MAX_NON_PRINTABLE_AMOUNT_LEN 8
 

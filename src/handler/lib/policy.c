@@ -2,20 +2,22 @@
 
 #include "policy.h"
 
-#include "../lib/get_merkle_leaf_element.h"
-#include "../lib/get_preimage.h"
-#include "../../crypto.h"
-#include "../../musig/musig.h"
-#include "../../common/base58.h"
-#include "../../common/bitvector.h"
-#include "../../common/read.h"
-#include "../../common/script.h"
-#include "../../common/segwit_addr.h"
-#include "../../common/wallet.h"
-
-#include "../../debug-helpers/debug.h"
-
+/* SDK headers */
+#include "base58.h"
 #include "ledger_assert.h"
+#include "read.h"
+
+/* Local headers */
+#include "bitvector.h"
+#include "buffer_ext.h"
+#include "crypto.h"
+#include "debug.h"
+#include "get_merkle_leaf_element.h"
+#include "get_preimage.h"
+#include "musig.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "wallet.h"
 
 #define MAX_POLICY_DEPTH 10
 
