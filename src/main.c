@@ -24,7 +24,7 @@
 #include "ux.h"
 
 #include "globals.h"
-#include "io.h"
+#include "boilerplate/io.h"
 #include "sw.h"
 #include "ui/menu.h"
 #include "boilerplate/apdu_parser.h"

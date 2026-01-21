@@ -24,6 +24,7 @@
 #include "../boilerplate/dispatcher.h"
 #include "../boilerplate/sw.h"
 #include "../common/bip32.h"
+#include "../common/buffer_ext.h"
 #include "../common/merkle.h"
 #include "../common/read.h"
 #include "../common/wallet.h"

@@ -6,7 +6,7 @@
 #include "ledger_assert.h"
 
 #include "common/bip32.h"
-#include "common/buffer.h"
+#include "lib_standard_app/buffer.h"
 #include "../constants.h"
 #include "../crypto.h"
 

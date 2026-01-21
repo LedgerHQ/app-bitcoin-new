@@ -4,7 +4,7 @@
 
 #include "apdu_parser.h"
 
-#include "common/buffer.h"
+#include "lib_standard_app/buffer.h"
 
 // Forward declaration
 struct dispatcher_context_s;

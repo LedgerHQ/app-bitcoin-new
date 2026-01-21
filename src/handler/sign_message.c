@@ -21,6 +21,7 @@
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
 #include "../common/bip32.h"
+#include "../common/buffer_ext.h"
 #include "../commands.h"
 #include "../constants.h"
 #include "../crypto.h"

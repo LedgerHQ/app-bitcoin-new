@@ -24,7 +24,8 @@
 #include "io.h"
 #include "sw.h"
 
-#include "common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "common/buffer_ext.h"
 
 extern dispatcher_context_t G_dispatcher_context;
 

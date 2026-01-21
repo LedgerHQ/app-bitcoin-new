@@ -3,7 +3,7 @@
 #include "nbgl_use_case.h"
 #include "./display.h"
 #include "./menu.h"
-#include "io.h"
+#include "../boilerplate/io.h"
 
 #include <assert.h>
 

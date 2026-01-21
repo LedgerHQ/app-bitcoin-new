@@ -5,7 +5,8 @@
 #include "get_merkle_leaf_element.h"
 #include "check_merkle_tree_sorted.h"
 
-#include "../../common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "../../common/buffer_ext.h"
 
 int call_get_merkleized_map_with_callback(dispatcher_context_t *dispatcher_context,
                                           void *callback_state,

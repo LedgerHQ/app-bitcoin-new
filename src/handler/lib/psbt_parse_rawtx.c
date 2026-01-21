@@ -11,8 +11,9 @@
 #include "../../boilerplate/dispatcher.h"
 #include "../../boilerplate/sw.h"
 
-#include "../../common/buffer.h"
-#include "../../common/parser.h"
+#include "lib_standard_app/buffer.h"
+#include "../../common/buffer_ext.h"
+#include "../../common/parser_ext.h"
 #include "../../common/read.h"
 #include "../../common/varint.h"
 #include "../../crypto.h"

@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-#include "parser.h"
-
+#include "buffer_ext.h"
+#include "parser_ext.h"
 #include "read.h"
 
 size_t dbuffer_get_length(buffer_t *buffers[2]) {
@@ -113,8 +113,8 @@ bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size) {
         return false;
     }
 
-    memmove(buffers[0]->ptr, buffers[0]->ptr + buffers[0]->offset, length0);
-    memmove(buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
+    memmove((uint8_t*)buffers[0]->ptr, buffers[0]->ptr + buffers[0]->offset, length0);
+    memmove((uint8_t*)buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
     buffers[0]->offset = 0;
     buffers[0]->size = length0 + length1;
     return true;

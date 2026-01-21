@@ -28,7 +28,7 @@ static void cb_process_data(buffer_t *data, void *cb_state) {
     callback_state_t *state = (callback_state_t *) cb_state;
 
     size_t data_len = data->size - data->offset;
-    uint8_t *data_start_ptr = data->ptr + data->offset;
+    uint8_t *data_start_ptr =(uint8_t *)data->ptr + data->offset;
 
     if (state->hash_prefixed != NULL) {
         crypto_hash_update(state->hash_prefixed, data_start_ptr, data_len);

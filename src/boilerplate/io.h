@@ -5,7 +5,7 @@
 #include "ux.h"
 #include "os_io_seproxyhal.h"
 
-#include "common/buffer.h"
+#include "lib_standard_app/buffer.h"
 
 /**
  * IO callback called when an interrupt based channel has received

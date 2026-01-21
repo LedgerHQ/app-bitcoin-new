@@ -26,7 +26,7 @@
 #include "io.h"
 #include "globals.h"
 #include "sw.h"
-#include "common/buffer.h"
+#include "lib_standard_app/buffer.h"
 #include "common/write.h"
 
 #include "dispatcher.h"

@@ -20,7 +20,7 @@
 #include "boilerplate/io.h"
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
-#include "../common/base58.h"
+#include "lib_standard_app/base58.h"
 #include "../common/bip32.h"
 #include "../commands.h"
 #include "../constants.h"

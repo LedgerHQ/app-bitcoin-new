@@ -2,9 +2,10 @@
 #include <string.h>
 #include <limits.h>
 
-#include "../common/base58.h"
+#include "lib_standard_app/base58.h"
 #include "../common/bip32.h"
-#include "../common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "../common/buffer_ext.h"
 #include "../common/script.h"
 #include "../common/segwit_addr.h"
 #include "../common/wallet.h"

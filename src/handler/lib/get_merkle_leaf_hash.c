@@ -2,7 +2,8 @@
 
 #include "get_merkle_leaf_hash.h"
 
-#include "../../common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "../../common/buffer_ext.h"
 #include "../../common/write.h"
 #include "../../common/merkle.h"
 #include "../../common/varint.h"

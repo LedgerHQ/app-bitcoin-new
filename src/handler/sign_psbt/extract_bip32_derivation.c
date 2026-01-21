@@ -5,6 +5,7 @@
 
 #include "../lib/stream_merkle_leaf_element.h"
 
+#include "../../common/buffer_ext.h"
 #include "../../common/psbt.h"
 #include "../../common/read.h"
 #include "../../common/varint.h"

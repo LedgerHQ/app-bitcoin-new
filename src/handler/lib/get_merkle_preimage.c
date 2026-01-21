@@ -3,7 +3,8 @@
 #include "get_merkle_preimage.h"
 
 #include "../../boilerplate/sw.h"
-#include "../../common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "../../common/buffer_ext.h"
 #include "../../crypto.h"
 #include "../client_commands.h"
 
@@ -56,7 +57,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     uint8_t *data_ptr =
-        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        (uint8_t *)(dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
 
     cx_sha256_t hash_context;
 

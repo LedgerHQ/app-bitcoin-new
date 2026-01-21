@@ -19,9 +19,10 @@
 
 #include "boilerplate/io.h"
 #include "boilerplate/sw.h"
-#include "../common/base58.h"
+#include "lib_standard_app/base58.h"
 #include "../common/bip32.h"
-#include "../common/buffer.h"
+#include "lib_standard_app/buffer.h"
+#include "../common/buffer_ext.h"
 #include "../common/merkle.h"
 #include "../common/read.h"
 #include "../common/script.h"
