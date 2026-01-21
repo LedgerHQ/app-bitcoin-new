@@ -1,7 +1,9 @@
 #pragma once
 
-#include "../boilerplate/dispatcher.h"
-#include "../sign_psbt.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "sign_psbt.h"
 
 /**
  * @brief Computes the transaction hashes required for signing.

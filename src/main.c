@@ -15,37 +15,32 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>  // uint*_t
-#include <string.h>  // memset, explicit_bzero
-
 #include <assert.h>
+#include <stdint.h>
+#include <string.h>
 
+/* SDK headers */
+#include "nbgl_use_case.h"
 #include "os.h"
 #include "ux.h"
 
-#include "globals.h"
-#include "io.h"
-#include "sw.h"
-#include "ui/menu.h"
-#include "boilerplate/apdu_parser.h"
-#include "boilerplate/constants.h"
-#include "boilerplate/dispatcher.h"
-
-#include "../debug-helpers/debug.h"
-
-#include "handler/handlers.h"
+/* Local headers */
 #include "commands.h"
-
-#include "common/wallet.h"
-
-// common declarations between legacy and new code; will refactor it out later
-#include "swap/swap_lib_calls.h"
-#include "swap/swap_globals.h"
-#include "swap/handle_swap_sign_transaction.h"
-#include "swap/handle_get_printable_amount.h"
-#include "swap/handle_check_address.h"
-
-#include "nbgl_use_case.h"
+#include "constants.h"
+#include "debug.h"
+#include "dispatcher.h"
+#include "globals.h"
+#include "handle_check_address.h"
+#include "handle_get_printable_amount.h"
+#include "handle_swap_sign_transaction.h"
+#include "handlers.h"
+#include "io_ext.h"
+#include "menu.h"
+#include "parser.h"
+#include "sw.h"
+#include "swap_globals.h"
+#include "swap_lib_calls.h"
+#include "wallet.h"
 
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
 extern unsigned int app_stack_canary;

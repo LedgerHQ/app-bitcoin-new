@@ -2,14 +2,17 @@
 
 #include "get_merkle_leaf_hash.h"
 
-#include "../../common/buffer.h"
-#include "../../common/write.h"
-#include "../../common/merkle.h"
-#include "../../common/varint.h"
-#include "../../boilerplate/sw.h"
-#include "../client_commands.h"
+/* SDK headers */
+#include "buffer.h"
+#include "varint.h"
+#include "write.h"
 
-#include "../../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "client_commands.h"
+#include "debug.h"
+#include "merkle.h"
+#include "sw.h"
 
 // Reads the inputs and sends the GET_MERKLE_LEAF_PROOF request.
 int call_get_merkle_leaf_hash(dispatcher_context_t *dc,

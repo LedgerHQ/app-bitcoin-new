@@ -1,10 +1,12 @@
 #include <string.h>
 
-#include "../../boilerplate/sw.h"
-#include "stream_preimage.h"
 
-#include "../../crypto.h"
-#include "../client_commands.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "client_commands.h"
+#include "crypto.h"
+#include "stream_preimage.h"
+#include "sw.h"
 
 int call_get_preimage(dispatcher_context_t *dispatcher_context,
                       const uint8_t hash[static 32],
@@ -46,7 +48,7 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
     buffer_t buffer_out = buffer_create(out, out_len);
 
     uint8_t *data_ptr =
-        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        (uint8_t *) (dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
@@ -86,7 +88,8 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
             return -8;
         }
 
-        data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        data_ptr = (uint8_t *) (dispatcher_context->read_buffer.ptr +
+                                dispatcher_context->read_buffer.offset);
 
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);

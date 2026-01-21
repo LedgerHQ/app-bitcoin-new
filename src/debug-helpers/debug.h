@@ -1,5 +1,6 @@
 #pragma once
 
+/* SDK headers */
 #include "os.h"
 
 void debug_write(const char *buf);

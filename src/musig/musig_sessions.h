@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdbool.h>
+
+
+/* Local headers */
 #include "musig.h"
 
 /**

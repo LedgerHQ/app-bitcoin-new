@@ -1,9 +1,12 @@
 #include <string.h>
 
+#include "musig_sessions.h"
+
+/* SDK headers */
 #include "cx.h"
 
-#include "musig_sessions.h"
-#include "../crypto.h"
+/* Local headers */
+#include "crypto.h"
 
 typedef struct {
     // Aligning by 4 is necessary due to platform limitations.

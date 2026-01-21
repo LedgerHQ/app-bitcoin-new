@@ -2,12 +2,15 @@
 
 #include "get_merkle_preimage.h"
 
-#include "../../boilerplate/sw.h"
-#include "../../common/buffer.h"
-#include "../../crypto.h"
-#include "../client_commands.h"
+/* SDK headers */
+#include "buffer.h"
 
-#include "../../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "client_commands.h"
+#include "crypto.h"
+#include "debug.h"
+#include "sw.h"
 
 // TODO: refactor common code with stream_preimage.c
 
@@ -56,7 +59,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     uint8_t *data_ptr =
-        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+        (uint8_t *) (dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
 
     cx_sha256_t hash_context;
 

@@ -15,32 +15,33 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>   // uint*_t
-#include <string.h>   // memset, explicit_bzero
-#include <stdbool.h>  // bool
-
-#include "os.h"
-#include "cx.h"
-#include "cx_stubs.h"
-#include "cx_ecfp.h"
-#include "ox_ec.h"
-#include "cx_ram.h"
-#include "lcx_ripemd160.h"
-#include "cx_ripemd160.h"
-#include "lib_standard_app/crypto_helpers.h"
-
-#include "common/base58.h"
-#include "common/bip32.h"
-#include "common/format.h"
-#include "common/read.h"
-#include "common/write.h"
-
-#include "../boilerplate/sw.h"
-#include "../debug-helpers/debug.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "crypto.h"
 
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "crypto_helpers.h"
+#include "cx.h"
+#include "cx_ecfp.h"
+#include "cx_ram.h"
+#include "cx_ripemd160.h"
+#include "cx_stubs.h"
+#include "format.h"
+#include "lcx_ripemd160.h"
+#include "os.h"
+#include "ox_ec.h"
+#include "read.h"
+#include "write.h"
+
+/* Local headers */
+#include "constants.h"
+#include "debug.h"
 #include "secp256k1.h"
+#include "sw.h"
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
 const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
