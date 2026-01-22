@@ -180,6 +180,7 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_standard_app
 # Application source files
 APP_SOURCE_PATH += src
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/base58.c
+APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/bip32.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/buffer.c
 
 # Allow usage of function from lib_standard_app/crypto_helpers.c

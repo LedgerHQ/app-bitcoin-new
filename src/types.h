@@ -4,5 +4,5 @@
 #include <stdint.h>  // uint*_t
 
 #include "constants.h"
-#include "common/bip32.h"
+#include "lib_standard_app/bip32.h"
 #include "commands.h"

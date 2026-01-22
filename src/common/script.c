@@ -3,8 +3,8 @@
 #include <string.h>
 #include <limits.h>
 
-#include "../common/bip32.h"
-#include "lib_standard_app//buffer.h"
+#include "lib_standard_app/bip32.h"
+#include "lib_standard_app/buffer.h"
 #include "../common/read.h"
 #include "../common/script.h"
 #include "../common/segwit_addr.h"

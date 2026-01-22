@@ -30,7 +30,8 @@
 #include "lib_standard_app/crypto_helpers.h"
 
 #include "lib_standard_app/base58.h"
-#include "common/bip32.h"
+#include "lib_standard_app/bip32.h"
+#include "common/bip32_ext.h"
 #include "common/format.h"
 #include "common/read.h"
 #include "common/write.h"

@@ -3,7 +3,7 @@
 #include <limits.h>
 
 #include "lib_standard_app/base58.h"
-#include "../common/bip32.h"
+#include "lib_standard_app/bip32.h"
 #include "lib_standard_app/buffer.h"
 #include "../common/buffer_ext.h"
 #include "../common/script.h"
