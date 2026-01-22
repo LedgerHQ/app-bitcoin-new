@@ -15,7 +15,7 @@
 #include "../../common/buffer_ext.h"
 #include "../../common/parser_ext.h"
 #include "lib_standard_app/read.h"
-#include "../../common/varint.h"
+#include "lib_standard_app/varint.h"
 #include "../../crypto.h"
 
 struct parse_rawtx_state_s;  // forward declaration

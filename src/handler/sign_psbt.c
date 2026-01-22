@@ -28,7 +28,7 @@
 #include "../common/psbt.h"
 #include "lib_standard_app/read.h"
 #include "../common/script.h"
-#include "../common/varint.h"
+#include "lib_standard_app/varint.h"
 #include "../common/wallet.h"
 #include "../common/write.h"
 

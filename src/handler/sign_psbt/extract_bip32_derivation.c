@@ -8,7 +8,7 @@
 #include "../../common/buffer_ext.h"
 #include "../../common/psbt.h"
 #include "lib_standard_app/read.h"
-#include "../../common/varint.h"
+#include "lib_standard_app/varint.h"
 
 typedef struct {
     int psbt_key_type;

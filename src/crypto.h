@@ -9,7 +9,7 @@
 #include "constants.h"
 
 #include "lib_standard_app/bip32.h"
-#include "./common/varint.h"
+#include "lib_standard_app/varint.h"
 #include "./common/write.h"
 
 /**

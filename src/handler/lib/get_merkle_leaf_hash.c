@@ -6,7 +6,7 @@
 #include "../../common/buffer_ext.h"
 #include "../../common/write.h"
 #include "../../common/merkle.h"
-#include "../../common/varint.h"
+#include "lib_standard_app/varint.h"
 #include "../../boilerplate/sw.h"
 #include "../client_commands.h"
 
