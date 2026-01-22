@@ -12,7 +12,7 @@
 #include "../boilerplate/sw.h"
 #include "lib_standard_app/bip32.h"
 #include "../common/bip32_ext.h"
-#include "../common/format.h"
+#include "lib_standard_app/format.h"
 #include "../common/script.h"
 #include "../constants.h"
 

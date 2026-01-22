@@ -32,7 +32,7 @@
 #include "lib_standard_app/base58.h"
 #include "lib_standard_app/bip32.h"
 #include "common/bip32_ext.h"
-#include "common/format.h"
+#include "lib_standard_app/format.h"
 #include "common/read.h"
 #include "common/write.h"
 
