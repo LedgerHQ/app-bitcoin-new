@@ -2,7 +2,7 @@
 
 #include "../../boilerplate/dispatcher.h"
 #include "../../common/merkle.h"
-#include "../../common/read.h"
+#include "lib_standard_app/read.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow finds out the index of the element

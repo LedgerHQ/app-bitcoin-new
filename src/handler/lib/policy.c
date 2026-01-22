@@ -9,7 +9,7 @@
 #include "lib_standard_app/base58.h"
 #include "../../common/buffer_ext.h"
 #include "../../common/bitvector.h"
-#include "../../common/read.h"
+#include "lib_standard_app/read.h"
 #include "../../common/script.h"
 #include "../../common/segwit_addr.h"
 #include "../../common/wallet.h"

@@ -26,7 +26,7 @@
 #include "lib_standard_app/bip32.h"
 #include "../common/buffer_ext.h"
 #include "../common/merkle.h"
-#include "../common/read.h"
+#include "lib_standard_app/read.h"
 #include "../common/wallet.h"
 #include "../common/write.h"
 

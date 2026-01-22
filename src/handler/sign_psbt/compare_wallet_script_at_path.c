@@ -6,7 +6,7 @@
 #include "../lib/get_merkleized_map_value.h"
 #include "../lib/policy.h"
 
-#include "../../common/read.h"
+#include "lib_standard_app/read.h"
 
 int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
                                   sign_psbt_cache_t *sign_psbt_cache,

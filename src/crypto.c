@@ -33,7 +33,7 @@
 #include "lib_standard_app/bip32.h"
 #include "common/bip32_ext.h"
 #include "lib_standard_app/format.h"
-#include "common/read.h"
+#include "lib_standard_app/read.h"
 #include "common/write.h"
 
 #include "../boilerplate/sw.h"

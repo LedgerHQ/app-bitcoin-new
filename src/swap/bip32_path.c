@@ -1,7 +1,7 @@
 
 #include "bip32_path.h"
 
-#include "../common/read.h"
+#include "lib_standard_app/read.h"
 
 bool parse_serialized_path(bip32_path_t* path,
                            unsigned char* serialized_path,

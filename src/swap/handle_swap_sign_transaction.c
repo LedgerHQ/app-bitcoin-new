@@ -9,7 +9,7 @@
 
 #include "../globals.h"
 #include "../swap/swap_globals.h"
-#include "../common/read.h"
+#include "lib_standard_app/read.h"
 
 // Save the BSS address where we will write the return value when finished
 static uint8_t* G_swap_sign_return_value_address;
