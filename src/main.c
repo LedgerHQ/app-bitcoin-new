@@ -27,7 +27,7 @@
 #include "boilerplate/io.h"
 #include "sw.h"
 #include "ui/menu.h"
-#include "boilerplate/apdu_parser.h"
+#include "lib_standard_app/parser.h"
 #include "boilerplate/constants.h"
 #include "boilerplate/dispatcher.h"
 

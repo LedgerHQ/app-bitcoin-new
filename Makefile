@@ -183,6 +183,7 @@ APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/base58.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/bip32.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/buffer.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/format.c
+APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/parser.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/read.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/varint.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/write.c
