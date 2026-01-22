@@ -185,6 +185,7 @@ APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/buffer.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/format.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/read.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/varint.c
+APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/write.c
 
 # Allow usage of function from lib_standard_app/crypto_helpers.c
 APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/crypto_helpers.c

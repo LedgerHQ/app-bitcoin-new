@@ -27,7 +27,7 @@
 #include "globals.h"
 #include "sw.h"
 #include "lib_standard_app/buffer.h"
-#include "common/write.h"
+#include "lib_standard_app/write.h"
 
 #include "dispatcher.h"
 #include "../swap/swap_globals.h"

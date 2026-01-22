@@ -30,7 +30,7 @@
 #include "../common/script.h"
 #include "lib_standard_app/varint.h"
 #include "../common/wallet.h"
-#include "../common/write.h"
+#include "../lib_standard_app/write.h"
 
 #include "../commands.h"
 #include "../constants.h"

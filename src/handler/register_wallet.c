@@ -28,7 +28,7 @@
 #include "../common/merkle.h"
 #include "lib_standard_app/read.h"
 #include "../common/wallet.h"
-#include "../common/write.h"
+#include "../lib_standard_app/write.h"
 
 #include "../commands.h"
 #include "../constants.h"

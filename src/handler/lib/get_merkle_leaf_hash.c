@@ -4,7 +4,7 @@
 
 #include "lib_standard_app/buffer.h"
 #include "../../common/buffer_ext.h"
-#include "../../common/write.h"
+#include "../../lib_standard_app/write.h"
 #include "../../common/merkle.h"
 #include "lib_standard_app/varint.h"
 #include "../../boilerplate/sw.h"

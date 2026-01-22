@@ -10,7 +10,7 @@
 
 #include "lib_standard_app/bip32.h"
 #include "lib_standard_app/varint.h"
-#include "./common/write.h"
+#include "./lib_standard_app/write.h"
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.
