@@ -16,7 +16,7 @@
  *
  */
 static inline uint8_t *buffer_get_cur(const buffer_t *buffer) {
-    return (uint8_t *)(buffer->ptr + buffer->offset);
+    return (uint8_t *) (buffer->ptr + buffer->offset);
 }
 
 /**

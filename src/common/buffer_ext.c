@@ -19,7 +19,6 @@
 #include <stdbool.h>  // bool
 #include <string.h>   // memmove
 
-
 #include "lib_standard_app/buffer.h"
 #include "buffer_ext.h"
 #include "read.h"
@@ -56,7 +55,7 @@ bool buffer_write_bytes(buffer_t *buffer, const uint8_t *data, size_t n) {
         return false;
     }
 
-    memmove((uint8_t *)(buffer->ptr + buffer->offset), data, n);
+    memmove((uint8_t *) (buffer->ptr + buffer->offset), data, n);
     buffer_seek_cur(buffer, n);
     return true;
 }
@@ -75,7 +74,7 @@ void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
         return NULL;
     }
 
-    void *result = (uint8_t *)(buffer->ptr + buffer->offset) + padding_size;
+    void *result = (uint8_t *) (buffer->ptr + buffer->offset) + padding_size;
     buffer_seek_cur(buffer, padding_size + size);
     return result;
 }

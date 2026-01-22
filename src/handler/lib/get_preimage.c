@@ -48,7 +48,7 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
     buffer_t buffer_out = buffer_create(out, out_len);
 
     uint8_t *data_ptr =
-        (uint8_t *)(dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
+        (uint8_t *) (dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
 
     cx_sha256_t hash_context;
     cx_sha256_init(&hash_context);
@@ -88,7 +88,8 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
             return -8;
         }
 
-        data_ptr = (uint8_t *)(dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
+        data_ptr = (uint8_t *) (dispatcher_context->read_buffer.ptr +
+                                dispatcher_context->read_buffer.offset);
 
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);

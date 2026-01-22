@@ -57,7 +57,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     uint8_t *data_ptr =
-        (uint8_t *)(dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
+        (uint8_t *) (dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
 
     cx_sha256_t hash_context;
 
