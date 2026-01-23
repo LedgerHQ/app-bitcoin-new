@@ -19,8 +19,18 @@
 #ifndef LCX_HASH_H
 #define LCX_HASH_H
 
-#include "os.h"
 #include <stdint.h>
+
+/* Defines from os.h */
+#ifndef SYSCALL
+#define SYSCALL
+#endif
+
+#ifndef PLENGTH
+#define PLENGTH(...)
+#endif
+
+#define WIDE // const // don't !!
 
 /** Message Digest algorithm identifiers. */
 enum cx_md_e {

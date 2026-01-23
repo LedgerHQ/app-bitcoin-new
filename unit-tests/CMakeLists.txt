@@ -39,9 +39,12 @@ endif()
 add_compile_definitions(TEST DEBUG=0 SKIP_FOR_CMOCKA PRINTF=printf COIN_NATIVE_SEGWIT_PREFIX=\"tb\")
 
 include_directories(../src)
+include_directories(../src/debug-helpers)
+include_directories(../src/boilerplate)
 include_directories(mock_includes)
 include_directories(libs)
 include_directories($ENV{BOLOS_SDK})
+include_directories($ENV{BOLOS_SDK}/lib_standard_app)
 
 add_executable(test_bitvector test_bitvector.c)
 add_executable(test_buffer test_buffer.c)
