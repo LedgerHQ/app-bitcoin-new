@@ -19,11 +19,12 @@
 #include <stdbool.h>  // bool
 #include <string.h>   // memmove
 
-#include "lib_standard_app/buffer.h"
 #include "buffer_ext.h"
-#include "read.h"
-#include "varint.h"
-#include "bip32.h"
+#include "lib_standard_app/bip32.h"
+#include "lib_standard_app/buffer.h"
+#include "lib_standard_app/read.h"
+#include "lib_standard_app/varint.h"
+#include "lib_standard_app/write.h"
 
 bool buffer_peek(const buffer_t *buffer, uint8_t *value) {
     return buffer_peek_n(buffer, 0, value);
@@ -46,6 +47,63 @@ bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n) {
 
     memmove(out, buffer->ptr + buffer->offset, n);
     buffer_seek_cur(buffer, n);
+
+    return true;
+}
+
+bool buffer_write_u8(buffer_t *buffer, uint8_t value) {
+    if (!buffer_can_read(buffer, 1)) {
+        return false;
+    }
+
+    ((uint8_t *) buffer->ptr)[buffer->offset] = value;
+    buffer_seek_cur(buffer, 1);
+
+    return true;
+}
+
+bool buffer_write_u16(buffer_t *buffer, uint16_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 2)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u16_be((uint8_t *) buffer->ptr, buffer->offset, value);
+    } else {
+        write_u16_le((uint8_t *) buffer->ptr, buffer->offset, value);
+    }
+    buffer_seek_cur(buffer, 2);
+
+    return true;
+}
+
+bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 4)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u32_be((uint8_t *) buffer->ptr, buffer->offset, value);
+    } else {
+        write_u32_le((uint8_t *) buffer->ptr, buffer->offset, value);
+    }
+    buffer_seek_cur(buffer, 4);
+
+    return true;
+}
+
+bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness) {
+    if (!buffer_can_read(buffer, 8)) {
+        return false;
+    }
+
+    if (endianness == BE) {
+        write_u64_be((uint8_t *) buffer->ptr, buffer->offset, value);
+    } else {
+        write_u64_le((uint8_t *) buffer->ptr, buffer->offset, value);
+    }
+
+    buffer_seek_cur(buffer, 8);
 
     return true;
 }

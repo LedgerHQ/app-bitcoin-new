@@ -4,7 +4,9 @@
 #include <stddef.h>   // size_t
 #include <stdbool.h>  // bool
 
-#include "lib_standard_app//buffer.h"
+#include "lib_standard_app/buffer.h"
+
+typedef size_t buffer_snapshot_t;
 
 /**
  * Returns the pointer to byte in the current position of the buffer.
@@ -18,6 +20,19 @@
 static inline uint8_t *buffer_get_cur(const buffer_t *buffer) {
     return (uint8_t *) (buffer->ptr + buffer->offset);
 }
+
+/**
+ * Read 1 byte from buffer into uint8_t.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to input buffer struct.
+ * @param[out]     value
+ *   Pointer to 8-bit unsigned integer read from buffer.
+ *
+ * @return true if success, false otherwise.
+ *
+ */
+bool buffer_read_u8(buffer_t *buffer, uint8_t *value);
 
 /**
  * Read 1 byte from buffer into uint8_t without advancing the current position in the buffer.
@@ -79,6 +94,51 @@ bool buffer_read_bytes(buffer_t *buffer, uint8_t *out, size_t n);
 bool buffer_write_u8(buffer_t *buffer, uint8_t value);
 
 /**
+ * Write a uint16_t into the buffer as 2 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to output buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u16(buffer_t *buffer, uint16_t value, endianness_t endianness);
+
+/**
+ * Write a uint32_t into the buffer as 4 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to output buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u32(buffer_t *buffer, uint32_t value, endianness_t endianness);
+
+/**
+ * Write a uint64_t into the buffer as 8 bytes, with the given endianness.
+ *
+ * @param[in,out]  buffer
+ *   Pointer to output buffer struct.
+ * @param[out]     value
+ *   Value to be written.
+ * @param[in]      endianness
+ *   Either BE (Big Endian) or LE (Little Endian).
+ *
+ * @return true if success, false if not enough space left in the buffer.
+ *
+ */
+bool buffer_write_u64(buffer_t *buffer, uint64_t value, endianness_t endianness);
+
+/**
  * Write a number of bytes to a buffer.
  *
  * @param[in,out]  buffer
@@ -132,4 +192,25 @@ void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned);
  */
 static inline bool buffer_is_cur_aligned(const buffer_t *buffer) {
     return (size_t) (buffer->ptr + buffer->offset) % 4 == 0;
+}
+
+/**
+ * Saves a snapshot of the current position within the buffer.
+ *
+ * @param[in] buffer The buffer whose position is saved.
+ *
+ * @return a snapshot that can be restored with `buffer_restore`.
+ */
+static inline buffer_snapshot_t buffer_snapshot(const buffer_t *buffer) {
+    return buffer->offset;
+}
+
+/**
+ * Restores a previously taken snapshot of the buffer.
+ *
+ * @param[in,out] snapshot The snapshot previously returned by a call to `buffer_snapshot` on the
+ * same buffer. The behavior is undefined if any other value is passed as `snapshot`.
+ */
+static inline void buffer_restore(buffer_t *buffer, buffer_snapshot_t snapshot) {
+    buffer->offset = snapshot;
 }
