@@ -14,17 +14,19 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>   // uint*_t
-#include <stddef.h>   // size_t
-#include <stdbool.h>  // bool
-#include <string.h>   // memmove
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "buffer_ext.h"
-#include "lib_standard_app/bip32.h"
-#include "lib_standard_app/buffer.h"
-#include "lib_standard_app/read.h"
-#include "lib_standard_app/varint.h"
-#include "lib_standard_app/write.h"
+
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
+#include "read.h"
+#include "varint.h"
+#include "write.h"
 
 bool buffer_peek(const buffer_t *buffer, uint8_t *value) {
     return buffer_peek_n(buffer, 0, value);

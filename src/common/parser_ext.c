@@ -1,8 +1,12 @@
 #include <stdio.h>
 
-#include "buffer_ext.h"
 #include "parser_ext.h"
-#include "lib_standard_app/read.h"
+
+/* SDK headers */
+#include "read.h"
+
+/* Local headers */
+#include "buffer_ext.h"
 
 size_t dbuffer_get_length(buffer_t *buffers[2]) {
     return (buffers[0]->size - buffers[0]->offset) + (buffers[1]->size - buffers[1]->offset);

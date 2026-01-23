@@ -1,12 +1,14 @@
 #include <string.h>
 
+#include "handle_check_address.h"
+
+/* SDK headers */
+#include "bip32_path.h"
 #include "os.h"
 
-#include "handle_check_address.h"
-#include "bip32_path.h"
-
-#include "../common/segwit_addr.h"
-#include "../crypto.h"
+/* Local headers */
+#include "crypto.h"
+#include "segwit_addr.h"
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 

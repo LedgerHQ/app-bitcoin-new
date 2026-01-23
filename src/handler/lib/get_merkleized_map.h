@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
 
+/* Local headers */
 #include "check_merkle_tree_sorted.h"
+#include "dispatcher.h"
+#include "merkle.h"
 
 /**
  * TODO: docs

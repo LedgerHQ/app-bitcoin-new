@@ -1,8 +1,11 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "lib_standard_app/bip32.h"
-#include "common/bip32_ext.h"
+/* SDK headers */
+#include "bip32.h"
+
+/* Local headers */
+#include "bip32_ext.h"
+#include "dispatcher.h"
 
 /**
  * Convenience function to extract the BIP32 derivation part from a PSBT field key type

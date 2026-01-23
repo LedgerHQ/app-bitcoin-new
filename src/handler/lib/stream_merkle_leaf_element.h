@@ -1,7 +1,9 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
 
 /**
  * This flow obtains and streams to the callback the preimage of a leaf of a Merkle tree, specified

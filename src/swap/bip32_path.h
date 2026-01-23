@@ -1,8 +1,9 @@
 #pragma once
 
-#include "stdbool.h"
+#include <stdbool.h>
 
-#include "lib_standard_app/bip32.h"
+/* SDK headers */
+#include "bip32.h"
 
 #define MAX_BIP32_PATH_LENGTH (4 * MAX_BIP32_PATH) + 1
 

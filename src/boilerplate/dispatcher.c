@@ -15,17 +15,20 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "dispatcher.h"
+
+/* SDK headers */
+#include "buffer.h"
+
+/* Local headers */
+#include "buffer_ext.h"
 #include "constants.h"
 #include "globals.h"
 #include "io_ext.h"
 #include "sw.h"
-
-#include "lib_standard_app/buffer.h"
-#include "common/buffer_ext.h"
 
 extern dispatcher_context_t G_dispatcher_context;
 

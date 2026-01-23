@@ -17,17 +17,20 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io_ext.h"
-#include "boilerplate/dispatcher.h"
-#include "boilerplate/sw.h"
-#include "lib_standard_app/base58.h"
-#include "lib_standard_app/bip32.h"
-#include "../common/bip32_ext.h"
-#include "../commands.h"
-#include "../constants.h"
-#include "../crypto.h"
-#include "../ui/display.h"
-#include "../ui/menu.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+
+/* Local headers */
+#include "bip32_ext.h"
+#include "commands.h"
+#include "constants.h"
+#include "crypto.h"
+#include "dispatcher.h"
+#include "display.h"
+#include "io_ext.h"
+#include "menu.h"
+#include "sw.h"
 
 #define H 0x80000000ul
 

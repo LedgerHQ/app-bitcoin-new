@@ -1,8 +1,10 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
-#include "../../constants.h"
+
+/* Local headers */
+#include "constants.h"
+#include "dispatcher.h"
+#include "merkle.h"
 
 typedef struct {
     uint64_t vout_value;                 // will contain the value of the requested output

@@ -1,8 +1,10 @@
 #pragma once
 
-#include "../musig/musig_sessions.h"
-#include "../common/merkle.h"
-#include "../ui/display.h"
+
+/* Local headers */
+#include "display.h"
+#include "merkle.h"
+#include "musig_sessions.h"
 
 // common info that applies to either the current input or the current output
 typedef struct {

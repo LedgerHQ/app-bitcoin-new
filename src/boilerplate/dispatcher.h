@@ -1,9 +1,11 @@
 #pragma once
 
+/* SDK headers */
+#include "buffer.h"
 #include "os.h"
 
-#include "lib_standard_app/buffer.h"
-#include "lib_standard_app/parser.h"
+/* Local headers */
+#include "parser.h"
 
 // Forward declaration
 struct dispatcher_context_s;

@@ -4,13 +4,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "os.h"
+/* SDK headers */
+#include "bip32.h"
 #include "cx.h"
-#include "constants.h"
+#include "os.h"
+#include "varint.h"
+#include "write.h"
 
-#include "lib_standard_app/bip32.h"
-#include "lib_standard_app/varint.h"
-#include "./lib_standard_app/write.h"
+/* Local headers */
+#include "constants.h"
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.

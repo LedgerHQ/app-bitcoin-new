@@ -2,8 +2,9 @@
 
 #include "get_merkleized_map_value.h"
 
-#include "get_merkle_leaf_index.h"
+/* Local headers */
 #include "get_merkle_leaf_element.h"
+#include "get_merkle_leaf_index.h"
 
 int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   const merkleized_map_commitment_t *map,

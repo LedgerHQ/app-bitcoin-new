@@ -17,33 +17,33 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io_ext.h"
-#include "boilerplate/sw.h"
-#include "lib_standard_app/base58.h"
-#include "lib_standard_app/bip32.h"
-#include "lib_standard_app/buffer.h"
-#include "../common/buffer_ext.h"
-#include "../common/merkle.h"
-#include "lib_standard_app/read.h"
-#include "../common/script.h"
-#include "../common/segwit_addr.h"
-#include "../common/wallet.h"
-#include "../commands.h"
-#include "../constants.h"
-#include "../crypto.h"
-#include "../error_codes.h"
-#include "../ui/display.h"
-#include "../ui/menu.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "buffer.h"
+#include "read.h"
 
-#include "../swap/swap_globals.h"
-#include "../swap/handle_swap_sign_transaction.h"
-
-#include "lib/policy.h"
-#include "lib/get_preimage.h"
-#include "lib/get_merkle_leaf_element.h"
-
-#include "handlers.h"
+/* Local headers */
+#include "buffer_ext.h"
 #include "client_commands.h"
+#include "commands.h"
+#include "constants.h"
+#include "crypto.h"
+#include "display.h"
+#include "error_codes.h"
+#include "get_merkle_leaf_element.h"
+#include "get_preimage.h"
+#include "handle_swap_sign_transaction.h"
+#include "handlers.h"
+#include "io_ext.h"
+#include "menu.h"
+#include "merkle.h"
+#include "policy.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "sw.h"
+#include "swap_globals.h"
+#include "wallet.h"
 
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_version) {
     UNUSED(protocol_version);

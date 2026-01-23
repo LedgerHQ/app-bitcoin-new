@@ -1,18 +1,20 @@
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
 
-#include "lib_standard_app/base58.h"
-#include "lib_standard_app/bip32.h"
-#include "lib_standard_app/buffer.h"
-#include "../common/buffer_ext.h"
-#include "../common/script.h"
-#include "../common/segwit_addr.h"
-#include "../common/wallet.h"
+#include "wallet.h"
 
-#include "../boilerplate/sw.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "buffer.h"
 
-#include "../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "debug.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "sw.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"

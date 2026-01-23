@@ -2,6 +2,7 @@
 
 #include "get_merkleized_map_value_hash.h"
 
+/* Local headers */
 #include "get_merkle_leaf_hash.h"
 #include "get_merkle_leaf_index.h"
 

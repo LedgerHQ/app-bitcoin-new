@@ -1,6 +1,8 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
+
+/* Local headers */
+#include "dispatcher.h"
 
 /**
  * TODO: docs

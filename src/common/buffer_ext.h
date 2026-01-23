@@ -1,10 +1,11 @@
 #pragma once
 
-#include <stdint.h>   // uint*_t
-#include <stddef.h>   // size_t
-#include <stdbool.h>  // bool
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-#include "lib_standard_app/buffer.h"
+/* SDK headers */
+#include "buffer.h"
 
 typedef size_t buffer_snapshot_t;
 

@@ -2,7 +2,9 @@
 
 #include <stdint.h>
 
-#include "../constants.h"
+
+/* Local headers */
+#include "constants.h"
 
 // up to 5 chars for ticker, 1 space, up to 20 digits (20 = digits of 2^64), + 1 decimal separator
 #define MAX_AMOUNT_LENGTH (5 + 1 + 20 + 1)

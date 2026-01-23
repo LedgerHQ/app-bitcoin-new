@@ -1,6 +1,7 @@
 #pragma once
 
-#include "lib_standard_app/bip32.h"
+/* SDK headers */
+#include "bip32.h"
 
 /**
  * Maximum length of BIP32 path supported.

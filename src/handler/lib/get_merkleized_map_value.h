@@ -1,8 +1,11 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
-#include "lib_standard_app/read.h"
+/* SDK headers */
+#include "read.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow finds out the index of the element

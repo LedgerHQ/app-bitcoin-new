@@ -1,15 +1,17 @@
 #include <assert.h>
 
-#include "ux.h"
-#include "usbd_core.h"
-#include "os_io_seproxyhal.h"
-#include "os.h"
-
 #include "handle_swap_sign_transaction.h"
 
-#include "../globals.h"
-#include "../swap/swap_globals.h"
-#include "lib_standard_app/read.h"
+/* SDK headers */
+#include "os.h"
+#include "read.h"
+#include "ux.h"
+
+/* Local headers */
+#include "globals.h"
+#include "os_io_seproxyhal.h"
+#include "swap_globals.h"
+#include "usbd_core.h"
 
 // Save the BSS address where we will write the return value when finished
 static uint8_t* G_swap_sign_return_value_address;

@@ -17,19 +17,21 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io_ext.h"
-#include "boilerplate/dispatcher.h"
-#include "boilerplate/sw.h"
-#include "lib_standard_app/bip32.h"
-#include "../common/buffer_ext.h"
-#include "../commands.h"
-#include "../constants.h"
-#include "../crypto.h"
-#include "../ui/display.h"
-#include "../ui/menu.h"
-#include "lib/get_merkle_leaf_element.h"
+/* SDK headers */
+#include "bip32.h"
 
+/* Local headers */
+#include "buffer_ext.h"
+#include "commands.h"
+#include "constants.h"
+#include "crypto.h"
+#include "dispatcher.h"
+#include "display.h"
+#include "get_merkle_leaf_element.h"
 #include "handlers.h"
+#include "io_ext.h"
+#include "menu.h"
+#include "sw.h"
 
 extern const char GA_LOADING_MESSAGE[];
 

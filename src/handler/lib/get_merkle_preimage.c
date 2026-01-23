@@ -2,13 +2,15 @@
 
 #include "get_merkle_preimage.h"
 
-#include "../../boilerplate/sw.h"
-#include "lib_standard_app/buffer.h"
-#include "../../common/buffer_ext.h"
-#include "../../crypto.h"
-#include "../client_commands.h"
+/* SDK headers */
+#include "buffer.h"
 
-#include "../../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "client_commands.h"
+#include "crypto.h"
+#include "debug.h"
+#include "sw.h"
 
 // TODO: refactor common code with stream_preimage.c
 

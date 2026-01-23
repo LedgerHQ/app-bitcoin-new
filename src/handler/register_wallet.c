@@ -18,32 +18,30 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "os.h"
+/* SDK headers */
+#include "bip32.h"
 #include "cx.h"
+#include "os.h"
+#include "read.h"
+#include "write.h"
 
-#include "../boilerplate/dispatcher.h"
-#include "../boilerplate/sw.h"
-#include "lib_standard_app/bip32.h"
-#include "../common/buffer_ext.h"
-#include "../common/merkle.h"
-#include "lib_standard_app/read.h"
-#include "../common/wallet.h"
-#include "../lib_standard_app/write.h"
-
-#include "../commands.h"
-#include "../constants.h"
-#include "../crypto.h"
-#include "../error_codes.h"
-#include "../ui/display.h"
-#include "../ui/menu.h"
-
-#include "lib/get_merkle_leaf_element.h"
-#include "lib/get_preimage.h"
-#include "lib/policy.h"
-
+/* Local headers */
+#include "buffer_ext.h"
 #include "client_commands.h"
-
+#include "commands.h"
+#include "constants.h"
+#include "crypto.h"
+#include "dispatcher.h"
+#include "display.h"
+#include "error_codes.h"
+#include "get_merkle_leaf_element.h"
+#include "get_preimage.h"
 #include "handlers.h"
+#include "menu.h"
+#include "merkle.h"
+#include "policy.h"
+#include "sw.h"
+#include "wallet.h"
 
 static bool is_policy_acceptable(const policy_node_t *policy);
 static bool is_policy_name_acceptable(const char *name, size_t name_len);

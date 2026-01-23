@@ -1,8 +1,10 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/wallet.h"
-#include "../../handler/sign_psbt/sign_psbt_cache.h"
+
+/* Local headers */
+#include "dispatcher.h"
+#include "sign_psbt_cache.h"
+#include "wallet.h"
 
 /**
  * Parses a serialized wallet policy, saving the wallet header, the policy map descriptor and the

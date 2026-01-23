@@ -1,11 +1,13 @@
+#include <assert.h>
 #include <stdint.h>
 
+/* SDK headers */
 #include "nbgl_use_case.h"
-#include "./display.h"
-#include "./menu.h"
-#include "../boilerplate/io_ext.h"
 
-#include <assert.h>
+/* Local headers */
+#include "display.h"
+#include "io_ext.h"
+#include "menu.h"
 
 #define REVIEW_CONFIRM FIRST_USER_TOKEN + 1
 

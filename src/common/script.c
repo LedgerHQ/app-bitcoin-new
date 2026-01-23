@@ -1,13 +1,17 @@
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
 
-#include "lib_standard_app/bip32.h"
-#include "lib_standard_app/buffer.h"
-#include "lib_standard_app/read.h"
-#include "../common/script.h"
-#include "../common/segwit_addr.h"
+#include "script.h"
+
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
+#include "read.h"
+
+/* Local headers */
+#include "segwit_addr.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"

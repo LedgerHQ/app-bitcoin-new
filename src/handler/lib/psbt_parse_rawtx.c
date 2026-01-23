@@ -1,22 +1,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cx.h"
-
 #include "psbt_parse_rawtx.h"
 
+/* SDK headers */
+#include "buffer.h"
+#include "cx.h"
+#include "read.h"
+#include "varint.h"
+
+/* Local headers */
+#include "buffer_ext.h"
+#include "crypto.h"
+#include "dispatcher.h"
 #include "get_merkleized_map_value_hash.h"
+#include "parser_ext.h"
 #include "stream_preimage.h"
-
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-
-#include "lib_standard_app/buffer.h"
-#include "../../common/buffer_ext.h"
-#include "../../common/parser_ext.h"
-#include "lib_standard_app/read.h"
-#include "lib_standard_app/varint.h"
-#include "../../crypto.h"
+#include "sw.h"
 
 struct parse_rawtx_state_s;  // forward declaration
 

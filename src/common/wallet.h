@@ -1,15 +1,17 @@
 #pragma once
 
-#include <stdint.h>
 #include <assert.h>
+#include <stdint.h>
 
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
 #include "ledger_assert.h"
 
-#include "lib_standard_app/bip32.h"
-#include "common/bip32_ext.h"
-#include "lib_standard_app/buffer.h"
-#include "../constants.h"
-#include "../crypto.h"
+/* Local headers */
+#include "bip32_ext.h"
+#include "constants.h"
+#include "crypto.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "os.h"

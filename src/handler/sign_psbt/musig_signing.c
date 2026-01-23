@@ -1,12 +1,16 @@
 #include <stdlib.h>
 
 #include "musig_signing.h"
-#include "lib_standard_app/crypto_helpers.h"
-#include "../boilerplate/sw.h"
-#include "../common/psbt.h"
-#include "../client_commands.h"
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/policy.h"
+
+/* SDK headers */
+#include "crypto_helpers.h"
+
+/* Local headers */
+#include "client_commands.h"
+#include "get_merkleized_map_value.h"
+#include "policy.h"
+#include "psbt.h"
+#include "sw.h"
 
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,

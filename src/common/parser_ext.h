@@ -2,7 +2,9 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "lib_standard_app/buffer.h"
+
+/* SDK headers */
+#include "buffer.h"
 
 typedef struct {
     size_t cur_step;
