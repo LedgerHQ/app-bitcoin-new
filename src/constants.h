@@ -6,6 +6,16 @@
 #define CLA_APP 0xE1
 
 /**
+ * APDU instruction class for command defined by the framework.
+ */
+#define CLA_FRAMEWORK 0xF8
+
+/**
+ * Framework instruction to continue execution after an interruption.
+ */
+#define INS_CONTINUE 0x01
+
+/**
  * Encodes the protocol version, which is passed in the p2 field of APDUs.
  */
 #define CURRENT_PROTOCOL_VERSION 1

@@ -28,7 +28,7 @@
 #include "sw.h"
 #include "ui/menu.h"
 #include "lib_standard_app/parser.h"
-#include "boilerplate/constants.h"
+#include "constants.h"
 #include "boilerplate/dispatcher.h"
 
 #include "../debug-helpers/debug.h"
@@ -39,7 +39,7 @@
 #include "common/wallet.h"
 
 // common declarations between legacy and new code; will refactor it out later
-#include "swap/swap_lib_calls.h"
+#include "lib_standard_app/swap_lib_calls.h"
 #include "swap/swap_globals.h"
 #include "swap/handle_swap_sign_transaction.h"
 #include "swap/handle_get_printable_amount.h"
