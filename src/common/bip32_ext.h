@@ -1,10 +1,12 @@
 #pragma once
 
+#include "lib_standard_app/bip32.h"
+
 /**
  * Maximum length of BIP32 path supported.
  * Note: BIP32 allows up to 256 derivation steps - but only 5 or 6 are used in most cases.
  */
-#define MAX_BIP32_PATH_STEPS 8
+#define MAX_BIP32_PATH_STEPS MAX_BIP32_PATH
 
 /**
  * Maximum length of a string representing a BIP32 derivation path.

@@ -2,7 +2,8 @@
 
 #include "stdbool.h"
 
-#define MAX_BIP32_PATH        10
+#include "lib_standard_app/bip32.h"
+
 #define MAX_BIP32_PATH_LENGTH (4 * MAX_BIP32_PATH) + 1
 
 typedef struct bip32_path {
