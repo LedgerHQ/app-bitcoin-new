@@ -17,7 +17,7 @@
 
 #include <stdint.h>
 
-#include "boilerplate/io.h"
+#include "boilerplate/io_ext.h"
 #include "boilerplate/dispatcher.h"
 #include "boilerplate/sw.h"
 #include "lib_standard_app/bip32.h"

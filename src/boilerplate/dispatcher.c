@@ -21,7 +21,7 @@
 #include "dispatcher.h"
 #include "constants.h"
 #include "globals.h"
-#include "io.h"
+#include "io_ext.h"
 #include "sw.h"
 
 #include "lib_standard_app/buffer.h"

@@ -23,7 +23,7 @@
 #include "nbgl_touch.h"
 #include "nbgl_use_case.h"
 
-#include "io.h"
+#include "io_ext.h"
 #include "globals.h"
 #include "sw.h"
 #include "lib_standard_app/buffer.h"

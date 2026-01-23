@@ -24,7 +24,7 @@
 #include "ux.h"
 
 #include "globals.h"
-#include "boilerplate/io.h"
+#include "boilerplate/io_ext.h"
 #include "sw.h"
 #include "ui/menu.h"
 #include "lib_standard_app/parser.h"

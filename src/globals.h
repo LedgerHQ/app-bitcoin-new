@@ -4,7 +4,7 @@
 
 #include "ux.h"
 
-#include "boilerplate/io.h"
+#include "boilerplate/io_ext.h"
 #include "commands.h"
 #include "constants.h"
 

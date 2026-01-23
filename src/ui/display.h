@@ -8,7 +8,7 @@
 #include "./display_utils.h"
 #include "../constants.h"
 #include "../globals.h"
-#include "../boilerplate/io.h"
+#include "../boilerplate/io_ext.h"
 #include "../boilerplate/sw.h"
 #include "lib_standard_app/bip32.h"
 #include "../common/bip32_ext.h"
