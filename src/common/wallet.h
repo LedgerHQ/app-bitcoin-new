@@ -9,7 +9,6 @@
 #include "ledger_assert.h"
 
 /* Local headers */
-#include "bip32_ext.h"
 #include "constants.h"
 #include "crypto.h"
 

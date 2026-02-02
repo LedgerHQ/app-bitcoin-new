@@ -7,7 +7,6 @@
 #include "format.h"
 
 /* Local headers */
-#include "bip32_ext.h"
 #include "constants.h"
 #include "dispatcher.h"
 #include "display.h"

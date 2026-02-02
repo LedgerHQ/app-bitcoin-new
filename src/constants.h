@@ -1,5 +1,8 @@
 #pragma once
 
+/* SDK headers */
+#include "bip32.h"
+
 /**
  * Instruction class of the Bitcoin application.
  */
@@ -91,3 +94,30 @@
 #define MAX_STANDARD_P2WSH_STACK_ITEMS 100U
 #define MAX_STANDARD_P2WSH_SCRIPT_SIZE 3600U
 #define MAX_OPS_PER_SCRIPT             201U
+
+
+/* BIP-32, BIP-44 and BIP-388 constants */
+/**
+ * Maximum length of BIP32 path supported.
+ * Note: BIP32 allows up to 256 derivation steps - but only 5 or 6 are used in most cases.
+ */
+#define MAX_BIP32_PATH_STEPS MAX_BIP32_PATH
+//#define MAX_BIP388_XPUB_DERIVATION_STEPS 8
+//#define MAX_BIP32_PATH_STEPS (MAX_BIP388_XPUB_DERIVATION_STEPS + 2)
+
+
+/**
+ * Maximum length of a string representing a BIP32 derivation path.
+ * Each step is up to 11 characters (10 decimal digits, plus the "hardened" symbol),
+ * and there is 1 separator before each step.
+ */
+#define MAX_SERIALIZED_BIP32_PATH_LENGTH (12 * MAX_BIP32_PATH_STEPS)
+
+/**
+ * Index of first hardened child according to BIP32; it can also be used as the bitmask for hardened
+ * children.
+ */
+#define BIP32_FIRST_HARDENED_CHILD 0x80000000
+
+#define MAX_BIP44_ACCOUNT_RECOMMENDED       100
+#define MAX_BIP44_ADDRESS_INDEX_RECOMMENDED 50000

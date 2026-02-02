@@ -4,7 +4,7 @@
 #include "bip32.h"
 
 /* Local headers */
-#include "bip32_ext.h"
+#include "constants.h"
 #include "dispatcher.h"
 
 /**

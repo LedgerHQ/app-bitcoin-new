@@ -38,7 +38,7 @@
 #include "write.h"
 
 /* Local headers */
-#include "bip32_ext.h"
+#include "constants.h"
 #include "debug.h"
 #include "secp256k1.h"
 #include "sw.h"

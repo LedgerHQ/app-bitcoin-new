@@ -22,7 +22,6 @@
 #include "bip32.h"
 
 /* Local headers */
-#include "bip32_ext.h"
 #include "commands.h"
 #include "constants.h"
 #include "crypto.h"
