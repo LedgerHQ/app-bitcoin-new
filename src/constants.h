@@ -95,7 +95,6 @@
 #define MAX_STANDARD_P2WSH_SCRIPT_SIZE 3600U
 #define MAX_OPS_PER_SCRIPT             201U
 
-
 /* BIP-32, BIP-44 and BIP-388 constants */
 /**
  * Maximum number of derivation steps for a wallet policy xpub (BIP-388).

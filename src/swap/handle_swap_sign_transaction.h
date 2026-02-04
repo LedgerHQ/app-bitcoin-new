@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "swap_lib_calls.h"
 

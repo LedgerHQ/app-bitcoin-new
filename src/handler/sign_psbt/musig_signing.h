@@ -1,6 +1,5 @@
 #include <stdint.h>
 
-
 /* Local headers */
 #include "dispatcher.h"
 #include "musig.h"

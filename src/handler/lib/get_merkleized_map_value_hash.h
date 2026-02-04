@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "dispatcher.h"
 #include "merkle.h"
