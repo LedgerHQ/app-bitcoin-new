@@ -339,7 +339,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
         // read all the given derivation steps
         out->master_key_derivation_len = 0;
         while (consume_character(buffer, '/')) {
-            if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
+            if (out->master_key_derivation_len >= MAX_BIP388_XPUB_DERIVATION_STEPS) {
                 return WITH_ERROR(-1, "Too many derivation steps");
             }
 
