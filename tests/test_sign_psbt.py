@@ -1,5 +1,7 @@
 import base64
 import pytest
+import hmac
+from hashlib import sha256
 
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
 
-from test_utils import bip0340, txmaker
+from test_utils import bip0340, txmaker, SpeculosGlobals
 
 from ragger_bitcoin import RaggerClient
 from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
@@ -747,6 +749,115 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     assert error_code == EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED
 
 
+def test_sign_psbt_with_max_derivation_path(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Test that we can sign a PSBT with MAX_BIP32_PATH_STEPS (10) derivation steps
+    # The key origin has 8 steps, plus the /** gives us 2 more for a total of 10
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3']tpubDNTK3WZ6g6eZBbCYCdFMpkCNvEqMxYexWRyqrGDkC5WDsNJdUk95z9wHWm6rBZeeMRxKafnuJzT8TqUs94A11KKkW9wT1pcFQShC9p3Vcxi"
+        ],
+    )
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        [100_000_000],
+        [99_000_000],
+        [True]
+    )
+
+    wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, wallet.id, sha256).digest()
+
+    # This should succeed as we're at the limit
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
+                              testname=test_name)
+
+    assert len(result) == 1
+
+
+def test_sign_psbt_fail_too_deep_derivation_path(navigator: Navigator, firmware: Firmware, client:
+                                                  RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Test that we cannot sign a PSBT with MAX_BIP32_PATH_STEPS + 1 (11) derivation steps
+    # The wallet policy has 8 steps in key origin (MAX_BIP388_XPUB_DERIVATION_STEPS)
+    # The PSBT has 11 derivation steps (8 + 3), exceeding MAX_BIP32_PATH_STEPS (10)
+    #
+    # How the rejection works:
+    # - read_change_and_index_from_psbt_bip32_derivation() checks der_len > MAX_BIP32_PATH_STEPS
+    # - When exceeded, it returns 0 (not an error, just "nothing to do")
+    # - This causes the input to not match any internal key expressions
+    # - The device marks it as external and aborts with "No internal inputs. Aborting"
+    # - Error returned: 0x6a80 (SW_FAIL_INTERNAL)
+    #
+    # This effectively validates that paths > MAX_BIP32_PATH_STEPS are rejected, even though
+    # the rejection is indirect (via "no internal inputs" rather than explicit path validation).
+
+    from ledger_bitcoin.key import KeyOriginInfo
+    from ledger_bitcoin.psbt import PartiallySignedInput, PartiallySignedOutput
+    from ledger_bitcoin.tx import CTransaction, CTxIn, CTxOut, COutPoint, CTxWitness
+    from ledger_bitcoin._serialize import uint256_from_str
+
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3']tpubDNTK3WZ6g6eZBbCYCdFMpkCNvEqMxYexWRyqrGDkC5WDsNJdUk95z9wHWm6rBZeeMRxKafnuJzT8TqUs94A11KKkW9wT1pcFQShC9p3Vcxi"
+        ],
+    )
+
+    wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, wallet.id, sha256).digest()
+
+    # Manually construct a PSBT with 11-step derivation
+    psbt = PSBT()
+    psbt.version = 0
+
+    tx = CTransaction()
+    tx.nVersion = 2
+    tx.nLockTime = 0
+
+    txin = CTxIn()
+    txin.prevout = COutPoint(uint256_from_str(bytes.fromhex("00" * 32)), 0)
+    txin.scriptSig = b''
+    txin.nSequence = 0xfffffffe
+    tx.vin = [txin]
+
+    txout = CTxOut()
+    txout.nValue = 99_000_000
+    txout.scriptPubKey = bytes.fromhex("0014" + "00" * 20)
+    tx.vout = [txout]
+
+    tx.wit = CTxWitness()
+    psbt.tx = tx
+
+    psinput = PartiallySignedInput(0)
+
+    witness_utxo = CTxOut()
+    witness_utxo.nValue = 100_000_000
+    witness_utxo.scriptPubKey = bytes.fromhex("0014" + "00" * 20)
+    psinput.witness_utxo = witness_utxo
+
+    # Set BIP32 derivation with 11 steps: 48'/1'/0'/2'/0'/1'/2'/3'/1/0/0
+    # This exceeds MAX_BIP32_PATH_STEPS (10)
+    pubkey = bytes.fromhex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+    origin_bytes = bytes.fromhex("f5acc2fd")
+    path = [0x80000030, 0x80000001, 0x80000000, 0x80000002, 0x80000000, 0x80000001, 0x80000002, 0x80000003, 1, 0, 0]
+    psinput.hd_keypaths = {pubkey: KeyOriginInfo(origin_bytes, path)}
+
+    psbt.inputs = [psinput]
+    psbt.outputs = [PartiallySignedOutput(0)]
+
+    # This should fail with 0x6a80
+    # Device output: "INPUT 0 is external" / "No internal inputs. Aborting"
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                         instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
+                         testname=test_name)
+
+    assert e.value.status == 0x6a80
 
 
 def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):

@@ -437,3 +437,36 @@ def test_register_wallet_tr_script_sortedmulti(navigator: Navigator, firmware: F
     ),
         instructions=register_wallet_instruction_approve_long(firmware),
         test_name=test_name)
+
+def test_register_wallet_max_derivation_steps(navigator: Navigator, firmware: Firmware, client:
+                                               RaggerClient, test_name: str, speculos_globals):
+    # Test that we can register a wallet with MAX_BIP388_XPUB_DERIVATION_STEPS (8) derivation steps
+    # This key has 8 derivation steps: 48'/1'/0'/2'/0'/1'/2'/3'
+    # Using a valid xpub from existing tests but with 8-step derivation path
+    run_register_test(navigator, client, speculos_globals, WalletPolicy(
+        name="Max derivation",
+        descriptor_template="wpkh(@0/**)",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3']tpubDNTK3WZ6g6eZBbCYCdFMpkCNvEqMxYexWRyqrGDkC5WDsNJdUk95z9wHWm6rBZeeMRxKafnuJzT8TqUs94A11KKkW9wT1pcFQShC9p3Vcxi",
+        ],
+    ),
+        instructions=register_wallet_instruction_approve(firmware),
+        test_name=test_name)
+
+
+def test_register_wallet_too_many_derivation_steps(navigator: Navigator, firmware: Firmware, client:
+                                                    RaggerClient, test_name: str):
+    # Test that we cannot register a wallet with MAX_BIP388_XPUB_DERIVATION_STEPS + 1 (9) derivation steps
+    # This key has 9 derivation steps: 48'/1'/0'/2'/0'/1'/2'/3'/4'
+    wallet = WalletPolicy(
+        name="Too many steps",
+        descriptor_template="wpkh(@0/**)",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3'/4']tpubDR1MRwnrfYuCbZ5dvozygap7EkR1pRXfwKhfCEpMTHtzrtN78MnFeipS2Vq9Nr3WHSurdqmrPfm5yQH5ikxJhYUTK12VxmqfTKR8hUF8mty",
+        ],
+    )
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.register_wallet(wallet)
+
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError

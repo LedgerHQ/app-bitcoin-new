@@ -120,3 +120,34 @@ def test_sign_message_hash_reject(navigator: Navigator, firmware: Firmware, clie
 
     assert DeviceException.exc.get(e.value.status) == DenyError
     assert len(e.value.data) == 0
+
+
+def test_sign_message_with_max_bip32_path(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Test signing with MAX_BIP32_PATH_STEPS (10) derivation steps
+    # Path: m/44'/1'/0'/0'/1'/2'/3'/4'/5/6 = 10 steps
+    message = "Maximum derivation path test"
+    path = "m/44'/1'/0'/0'/1'/2'/3'/4'/5/6"
+    
+    result = client.sign_message(message, path, navigator,
+                                 instructions=message_instruction_approve(firmware, save_screenshot=False),
+                                 testname=test_name)
+    
+    # Just verify it succeeds and returns a signature
+    assert result is not None
+    assert len(result) > 0
+
+
+def test_sign_message_fail_too_long_bip32_path(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
+    # Test signing with MAX_BIP32_PATH_STEPS + 1 (11) derivation steps should fail
+    # Path: m/44'/1'/0'/0'/1'/2'/3'/4'/5/6/7 = 11 steps
+    message = "Too long derivation path test"
+    path = "m/44'/1'/0'/0'/1'/2'/3'/4'/5/6/7"
+    
+    from ledger_bitcoin.exception.errors import WrongDataLengthError
+    
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.sign_message(message, path, navigator,
+                           instructions=message_instruction_approve(firmware, save_screenshot=False),
+                           testname=test_name)
+    
+    assert DeviceException.exc.get(e.value.status) == WrongDataLengthError
