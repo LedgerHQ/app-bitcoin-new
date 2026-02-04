@@ -1,6 +1,5 @@
 #include <string.h>
 
-
 /* Local headers */
 #include "client_commands.h"
 #include "get_merkle_leaf_hash.h"

@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "display.h"
 #include "merkle.h"

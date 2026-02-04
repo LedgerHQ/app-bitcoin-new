@@ -1,7 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-
 /* Local headers */
 #include "printf.h"
 

@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "check_merkle_tree_sorted.h"
 #include "dispatcher.h"
