@@ -14,6 +14,11 @@
  *  limitations under the License.
  *****************************************************************************/
 
+/*
+ * NOTE: The SDK's buffer_t type uses `const uint8_t *ptr` for both read and write.
+ * Write functions cast away const; callers must ensure underlying memory is mutable.
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

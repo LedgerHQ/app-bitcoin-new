@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "crypto.h"
 #include "wallet.h"

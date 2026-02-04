@@ -16,7 +16,6 @@
  *****************************************************************************/
 
 /* SDK headers */
-/* SDK headers */
 #include "nbgl_use_case.h"
 
 /* Local headers */

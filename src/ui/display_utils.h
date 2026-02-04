@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-
 /* Local headers */
 #include "constants.h"
 

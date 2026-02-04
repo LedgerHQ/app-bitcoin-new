@@ -17,7 +17,6 @@
 
 #include <stdint.h>
 
-
 /* Local headers */
 #include "commands.h"
 #include "crypto.h"

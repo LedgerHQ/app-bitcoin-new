@@ -1,6 +1,5 @@
 #pragma once
 
-
 /* Local headers */
 #include "constants.h"
 #include "dispatcher.h"
