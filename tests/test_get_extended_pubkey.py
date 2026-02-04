@@ -6,7 +6,7 @@ from ragger.backend import SpeculosBackend
 from ragger.firmware import Firmware
 from ragger.error import ExceptionRAPDU
 
-from ledger_bitcoin.exception.errors import NotSupportedError, DenyError
+from ledger_bitcoin.exception.errors import NotSupportedError, DenyError, IncorrectDataError
 from ledger_bitcoin.exception.device_exception import DeviceException
 from .instructions import pubkey_instruction_approve, pubkey_instruction_reject_early, pubkey_reject
 
@@ -23,6 +23,7 @@ def test_get_extended_pubkey_standard_display(navigator: Navigator, firmware: Fi
         "m/86'/1'/4'/1/12": "tpubDHTZ815MvTaRmo6Qg1rnU6TEU4ZkWyA56jA1UgpmMcBGomnSsyo34EZLoctzZY9MTJ6j7bhccceUeXZZLxZj5vgkVMYfcZ7DNPsyRdFpS3f",
         # the following path tests compatibility with Unchained Capital's multisig setup
         "m/45'/2'/0'/1'": "tpubDFL11pFAgsKed5bv9Tkxe51xyB4qo1cPDwK6c8WZ4wiVEjtGDg5YuMXNk9yZcB6b47k2oaSWADJF3CRmk97qAwnaiRieT2ocWzh4rq2b3F3",
+        "m/48'/1'/0'/2'/0'/1'/2'/3'/0/1": "tpubDSegeM6ezY6VYgNjYiUxk94ZwLYeuUzHpUYff4LLdEEUVUd8VpgGUxyxZ9oRiEepZzmFZogVWFEWznRj3oJgEuWjcg6BERCxTCYdaxwtShk"
     }
 
     for path, pubkey in testcases.items():
@@ -123,7 +124,7 @@ def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmwa
     # The test will be re-enabled for Speculos once the installation parameters are supported
     # Deriving a key at root level without HAVE_APPLICATION_FLAG_DERIVE_MASTER permission
     with pytest.raises(ExceptionRAPDU) as e:
-        pub_key = client.get_extended_pubkey(
+        client.get_extended_pubkey(
             path="m",  # root pubkey
             display=True,
             navigator=navigator,
@@ -135,7 +136,7 @@ def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmwa
     # Deriving a key at unauthorized path
     # The below part does not raise exception when built with COIN=bitcoin_recovery as all paths are permitted
     with pytest.raises(ExceptionRAPDU) as e:
-        pub_key = client.get_extended_pubkey(
+        client.get_extended_pubkey(
             path="m/44'/2'/333'",
             display=True,
             navigator=navigator,
@@ -144,6 +145,19 @@ def test_get_extended_pubkey_non_standard(navigator: Navigator, firmware: Firmwa
         )
     assert DeviceException.exc.get(e.value.status) == NotSupportedError
     assert len(e.value.data) == 0
+
+    # Deriving a key with a path exceeding maximum one
+    with pytest.raises(ExceptionRAPDU) as e:
+        client.get_extended_pubkey(
+            path="m/48'/1'/0'/2'/0'/1'/2'/3'/0/1/2",
+            display=True,
+            navigator=navigator,
+            instructions=pubkey_instruction_approve(firmware),
+            testname=test_name
+        )
+    assert DeviceException.exc.get(e.value.status) == IncorrectDataError
+    assert len(e.value.data) == 0
+
 
 
 def test_get_extended_pubkey_non_standard_reject_early(navigator: Navigator, firmware: Firmware,
