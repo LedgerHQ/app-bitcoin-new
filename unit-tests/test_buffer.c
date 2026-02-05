@@ -7,40 +7,8 @@
 
 #include <cmocka.h>
 
-#include "common/buffer.h"
-
-static void test_buffer_can_read(void **state) {
-    (void) state;
-
-    uint8_t temp[20] = {0};
-    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
-
-    assert_true(buffer_can_read(&buf, 20));
-
-    assert_true(buffer_seek_cur(&buf, 20));
-    assert_false(buffer_can_read(&buf, 1));
-}
-
-static void test_buffer_seek(void **state) {
-    (void) state;
-
-    uint8_t temp[20] = {0};
-    buffer_t buf = {.ptr = temp, .size = sizeof(temp), .offset = 0};
-
-    assert_true(buffer_can_read(&buf, 20));
-
-    assert_true(buffer_seek_cur(&buf, 20));  // seek at offset 20
-    assert_false(buffer_can_read(&buf, 1));  // can't read 1 byte
-    assert_false(buffer_seek_cur(&buf, 1));  // can't move at offset 21
-
-    assert_true(buffer_seek_end(&buf, 19));
-    assert_int_equal(buf.offset, 1);
-    assert_false(buffer_seek_end(&buf, 21));  // can't seek at offset -1
-
-    assert_true(buffer_seek_set(&buf, 10));
-    assert_int_equal(buf.offset, 10);
-    assert_false(buffer_seek_set(&buf, 21));  // can't seek at offset 21
-}
+#include "common/buffer_ext.h"
+#include "lib_standard_app/buffer.h"
 
 static void test_buffer_get_cur(void **state) {
     (void) state;
@@ -483,9 +451,7 @@ static void test_buffer_snapshot_restore(void **state) {
 
 
 int main() {
-    const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_can_read),
-                                       cmocka_unit_test(test_buffer_seek),
-                                       cmocka_unit_test(test_buffer_get_cur),
+    const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_get_cur),
                                        cmocka_unit_test(test_buffer_read),
                                        cmocka_unit_test(test_buffer_peek),
                                        cmocka_unit_test(test_buffer_peek_n),

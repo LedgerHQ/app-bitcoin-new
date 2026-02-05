@@ -8,6 +8,8 @@
 
 #include <cmocka.h>
 
+#include "common/buffer_ext.h"
+
 // missing definitions to make it compile without the SDK
 unsigned int pic(unsigned int linked_address) {
     return linked_address;
@@ -680,6 +682,8 @@ int main() {
         cmocka_unit_test(test_parse_policy_map_multisig_3),
         cmocka_unit_test(test_parse_policy_tr),
         cmocka_unit_test(test_parse_policy_tr_multisig),
+        cmocka_unit_test(test_parse_policy_tr_musig_scriptpath),
+        cmocka_unit_test(test_parse_policy_tr_musig_keypath),
         cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
