@@ -11,7 +11,6 @@
 #include "dispatcher.h"
 #include "display.h"
 #include "display_utils.h"
-#include "globals.h"
 #include "io_ext.h"
 #include "script.h"
 #include "sw.h"

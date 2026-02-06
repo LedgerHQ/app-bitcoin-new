@@ -1,18 +1,17 @@
-#include "handle_get_printable_amount.h"
-
 /* SDK headers */
 #include "read.h"
+#include "swap_lib_calls.h"
 
 /* Local headers */
 #include "display_utils.h"
 
 #define MAX_NON_PRINTABLE_AMOUNT_LEN 8
 
-int handle_get_printable_amount(get_printable_amount_parameters_t *params) {
+void swap_handle_get_printable_amount(get_printable_amount_parameters_t *params) {
     params->printable_amount[0] = 0;
     if (params->amount_length > MAX_NON_PRINTABLE_AMOUNT_LEN) {
         PRINTF("Amount is too big");
-        return 0;
+        return;
     }
     unsigned char amount[MAX_NON_PRINTABLE_AMOUNT_LEN] = {0};
     /* Amount + ' ' + ticker */
@@ -23,5 +22,4 @@ int handle_get_printable_amount(get_printable_amount_parameters_t *params) {
     format_sats_amount(COIN_COINID_SHORT,
                        (uint64_t) (read_u64_be(amount, 0)),  // Cast prevents weird compilo bug
                        params->printable_amount);
-    return 1;
 }

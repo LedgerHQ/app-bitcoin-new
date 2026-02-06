@@ -20,7 +20,6 @@
 
 /* Local headers */
 #include "display.h"
-#include "globals.h"
 #include "menu.h"
 
 #define SETTING_INFO_NB 3

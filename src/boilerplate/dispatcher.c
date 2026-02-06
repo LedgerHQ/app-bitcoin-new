@@ -22,10 +22,10 @@
 
 /* SDK headers */
 #include "buffer.h"
+#include "io.h"
 
 /* Local headers */
 #include "constants.h"
-#include "globals.h"
 #include "io_ext.h"
 #include "sw.h"
 
