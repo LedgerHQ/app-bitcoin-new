@@ -23,6 +23,7 @@
 /* SDK headers */
 #include "crypto_helpers.h"
 #include "read.h"
+#include "swap.h"
 #include "varint.h"
 #include "write.h"
 
@@ -2170,7 +2171,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // we execute the signing flow only if we're expected to produce any signature
     // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
     if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
-        if (G_swap_state.called_from_swap) {
+        if (G_called_from_swap) {
             /** SWAP CHECKS
              *
              *  If called from the exchange app, perform the necessary additional checks.
@@ -2196,7 +2197,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
          */
         int sign_result = sign_transaction(dc, &st, cache, &signing_state, internal_inputs);
 
-        if (!G_swap_state.called_from_swap) {
+        if (!G_called_from_swap) {
             ui_post_processing_confirm_transaction(dc, sign_result);
         }
 
@@ -2205,7 +2206,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         }
 
         // Only if called from swap, the app should terminate after sending the response
-        if (G_swap_state.called_from_swap) {
+        if (G_called_from_swap) {
             G_swap_state.should_exit = true;
         }
     }

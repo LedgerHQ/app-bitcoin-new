@@ -10,6 +10,11 @@
 #include "os_io_seproxyhal.h"
 
 /**
+ * Global variable with the length of APDU response to send back.
+ */
+extern uint16_t G_output_len;
+
+/**
  * IO callback called when an interrupt based channel has received
  * data to be processed.
  *
