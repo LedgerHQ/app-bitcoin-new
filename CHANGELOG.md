@@ -7,18 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.4.5] - 09-01-2026
+## [2.4.5] - 10-02-2026
 
 ### Changed
 
-- for `bitcoin_recovery`
+- For `bitcoin_recovery`
     - `HAVE_APPLICATION_FLAG_DERIVE_MASTER` enabled so fully non-hardened paths can be used
     -  A warning dispalyed on home screen
 
 ### Fixed
 
-- getting xpub at purpose level (for permitted paths)
-
+- Getting xpub at purpose level (for permitted paths)
+- Bug causing signing failures if the client sends data in small chunks
 
 ## [2.4.4] - 15-12-2025
 
