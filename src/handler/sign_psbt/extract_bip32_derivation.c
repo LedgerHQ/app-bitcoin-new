@@ -7,7 +7,6 @@
 
 #include "../../common/psbt.h"
 #include "../../common/read.h"
-#include "../../common/varint.h"
 
 typedef struct {
     int psbt_key_type;
@@ -27,6 +26,11 @@ static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
 
     if (cs->result < 0) return;  // an error already happened, ignore the rest
 
+    if (data->size == 0) {
+        // ignore empty chunks
+        return;
+    }
+
     // on the first call, compute the length the fingerprint + derivation part of the message.
     // - if non-taproot, then it's the entire message;
     // - if taproot, it's the message after the hashes are removed.
@@ -37,16 +41,24 @@ static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
         if (!is_tap) {
             cs->out_data_length = cs->total_data_length;
         } else {
-            uint64_t n_hashes;
-            if ((!buffer_read_varint(data, &n_hashes)) ||
-                (cs->total_data_length < varint_size(n_hashes) + 32 * (int) n_hashes)) {
+            // While BIP-0174 defines the number of hashes as a compact size integer, this
+            // can never be more than 128 in taproot. Since such numbers are always encoded
+            // as a single byte, we simplify by reading a single byte instead of a varint.
+            uint8_t n_hashes;
+            if ((!buffer_read_u8(data, &n_hashes)) ||
+                (cs->total_data_length < 1 + 32 * (int) n_hashes)) {
                 PRINTF("Unexpected: initial callback message too short\n");
                 cs->result = -1;
                 return;
             }
 
-            int out_data_length =
-                cs->total_data_length - varint_size(n_hashes) - 32 * (int) n_hashes;
+            if (n_hashes > 128) {
+                PRINTF("Unexpected: too many hashes in taproot BIP32 derivation\n");
+                cs->result = -1;
+                return;
+            }
+
+            int out_data_length = cs->total_data_length - 1 - 32 * (int) n_hashes;
 
             if (out_data_length > 4 * (1 + MAX_BIP32_PATH_STEPS)) {
                 PRINTF("BIP32 derivation longer than supported in psbt derivation\n");
@@ -69,9 +81,9 @@ static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
         buffer_seek_set(data, 0);
         // We need to concatenate the new data we are reading with any previously read data.
         // Since we can only read data->size bytes, only the last d = out_data_length - data->size
-        // previous bytes are kept; they move from position out_data_length - d + 1 to position 0.
+        // previous bytes are kept; they move from position out_data_length - d to position 0.
         int d = cs->out_data_length - data->size;
-        memmove(cs->out, &cs->out[cs->out_data_length - d + 1], d);
+        memmove(cs->out, &cs->out[cs->out_data_length - d], d);
         // starting at position d, we read the entire data
         buffer_read_bytes(data, &cs->out[d], data->size);
     }
