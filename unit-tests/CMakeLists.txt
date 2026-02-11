@@ -44,6 +44,7 @@ include_directories(../src/boilerplate)
 include_directories(mock_includes)
 include_directories(libs)
 include_directories($ENV{BOLOS_SDK})
+include_directories($ENV{BOLOS_SDK}/include)
 include_directories($ENV{BOLOS_SDK}/lib_standard_app)
 
 add_executable(test_bitvector test_bitvector.c)
