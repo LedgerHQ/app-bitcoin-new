@@ -131,19 +131,7 @@ void io_finalize_response(uint16_t sw) {
     }
 }
 
-void io_reset_response() {
-    G_output_len = 0;
-}
-
-void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw) {
-    io_reset_response();
-    if (rdata != NULL) {
-        io_add_to_response(rdata, rdata_len);
-    }
-    io_finalize_response(sw);
-}
-
-int io_confirm_response() {
+int io_send_response() {
     int ret;
 
     ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
@@ -152,11 +140,8 @@ int io_confirm_response() {
     return ret;
 }
 
-int io_send_response(void *rdata, size_t rdata_len, uint16_t sw) {
-    io_set_response(rdata, rdata_len, sw);
-    return io_confirm_response();
-}
-
 int io_send_sw(uint16_t sw) {
-    return io_send_response(NULL, 0, sw);
+    G_output_len = 0;
+    io_finalize_response(sw);
+    return io_send_response();
 }
