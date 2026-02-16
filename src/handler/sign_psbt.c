@@ -1092,7 +1092,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             data_size = second_byte;
         } else if (second_byte == OP_PUSHDATA1) {
             // pushing more than 75 bytes requires using OP_PUSHDATA1 <len>
-            // insted of a single-byte opcode
+            // instead of a single-byte opcode
             push_opcode_size = 2;
             data_size = opreturn_script[2];
         } else {
@@ -2106,7 +2106,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
     st.protocol_version = protocol_version;
 
-    // read APDU inputs, intialize global state and read global PSBT map
+    // read APDU inputs, initialize global state and read global PSBT map
     if (!init_global_state(dc, &st)) return;
 
     sign_psbt_cache_t *cache = &G_sign_psbt_cache;

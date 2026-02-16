@@ -75,7 +75,7 @@ int merkle_get_ith_direction(size_t size, size_t index, size_t i);
 /**
  * Represents the Merkleized version of a key-value map, holding the number of elements, the root of
  * the Merkle tree of the sorted list of keys, and the root of the Merkle tree of the values (sorted
- * by their correpsonding key).
+ * by their corresponding key).
  */
 typedef struct {
     uint64_t size;
