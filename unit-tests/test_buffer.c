@@ -427,29 +427,6 @@ static void test_buffer_is_cur_aligned(void **state) {
     assert_false(buffer_is_cur_aligned(&buf)); //9
 }
 
-// tests the buffer_snapshot/buffer_restore functions
-static void test_buffer_snapshot_restore(void **state) {
-    (void) state;
-
-    uint8_t data[32];
-
-    buffer_snapshot_t snap;
-    buffer_t buf;
-    buffer_t buf_correct;
-
-    buf = buffer_create(data, sizeof(data));
-    buf_correct = buf;
-
-    snap = buffer_snapshot(&buf);
-    buffer_alloc(&buf, 11, false);
-    buffer_restore(&buf, snap);
-
-    assert_int_equal(buf.offset, buf_correct.offset);
-    assert_ptr_equal(buf.ptr, buf_correct.ptr);
-    assert_int_equal(buf.size, buf_correct.size);
-}
-
-
 int main() {
     const struct CMUnitTest tests[] = {cmocka_unit_test(test_buffer_get_cur),
                                        cmocka_unit_test(test_buffer_read),
@@ -458,8 +435,7 @@ int main() {
                                        cmocka_unit_test(test_buffer_write),
                                        cmocka_unit_test(test_buffer_create),
                                        cmocka_unit_test(test_buffer_alloc),
-                                       cmocka_unit_test(test_buffer_is_cur_aligned),
-                                       cmocka_unit_test(test_buffer_snapshot_restore)};
+                                       cmocka_unit_test(test_buffer_is_cur_aligned)};
 
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

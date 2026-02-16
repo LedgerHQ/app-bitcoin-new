@@ -10,7 +10,6 @@
 #include "varint.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "crypto.h"
 #include "dispatcher.h"
 #include "get_merkleized_map_value_hash.h"

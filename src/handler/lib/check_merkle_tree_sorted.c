@@ -3,7 +3,6 @@
 #include "check_merkle_tree_sorted.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "get_merkle_leaf_element.h"
 #include "merkle.h"
 

@@ -8,7 +8,6 @@
 #include "varint.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "psbt.h"
 #include "stream_merkle_leaf_element.h"
 

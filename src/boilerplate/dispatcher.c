@@ -24,7 +24,6 @@
 #include "buffer.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "constants.h"
 #include "globals.h"
 #include "io_ext.h"

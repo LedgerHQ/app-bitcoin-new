@@ -9,7 +9,6 @@
 
 /* Local headers */
 #include "bitvector.h"
-#include "buffer_ext.h"
 #include "crypto.h"
 #include "debug.h"
 #include "get_merkle_leaf_element.h"

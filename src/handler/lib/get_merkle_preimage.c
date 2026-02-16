@@ -6,7 +6,6 @@
 #include "buffer.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "client_commands.h"
 #include "crypto.h"
 #include "debug.h"
@@ -59,7 +58,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     }
 
     uint8_t *data_ptr =
-        (uint8_t *) (dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset);
+        dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
     cx_sha256_t hash_context;
 
@@ -100,8 +99,7 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
             return -9;
         }
 
-        data_ptr = (uint8_t *) dispatcher_context->read_buffer.ptr +
-                   dispatcher_context->read_buffer.offset;
+        data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
 
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);

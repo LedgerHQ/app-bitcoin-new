@@ -29,7 +29,6 @@
 /* Local headers */
 #include "amount_from_psbt.h"
 #include "bitvector.h"
-#include "buffer_ext.h"
 #include "check_merkle_tree_sorted.h"
 #include "client_commands.h"
 #include "commands.h"

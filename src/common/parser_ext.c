@@ -5,9 +5,6 @@
 /* SDK headers */
 #include "read.h"
 
-/* Local headers */
-#include "buffer_ext.h"
-
 size_t dbuffer_get_length(buffer_t *buffers[2]) {
     return (buffers[0]->size - buffers[0]->offset) + (buffers[1]->size - buffers[1]->offset);
 }
@@ -117,8 +114,8 @@ bool parser_consolidate_buffers(buffer_t *buffers[2], size_t max_size) {
         return false;
     }
 
-    memmove((uint8_t *) buffers[0]->ptr, buffers[0]->ptr + buffers[0]->offset, length0);
-    memmove((uint8_t *) buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
+    memmove(buffers[0]->ptr, buffers[0]->ptr + buffers[0]->offset, length0);
+    memmove(buffers[0]->ptr + length0, buffers[1]->ptr + buffers[1]->offset, length1);
     buffers[0]->offset = 0;
     buffers[0]->size = length0 + length1;
     return true;

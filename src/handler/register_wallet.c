@@ -26,7 +26,6 @@
 #include "write.h"
 
 /* Local headers */
-#include "buffer_ext.h"
 #include "client_commands.h"
 #include "commands.h"
 #include "constants.h"
