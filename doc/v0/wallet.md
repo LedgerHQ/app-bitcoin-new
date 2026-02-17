@@ -27,9 +27,9 @@ Key placeholder `KP` expressions consist of
 - a single character `@`
 - followed by a non-negative decimal number, with no leading zeros (except for `@0`).
 
-The placeholder `@i` for some number *i* represents the *i*-th key in the vector of key orgin informations (which must be of size at least *i* + 1, or the wallet is invalid. 
+The placeholder `@i` for some number *i* represents the *i*-th key in the vector of key origin information (which must be of size at least *i* + 1, or the wallet is invalid.
 
-Each element of the *key origin informations* list is a `KEY` expression.
+Each element of the *key origin information* list is a `KEY` expression.
 `KEY` expressions:
 
 -   Key origin information, consisting of:
@@ -61,7 +61,7 @@ The app supports a number of features related to wallet policies. In order to se
 
 - register a wallet, validating all the information (policy and keys involved) with the user on the trusted screen;
 - show the addresses for a registered wallet on the trusted screen;
-- sign spends from the wallet. 
+- sign spends from the wallet.
 
 Since the application is stateless, wallet registration is not persisted on device. In order to make it possible to use a registered wallet in future requests, the device returns a hmac-sha256 (32 bytes long) for the wallet upon a successful registration. The client side is responsible for persisting the wallet policy *and* the returned hmac-sha256, and to provide this information in future requests.
 
