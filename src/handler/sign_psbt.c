@@ -278,7 +278,7 @@ init_global_state(dispatcher_context_t *dc, sign_psbt_state_t *st) {
                                                    1,
                                                    raw_result,
                                                    sizeof(raw_result));
-        if (result_len == -1) {
+        if (result_len < 0) {
             st->locktime = 0;
         } else if (result_len != 4) {
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -962,7 +962,7 @@ preprocess_outputs(dispatcher_context_t *dc,
                                                    output.in_out.scriptPubKey,
                                                    sizeof(output.in_out.scriptPubKey));
 
-        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
+        if (result_len < 0 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
@@ -1272,7 +1272,7 @@ static bool get_output_script_and_amount(
                                                out_scriptPubKey,
                                                MAX_OUTPUT_SCRIPTPUBKEY_LEN);
 
-    if (result_len == -1 || result_len > MAX_OUTPUT_SCRIPTPUBKEY_LEN) {
+    if (result_len < 0 || result_len > MAX_OUTPUT_SCRIPTPUBKEY_LEN) {
         SEND_SW(dc, SW_INCORRECT_DATA);
         return false;
     }
