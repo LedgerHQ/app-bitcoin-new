@@ -98,7 +98,7 @@ static int hash_output_n(dispatcher_context_t *dc,
                                                        1,
                                                        out_script,
                                                        sizeof(out_script));
-    if (out_script_len == -1) {
+    if (out_script_len < 0) {
         return -1;
     }
 
