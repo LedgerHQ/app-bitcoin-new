@@ -264,27 +264,32 @@ int musig_nonce_gen(const uint8_t *rand,
     uint8_t msg[] = {0x00};
 
     musig_nonce_hash(rand, rand_len, pk, aggpk, 0, msg, 1, NULL, 0, secnonce->k_1);
-    if (CX_OK != cx_math_modm_no_throw(secnonce->k_1, 32, secp256k1_n, 32)) return -1;
+    if (CX_OK != cx_math_modm_no_throw(secnonce->k_1, 32, secp256k1_n, 32)) goto nonce_gen_fail;
     musig_nonce_hash(rand, rand_len, pk, aggpk, 1, msg, 1, NULL, 0, secnonce->k_2);
-    if (CX_OK != cx_math_modm_no_throw(secnonce->k_2, 32, secp256k1_n, 32)) return -1;
+    if (CX_OK != cx_math_modm_no_throw(secnonce->k_2, 32, secp256k1_n, 32)) goto nonce_gen_fail;
 
     if (is_array_all_zeros(secnonce->k_1, sizeof(secnonce->k_1)) ||
         is_array_all_zeros(secnonce->k_2, sizeof(secnonce->k_2))) {
         // this can only happen with negligible probability
-        return -1;
+        goto nonce_gen_fail;
     }
 
     memcpy(secnonce->pk, pk, sizeof(secnonce->pk));
 
     point_t R_s1, R_s2;
 
-    if (CX_OK != point_mul(G, secnonce->k_1, &R_s1)) return -1;
-    if (CX_OK != point_mul(G, secnonce->k_2, &R_s2)) return -1;
+    if (CX_OK != point_mul(G, secnonce->k_1, &R_s1)) goto nonce_gen_fail;
+    if (CX_OK != point_mul(G, secnonce->k_2, &R_s2)) goto nonce_gen_fail;
 
-    if (0 > crypto_get_compressed_pubkey(R_s1.raw, pubnonce->R_s1)) return -1;
-    if (0 > crypto_get_compressed_pubkey(R_s2.raw, pubnonce->R_s2)) return -1;
+    if (0 > crypto_get_compressed_pubkey(R_s1.raw, pubnonce->R_s1)) goto nonce_gen_fail;
+    if (0 > crypto_get_compressed_pubkey(R_s2.raw, pubnonce->R_s2)) goto nonce_gen_fail;
 
     return 0;
+
+nonce_gen_fail:
+    explicit_bzero(secnonce->k_1, sizeof(secnonce->k_1));
+    explicit_bzero(secnonce->k_2, sizeof(secnonce->k_2));
+    return -1;
 }
 
 int musig_nonce_agg(const musig_pubnonce_t pubnonces[], size_t n_keys, musig_pubnonce_t *out) {
@@ -484,39 +489,48 @@ int musig_sign(musig_secnonce_t *secnonce,
     explicit_bzero(secnonce->k_1, sizeof(secnonce->k_1));
     explicit_bzero(secnonce->k_2, sizeof(secnonce->k_2));
 
+    bool err = false;
+    uint8_t bk_2[32];
+
     if (CX_OK != cx_math_cmp_no_throw(k_1, secp256k1_n, 32, &diff)) {
-        return -1;
+        err = true;
+        goto cleanup;
     }
     if (is_array_all_zeros(k_1, sizeof(k_1)) || diff >= 0) {
         PRINTF("first secnonce value is out of range\n");
-        return -1;
+        err = true;
+        goto cleanup;
     }
     if (CX_OK != cx_math_cmp_no_throw(k_2, secp256k1_n, 32, &diff)) {
-        return -1;
+        err = true;
+        goto cleanup;
     }
     if (is_array_all_zeros(k_2, sizeof(k_2)) || diff >= 0) {
         PRINTF("second secnonce value is out of range\n");
-        return -1;
+        err = true;
+        goto cleanup;
     }
 
     if (!has_even_y(&R)) {
         if (CX_OK != cx_math_sub_no_throw(k_1, secp256k1_n, k_1, 32)) {
-            return -1;
+            err = true;
+            goto cleanup;
         };
         if (CX_OK != cx_math_sub_no_throw(k_2, secp256k1_n, k_2, 32)) {
-            return -1;
+            err = true;
+            goto cleanup;
         };
     }
 
     if (CX_OK != cx_math_cmp_no_throw(sk, secp256k1_n, 32, &diff)) {
-        return -1;
+        err = true;
+        goto cleanup;
     }
     if (is_array_all_zeros(sk, 32) || diff >= 0) {
         PRINTF("secret key value is out of range\n");
-        return -1;
+        err = true;
+        goto cleanup;
     }
-
-    bool err = false;
 
     // Put together all the variables that we want to always zero out before returning.
     // As an excess of safety, we put here any variable that is (directly or indirectly) derived
@@ -574,7 +588,7 @@ int musig_sign(musig_secnonce_t *secnonce,
             break;
         }
 
-        uint8_t bk_2[32];  // b * k_2
+        // bk_2 = b * k_2
         if (CX_OK != cx_math_multm_no_throw(bk_2, b, k_2, secp256k1_n, 32)) {
             err = true;
             break;
@@ -606,6 +620,11 @@ int musig_sign(musig_secnonce_t *secnonce,
 
     // make sure to zero out any variable derived from secrets before returning
     explicit_bzero(&secrets, sizeof(secrets));
+
+cleanup:
+    explicit_bzero(k_1, sizeof(k_1));
+    explicit_bzero(k_2, sizeof(k_2));
+    explicit_bzero(bk_2, sizeof(bk_2));
 
     if (err) {
         return -1;

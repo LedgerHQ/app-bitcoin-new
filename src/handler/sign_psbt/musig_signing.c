@@ -269,20 +269,22 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
         return false;
     }
 
+    bool ret = false;
     uint8_t rand_i_j[32];
     compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
 
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
-    if (0 > musig_nonce_gen(rand_i_j,
-                            sizeof(rand_i_j),
-                            keyexpr_info->internal_pubkey.compressed_pubkey,
-                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                            &secnonce,
-                            &pubnonce)) {
+    int res = musig_nonce_gen(rand_i_j,
+                              sizeof(rand_i_j),
+                              keyexpr_info->internal_pubkey.compressed_pubkey,
+                              musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                              &secnonce,
+                              &pubnonce);
+    explicit_bzero(&secnonce, sizeof(secnonce));
+    if (0 > res) {
         PRINTF("MuSig2 nonce generation failed\n");
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
+        goto cleanup;
     }
 
     if (!yield_musig_pubnonce(dc,
@@ -293,6 +295,14 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
                               musig_per_input_info.agg_key_tweaked.compressed_pubkey,
                               keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
         PRINTF("Failed yielding MuSig2 pubnonce\n");
+        goto cleanup;
+    }
+
+    ret = true;
+
+cleanup:
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+    if (!ret) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -413,6 +423,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
                             &secnonce,
                             &pubnonce)) {
         PRINTF("MuSig2 nonce generation failed\n");
+        explicit_bzero(rand_i_j, sizeof(rand_i_j));
+        explicit_bzero(&secnonce, sizeof(secnonce));
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -464,6 +476,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     } while (false);
 
     explicit_bzero(&private_key, sizeof(private_key));
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+    explicit_bzero(&secnonce, sizeof(secnonce));
 
     if (err) {
         PRINTF("Partial signature generation failed\n");
