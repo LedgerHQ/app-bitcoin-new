@@ -2027,8 +2027,6 @@ sign_transaction(dispatcher_context_t *dc,
                  const uint8_t internal_inputs[static BITVECTOR_REAL_SIZE(MAX_N_INPUTS_CAN_SIGN)]) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
-    int key_expression_index = 0;
-
     // Iterate over all the key expressions that correspond to keys owned by us
     for (size_t i_keyexpr = 0; i_keyexpr < st->n_internal_key_expressions; i_keyexpr++) {
         keyexpr_info_t *keyexpr_info = &st->internal_key_expressions[i_keyexpr];
@@ -2081,8 +2079,6 @@ sign_transaction(dispatcher_context_t *dc,
                 }
             }
         }
-
-        ++key_expression_index;
     }
 
     return true;
