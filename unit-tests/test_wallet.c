@@ -669,6 +669,10 @@ static void test_miniscript_types(void **state) {
     // Since 'd:' is 'u' we can use it directly inside a thresh. But we can't under P2WSH.
     Test("thresh(2,dv:older(42),s:pk(@0/**),s:pk(@1/**))", "7663012ab269687c205cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac937c20d30199d74fb5a22d47b6e054e2f378cedacffcb89904a61d75d0dbd407143e65ac935287", TESTMODE_VALID | TESTMODE_NONMAL | TESTMODE_NEEDSIG | TESTMODE_P2WSH_INVALID, 12, 4);
 
+    // Regression test: thresh 'm' (non-malleable) must require all children to have 'm'.
+    // or_b(sha256,a:sha256) has e=1 but m=0 (children lack 's'), so thresh must NOT be NONMAL.
+    Test("thresh(1,or_b(sha256(e38990d0c7fc009880a9c07c23842e886c6bbdc964ce6bdd5817ad357335ee6f),a:sha256(d1ec675902ef1633427ca360b290b0b3045a0d9058ddb5e648b4c3c3224c5c68)),a:0)", "?", TESTMODE_VALID, -1, -1);
+
     // clang-format on
 }
 
