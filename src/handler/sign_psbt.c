@@ -1680,7 +1680,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
     // Sign as segwit input iff it has a witness utxo
     if (!input->has_witnessUtxo) {
         LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
-                      "Only plain key expressions are valid for legacy inputs");
+                      "Only plain key expressions for legacy inputs");
         // sign legacy P2PKH or P2SH
 
         // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
@@ -1777,7 +1777,7 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         uint8_t sighash[32];
         if (segwit_version == 0) {
             LEDGER_ASSERT(keyexpr_info->key_expression_ptr->type == KEY_EXPRESSION_NORMAL,
-                          "Only plain key expressions are valid for SegwitV0 inputs");
+                          "Only plain key expressions for SegwitV0 inputs");
             // segwitv0 inputs default to SIGHASH_ALL
             uint8_t sighash_byte =
                 input->has_sighash_type ? (uint8_t) input->sighash_type : SIGHASH_ALL;
