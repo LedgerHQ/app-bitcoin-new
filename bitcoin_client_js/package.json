@@ -34,11 +34,11 @@
     "node": ">=18.14"
   },
   "dependencies": {
-    "@bitcoinerlab/descriptors": "^3.0.5",
+    "@bitcoinerlab/descriptors": "^3.0.6",
     "@bitcoinerlab/secp256k1": "^1.2.0",
     "@ledgerhq/hw-transport": "^6.31.13",
     "bip32-path": "^0.4.2",
-    "bitcoinjs-lib": "^6.1.7"
+    "bitcoinjs-lib": "^7.0.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.26.0",

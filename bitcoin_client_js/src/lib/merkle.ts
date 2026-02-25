@@ -1,5 +1,9 @@
 import { crypto } from 'bitcoinjs-lib';
 
+function sha256AsBuffer(buf: Buffer): Buffer {
+  return Buffer.from(crypto.sha256(buf));
+}
+
 /**
  * This class implements the merkle tree used by Ledger Bitcoin app v2+,
  * which is documented at
@@ -12,7 +16,7 @@ export class Merkle {
   private h: (buf: Buffer) => Buffer;
   constructor(
     leaves: Buffer[],
-    hasher: (buf: Buffer) => Buffer = crypto.sha256
+    hasher: (buf: Buffer) => Buffer = sha256AsBuffer
   ) {
     this.leaves = leaves;
     this.h = hasher;
@@ -71,7 +75,7 @@ export class Merkle {
 
 export function hashLeaf(
   buf: Buffer,
-  hashFunction: (buf: Buffer) => Buffer = crypto.sha256
+  hashFunction: (buf: Buffer) => Buffer = sha256AsBuffer
 ): Buffer {
   return hashConcat(Buffer.from([0]), buf, hashFunction);
 }

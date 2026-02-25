@@ -37,7 +37,7 @@ export class WalletPolicy {
    * Returns the unique 32-bytes id of this wallet policy.
    */
   getId(): Buffer {
-    return crypto.sha256(this.serialize());
+    return Buffer.from(crypto.sha256(this.serialize()));
   }
 
   /**
@@ -59,7 +59,9 @@ export class WalletPolicy {
     // length of descriptor template
     buf.writeVarInt(this.descriptorTemplate.length);
     // sha256 hash of descriptor template
-    buf.writeSlice(crypto.sha256(Buffer.from(this.descriptorTemplate)));
+    buf.writeSlice(
+      Buffer.from(crypto.sha256(Buffer.from(this.descriptorTemplate)))
+    );
 
     // number of keys
     buf.writeVarInt(this.keys.length);
