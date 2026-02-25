@@ -104,7 +104,7 @@ describe("test AppClient", () => {
       repoRootPath + "/bin/app.elf",
       '--display', 'headless'
     ]);
-    
+
     sp.stdout.on('data', function(data) {
       if (process.env.LOG_SPECULOS) {
         console.log('stdout: ' + data);
@@ -230,11 +230,101 @@ describe("test AppClient", () => {
         expResult: "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28",
         walletHmac: Buffer.from("d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371", "hex")
       },
+      // additional descriptor/address vectors from python tests (not previously covered in JS)
+      {
+        policy: new WalletPolicy(
+          "Cold storage",
+          "sh(sortedmulti(2,@0/**,@1/**))",
+          [
+            "[5c9e228d/48'/1'/0'/0']tpubDEGquuorgFNb8bjh5kNZQMPtABJzoWwNm78FUmeoPkfRtoPF7JLrtoZeT3J3ybq1HmC3Rn1Q8wFQ8J5usanzups5rj7PJoQLNyvq8QbJruW",
+            "[f5acc2fd/48'/1'/0'/0']tpubDFAqEGNyad35WQAZMmPD4vgBXnjH16RGciLdWekPe4f4d5JzoHVu1PS86Sy4Tm63vDf8rfV3UjifhrRuSUDfiZj5KPffTPyZ4ZXBKvjD8jm"
+          ]
+        ),
+        change: 0,
+        addrIndex: 0,
+        expResult: "2Mx69MjHC4ViZAH1koVXPvVgaazbBCdr89j",
+        walletHmac: Buffer.from("fa73e36119324fbe4cc1ca94aa842c6261526d44112a22164bc57c3335102b04", "hex")
+      },
+      {
+        policy: new WalletPolicy(
+          "Cold storage",
+          "sh(wsh(sortedmulti(2,@0/**,@1/**)))",
+          [
+            "[76223a6e/48'/1'/0'/1']tpubDE7NQymr4AFtcJXi9TaWZtrhAdy8QyKmT4U6b9qYByAxCzoyMJ8zw5d8xVLVpbTRAEqP8pVUxjLE2vDt1rSFjaiS8DSz1QcNZ8D1qxUMx1g",
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY"
+          ]
+        ),
+        change: 0,
+        addrIndex: 0,
+        expResult: "2MxAUTJh27foYtyp9dcSxP7RgaSwkkVCHTU",
+        walletHmac: Buffer.from("1f498e7444841b883c4a63e2b88a5cad297c289d235794f8e3e17cf559ed0654", "hex")
+      },
+      {
+        policy: new WalletPolicy(
+          'Taproot foreign internal key, and our script key',
+          'tr(@0/**,pk(@1/**))',
+          [
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+          ]
+        ),
+        change: 0,
+        addrIndex: 0,
+        expResult: 'tb1pls9pp5cgcljpkjauxep03lv2c2yc2wcuua26p3ks6j2lq0vl9kjqf5rgm2',
+        walletHmac: Buffer.from(
+          'dae925660e20859ed8833025d46444483ce264fdb77e34569aabe9d590da8fb7',
+          'hex'
+        )
+      },
+      {
+        policy: new WalletPolicy(
+          "Taproot single-key or multisig 2-of-2",
+          "tr(@0/**,sortedmulti_a(2,@1/**,@2/**))",
+          [
+            "[f5acc2fd/48'/1'/0'/1']tpubDFAqEGNyad35YgH8zxvxFZqNUoPtr5mDojs7wzbXQBHTZ4xHeVXG6w2HvsKvjBpaRpTmjYDjdPg5w2c6Wvu8QBkyMDrmBWdCyqkDM7reSsY",
+            "[76223a6e/48'/1'/0'/2']tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK"
+          ]
+        ),
+        change: 0,
+        addrIndex: 0,
+        expResult: "tb1pdzk72dnvz3246474p4m5a97u43h6ykt2qcjrrhk6y0fkg8hx2mvswwgvv7",
+        walletHmac: Buffer.from("a3f31e9d7b70d1d967413488bae136a8b6c7afd1de0524deb6cf74f5c509b9ab", "hex")
+      },
+      {
+        policy: new WalletPolicy(
+          "Musig in keypath",
+          "tr(musig(@0,@1)/**)",
+          [
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm"
+          ]
+        ),
+        change: 0,
+        addrIndex: 3,
+        expResult: "tb1pc87la0ksvw4pfq6qc3gn9en33kx7s9rx4c4epy578kfjsdjv6mks7u7dgn",
+        walletHmac: Buffer.from("05b7b4bccd3188effc24de8fd67e83231d8486772800884db0d81bad19f2be3e", "hex")
+      },
+      {
+        policy: new WalletPolicy(
+          "Musig in script path",
+          "tr(@0/**,pk(musig(@1,@2)/**))",
+          [
+            "tpubD6NzVbkrYhZ4WLczPJWReQycCJdd6YVWXubbVUFnJ5KgU5MDQrD998ZJLSmaB7GVcCnJSDWprxmrGkJ6SvgQC6QAffVpqSvonXmeizXcrkN",
+            "[f5acc2fd/44'/1'/0']tpubDCwYjpDhUdPGP5rS3wgNg13mTrrjBuG8V9VpWbyptX6TRPbNoZVXsoVUSkCjmQ8jJycjuDKBb9eataSymXakTTaGifxR6kmVsfFehH1ZgJT",
+            "tpubDCwYjpDhUdPGQWG6wG6hkBJuWFZEtrn7j3xwG3i8XcQabcGC53xWZm1hSXrUPFS5UvZ3QhdPSjXWNfWmFGTioARHuG5J7XguEjgg7p8PxAm"
+          ]
+        ),
+        change: 0,
+        addrIndex: 3,
+        expResult: "tb1pa423acwcjc8jgt36muavyun8e2hz3t5qwptsr3wr8afmdfk3wchswf9ntp",
+        walletHmac: Buffer.from("b22397b717949ede59c3c9f31c987acda098471211f754b6633c87054c1efb51", "hex")
+      },
     ];
 
     for (const { policy, change, addrIndex, expResult, walletHmac } of testcases) {
       const result = await app.getWalletAddress(policy, walletHmac || null, change, addrIndex, false);
-      expect(result).toEqual(expResult);  
+      expect(result).toEqual(expResult);
     }
   });
 
