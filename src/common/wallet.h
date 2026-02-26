@@ -1,14 +1,16 @@
 #pragma once
 
-#include <stdint.h>
 #include <assert.h>
+#include <stdint.h>
 
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
 #include "ledger_assert.h"
 
-#include "common/bip32.h"
-#include "common/buffer.h"
-#include "../constants.h"
-#include "../crypto.h"
+/* Local headers */
+#include "constants.h"
+#include "crypto.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "os.h"
@@ -86,7 +88,7 @@
 #define MAX_TAPTREE_POLICY_DEPTH 9
 
 typedef struct {
-    uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
+    uint32_t master_key_derivation[MAX_BIP388_XPUB_DERIVATION_STEPS];
     uint8_t master_key_fingerprint[4];
     uint8_t master_key_derivation_len;
     uint8_t has_key_origin;

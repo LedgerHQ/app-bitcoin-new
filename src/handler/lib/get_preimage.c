@@ -1,10 +1,10 @@
 #include <string.h>
 
-#include "../../boilerplate/sw.h"
+/* Local headers */
+#include "client_commands.h"
+#include "crypto.h"
 #include "stream_preimage.h"
-
-#include "../../crypto.h"
-#include "../client_commands.h"
+#include "sw.h"
 
 int call_get_preimage(dispatcher_context_t *dispatcher_context,
                       const uint8_t hash[static 32],

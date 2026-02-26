@@ -15,10 +15,12 @@
  *  limitations under the License.
  *****************************************************************************/
 
+/* SDK headers */
 #include "nbgl_use_case.h"
 
-#include "../globals.h"
-#include "./display.h"
+/* Local headers */
+#include "display.h"
+#include "globals.h"
 #include "menu.h"
 
 #define SETTING_INFO_NB 3

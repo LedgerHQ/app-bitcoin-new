@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "./display_utils.h"
+#include "display_utils.h"
 
 static size_t n_digits(uint64_t number) {
     size_t count = 0;

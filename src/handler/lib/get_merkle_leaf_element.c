@@ -1,5 +1,6 @@
 #include "get_merkle_leaf_element.h"
 
+/* Local headers */
 #include "get_merkle_leaf_hash.h"
 #include "get_merkle_preimage.h"
 

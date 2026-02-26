@@ -1,9 +1,10 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
-#include "../../common/wallet.h"
-#include "../../handler/sign_psbt/sign_psbt_cache.h"
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
+#include "sign_psbt_cache.h"
+#include "wallet.h"
 
 /**
  * TODO

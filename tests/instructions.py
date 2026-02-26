@@ -60,14 +60,14 @@ def message_instruction_reject(model: Firmware) -> Instructions:
     return instructions
 
 
-def pubkey_instruction_approve(model: Firmware) -> Instructions:
+def pubkey_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
+        instructions.new_request("Approve", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.status_dismiss("approved")
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.status_dismiss("approved", save_screenshot=save_screenshot)
     return instructions
 
 

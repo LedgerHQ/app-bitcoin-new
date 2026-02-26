@@ -2,11 +2,13 @@
 
 #include <stdint.h>
 
+/* SDK headers */
 #include "ux.h"
 
-#include "boilerplate/io.h"
+/* Local headers */
 #include "commands.h"
 #include "constants.h"
+#include "io_ext.h"
 
 /**
  * Global buffer for interactions between SE and MCU.

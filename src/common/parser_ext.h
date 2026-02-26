@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 #include <string.h>
+
+/* SDK headers */
 #include "buffer.h"
 
 typedef struct {

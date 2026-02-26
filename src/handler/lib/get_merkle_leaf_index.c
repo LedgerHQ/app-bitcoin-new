@@ -1,9 +1,9 @@
 #include <string.h>
 
-#include "../../boilerplate/sw.h"
+/* Local headers */
+#include "client_commands.h"
 #include "get_merkle_leaf_hash.h"
-
-#include "../client_commands.h"
+#include "sw.h"
 
 int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
                                size_t size,

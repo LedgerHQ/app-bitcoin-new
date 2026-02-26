@@ -1,9 +1,10 @@
 #include <string.h>
 
 #include "check_merkle_tree_sorted.h"
-#include "get_merkle_leaf_element.h"
 
-#include "../../common/merkle.h"
+/* Local headers */
+#include "get_merkle_leaf_element.h"
+#include "merkle.h"
 
 static int compare_byte_arrays(const uint8_t array1[],
                                size_t array1_len,

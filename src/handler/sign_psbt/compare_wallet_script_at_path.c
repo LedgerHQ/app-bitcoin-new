@@ -3,10 +3,12 @@
 
 #include "compare_wallet_script_at_path.h"
 
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/policy.h"
+/* SDK headers */
+#include "read.h"
 
-#include "../../common/read.h"
+/* Local headers */
+#include "get_merkleized_map_value.h"
+#include "policy.h"
 
 int compare_wallet_script_at_path(dispatcher_context_t *dispatcher_context,
                                   sign_psbt_cache_t *sign_psbt_cache,

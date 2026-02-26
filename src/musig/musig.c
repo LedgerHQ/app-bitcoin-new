@@ -1,11 +1,13 @@
 #include <stdbool.h>
 
-#include "cx_errors.h"
-
 #include "musig.h"
 
-#include "../crypto.h"
-#include "../secp256k1.h"
+/* SDK headers */
+#include "cx_errors.h"
+
+/* Local headers */
+#include "crypto.h"
+#include "secp256k1.h"
 
 static const uint8_t BIP0327_keyagg_coeff_tag[] =
     {'K', 'e', 'y', 'A', 'g', 'g', ' ', 'c', 'o', 'e', 'f', 'f', 'i', 'c', 'i', 'e', 'n', 't'};

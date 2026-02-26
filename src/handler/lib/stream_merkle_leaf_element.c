@@ -1,6 +1,7 @@
 
 #include "stream_merkle_leaf_element.h"
 
+/* Local headers */
 #include "get_merkle_leaf_hash.h"
 #include "stream_preimage.h"
 

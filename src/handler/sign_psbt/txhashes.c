@@ -1,12 +1,12 @@
 #include "txhashes.h"
+
+/* Local headers */
 #include "amount_from_psbt.h"
-
-#include "../../common/psbt.h"
-#include "../../error_codes.h"
-
-#include "../lib/get_merkleized_map.h"
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/stream_merkleized_map_value.h"
+#include "error_codes.h"
+#include "get_merkleized_map.h"
+#include "get_merkleized_map_value.h"
+#include "psbt.h"
+#include "stream_merkleized_map_value.h"
 
 /* BIP0341 tags for computing the tagged hashes when computing he sighash */
 static const uint8_t BIP0341_sighash_tag[] = {'T', 'a', 'p', 'S', 'i', 'g', 'h', 'a', 's', 'h'};

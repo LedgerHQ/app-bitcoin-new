@@ -1,5 +1,7 @@
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
+
+/* Local headers */
 #include "printf.h"
 
 #pragma GCC diagnostic ignored "-Wunused-function"

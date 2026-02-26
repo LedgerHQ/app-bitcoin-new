@@ -1,6 +1,5 @@
 /*****************************************************************************
- *   Ledger App Bitcoin.
- *   (c) 2025 Ledger SAS.
+ *   (c) 2026 Ledger SAS.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -14,26 +13,35 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  *****************************************************************************/
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
-#include <stddef.h>   // size_t
-#include <stdint.h>   // uint*_t
-#include <stdbool.h>  // bool
+#include "buffer_ext.h"
 
-#include "apdu_parser.h"
-#include "offsets.h"
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
+#include "read.h"
+#include "varint.h"
+#include "write.h"
 
-bool apdu_parser(command_t *cmd, uint8_t *buf, size_t buf_len) {
-    // Check minimum length and Lc field of APDU command
-    if (buf_len < OFFSET_CDATA || buf_len - OFFSET_CDATA != buf[OFFSET_LC]) {
-        return false;
+void *buffer_alloc(buffer_t *buffer, size_t size, bool aligned) {
+    size_t padding_size = 0;
+
+    if (aligned) {
+        uint32_t d = (uint32_t) (buffer->ptr + buffer->offset) % 4;
+        if (d != 0) {
+            padding_size = 4 - d;
+        }
     }
 
-    cmd->cla = buf[OFFSET_CLA];
-    cmd->ins = buf[OFFSET_INS];
-    cmd->p1 = buf[OFFSET_P1];
-    cmd->p2 = buf[OFFSET_P2];
-    cmd->lc = buf[OFFSET_LC];
-    cmd->data = (buf[OFFSET_LC] > 0) ? buf + OFFSET_CDATA : NULL;
+    if (!buffer_can_read(buffer, padding_size + size)) {
+        return NULL;
+    }
 
-    return true;
+    void *result = (uint8_t *) (buffer->ptr + buffer->offset) + padding_size;
+    buffer_seek_cur(buffer, padding_size + size);
+    return result;
 }

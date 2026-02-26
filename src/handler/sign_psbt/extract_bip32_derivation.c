@@ -1,12 +1,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "./extract_bip32_derivation.h"
+#include "extract_bip32_derivation.h"
 
-#include "../lib/stream_merkle_leaf_element.h"
+/* SDK headers */
+#include "read.h"
+#include "varint.h"
 
-#include "../../common/psbt.h"
-#include "../../common/read.h"
+/* Local headers */
+#include "psbt.h"
+#include "stream_merkle_leaf_element.h"
 
 typedef struct {
     int psbt_key_type;

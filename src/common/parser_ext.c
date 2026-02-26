@@ -1,7 +1,8 @@
 #include <stdio.h>
 
-#include "parser.h"
+#include "parser_ext.h"
 
+/* SDK headers */
 #include "read.h"
 
 size_t dbuffer_get_length(buffer_t *buffers[2]) {

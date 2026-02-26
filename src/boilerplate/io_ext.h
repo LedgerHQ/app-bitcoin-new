@@ -2,10 +2,12 @@
 
 #include <stdint.h>
 
+/* SDK headers */
+#include "buffer.h"
 #include "ux.h"
-#include "os_io_seproxyhal.h"
 
-#include "common/buffer.h"
+/* Local headers */
+#include "os_io_seproxyhal.h"
 
 /**
  * IO callback called when an interrupt based channel has received

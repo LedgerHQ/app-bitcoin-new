@@ -1,19 +1,21 @@
 #pragma once
 
-#include <stdbool.h>  // bool
-#include "../boilerplate/dispatcher.h"
+#include <stdbool.h>
 
-#include "../common/wallet.h"
-#include "./display.h"
-#include "./display_utils.h"
-#include "../constants.h"
-#include "../globals.h"
-#include "../boilerplate/io.h"
-#include "../boilerplate/sw.h"
-#include "../common/bip32.h"
-#include "../common/format.h"
-#include "../common/script.h"
-#include "../constants.h"
+/* SDK headers */
+#include "bip32.h"
+#include "format.h"
+
+/* Local headers */
+#include "constants.h"
+#include "dispatcher.h"
+#include "display.h"
+#include "display_utils.h"
+#include "globals.h"
+#include "io_ext.h"
+#include "script.h"
+#include "sw.h"
+#include "wallet.h"
 
 #define MESSAGE_CHUNK_SIZE 64  // Protocol specific
 // Displayed message length - if the message is too long we will not display it

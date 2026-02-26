@@ -1,17 +1,20 @@
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
 
-#include "../common/base58.h"
-#include "../common/bip32.h"
-#include "../common/buffer.h"
-#include "../common/script.h"
-#include "../common/segwit_addr.h"
-#include "../common/wallet.h"
+#include "wallet.h"
 
-#include "../boilerplate/sw.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "buffer.h"
 
-#include "../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "debug.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "sw.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
@@ -336,7 +339,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
         // read all the given derivation steps
         out->master_key_derivation_len = 0;
         while (consume_character(buffer, '/')) {
-            if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
+            if (out->master_key_derivation_len >= MAX_BIP388_XPUB_DERIVATION_STEPS) {
                 return WITH_ERROR(-1, "Too many derivation steps");
             }
 

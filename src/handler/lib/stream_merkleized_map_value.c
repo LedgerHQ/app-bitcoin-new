@@ -1,4 +1,6 @@
 #include "stream_merkleized_map_value.h"
+
+/* Local headers */
 #include "get_merkle_leaf_index.h"
 #include "stream_merkle_leaf_element.h"
 

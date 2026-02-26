@@ -15,18 +15,19 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>   // uint*_t
-#include <string.h>   // memset, explicit_bzero
-#include <stdbool.h>  // bool
-
-#include "buffer.h"
-#include "../crypto.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "merkle.h"
 
-#include "../debug-helpers/debug.h"
-
+/* SDK headers */
+#include "buffer.h"
 #include "ledger_assert.h"
+
+/* Local headers */
+#include "crypto.h"
+#include "debug.h"
 
 void merkle_compute_element_hash(const uint8_t *in,
                                  size_t in_len,
