@@ -22,10 +22,10 @@
 
 /* SDK headers */
 #include "buffer.h"
+#include "io.h"
 
 /* Local headers */
 #include "constants.h"
-#include "globals.h"
 #include "io_ext.h"
 #include "sw.h"
 
@@ -52,7 +52,7 @@ static void finalize_response(uint16_t sw) {
 }
 
 static void send_response() {
-    io_confirm_response();
+    io_send_response();
 }
 
 static void set_ui_dirty() {

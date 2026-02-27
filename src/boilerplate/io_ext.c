@@ -25,13 +25,13 @@
 #include "nbgl_touch.h"
 #include "nbgl_use_case.h"
 #include "os.h"
+#include "swap.h"
 #include "ux.h"
 #include "write.h"
 
 /* Local headers */
 #include "dispatcher.h"
 #include "display.h"
-#include "globals.h"
 #include "sw.h"
 #include "swap_globals.h"
 
@@ -80,89 +80,32 @@ void io_reset_timeouts() {
 void io_show_processing_screen() {
     if (!G_was_processing_screen_shown) {
         G_was_processing_screen_shown = true;
-        if (!G_swap_state.called_from_swap) {
+        if (!G_called_from_swap) {
             nbgl_useCaseSpinner(ui_get_processing_screen_text());
         }
     }
 }
 
-uint8_t io_event(uint8_t channel) {
-    UNUSED(channel);
+// This function can be used to declare a callback to SEPROXYHAL_TAG_TICKER_EVENT in the application
+void app_ticker_event_callback(void) {
+    ++G_ticks;
 
-    switch (G_io_seproxyhal_spi_buffer[0]) {
-        case SEPROXYHAL_TAG_BUTTON_PUSH_EVENT:
-            UX_BUTTON_PUSH_EVENT(G_io_seproxyhal_spi_buffer);
-            break;
-        case SEPROXYHAL_TAG_STATUS_EVENT:
-            if (G_io_apdu_media == IO_APDU_MEDIA_USB_HID &&  //
-                !(U4BE(G_io_seproxyhal_spi_buffer, 3) &      //
-                  SEPROXYHAL_TAG_STATUS_EVENT_FLAG_USB_POWERED)) {
-                THROW(EXCEPTION_IO_RESET);
-            }
-            __attribute__((fallthrough));
-        case SEPROXYHAL_TAG_DISPLAY_PROCESSED_EVENT:
-            UX_DEFAULT_EVENT();
-            break;
-#ifdef SCREEN_SIZE_WALLET
-        case SEPROXYHAL_TAG_FINGER_EVENT:
-            UX_FINGER_EVENT(G_io_seproxyhal_spi_buffer);
-            break;
-#endif  // SCREEN_SIZE_WALLET
-        case SEPROXYHAL_TAG_TICKER_EVENT:
-            ++G_ticks;
+    if (G_is_timeout_active.processing &&
+        (uint16_t) (G_ticks - G_processing_timeout_start_tick) >= PROCESSING_TIMEOUT_TICKS) {
+        io_clear_processing_timeout();
 
-            if (G_is_timeout_active.processing &&
-                G_ticks - G_processing_timeout_start_tick >= PROCESSING_TIMEOUT_TICKS) {
-                io_clear_processing_timeout();
-
-                io_show_processing_screen();
-            }
-
-            if (G_is_timeout_active.interruption &&
-                G_ticks - G_interruption_timeout_start_tick >= INTERRUPTION_TIMEOUT_TICKS) {
-                io_clear_interruption_timeout();
-
-                // TODO: It would be better to have the dispatcher be notified somehow.
-                //       This would require some tampering with the io_exchange in
-                //       process_interruption.
-                THROW(EXCEPTION_IO_RESET);
-            }
-
-            UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {});
-            break;
-        default:
-            UX_DEFAULT_EVENT();
-            break;
+        io_show_processing_screen();
     }
 
-    if (!io_seproxyhal_spi_is_status_sent()) {
-        io_seproxyhal_general_status();
+    if (G_is_timeout_active.interruption &&
+        (uint16_t) (G_ticks - G_interruption_timeout_start_tick) >= INTERRUPTION_TIMEOUT_TICKS) {
+        io_clear_interruption_timeout();
+
+        // TODO: It would be better to have the dispatcher be notified somehow.
+        //       This would require some tampering with the io_exchange in
+        //       process_interruption.
+        THROW(EXCEPTION_IO_RESET);
     }
-
-    return 1;
-}
-
-uint16_t io_exchange_al(uint8_t channel, uint16_t tx_len) {
-    switch (channel & ~(IO_FLAGS)) {
-        case CHANNEL_KEYBOARD:
-            break;
-        case CHANNEL_SPI:
-            if (tx_len) {
-                io_seproxyhal_spi_send(G_io_apdu_buffer, tx_len);
-
-                if (channel & IO_RESET_AFTER_REPLIED) {
-                    halt();
-                }
-
-                return 0;
-            } else {
-                return io_seproxyhal_spi_recv(G_io_apdu_buffer, sizeof(G_io_apdu_buffer), 0);
-            }
-        default:
-            THROW(INVALID_PARAMETER);
-    }
-
-    return 0;
 }
 
 void io_add_to_response(const void *rdata, size_t rdata_len) {
@@ -188,19 +131,7 @@ void io_finalize_response(uint16_t sw) {
     }
 }
 
-void io_reset_response() {
-    G_output_len = 0;
-}
-
-void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw) {
-    io_reset_response();
-    if (rdata != NULL) {
-        io_add_to_response(rdata, rdata_len);
-    }
-    io_finalize_response(sw);
-}
-
-int io_confirm_response() {
+int io_send_response() {
     int ret;
 
     ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
@@ -209,11 +140,8 @@ int io_confirm_response() {
     return ret;
 }
 
-int io_send_response(void *rdata, size_t rdata_len, uint16_t sw) {
-    io_set_response(rdata, rdata_len, sw);
-    return io_confirm_response();
-}
-
 int io_send_sw(uint16_t sw) {
-    return io_send_response(NULL, 0, sw);
+    G_output_len = 0;
+    io_finalize_response(sw);
+    return io_send_response();
 }

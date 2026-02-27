@@ -7,6 +7,7 @@
 
 /* Local headers */
 #include "client_commands.h"
+#include "commands.h"
 #include "get_merkleized_map_value.h"
 #include "policy.h"
 #include "psbt.h"

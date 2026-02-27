@@ -22,6 +22,7 @@
 #include "bip32.h"
 #include "buffer.h"
 #include "read.h"
+#include "swap.h"
 
 /* Local headers */
 #include "client_commands.h"
@@ -155,7 +156,7 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
     }
 
     // Swap feature: check that the wallet policy is a default one
-    if (G_swap_state.called_from_swap && !is_wallet_default) {
+    if (G_called_from_swap && !is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);

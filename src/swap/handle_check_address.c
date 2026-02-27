@@ -1,10 +1,9 @@
 #include <string.h>
 
-#include "handle_check_address.h"
-
 /* SDK headers */
 #include "bip32_path.h"
 #include "os.h"
+#include "swap_lib_calls.h"
 
 /* Local headers */
 #include "crypto.h"
@@ -95,26 +94,27 @@ static int os_strcmp(const char* s1, const char* s2) {
     return memcmp(s1, s2, size);
 }
 
-int handle_check_address(check_address_parameters_t* params) {
+void swap_handle_check_address(check_address_parameters_t* params) {
     unsigned char compressed_public_key[33];
     PRINTF("Params on the address %d\n", (unsigned int) params);
     PRINTF("Address to check %s\n", params->address_to_check);
     PRINTF("Inside handle_check_address\n");
+    params->result = 0;
     if (params->address_to_check == 0) {
         PRINTF("Address to check == 0\n");
-        return 0;
+        return;
     }
     bip32_path_t path;
     if (!parse_serialized_path(&path,
                                params->address_parameters + 1,
                                params->address_parameters_length - 1)) {
         PRINTF("Can't parse path\n");
-        return false;
+        return;
     }
 
     if (CX_OK !=
         crypto_get_compressed_pubkey_at_path(path.path, path.length, compressed_public_key, NULL)) {
-        return 0;
+        return;
     }
     char address[MAX_ADDRESS_LENGTH_STR + 1];
     if (!get_address_from_compressed_public_key(params->address_parameters[0],
@@ -125,12 +125,12 @@ int handle_check_address(check_address_parameters_t* params) {
                                                 address,
                                                 sizeof(address))) {
         PRINTF("Can't create address from given public key\n");
-        return 0;
+        return;
     }
     if (os_strcmp(address, params->address_to_check) != 0) {
         PRINTF("Addresses don't match\n");
-        return 0;
+        return;
     }
     PRINTF("Addresses match\n");
-    return 1;
+    params->result = 1;
 }

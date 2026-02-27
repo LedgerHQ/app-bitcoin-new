@@ -10,6 +10,11 @@
 #include "os_io_seproxyhal.h"
 
 /**
+ * Global variable with the length of APDU response to send back.
+ */
+extern uint16_t G_output_len;
+
+/**
  * IO callback called when an interrupt based channel has received
  * data to be processed.
  *
@@ -58,48 +63,39 @@ void io_reset_timeouts();
 void io_show_processing_screen();
 
 /**
- * TODO: docs
- */
-void io_reset_response();
-
-/**
- * TODO: docs
+ * Append data to the APDU response buffer (G_io_apdu_buffer).
+ *
+ * @param[in] rdata
+ *   Pointer to the data to append.
+ * @param[in] rdata_len
+ *   Length of data to append.
  */
 void io_add_to_response(const void *rdata, size_t rdata_len);
 
 /**
- * TODO: docs
+ * Finalize the APDU response by appending the status word.
+ * Must be called after all io_add_to_response() calls are done.
+ *
+ * @param[in] sw
+ *   Status word of APDU response.
  */
 void io_finalize_response(uint16_t sw);
 
-/* TODO: docs */
-void io_set_response(const void *rdata, size_t rdata_len, uint16_t sw);
-
-/* TODO: docs */
-int io_confirm_response(void);
-
 /**
- * Send APDU response (response data + status word) by filling G_io_apdu_buffer.
- *
- * @param[in] rdata
- *   Pointer to the response.
- * @param[in] rdata_len
- *   Length of response.
- * @param[in] sw
- *   Status word of APDU response.
+ * Send the previously prepared APDU response via io_exchange.
+ * The response must have been built with io_add_to_response()/io_finalize_response()
+ * before calling this function.
  *
  * @return zero or positive integer if success, -1 otherwise.
- *
  */
-int io_send_response(void *rdata, size_t rdata_len, uint16_t sw);
+int io_send_response(void);
 
 /**
- * Send APDU response (only status word) by filling G_io_apdu_buffer.
+ * Send APDU response containing only a status word (no data).
  *
  * @param[in] sw
  *   Status word of APDU response.
  *
  * @return zero or positive integer if success, -1 otherwise.
- *
  */
 int io_send_sw(uint16_t sw);

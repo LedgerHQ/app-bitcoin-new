@@ -19,11 +19,11 @@ ifeq ($(BOLOS_SDK),)
 $(error Environment variable BOLOS_SDK is not set)
 endif
 
-# Application allowed derivation curves.
-CURVE_APP_LOAD_PARAMS = secp256k1
+include $(BOLOS_SDK)/Makefile.target
 
-# Allowed SLIP21 paths
-PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
+########################################
+#        Mandatory configuration       #
+########################################
 
 # Application version
 APPVERSION_M = 2
@@ -37,12 +37,22 @@ else
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-$(strip $(APPVERSION_SUFFIX))"
 endif
 
-# If set, the app will automatically approve all requests without user interaction. Useful for performance tests.
-# It is critical that no such app is ever deployed in production.
-AUTOAPPROVE_FOR_PERF_TESTS ?= 0
-ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
-    DEFINES += HAVE_AUTOAPPROVE_FOR_PERF_TESTS
-endif
+# Application source files
+APP_SOURCE_PATH += src
+
+# Application icons following guidelines:
+# https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
+ICON_NANOX = icons/nanox_app_bitcoin.gif
+ICON_NANOSP = icons/nanox_app_bitcoin.gif
+ICON_STAX = icons/stax_app_bitcoin.gif
+ICON_FLEX = icons/flex_app_bitcoin.gif
+ICON_APEX_P = icons/apex_p_app_bitcoin.png
+
+# Application allowed derivation curves.
+CURVE_APP_LOAD_PARAMS = secp256k1
+
+# Allowed SLIP21 paths
+PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
@@ -53,17 +63,8 @@ ifndef COIN
 COIN=bitcoin_testnet
 endif
 
-########################################
-#     Application custom permissions   #
-########################################
-HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
-HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
-HAVE_APPLICATION_FLAG_LIBRARY = 1
-
+# Coin-specific configuration
 ifeq ($(COIN),bitcoin_testnet)
-    # Application allowed derivation paths (testnet) + exception for Electrum + BIP-45 whole tree
-    PATH_APP_LOAD_PARAMS = "*/1'" "4541509'" "45'"
-
     # Bitcoin testnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
     DEFINES   += BIP44_COIN_TYPE=1
@@ -71,19 +72,11 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_P2SH_VERSION=196
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"tb\"
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
-
     APPNAME = "Bitcoin Test"
+    # Application allowed derivation paths (testnet) + exception for Electrum + BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS = "*/1'" "4541509'" "45'"
 
 else ifeq ($(COIN),bitcoin)
-    # Application allowed derivation paths (mainnet) + exception for Electrum + BIP-45 whole tree
-    PATH_APP_LOAD_PARAMS = "*/0'" "4541509'" "45'"
-
-    # the version for performance tests automatically approves all requests
-    # there is no reason to ever compile the mainnet app with this flag
-    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
-        $(error Use testnet app for performance tests)
-    endif
-
     # Bitcoin mainnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
     DEFINES   += BIP44_COIN_TYPE=0
@@ -91,20 +84,11 @@ else ifeq ($(COIN),bitcoin)
     DEFINES   += COIN_P2SH_VERSION=5
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
-
     APPNAME = "Bitcoin"
+    # Application allowed derivation paths (mainnet) + exception for Electrum + BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS = "*/0'" "4541509'" "45'"
 
 else ifeq ($(COIN),bitcoin_recovery)
-    # Application allowed derivation paths (all paths are permitted).
-    PATH_APP_LOAD_PARAMS = ""
-    HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
-
-    # the version for performance tests automatically approves all requests
-    # there is no reason to ever compile the mainnet app with this flag
-    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
-        $(error Use testnet app for performance tests)
-    endif
-
     # Bitcoin mainnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
     DEFINES   += BIP44_COIN_TYPE=0
@@ -113,8 +97,10 @@ else ifeq ($(COIN),bitcoin_recovery)
     DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
     DEFINES   += BITCOIN_RECOVERY
-
     APPNAME = "Bitcoin Recovery"
+    # Application allowed derivation paths (all paths are permitted).
+    PATH_APP_LOAD_PARAMS = ""
+    HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
@@ -128,20 +114,19 @@ ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
   endif
 endif
 
-ENABLE_NBGL_FOR_NANO_DEVICES = 1
-
-# Application icons following guidelines:
-# https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
-ICON_NANOX = icons/nanox_app_bitcoin.gif
-ICON_NANOSP = icons/nanox_app_bitcoin.gif
-ICON_STAX = icons/stax_app_bitcoin.gif
-ICON_FLEX = icons/flex_app_bitcoin.gif
-ICON_APEX_P = icons/apex_p_app_bitcoin.png
+########################################
+#     Application custom permissions   #
+########################################
+# See SDK `include/appflags.h` for the purpose of each permission
+HAVE_APPLICATION_FLAG_GLOBAL_PIN = 1
+HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
+HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ########################################
 # Application communication interfaces #
 ########################################
 ENABLE_BLUETOOTH = 1
+ENABLE_NBGL_FOR_NANO_DEVICES = 1
 
 ########################################
 #         NBGL custom features         #
@@ -149,19 +134,44 @@ ENABLE_BLUETOOTH = 1
 ENABLE_NBGL_QRCODE = 1
 
 ########################################
+#       SWAP FEATURE FLAG      	       #
+# This flag enables the swap feature   #
+# in the Boilerplate application.      #
+########################################
+# Testing only SWAP flag
+# ENABLE_TESTING_SWAP = 1
+# Production enabled SWAP flag
+ENABLE_SWAP = 1
+
+########################################
 #          Features disablers          #
 ########################################
 # Don't use standard app file to avoid conflicts for now
-DISABLE_STANDARD_APP_FILES = 1
+#DISABLE_STANDARD_APP_FILES = 1
 
 # Don't use default IO_SEPROXY_BUFFER_SIZE to use another
 # value for NANOS for an unknown reason.
-DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
+#DISABLE_DEFAULT_IO_SEPROXY_BUFFER_SIZE = 1
 
+########################################
+#        Application defines           #
+########################################
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
-
-DEFINES   += IO_SEPROXYHAL_BUFFER_SIZE_B=300
+# If set, the app will automatically approve all requests without user interaction. Useful for performance tests.
+# It is critical that no such app is ever deployed in production.
+AUTOAPPROVE_FOR_PERF_TESTS ?= 0
+ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+    DEFINES += HAVE_AUTOAPPROVE_FOR_PERF_TESTS
+    # the version for performance tests automatically approves all requests
+    # there is no reason to ever compile the mainnet app with this flag
+    ifeq ($(COIN),bitcoin)
+        $(error Use testnet app for performance tests)
+    endif
+    ifeq ($(COIN),bitcoin_recovery)
+        $(error Use testnet app for performance tests)
+    endif
+endif
 
 # debugging helper functions and macros
 CFLAGS    += -include debug-helpers/debug.h
@@ -175,21 +185,6 @@ endif
 
 # Needed to be able to include the definition of G_cx
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
-INCLUDES_PATH += $(BOLOS_SDK)/lib_standard_app
-
-# Application source files
-APP_SOURCE_PATH += src
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/base58.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/bip32.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/buffer.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/format.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/parser.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/read.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/varint.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/write.c
-
-# Allow usage of function from lib_standard_app/crypto_helpers.c
-APP_SOURCE_FILES += ${BOLOS_SDK}/lib_standard_app/crypto_helpers.c
 
 ########################################
 #          Features enablers           #
