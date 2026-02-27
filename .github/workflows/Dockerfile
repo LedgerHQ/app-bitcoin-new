@@ -1,5 +1,4 @@
 # An image derived from ledgerhq/speculos but also containing the bitcoin-core binaries
-# compiled from the master branch
 
 # ==========================================
 # STAGE 1: Builder
@@ -31,10 +30,11 @@ FROM ghcr.io/ledgerhq/speculos:latest
 # Copy the compiled binaries from Stage 1
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
-# 3. Clean up the runtime dependencies.
+# 3. Clean up the runtime dependencies, but KEEP build-essential for pip!
 RUN apt-get update -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    curl git libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev && \
+    curl git libminiupnpc-dev libnatpmp-dev libevent-dev libzmq3-dev \
+    build-essential python3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Add bitcoin binaries to path
