@@ -21,7 +21,7 @@
  * @param policy_map_bytes Pointer to an array of bytes that will be used for the parsed abstract
  * syntax tree
  * @param policy_map_bytes_len Length of policy_map_bytes in bytes.
- * @return The memory size of the parsed descriotor template on success, a negative number in case
+ * @return The memory size of the parsed descriptor template on success, a negative number in case
  * of error.
  */
 // TODO: we should distinguish actual errors from just "policy too big to fit in memory"
@@ -46,7 +46,7 @@ typedef struct {
     int wallet_version;  // The wallet policy version, either WALLET_POLICY_VERSION_V1 or
                          // WALLET_POLICY_VERSION_V2
     const uint8_t
-        *keys_merkle_root;  // The Merkle root of the tree of key informations in the policy
+        *keys_merkle_root;  // The Merkle root of the tree of key information in the policy
     uint32_t n_keys;        // The number of key information elements in the policy
     size_t address_index;   // The address index to use in the derivation
     bool change;            // whether a change address or a receive address is derived

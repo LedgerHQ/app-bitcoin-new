@@ -308,9 +308,9 @@ typedef enum {
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
 
 /** Structure representing a key expression.
- * In V1, it's the index of a key in the key informations array, which includes the final /** step.
- * In V2, it's the index of a key in the key informations array, plus the two numbers a, b in the
- * /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations array don't have extra
+ * In V1, it's the index of a key in the key information array, which includes the final /** step.
+ * In V2, it's the index of a key in the key information array, plus the two numbers a, b in the
+ * /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key information array don't have extra
  * derivation steps.
  */
 #pragma GCC diagnostic pop

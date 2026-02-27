@@ -417,7 +417,7 @@ execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, 
 
 // p2pkh                     ==> legacy address (start with 1 on mainnet, m or n on testnet)
 // p2sh (also nested segwit) ==> legacy script  (start with 3 on mainnet, 2 on testnet)
-// p2wpkh or p2wsh           ==> bech32         (sart with bc1 on mainnet, tb1 on testnet)
+// p2wpkh or p2wsh           ==> bech32         (start with bc1 on mainnet, tb1 on testnet)
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
@@ -1163,7 +1163,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         out[1] = 32;  // PUSH 32 bytes
 
         // uint8_t h[32];
-        uint8_t *h = out + 2;  // hack: re-use the output array to save memory
+        uint8_t *h = out + 2;  // hack: reuse the output array to save memory
 
         int h_length = 0;
         if (!isnull_policy_node_tree(&tr_policy->tree)) {

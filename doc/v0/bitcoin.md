@@ -62,7 +62,7 @@ Once the user approves, the `REGISTER_WALLET` returns to the client a 32-byte HM
 | 0xE000 | `SW_INTERRUPTED_EXECUTION`   | The command is interrupted, and requires the client's response |
 | 0x9000 | `SW_OK`                      | Success |
 
-<!-- TODO: add an introduction section explaining the comand reference notations (e.g. the Bitcoin style varint) -->
+<!-- TODO: add an introduction section explaining the command reference notations (e.g. the Bitcoin style varint) -->
 
 ## Commands
 
@@ -103,7 +103,7 @@ The paths defined in [BIP-44](https://github.com/bitcoin/bips/blob/master/bip-00
 
 If the `display` parameter is `0` and the path is not standard, an error is returned.
 
-If the `display` parameter is `1`, the result is also shown on the secure screen for verification. The UX flow shows on the device screen the exact path and the complete serialized extended pubkey as defined in [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for that path. If the path is not standard, an additional warning is shown to the user. 
+If the `display` parameter is `1`, the result is also shown on the secure screen for verification. The UX flow shows on the device screen the exact path and the complete serialized extended pubkey as defined in [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for that path. If the path is not standard, an additional warning is shown to the user.
 
 ### REGISTER_WALLET
 
@@ -209,9 +209,9 @@ Given a PSBTv2 and a registered wallet (or a standard one), sign all the inputs 
 | `<var>` | `global_map_size`      | The number of key/value pairs of the global map of the psbt |
 | `32`    | `global_map_keys_root` | The Merkle root of the keys of the global map |
 | `32`    | `global_map_vals_root` | The Merkle root of the values of the global map |
-| `<var>` | `n_inputs`             | The number of inputs of the psbt | 
+| `<var>` | `n_inputs`             | The number of inputs of the psbt |
 | `32`    | `inputs_maps_root`     | The Merkle root of the vector of Merkleized map commitments for the input maps |
-| `<var>` | `n_outputs`            | The number of outputs of the psbt | 
+| `<var>` | `n_outputs`            | The number of outputs of the psbt |
 | `32`    | `outputs_maps_root`    | The Merkle root of the vector of Merkleized map commitments for the output maps |
 | `32`    | `wallet_id`            | The id of the wallet |
 | `32`    | `wallet_hmac`          | The hmac of a registered wallet, or exactly 32 0 bytes |
@@ -352,7 +352,7 @@ The response must contain:
 - `1` byte: a 1-byte unsigned integer `b`, the length of the prefix of the pre-image that is part of the response;
 - `b` bytes: corresponding to the first `b` bytes of the preimage.
 
-If the pre-image is too long to be contained in a single response, the client should choose `b` to be as large as possible; subsequent bytes are enqueued as single-byte elements that the Hardware Wallet will request with one ore more `GET_MORE_ELEMENTS` requests.
+If the pre-image is too long to be contained in a single response, the client should choose `b` to be as large as possible; subsequent bytes are enqueued as single-byte elements that the Hardware Wallet will request with one or more `GET_MORE_ELEMENTS` requests.
 
 ### GET_MERKLE_LEAF_PROOF
 
