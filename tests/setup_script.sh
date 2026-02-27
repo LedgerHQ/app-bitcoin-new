@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Check if bitcoind is already installed and in the PATH (e.g., in our custom Docker image)
+if command -v bitcoind >/dev/null 2>&1; then
+    echo "SUCCESS: bitcoind is already installed. Skipping setup script!"
+    exit 0
+fi
+
 # Use '--no-install-recommends' to skip heavy, unnecessary bloatware.
 echo "Updating packages and installing dependencies..."
 sudo apt update && sudo apt install -y --no-install-recommends wget tar gnupg2 curl git ca-certificates
