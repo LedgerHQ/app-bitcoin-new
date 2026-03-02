@@ -2184,7 +2184,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         }
 
         // Signing always takes some time, so we rather not wait before showing the spinner
-        io_show_processing_screen();
+        ioe_show_processing_screen();
 
         /** SIGNING FLOW
          *

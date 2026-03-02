@@ -53,31 +53,31 @@ bool G_was_processing_screen_shown;
 uint16_t G_interruption_timeout_start_tick;
 uint16_t G_processing_timeout_start_tick;
 
-void io_start_interruption_timeout() {
+void ioe_start_interruption_timeout() {
     G_interruption_timeout_start_tick = G_ticks;
     G_is_timeout_active.interruption = true;
 }
 
-void io_clear_interruption_timeout() {
+void ioe_clear_interruption_timeout() {
     G_is_timeout_active.interruption = false;
 }
 
-void io_start_processing_timeout() {
+void ioe_start_processing_timeout() {
     G_processing_timeout_start_tick = G_ticks;
     G_is_timeout_active.processing = true;
 }
 
-void io_clear_processing_timeout() {
+void ioe_clear_processing_timeout() {
     G_is_timeout_active.processing = false;
 }
 
-void io_reset_timeouts() {
-    io_clear_interruption_timeout();
-    io_clear_processing_timeout();
+void ioe_reset_timeouts() {
+    ioe_clear_interruption_timeout();
+    ioe_clear_processing_timeout();
     G_was_processing_screen_shown = false;
 }
 
-void io_show_processing_screen() {
+void ioe_show_processing_screen() {
     if (!G_was_processing_screen_shown) {
         G_was_processing_screen_shown = true;
         if (!G_called_from_swap) {
@@ -92,14 +92,14 @@ void app_ticker_event_callback(void) {
 
     if (G_is_timeout_active.processing &&
         (uint16_t) (G_ticks - G_processing_timeout_start_tick) >= PROCESSING_TIMEOUT_TICKS) {
-        io_clear_processing_timeout();
+        ioe_clear_processing_timeout();
 
-        io_show_processing_screen();
+        ioe_show_processing_screen();
     }
 
     if (G_is_timeout_active.interruption &&
         (uint16_t) (G_ticks - G_interruption_timeout_start_tick) >= INTERRUPTION_TIMEOUT_TICKS) {
-        io_clear_interruption_timeout();
+        ioe_clear_interruption_timeout();
 
         // TODO: It would be better to have the dispatcher be notified somehow.
         //       This would require some tampering with the io_exchange in
@@ -108,20 +108,21 @@ void app_ticker_event_callback(void) {
     }
 }
 
-void io_add_to_response(const void *rdata, size_t rdata_len) {
-    if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
+void ioe_add_to_response(const void *rdata, size_t rdata_len) {
+    size_t remaining = (IO_APDU_BUFFER_SIZE - 2) - G_output_len;
+
+    if (rdata_len > remaining) {
+        // Truncate: copy only what fits, then finalize with error SW
+        memmove(G_io_apdu_buffer + G_output_len, rdata, remaining);
         G_output_len = IO_APDU_BUFFER_SIZE;
         write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
-    } else if (G_output_len + rdata_len > IO_APDU_BUFFER_SIZE - 2) {
-        io_add_to_response(rdata, IO_APDU_BUFFER_SIZE - 2 - rdata_len);
-        io_finalize_response(SW_WRONG_RESPONSE_LENGTH);
     } else {
         memmove(G_io_apdu_buffer + G_output_len, rdata, rdata_len);
         G_output_len += rdata_len;
     }
 }
 
-void io_finalize_response(uint16_t sw) {
+void ioe_finalize_response(uint16_t sw) {
     if (G_output_len >= IO_APDU_BUFFER_SIZE - 2) {
         G_output_len = IO_APDU_BUFFER_SIZE;
         write_u16_be(G_io_apdu_buffer, IO_APDU_BUFFER_SIZE - 2, SW_WRONG_RESPONSE_LENGTH);
@@ -131,17 +132,15 @@ void io_finalize_response(uint16_t sw) {
     }
 }
 
-int io_send_response() {
-    int ret;
-
-    ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
+int ioe_send_response() {
+    int ret = io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, G_output_len);
     G_output_len = 0;
 
     return ret;
 }
 
-int io_send_sw(uint16_t sw) {
+int ioe_send_sw(uint16_t sw) {
     G_output_len = 0;
-    io_finalize_response(sw);
-    return io_send_response();
+    ioe_finalize_response(sw);
+    return ioe_send_response();
 }
