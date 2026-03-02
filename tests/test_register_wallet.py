@@ -351,6 +351,44 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
     error_code = int.from_bytes(e.value.data, 'big')
     assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
 
+    # Relative timelocks outside of the sane range.
+    # Not testing for older(0), since it's already rejected by the miniscript parser, which enforces 1 <= n < 2^31,
+    # and is therefore rejected with IncorrectDataError rather than NotSupportedError.
+    INVALID_RELATIVE_TIMELOCKS = [65536, (1 << 22) + 0, (1 << 22) + 65536]
+    for invalid_timelock in INVALID_RELATIVE_TIMELOCKS:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Invalid relative timelock",
+                descriptor_template=f"wsh(and_v(v:pk(@0/**),older({invalid_timelock})))",
+                keys_info=[
+                    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                ],
+            ),
+                navigator,
+                testname=test_name
+            )
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+        # repeat the test for a taproot policy
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Invalid relative timelock",
+                descriptor_template=f"tr(@0/<0;1>/*,and_v(v:pk(@0/<2;3>/*),older({invalid_timelock})))",
+                keys_info=[
+                    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                ],
+            ),
+                navigator,
+                testname=test_name
+            )
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+
+
     # TODO: we can probably not trigger stack and ops limits with the current limits we have on the
     # miniscript policy size; otherwise it would be worth to add tests for them, too.
 
