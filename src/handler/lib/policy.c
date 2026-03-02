@@ -439,7 +439,7 @@ __attribute__((noinline, warn_unused_result)) int get_extended_pubkey_from_clien
                                                         key_index,
                                                         (uint8_t *) key_info_str,
                                                         sizeof(key_info_str));
-        if (key_info_len == -1) {
+        if (key_info_len < 0) {
             return -1;
         }
 
@@ -1799,7 +1799,7 @@ static int get_pubkey_from_merkle_tree(dispatcher_context_t *dispatcher_context,
                                                     index,
                                                     (uint8_t *) key_info_str,
                                                     sizeof(key_info_str));
-    if (key_info_len == -1) {
+    if (key_info_len < 0) {
         return WITH_ERROR(-1, "Failed to retrieve key info");
     }
 
