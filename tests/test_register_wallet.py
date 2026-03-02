@@ -235,6 +235,23 @@ def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmwar
         wallet_hmac,
     )
 
+def test_register_wallet_minmax_relative_timelocks(navigator: Navigator, firmware: Firmware, client:
+                                                   RaggerClient, test_name: str):
+    # This test makes sure that the minimum and maximum values in the sane range for relative timelocks are accepted.
+    # Since mixing height-based and time-based is not allowed, we separate them in different leaves of a taptree.
+    wallet = WalletPolicy(
+        name="Relative timelocks",
+        descriptor_template="tr(@0/<0;1>/*,{thresh(3,pk(@0/<2;3>/*),s:pk(@1/<2;3>/*),s:pk(@2/<2;3>/*),sln:older(1),sln:older(65535)),thresh(3,pk(@0/<4;5>/*),s:pk(@1/<4;5>/*),s:pk(@2/<4;5>/*),sln:older(4194305),sln:older(4259839))})",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+        ])
+    wallet_id, _ = client.register_wallet(wallet, navigator,
+                                          instructions=register_wallet_instruction_approve_long(
+                                              firmware, save_screenshot=False),
+                                          testname=test_name)
+    assert wallet_id == wallet.id
 
 def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str):

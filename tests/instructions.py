@@ -109,15 +109,15 @@ def wallet_instruction_approve(model: Firmware) -> Instructions:
     return instructions
 
 
-def register_wallet_instruction_approve(model: Firmware) -> Instructions:
+def register_wallet_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Register account")
+        instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -133,16 +133,16 @@ def register_wallet_instruction_approve_no_save(model: Firmware) -> Instructions
     return instructions
 
 
-def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
+def register_wallet_instruction_approve_long(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Register account")
+        instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
