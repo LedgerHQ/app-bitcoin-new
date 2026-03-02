@@ -1945,6 +1945,25 @@ static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
     LEDGER_ASSERT(false, "Unreachable code");
 }
 
+/**
+ * Callback for traverse_policy_dfs that rejects any TOKEN_OLDER node whose argument is not either:
+ * - between 1 and 65535 (inclusive), if bit 22 is cleared (block-based relative timelock)
+ * - between 1 + 2^22 = 4194305 and 65535 + 2^22 = 4259839 (inclusive), if bit 22 is set (time-based
+ * relative timelock) This forces all the bits that have no consensus meaning per BIP-68/BIP-112 to
+ * be zero.
+ */
+static int check_older_node_cb(const policy_node_t *node, void *callback_state) {
+    (void) callback_state;
+    if (node->type == TOKEN_OLDER) {
+        const policy_node_with_uint32_t *older = (const policy_node_with_uint32_t *) node;
+        uint32_t n = older->n & ~SEQUENCE_LOCKTIME_TYPE_FLAG;
+        if (n < 1 || n > 65535) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -2069,6 +2088,20 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             }
         }
     }
+
+    // For relative timelocks with `older(n)`, bits 16 to 21 and 23 to 31 have no consensus meaning
+    // per BIP-68/BIP-112. Therefore, for example, `older(65536)` is equivalent to `older(0)`, which
+    // could be dangerous as the user might expect that a timelock is enforced. For relative
+    // timelocks, we reject any value outside the following safe ranges:
+    // - between 1 and 65535 (inclusive), if bit 22 is cleared (block-based timelock)
+    // - between 1 + 2^22 = 4194305 and 65535 + 2^22 = 4259839 (inclusive), if bit 22 is set
+    // (time-based timelock)
+    //
+    // See also: https://github.com/bitcoin/bitcoin/pull/33135
+    if (0 > traverse_policy_dfs(policy, check_older_node_cb, NULL)) {
+        return WITH_ERROR(-1, "older() argument out of valid range");
+    }
+
     return 0;
 }
 
