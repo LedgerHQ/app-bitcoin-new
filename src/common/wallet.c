@@ -2666,7 +2666,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->s = count_not_s <= node->k - 1 ? 1 : 0;
             out->e = count_s == node->n ? 1 : 0;
 
-            out->m = (count_e == node->n && count_not_s <= node->k) ? 1 : 0;
+            out->m = (count_e == node->n && count_m == node->n && count_not_s <= node->k) ? 1 : 0;
 
             out->x = 0;
 

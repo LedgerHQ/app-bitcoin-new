@@ -233,7 +233,7 @@ typedef enum {
         else {                                                                                   \
             int offset = (uint8_t *) obj - (uint8_t *) relative_ptr;                             \
             LEDGER_ASSERT(offset >= 0 && offset < UINT16_MAX,                                    \
-                          "Relative pointer's offset must be between 0 and 65535");              \
+                          "Relative pointer offset must be in 0-65535 range");                   \
             relative_ptr->offset = (uint16_t) offset;                                            \
         }                                                                                        \
     }

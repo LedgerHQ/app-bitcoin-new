@@ -1730,8 +1730,7 @@ int get_keyexpr_by_index(const policy_node_t *policy,
             int ret = 0;
             policy_node_scriptlist_t *cur_child = r_policy_node_scriptlist(&node->scriptlist);
             for (int script_idx = 0; script_idx < node->n; script_idx++) {
-                LEDGER_ASSERT(cur_child != NULL,
-                              "The script should always have exactly n child scripts");
+                LEDGER_ASSERT(cur_child != NULL, "The script must have exactly n child scripts");
 
                 found = i < (unsigned int) ret;
                 int ret_partial = get_keyexpr_by_index(r_policy_node(&cur_child->script),
