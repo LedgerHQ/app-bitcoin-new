@@ -152,3 +152,13 @@ If you need to go deeper into the rabbit hole 🐇🕳️, refer to the followin
 ## Tests
 
 See the [tests](tests) folder for documentation on the functional and end-to-end test suites of the bitcoin app, and the [unit-tests](unit-tests) folder for the C unit tests.
+
+## Deployment
+
+To have either the python client, javascript client or rust client published to their respective package registries upon a new release, please create a tag with their respective regex :
+
+```bash
+pyclient-\d+\.\d+\.\d+
+jsclient-\d+\.\d+\.\d+
+rsclient-\d+\.\d+\.\d+
+```

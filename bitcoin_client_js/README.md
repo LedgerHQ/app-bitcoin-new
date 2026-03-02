@@ -9,21 +9,20 @@ Main repository and documentation: https://github.com/LedgerHQ/app-bitcoin-new
 ## Install
 
 ```bash
-$ yarn add ledger-bitcoin
+$ yarn add @ledgerhq/ledger-bitcoin
 ```
 
 Or if you prefer using npm:
 
 ```bash
-$ npm install ledger-bitcoin
+$ npm install @ledgerhq/ledger-bitcoin
 ```
 
 ## Building
 
 ```bash
-$ yarn
-
-$ yarn build
+$ npm install
+$ npm run build
 ```
 
 ## Getting started
@@ -35,7 +34,7 @@ More examples can be found in the [test suite](src/__tests__/appClient.test.ts).
 Testing the `signPsbt` method requires a valid PSBT, and provide the corresponding wallet policy; it is skipped by default in the following example.
 
 ```javascript
-import { AppClient, DefaultWalletPolicy, WalletPolicy } from 'ledger-bitcoin';
+import { AppClient, DefaultWalletPolicy, WalletPolicy } from '@ledgerhq/ledger-bitcoin';
 import Transport from '@ledgerhq/hw-transport-node-hid';
 
 // This examples assumes the Bitcoin Testnet app is running.

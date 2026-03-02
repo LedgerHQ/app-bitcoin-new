@@ -28,7 +28,7 @@ PATH_SLIP21_APP_LOAD_PARAMS = "LEDGER-Wallet policy"
 # Application version
 APPVERSION_M = 2
 APPVERSION_N = 4
-APPVERSION_P = 3
+APPVERSION_P = 5
 APPVERSION_SUFFIX = # if not empty, appended at the end. Do not add a dash.
 
 ifeq ($(APPVERSION_SUFFIX),)
@@ -46,7 +46,7 @@ endif
 
 # Setting to allow building variant applications
 VARIANT_PARAM = COIN
-VARIANT_VALUES = bitcoin_testnet bitcoin
+VARIANT_VALUES = bitcoin_testnet bitcoin bitcoin_recovery
 
 # simplify for tests
 ifndef COIN
@@ -61,8 +61,8 @@ HAVE_APPLICATION_FLAG_BOLOS_SETTINGS = 1
 HAVE_APPLICATION_FLAG_LIBRARY = 1
 
 ifeq ($(COIN),bitcoin_testnet)
-    # Application allowed derivation paths (testnet).
-    PATH_APP_LOAD_PARAMS = "*/1'"
+    # Application allowed derivation paths (testnet) + exception for Electrum + BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS = "*/1'" "4541509'" "45'"
 
     # Bitcoin testnet, no legacy support
     DEFINES   += BIP32_PUBKEY_VERSION=0x043587CF
@@ -73,9 +73,10 @@ ifeq ($(COIN),bitcoin_testnet)
     DEFINES   += COIN_COINID_SHORT=\"TEST\"
 
     APPNAME = "Bitcoin Test"
+
 else ifeq ($(COIN),bitcoin)
-    # Application allowed derivation paths (mainnet).
-    PATH_APP_LOAD_PARAMS = "*/0'"
+    # Application allowed derivation paths (mainnet) + exception for Electrum + BIP-45 whole tree
+    PATH_APP_LOAD_PARAMS = "*/0'" "4541509'" "45'"
 
     # the version for performance tests automatically approves all requests
     # there is no reason to ever compile the mainnet app with this flag
@@ -92,6 +93,28 @@ else ifeq ($(COIN),bitcoin)
     DEFINES   += COIN_COINID_SHORT=\"BTC\"
 
     APPNAME = "Bitcoin"
+
+else ifeq ($(COIN),bitcoin_recovery)
+    # Application allowed derivation paths (all paths are permitted).
+    PATH_APP_LOAD_PARAMS = ""
+    HAVE_APPLICATION_FLAG_DERIVE_MASTER = 1
+
+    # the version for performance tests automatically approves all requests
+    # there is no reason to ever compile the mainnet app with this flag
+    ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
+        $(error Use testnet app for performance tests)
+    endif
+
+    # Bitcoin mainnet, no legacy support
+    DEFINES   += BIP32_PUBKEY_VERSION=0x0488B21E
+    DEFINES   += BIP44_COIN_TYPE=0
+    DEFINES   += COIN_P2PKH_VERSION=0
+    DEFINES   += COIN_P2SH_VERSION=5
+    DEFINES   += COIN_NATIVE_SEGWIT_PREFIX=\"bc\"
+    DEFINES   += COIN_COINID_SHORT=\"BTC\"
+    DEFINES   += BITCOIN_RECOVERY
+
+    APPNAME = "Bitcoin Recovery"
 
 else
     ifeq ($(filter clean,$(MAKECMDGOALS)),)
