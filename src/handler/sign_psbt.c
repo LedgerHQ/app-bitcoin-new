@@ -1171,8 +1171,8 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
         // Swap feature: do not show the address to the user, but double check it matches
         // the request from app-exchange; it must be the only external output (checked
         // elsewhere).
-        int swap_addr_len = strlen(G_swap_state.destination_address);
-        if (swap_addr_len != address_len ||
+        size_t swap_addr_len = strlen(G_swap_state.destination_address);
+        if (swap_addr_len != (size_t)address_len ||
             0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
             // address did not match
             PRINTF("Mismatching address for swap\n");
