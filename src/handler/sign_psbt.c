@@ -1167,22 +1167,22 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         finalize_exchange_sign_transaction(false);
     }
 
-    char output_description_len = strlen(output_description);
+    size_t output_description_len = strlen(output_description);
 
     // Check that the external output's address matches the request from app-exchange
-    int swap_addr_len = strlen(G_swap_state.destination_address);
+    size_t swap_addr_len = strlen(G_swap_state.destination_address);
     if (swap_addr_len != output_description_len ||
         0 !=
             strncmp(G_swap_state.destination_address, output_description, output_description_len)) {
         // address did not match
         PRINTF("Mismatching address for swap\n");
         PRINTF("Expected: ");
-        for (int i = 0; i < swap_addr_len; i++) {
+        for (size_t i = 0; i < swap_addr_len; i++) {
             PRINTF("%c", G_swap_state.destination_address[i]);
         }
         PRINTF("\n");
         PRINTF("Found: ");
-        for (int i = 0; i < output_description_len; i++) {
+        for (size_t i = 0; i < output_description_len; i++) {
             PRINTF("%c", output_description[i]);
         }
         PRINTF("\n");
