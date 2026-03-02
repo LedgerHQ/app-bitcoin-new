@@ -489,7 +489,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                                        MiniscriptContext ctx);
 
 /**
- * Callback type for traverse_policy_script_tree.
+ * Callback type for traverse_policy_dfs.
  * Called for each node in depth-first (pre-order) traversal.
  *
  * @param node pointer to the current policy node
