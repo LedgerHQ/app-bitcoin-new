@@ -1946,11 +1946,8 @@ static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
 }
 
 /**
- * Callback for traverse_policy_dfs that rejects any TOKEN_OLDER node whose argument is not either:
- * - between 1 and 65535 (inclusive), if bit 22 is cleared (block-based relative timelock)
- * - between 1 + 2^22 = 4194305 and 65535 + 2^22 = 4259839 (inclusive), if bit 22 is set (time-based
- * relative timelock) This forces all the bits that have no consensus meaning per BIP-68/BIP-112 to
- * be zero.
+ * Callback for traverse_policy_dfs that rejects older(n) nodes with an argument that is not
+ * safe, as it sets bits with no consensus meaning (see comment in is_policy_sane() below).
  */
 static int check_older_node_cb(const policy_node_t *node, void *callback_state) {
     (void) callback_state;
@@ -2096,6 +2093,11 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
     // - between 1 and 65535 (inclusive), if bit 22 is cleared (block-based timelock)
     // - between 1 + 2^22 = 4194305 and 65535 + 2^22 = 4259839 (inclusive), if bit 22 is set
     // (time-based timelock)
+    //
+    // Bit 22 is SEQUENCE_LOCKTIME_TYPE_FLAG in BIP-68.
+    // Note that bit 31 (SEQUENCE_LOCKTIME_DISABLE_FLAG) is implicitly excluded, as the argument n
+    // of older(n) is guaranteed to be strictly less than 2^31 per miniscript rules, which are
+    // enforced in the policy parser.
     //
     // See also: https://github.com/bitcoin/bitcoin/pull/33135
     if (0 > traverse_policy_dfs(policy, check_older_node_cb, NULL)) {

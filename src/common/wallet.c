@@ -3009,6 +3009,7 @@ int traverse_policy_dfs(const policy_node_t *policy_node,
             return 0;
         }
 
+        // tr nodes with a keypath and (possibly) a taptree
         case TOKEN_TR: {
             const policy_node_tr_t *node = (const policy_node_tr_t *) policy_node;
             if (!isnull_policy_node_tree(&node->tree)) {
