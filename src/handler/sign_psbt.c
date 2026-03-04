@@ -1085,8 +1085,8 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
 
         uint8_t second_byte = opreturn_script[1];
-        size_t push_opcode_size;  // the length of the push opcode (1 or 2 bytes)
-        size_t data_size;         // the length of the actual data embedded in the OP_RETURN output
+        size_t push_opcode_size = 0;  // the length of the push opcode (1 or 2 bytes)
+        size_t data_size = 0;  // the length of the actual data embedded in the OP_RETURN output
         if (2 <= second_byte && second_byte <= 75) {
             push_opcode_size = 1;
             data_size = second_byte;
