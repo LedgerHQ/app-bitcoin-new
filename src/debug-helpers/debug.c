@@ -1,6 +1,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+/* SDK headers */
+#include "os.h"
+
 /* Local headers */
 #include "printf.h"
 

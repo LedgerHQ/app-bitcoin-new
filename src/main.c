@@ -23,7 +23,9 @@
 #include "nbgl_use_case.h"
 #include "io.h"
 #include "os.h"
+#ifdef HAVE_SWAP
 #include "swap.h"
+#endif /* HAVE_SWAP */
 #include "ux.h"
 
 /* Local headers */
@@ -31,14 +33,17 @@
 #include "constants.h"
 #include "debug.h"
 #include "dispatcher.h"
+#ifdef HAVE_SWAP
 #include "handle_swap_sign_transaction.h"
+#endif /* HAVE_SWAP */
 #include "handlers.h"
 #include "io_ext.h"
 #include "menu.h"
 #include "parser.h"
 #include "sw.h"
+#ifdef HAVE_SWAP
 #include "swap_globals.h"
-#include "swap_lib_calls.h"
+#endif /* HAVE_SWAP */
 #include "wallet.h"
 
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
@@ -91,7 +96,9 @@ static void initialize_app_globals() {
     // we need the globals initialization to happen _after_ calling copy_transaction_parameters when
     // processing a SIGN_TRANSACTION request from the swap app (which initializes the other fields
     // of G_swap_state).
+#ifdef HAVE_SWAP
     G_swap_state.should_exit = false;
+#endif /* HAVE_SWAP */
 }
 
 /**
@@ -147,7 +154,7 @@ void app_main() {
                cmd.lc,
                cmd.lc,
                cmd.data);
-
+#ifdef HAVE_SWAP
         if (G_called_from_swap) {
             if (cmd.cla != CLA_APP) {
                 ioe_send_sw(SW_CLA_NOT_SUPPORTED);
@@ -163,14 +170,17 @@ void app_main() {
             }
         }
 
+#endif /* HAVE_SWAP */
         // Dispatch structured APDU command to handler
         apdu_dispatcher(COMMAND_DESCRIPTORS,
                         sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
                         ui_menu_main,
                         &cmd);
+#ifdef HAVE_SWAP
         if (G_called_from_swap && G_swap_state.should_exit) {
             // Bitcoin app will keep listening as long as it does not receive a valid TX
             finalize_exchange_sign_transaction(true);
         }
+#endif /* HAVE_SWAP */
     }
 }

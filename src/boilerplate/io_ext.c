@@ -25,7 +25,9 @@
 #include "nbgl_touch.h"
 #include "nbgl_use_case.h"
 #include "os.h"
+#ifdef HAVE_SWAP
 #include "swap.h"
+#endif /* HAVE_SWAP */
 #include "ux.h"
 #include "write.h"
 
@@ -33,7 +35,6 @@
 #include "dispatcher.h"
 #include "display.h"
 #include "sw.h"
-#include "swap_globals.h"
 
 uint16_t G_output_len = 0;
 
@@ -80,9 +81,13 @@ void ioe_reset_timeouts() {
 void ioe_show_processing_screen() {
     if (!G_was_processing_screen_shown) {
         G_was_processing_screen_shown = true;
+#ifdef HAVE_SWAP
         if (!G_called_from_swap) {
+#endif /* HAVE_SWAP */
             nbgl_useCaseSpinner(ui_get_processing_screen_text());
+#ifdef HAVE_SWAP
         }
+#endif /* HAVE_SWAP */
     }
 }
 

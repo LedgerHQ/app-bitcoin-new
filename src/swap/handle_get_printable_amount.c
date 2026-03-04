@@ -1,4 +1,7 @@
+#include <string.h>
+
 /* SDK headers */
+#include "os.h"
 #include "read.h"
 #include "swap_lib_calls.h"
 

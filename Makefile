@@ -37,9 +37,6 @@ else
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)-$(strip $(APPVERSION_SUFFIX))"
 endif
 
-# Application source files
-APP_SOURCE_PATH += src
-
 # Application icons following guidelines:
 # https://developers.ledger.com/docs/embedded-app/design-requirements/#device-icon
 ICON_NANOX = icons/nanox_app_bitcoin.gif
@@ -173,8 +170,16 @@ ifneq ($(AUTOAPPROVE_FOR_PERF_TESTS),0)
     endif
 endif
 
-# debugging helper functions and macros
-CFLAGS    += -include debug-helpers/debug.h
+# Source files (listed explicitly to allow conditional exclusion of src/swap)
+APP_SOURCE_PATH += src/crypto.c src/main.c src/secp256k1.c src/boilerplate src/common src/debug-helpers src/handler src/musig src/ui
+ifneq ($(filter 1, $(ENABLE_SWAP) $(ENABLE_TESTING_SWAP)),)
+    APP_SOURCE_PATH += src/swap
+endif
+
+# Header files from `src` folder directly
+INCLUDES_PATH += src
+# Needed to be able to include the definition of G_cx
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 # DEFINES   += HAVE_PRINT_STACK_POINTER
 
@@ -182,9 +187,6 @@ ifeq ($(DEBUG),10)
     $(warning Using semihosted PRINTF. Only run with speculos!)
     DEFINES   += HAVE_PRINTF HAVE_SEMIHOSTED_PRINTF PRINTF=semihosted_printf
 endif
-
-# Needed to be able to include the definition of G_cx
-INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 ########################################
 #          Features enablers           #
