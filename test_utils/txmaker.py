@@ -27,10 +27,8 @@ from embit.script import Script
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
 
-from hashlib import sha256
-
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
-from test_utils import bip0340
+from test_utils import bip0340, sha256, hash160
 from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
 
 
@@ -66,7 +64,7 @@ def random_p2tr() -> bytes:
     """Returns 32 random bytes. Not cryptographically secure."""
     global privkey_initial
     # Using non-random sequence for the sake of tests
-    privkey_initial = sha256(privkey_initial).digest()
+    privkey_initial = sha256(privkey_initial)
     pubkey = bip0340.point_mul(bip0340.G, int.from_bytes(privkey_initial, 'big'))
 
     return b'\x51\x20' + (pubkey[0]).to_bytes(32, 'big')
@@ -222,6 +220,18 @@ def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, P
 
                 inout.tap_bip32_paths[derived_pubkey.pubkey[1:]] = (
                     leaf_hashes, derived_key_origin)
+            else:
+                # No key origin info: treat the xpub as the root key, so compute its own fingerprint
+                # and use placeholder_der_subpath as the full derivation path.
+                fpr = hash160(root_pubkey.pubkey)[:4]
+                derived_key_origin = KeyOriginInfo(fpr, placeholder_der_subpath)
+
+                leaf_hashes = []
+                if leaf_script is not None:
+                    leaf_hashes = [tapleaf_hash(leaf_script)]
+
+                inout.tap_bip32_paths[derived_pubkey.pubkey[1:]] = (
+                    leaf_hashes, derived_key_origin)
     else:
         if isinstance(desc_tmpl, WshDescriptorTemplate):
             # add witnessScript
@@ -248,7 +258,10 @@ def fill_inout(wallet_policy: WalletPolicy, inout: Union[PartiallySignedInput, P
                     root_pubkey_origin.fingerprint, root_pubkey_origin.path + placeholder_der_subpath)
 
                 inout.hd_keypaths[derived_pubkey.pubkey] = derived_key_origin
-
+            else:
+                fpr = hash160(root_pubkey.pubkey)[:4]
+                derived_key_origin = KeyOriginInfo(fpr, placeholder_der_subpath)
+                inout.hd_keypaths[derived_pubkey.pubkey] = derived_key_origin
 
 def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amounts: List[int], output_is_change: List[bool]) -> PSBT:
     assert len(output_amounts) == len(output_is_change)
@@ -280,6 +293,7 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
     psbt.version = 0
 
     tx = CTransaction()
+    tx.nVersion = 2
     tx.vin = vin
     tx.vout = vout
     tx.wit = CTxWitness()
@@ -297,6 +311,18 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
         else:
             # a random P2TR output
             tx.vout[i].scriptPubKey = random_p2tr()
+
+    # Fill the global xpub map: each root key in the wallet policy maps to its key origin info
+    for key_info_str in wallet_policy.keys_info:
+        key_origin_end_pos = key_info_str.find("]")
+        if key_origin_end_pos == -1:
+            root_pubkey = ExtendedKey.deserialize(key_info_str)
+            fpr = hash160(root_pubkey.pubkey)[:4]
+            key_origin = KeyOriginInfo(fpr, [])
+        else:
+            root_pubkey = ExtendedKey.deserialize(key_info_str[key_origin_end_pos + 1:])
+            key_origin = KeyOriginInfo.from_string(key_info_str[1:key_origin_end_pos])
+        psbt.xpub[root_pubkey.serialize()] = key_origin
 
     psbt.inputs = [PartiallySignedInput(0) for _ in input_amounts]
     psbt.outputs = [PartiallySignedOutput(0) for _ in output_amounts]
