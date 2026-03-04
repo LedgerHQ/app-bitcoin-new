@@ -5,6 +5,7 @@
 # Ledger bitcoin app might not be filled in.
 
 
+import argparse
 import sys
 import os
 from io import BytesIO
@@ -17,25 +18,52 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from bitcoin_client.ledger_bitcoin import WalletPolicy, WalletType
-from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo, parse_path, get_taproot_output_key
+from bitcoin_client.ledger_bitcoin import WalletPolicy
+from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo, taproot_tweak_pubkey
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
 from bitcoin_client.ledger_bitcoin.tx import CScriptWitness, CTransaction, CTxIn, CTxInWitness, CTxOut, COutPoint, CTxWitness, uint256_from_str
 
-from embit.descriptor import Descriptor
-from embit.script import Script
 from embit.bip32 import HDKey
 from embit.bip39 import mnemonic_to_seed
+from embit.descriptor import Descriptor
+from embit.networks import NETWORKS
+from embit.script import Script
 
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340, sha256, hash160
-from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
+from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, WpkhDescriptorTemplate, PkhDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
 
 
 SPECULOS_SEED = "glory promote mansion idle axis finger extra february uncover one trip resource lawn turtle enact monster seven myth punch hobby comfort wild raise skin"
 master_key = HDKey.from_seed(mnemonic_to_seed(SPECULOS_SEED))
 master_key_fpr = master_key.derive("m/0'").fingerprint
 privkey_initial = bytearray(32)
+
+
+def _count_keys_in_template(descriptor_template: str) -> int:
+    """Returns the number of distinct key placeholders (@0, @1, ...) in the descriptor template."""
+    indices = [int(m) for m in re.findall(r'@(\d+)', descriptor_template)]
+    if not indices:
+        return 0
+    return max(indices) + 1
+
+
+def _derive_key_info_from_path(derivation_path: str) -> str:
+    """Derives an xpub at *derivation_path* from SPECULOS_SEED and returns a
+    key-info string in the format ``[master_fpr/path]tpub``."""
+    child = master_key.derive(derivation_path)
+    path_for_origin = derivation_path.lstrip("m").lstrip("/")
+    xpub = child.to_public(version=NETWORKS["test"]["xpub"]).to_base58()
+    if path_for_origin:
+        return f"[{master_key_fpr.hex()}/{path_for_origin}]{xpub}"
+    return xpub
+
+
+def _random_tpub() -> str:
+    """Returns a random tpub (no key origin information) derived from a random seed."""
+    random_seed = os.urandom(32)
+    rand_key = HDKey.from_seed(random_seed, version=NETWORKS["test"]["xprv"])
+    return rand_key.to_public().to_base58()
 
 
 def random_numbers_with_sum(n: int, s: int) -> List[int]:
@@ -71,29 +99,45 @@ def random_p2tr() -> bytes:
 
 
 def getScriptPubkeyFromWallet(wallet: WalletPolicy, change: bool, address_index: int) -> Script:
-    descriptor_str = wallet.descriptor_template
+    desc_tmpl = DescriptorTemplate.from_string(wallet.descriptor_template)
 
-    # Iterate in reverse order, as strings identifying a small-index key (like @1) can be a
-    # prefix of substrings identifying a large-index key (like @12), but not the other way around
-    # A more structural parsing would be more robust
-    for i, key_info_str in reversed(list(enumerate(wallet.keys_info))):
-        if wallet.version == WalletType.WALLET_POLICY_V1 and key_info_str[-3:] != "/**":
-            raise ValueError("All the keys must have wildcard (/**)")
+    def _derive_key(placeholder: KeyPlaceholder) -> bytes:
+        """Returns the 33-byte compressed derived pubkey for *placeholder*."""
+        der_subpath = [
+            placeholder.num1 if not change else placeholder.num2,
+            address_index
+        ]
+        root_pubkey, _ = get_placeholder_root_key(placeholder, wallet.keys_info)
+        return root_pubkey.derive_pub_path(der_subpath).pubkey
 
-        if f"@{i}" not in descriptor_str:
-            raise ValueError(f"Invalid policy: not using key @{i}")
+    if isinstance(desc_tmpl, TrDescriptorTemplate):
+        internal_key = _derive_key(desc_tmpl.key)[1:]  # x-only (drop parity byte)
 
-        descriptor_str = descriptor_str.replace(f"@{i}", key_info_str)
+        taptree_hash = b''
+        if desc_tmpl.tree is not None:
+            taptree_hash = desc_tmpl.get_taptree_hash(wallet.keys_info, change, address_index)
 
-    # by doing the text substitution of '/**' at the end, this works for either V1 or V2
-    descriptor_str = descriptor_str.replace("/**", f"/{1 if change else 0}/*")
+        _, output_key = taproot_tweak_pubkey(internal_key, taptree_hash)
+        return Script(b'\x51\x20' + output_key)
 
-    # Substitute '<NUM1;NUM2>/*' with either `NUM1/*` (not change) or `NUM2/*` (change)
-    pattern = re.compile(r'<(\d+);(\d+)>(/\*)')
-    descriptor_str = pattern.sub(lambda m: (
-        m.group(2) if change else m.group(1)) + m.group(3), descriptor_str)
+    elif isinstance(desc_tmpl, WshDescriptorTemplate):
+        # Compile the inner miniscript to obtain the witness script, then wrap in P2WSH.
+        inner_desc_str = derive_plain_descriptor(
+            desc_tmpl.inner_script, wallet.keys_info, change, address_index)
+        witness_script: bytes = Miniscript.read_from(
+            BytesIO(inner_desc_str.encode()), taproot=False).compile()
+        return Script(b'\x00\x20' + sha256(witness_script))
 
-    return Descriptor.from_string(descriptor_str).derive(address_index).script_pubkey()
+    elif isinstance(desc_tmpl, WpkhDescriptorTemplate):
+        pubkey = _derive_key(desc_tmpl.key)
+        return Script(b'\x00\x14' + hash160(pubkey))
+
+    elif isinstance(desc_tmpl, PkhDescriptorTemplate):
+        pubkey = _derive_key(desc_tmpl.key)
+        return Script(b'\x76\xa9\x14' + hash160(pubkey) + b'\x88\xac')
+
+    else:
+        raise ValueError(f"Unsupported descriptor type: {type(desc_tmpl).__name__}")
 
 
 def createFakeWalletTransaction(n_inputs: int, n_outputs: int, output_amount: int, wallet: WalletPolicy) -> Tuple[CTransaction, int, int, int]:
@@ -353,3 +397,156 @@ def createPsbt(wallet_policy: WalletPolicy, input_amounts: List[int], output_amo
     psbt.tx = tx
 
     return psbt
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Create a test PSBT from a BIP-388 wallet policy."
+    )
+    parser.add_argument(
+        "--descriptor", "-d",
+        help="Descriptor template, e.g. tr(@0/**) or wsh(multi(2,@0/**,@1/**)).",
+    )
+    parser.add_argument(
+        "--key", "-k",
+        action="append",
+        dest="keys",
+        metavar="KEY",
+        help=(
+            "Key for @N (repeat for each key, in order). "
+            "Supply a tpub, a BIP-32 derivation path to derive from the "
+            "default Speculos mnemonic (e.g. m/48\'/1\'/0\'/2\'), "
+            "or 'r' for a random key."
+        ),
+    )
+    parser.add_argument(
+        "--inputs", "-i",
+        type=int,
+        help="Number of inputs (default: 2).",
+    )
+    parser.add_argument(
+        "--outputs", "-o",
+        type=int,
+        help="Number of outputs (default: 2).",
+    )
+    parser.add_argument(
+        "--change", "-c",
+        help="0-based index of the change output, or 'no' for no change (default: random).",
+    )
+    args = parser.parse_args()
+
+    # ------------------------------------------------------------------ #
+    # Descriptor template
+    # ------------------------------------------------------------------ #
+    descriptor_template: str = args.descriptor or ""
+    if not descriptor_template:
+        descriptor_template = input("Descriptor template: ").strip()
+    if not descriptor_template:
+        print("Error: descriptor template cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+
+    n_keys = _count_keys_in_template(descriptor_template)
+    if n_keys == 0:
+        print(
+            "Error: no key placeholders (@0, @1, …) found in descriptor template.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # ------------------------------------------------------------------ #
+    # Keys
+    # ------------------------------------------------------------------ #
+    provided_keys: List[str] = list(args.keys) if args.keys else []
+    keys_info: List[str] = []
+    default_is_random = False  # flips to True after the first derivation-path key is used
+    for i in range(n_keys):
+        if i < len(provided_keys):
+            key_str = provided_keys[i].strip()
+        else:
+            default_path = f"m/48'/1'/{i}'/2'"
+            if default_is_random:
+                raw = input(
+                    f"Key @{i} [default: random, or enter a derivation path]: "
+                ).strip()
+                key_str = raw if raw else "r"
+            else:
+                raw = input(
+                    f"Key @{i} [default: derive from {default_path}, or 'r' for random]: "
+                ).strip()
+                key_str = raw if raw else default_path
+
+        # Treat as a derivation path when it starts with 'm'; 'r' for random; otherwise use as-is (tpub).
+        if key_str.lower() == "r":
+            keys_info.append(_random_tpub())
+        elif re.match(r"^m(/|$)", key_str):
+            keys_info.append(_derive_key_info_from_path(key_str))
+            default_is_random = True
+        else:
+            keys_info.append(key_str)
+
+    # ------------------------------------------------------------------ #
+    # Number of inputs / outputs
+    # ------------------------------------------------------------------ #
+    n_inputs: int
+    if args.inputs is not None:
+        n_inputs = args.inputs
+    else:
+        raw = input("Number of inputs [default: 2]: ").strip()
+        n_inputs = int(raw) if raw else 2
+
+    n_outputs: int
+    if args.outputs is not None:
+        n_outputs = args.outputs
+    else:
+        raw = input("Number of outputs [default: 2]: ").strip()
+        n_outputs = int(raw) if raw else 2
+
+    # ------------------------------------------------------------------ #
+    # Change output index
+    # ------------------------------------------------------------------ #
+    no_change = False
+    change_index: int
+    if args.change is not None:
+        if args.change.lower() == "no":
+            no_change = True
+        else:
+            change_index = int(args.change)
+    else:
+        default_change = randint(0, n_outputs - 1)
+        raw = input(
+            f"Change output index [default: {default_change}, or 'no' for no change]: "
+        ).strip()
+        if raw.lower() == "no":
+            no_change = True
+        elif raw:
+            change_index = int(raw)
+        else:
+            change_index = default_change
+
+    # ------------------------------------------------------------------ #
+    # Build PSBT
+    # ------------------------------------------------------------------ #
+    wallet_policy = WalletPolicy("cli-wallet", descriptor_template, keys_info)
+
+    input_amounts = [10000 + 10000 * idx for idx in range(n_inputs)]
+    total_in = sum(input_amounts)
+    out_amounts = [total_in // n_outputs - idx for idx in range(n_outputs)]
+
+    output_is_change = (
+        [False] * n_outputs
+        if no_change
+        else [idx == change_index for idx in range(n_outputs)]
+    )
+
+    psbt = createPsbt(wallet_policy, input_amounts, out_amounts, output_is_change)
+
+    print(f"\nWallet policy:")
+    print(f"  Descriptor template: {wallet_policy.descriptor_template}")
+    for i, key_info in enumerate(wallet_policy.keys_info):
+        print(f"  Key @{i}: {key_info}")
+    print("\nPSBT:")
+    print(psbt.serialize())
+
+
+if __name__ == "__main__":
+    main()
