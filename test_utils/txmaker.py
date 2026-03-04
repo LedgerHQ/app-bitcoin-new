@@ -5,11 +5,18 @@
 # Ledger bitcoin app might not be filled in.
 
 
+import sys
+import os
 from io import BytesIO
 from random import randint
 import re
 
 from typing import List, Tuple, Optional, Union
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 from bitcoin_client.ledger_bitcoin import WalletPolicy, WalletType
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo, parse_path, get_taproot_output_key
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
@@ -22,7 +29,7 @@ from embit.bip39 import mnemonic_to_seed
 
 from hashlib import sha256
 
-from ledger_bitcoin.embit.descriptor.miniscript import Miniscript
+from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from test_utils import bip0340
 from test_utils.wallet_policy import DescriptorTemplate, KeyPlaceholder, PlainKeyPlaceholder, TrDescriptorTemplate, WshDescriptorTemplate, derive_plain_descriptor, tapleaf_hash
 

@@ -3,10 +3,15 @@ import pytest
 from pathlib import Path
 import re
 import os
+import sys
 import json
 from typing import Literal, Union
 
-from . import default_settings, SpeculosGlobals
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from test_utils import default_settings, SpeculosGlobals
 
 from bitcoin_client.ledger_bitcoin import TransportClient, Client, Chain, createClient
 
