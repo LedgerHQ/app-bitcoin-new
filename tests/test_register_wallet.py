@@ -235,6 +235,23 @@ def test_register_miniscript_long_policy(navigator: Navigator, firmware: Firmwar
         wallet_hmac,
     )
 
+def test_register_wallet_minmax_relative_timelocks(navigator: Navigator, firmware: Firmware, client:
+                                                   RaggerClient, test_name: str):
+    # This test makes sure that the minimum and maximum values in the sane range for relative timelocks are accepted.
+    # Since mixing height-based and time-based is not allowed, we separate them in different leaves of a taptree.
+    wallet = WalletPolicy(
+        name="Relative timelocks",
+        descriptor_template="tr(@0/<0;1>/*,{thresh(3,pk(@0/<2;3>/*),s:pk(@1/<2;3>/*),s:pk(@2/<2;3>/*),sln:older(1),sln:older(65535)),thresh(3,pk(@0/<4;5>/*),s:pk(@1/<4;5>/*),s:pk(@2/<4;5>/*),sln:older(4194305),sln:older(4259839))})",
+        keys_info=[
+            "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+            "tpubDE7NQymr4AFtewpAsWtnreyq9ghkzQBXpCZjWLFVRAvnbf7vya2eMTvT2fPapNqL8SuVvLQdbUbMfWLVDCZKnsEBqp6UK93QEzL8Ck23AwF",
+            "tpubDDV6FDLcCieWUeN7R3vZK2Qs3KuQed3ScTY9EiwMXvyCkLjDbCb8RXaAgWDbkG4tW1BMKVF1zERHnyt78QKd4ZaAYGMJMpvHPwgSSU1AxZ3",
+        ])
+    wallet_id, _ = client.register_wallet(wallet, navigator,
+                                          instructions=register_wallet_instruction_approve_long(
+                                              firmware, save_screenshot=False),
+                                          testname=test_name)
+    assert wallet_id == wallet.id
 
 def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmware, client:
                                          RaggerClient, test_name: str):
@@ -350,6 +367,44 @@ def test_register_wallet_not_sane_policy(navigator: Navigator, firmware: Firmwar
     assert len(e.value.data) == 2
     error_code = int.from_bytes(e.value.data, 'big')
     assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+
+    # Relative timelocks outside of the sane range.
+    # Not testing for older(0), since it's already rejected by the miniscript parser, which enforces 1 <= n < 2^31,
+    # and is therefore rejected with IncorrectDataError rather than NotSupportedError.
+    INVALID_RELATIVE_TIMELOCKS = [65536, (1 << 22) + 0, (1 << 22) + 65536]
+    for invalid_timelock in INVALID_RELATIVE_TIMELOCKS:
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Invalid relative timelock",
+                descriptor_template=f"wsh(and_v(v:pk(@0/**),older({invalid_timelock})))",
+                keys_info=[
+                    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                ],
+            ),
+                navigator,
+                testname=test_name
+            )
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+        # repeat the test for a taproot policy
+        with pytest.raises(ExceptionRAPDU) as e:
+            client.register_wallet(WalletPolicy(
+                name="Invalid relative timelock",
+                descriptor_template=f"tr(@0/<0;1>/*,and_v(v:pk(@0/<2;3>/*),older({invalid_timelock})))",
+                keys_info=[
+                    "[f5acc2fd/48'/1'/0'/2']tpubDFAqEGNyad35aBCKUAXbQGDjdVhNueno5ZZVEn3sQbW5ci457gLR7HyTmHBg93oourBssgUxuWz1jX5uhc1qaqFo9VsybY1J5FuedLfm4dK",
+                ],
+            ),
+                navigator,
+                testname=test_name
+            )
+        assert DeviceException.exc.get(e.value.status) == NotSupportedError
+        assert len(e.value.data) == 2
+        error_code = int.from_bytes(e.value.data, 'big')
+        assert error_code == EC_REGISTER_WALLET_POLICY_NOT_SANE
+
 
     # TODO: we can probably not trigger stack and ops limits with the current limits we have on the
     # miniscript policy size; otherwise it would be worth to add tests for them, too.

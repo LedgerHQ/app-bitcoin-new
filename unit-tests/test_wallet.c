@@ -676,6 +676,214 @@ static void test_miniscript_types(void **state) {
     // clang-format on
 }
 
+// =============================================================================
+// Tests for traverse_policy_dfs
+// =============================================================================
+
+/**
+ * Callback state for collecting the node types visited during traversal,
+ * in order.
+ * If max_visits >= 0, the callback returns -1 (aborting traversal) after
+ * that many visits.
+ */
+typedef struct {
+    PolicyNodeType types[32];
+    int count;
+    int max_visits;  // -1 means no limit
+} traverse_collect_t;
+
+static int traverse_collect_cb(const policy_node_t *node, void *state_) {
+    traverse_collect_t *s = (traverse_collect_t *) state_;
+    if (s->count < (int) (sizeof(s->types) / sizeof(s->types[0]))) {
+        s->types[s->count] = node->type;
+    }
+    s->count++;
+    if (s->max_visits >= 0 && s->count >= s->max_visits) {
+        return -1;
+    }
+    return 0;
+}
+
+// pkh(@0/**) — a single leaf node; callback is invoked exactly once.
+static void test_traverse_single_leaf(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("pkh(@0/**)", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+    assert_int_equal(s.count, 1);
+    assert_int_equal(s.types[0], TOKEN_PKH);
+}
+
+// wsh(multi(2,@0/**,@1/**)) — outer wrapper then the multi leaf.
+static void test_traverse_wsh_multi(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("wsh(multi(2,@0/**,@1/**))", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    PolicyNodeType expected[] = {TOKEN_WSH, TOKEN_MULTI};
+    assert_int_equal(s.count, 2);
+    for (int i = 0; i < 2; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+// wsh(or_i(pk(@0/**),pk(@1/**))) — root, binary node, then two leaves.
+static void test_traverse_or_i(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("wsh(or_i(pk(@0/**),pk(@1/**)))", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    PolicyNodeType expected[] = {TOKEN_WSH, TOKEN_OR_I, TOKEN_PK, TOKEN_PK};
+    assert_int_equal(s.count, 4);
+    for (int i = 0; i < 4; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+// wsh(c:andor(0,pk_k(@0/**),pk_k(@1/**))) — three-child node: visits in
+// pre-order (root, first child, second child, third child).
+static void test_traverse_andor(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("wsh(c:andor(0,pk_k(@0/**),pk_k(@1/**)))", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    // TOKEN_WSH → TOKEN_C → TOKEN_ANDOR → TOKEN_0, TOKEN_PK_K, TOKEN_PK_K
+    PolicyNodeType expected[] = {TOKEN_WSH, TOKEN_C, TOKEN_ANDOR, TOKEN_0, TOKEN_PK_K, TOKEN_PK_K};
+    assert_int_equal(s.count, 6);
+    for (int i = 0; i < 6; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+// wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),ac:pk_k(@2/**))) — thresh node
+// with a linked list of children; verifies all children and their wrappers
+// are visited left-to-right.
+static void test_traverse_thresh(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("wsh(thresh(2,c:pk_k(@0/**),ac:pk_k(@1/**),ac:pk_k(@2/**)))",
+                             out,
+                             sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    // TOKEN_WSH → TOKEN_THRESH →
+    //   child 0: TOKEN_C → TOKEN_PK_K
+    //   child 1: TOKEN_A → TOKEN_C → TOKEN_PK_K   (ac: = a: wrapping c:)
+    //   child 2: TOKEN_A → TOKEN_C → TOKEN_PK_K
+    PolicyNodeType expected[] = {TOKEN_WSH,
+                                 TOKEN_THRESH,
+                                 TOKEN_C,
+                                 TOKEN_PK_K,
+                                 TOKEN_A,
+                                 TOKEN_C,
+                                 TOKEN_PK_K,
+                                 TOKEN_A,
+                                 TOKEN_C,
+                                 TOKEN_PK_K};
+    assert_int_equal(s.count, 10);
+    for (int i = 0; i < 10; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+// tr(@0/**) — taproot key-path only; no script tree, callback fires once.
+static void test_traverse_tr_no_script(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("tr(@0/**)", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    assert_int_equal(s.count, 1);
+    assert_int_equal(s.types[0], TOKEN_TR);
+}
+
+/** tr(@0/**,pk(@1/**)) — taproot with a single tapleaf. */
+static void test_traverse_tr_one_leaf(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("tr(@0/**,pk(@1/**))", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    // TOKEN_TR fires for the root; then the taptree leaf fires TOKEN_PK
+    PolicyNodeType expected[] = {TOKEN_TR, TOKEN_PK};
+    assert_int_equal(s.count, 2);
+    for (int i = 0; i < 2; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+/** tr(@0/**,{pk(@1/**),pk(@2/**)}) — taproot with two tapleaves. */
+static void test_traverse_tr_two_leaves(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("tr(@0/**,{pk(@1/**),pk(@2/**)})", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    // root TOKEN_TR; left leaf TOKEN_PK(@1); right leaf TOKEN_PK(@2)
+    PolicyNodeType expected[] = {TOKEN_TR, TOKEN_PK, TOKEN_PK};
+    assert_int_equal(s.count, 3);
+    for (int i = 0; i < 3; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+/**
+ * tr with a nested taptree (three leaves): left leaf pk(@1), right subtree with
+ * pk(@2) and pk(@3). Verifies that the binary tree structure is traversed
+ * depth-first left-to-right.
+ */
+static void test_traverse_tr_nested_tree(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    // tr(@0/**,{pk(@1/**),{pk(@2/**),pk(@3/**)}})  — nested taptree
+    assert_true(parse_policy("tr(@0/**,{pk(@1/**),{pk(@2/**),pk(@3/**)}})", out, sizeof(out)) >= 0);
+
+    traverse_collect_t s = {.count = 0, .max_visits = -1};
+    assert_int_equal(traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s), 0);
+
+    // TOKEN_TR; left leaf TOKEN_PK(@1); right subtree: TOKEN_PK(@2), TOKEN_PK(@3)
+    PolicyNodeType expected[] = {TOKEN_TR, TOKEN_PK, TOKEN_PK, TOKEN_PK};
+    assert_int_equal(s.count, 4);
+    for (int i = 0; i < 4; i++) assert_int_equal(s.types[i], expected[i]);
+}
+
+/**
+ * Verifies that returning a negative value from the callback aborts the
+ * traversal immediately: when max_visits is set to 2, the traverse should
+ * stop after visiting the second node and return -1.
+ */
+static void test_traverse_callback_abort(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(parse_policy("wsh(or_i(pk(@0/**),pk(@1/**)))", out, sizeof(out)) >= 0);
+
+    // The DFS order is: TOKEN_WSH, TOKEN_OR_I, TOKEN_PK, TOKEN_PK.
+    // Abort after seeing 2 nodes; traversal must stop before TOKEN_PK nodes.
+    traverse_collect_t s = {.count = 0, .max_visits = 2};
+    int ret = traverse_policy_dfs((policy_node_t *) out, traverse_collect_cb, &s);
+    assert_true(ret < 0);
+    assert_int_equal(s.count, 2);
+    assert_int_equal(s.types[0], TOKEN_WSH);
+    assert_int_equal(s.types[1], TOKEN_OR_I);
+}
+
 int main() {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_parse_policy_map_singlesig_1),
@@ -691,6 +899,16 @@ int main() {
         cmocka_unit_test(test_get_policy_segwit_version),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
+        cmocka_unit_test(test_traverse_single_leaf),
+        cmocka_unit_test(test_traverse_wsh_multi),
+        cmocka_unit_test(test_traverse_or_i),
+        cmocka_unit_test(test_traverse_andor),
+        cmocka_unit_test(test_traverse_thresh),
+        cmocka_unit_test(test_traverse_tr_no_script),
+        cmocka_unit_test(test_traverse_tr_one_leaf),
+        cmocka_unit_test(test_traverse_tr_two_leaves),
+        cmocka_unit_test(test_traverse_tr_nested_tree),
+        cmocka_unit_test(test_traverse_callback_abort),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
