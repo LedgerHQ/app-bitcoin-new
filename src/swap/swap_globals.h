@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef HAVE_SWAP
+
 #include <stdint.h>
 
 enum {
@@ -18,3 +20,5 @@ typedef struct swap_globals_s {
 } swap_globals_t;
 
 extern swap_globals_t G_swap_state;
+
+#endif /* HAVE_SWAP */

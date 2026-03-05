@@ -1,3 +1,5 @@
+#ifdef HAVE_SWAP
+
 #include <string.h>
 
 /* SDK headers */
@@ -134,3 +136,5 @@ void swap_handle_check_address(check_address_parameters_t* params) {
     PRINTF("Addresses match\n");
     params->result = 1;
 }
+
+#endif /* HAVE_SWAP */

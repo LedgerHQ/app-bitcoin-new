@@ -1,3 +1,5 @@
+#ifdef HAVE_SWAP
+
 /* SDK headers */
 #include "read.h"
 #include "swap_lib_calls.h"
@@ -23,3 +25,5 @@ void swap_handle_get_printable_amount(get_printable_amount_parameters_t *params)
                        (uint64_t) (read_u64_be(amount, 0)),  // Cast prevents weird compilo bug
                        params->printable_amount);
 }
+
+#endif /* HAVE_SWAP */

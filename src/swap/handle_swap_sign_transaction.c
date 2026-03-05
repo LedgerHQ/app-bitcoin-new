@@ -1,3 +1,5 @@
+#ifdef HAVE_SWAP
+
 #include <assert.h>
 
 #include "handle_swap_sign_transaction.h"
@@ -94,3 +96,5 @@ void __attribute__((noreturn)) finalize_exchange_sign_transaction(bool is_succes
     *G_swap_sign_return_value_address = is_success;
     os_lib_end();
 }
+
+#endif /* HAVE_SWAP */
