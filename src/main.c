@@ -38,7 +38,6 @@
 #include "parser.h"
 #include "sw.h"
 #include "swap_globals.h"
-#include "swap_lib_calls.h"
 #include "wallet.h"
 
 #ifdef HAVE_BOLOS_APP_STACK_CANARY
@@ -85,13 +84,15 @@ const command_descriptor_t COMMAND_DESCRIPTORS[] = {
 // clang-format on
 
 static void initialize_app_globals() {
-    io_reset_timeouts();
+    ioe_reset_timeouts();
 
     // We only zero out should_exit field and not the entire G_swap_state, as
     // we need the globals initialization to happen _after_ calling copy_transaction_parameters when
     // processing a SIGN_TRANSACTION request from the swap app (which initializes the other fields
     // of G_swap_state).
+#ifdef HAVE_SWAP
     G_swap_state.should_exit = false;
+#endif /* HAVE_SWAP */
 }
 
 /**
@@ -135,7 +136,7 @@ void app_main() {
         // Parse APDU command from G_io_apdu_buffer
         if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
             PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
-            io_send_sw(SW_WRONG_DATA_LENGTH);
+            ioe_send_sw(SW_WRONG_DATA_LENGTH);
             continue;
         }
 
@@ -147,10 +148,10 @@ void app_main() {
                cmd.lc,
                cmd.lc,
                cmd.data);
-
+#ifdef HAVE_SWAP
         if (G_called_from_swap) {
             if (cmd.cla != CLA_APP) {
-                io_send_sw(SW_CLA_NOT_SUPPORTED);
+                ioe_send_sw(SW_CLA_NOT_SUPPORTED);
                 continue;
             }
             if (cmd.ins != GET_EXTENDED_PUBKEY && cmd.ins != GET_WALLET_ADDRESS &&
@@ -158,19 +159,22 @@ void app_main() {
                 PRINTF(
                     "Only GET_EXTENDED_PUBKEY, GET_WALLET_ADDRESS, SIGN_PSBT and "
                     "GET_MASTER_FINGERPRINT can be called during swap\n");
-                io_send_sw(SW_INS_NOT_SUPPORTED);
+                ioe_send_sw(SW_INS_NOT_SUPPORTED);
                 continue;
             }
         }
 
+#endif /* HAVE_SWAP */
         // Dispatch structured APDU command to handler
         apdu_dispatcher(COMMAND_DESCRIPTORS,
                         sizeof(COMMAND_DESCRIPTORS) / sizeof(COMMAND_DESCRIPTORS[0]),
                         ui_menu_main,
                         &cmd);
+#ifdef HAVE_SWAP
         if (G_called_from_swap && G_swap_state.should_exit) {
             // Bitcoin app will keep listening as long as it does not receive a valid TX
             finalize_exchange_sign_transaction(true);
         }
+#endif /* HAVE_SWAP */
     }
 }

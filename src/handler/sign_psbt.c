@@ -1021,6 +1021,7 @@ preprocess_outputs(dispatcher_context_t *dc,
     return true;
 }
 
+#ifdef HAVE_SWAP
 static bool __attribute__((noinline))
 execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
@@ -1085,8 +1086,8 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         }
 
         uint8_t second_byte = opreturn_script[1];
-        size_t push_opcode_size;  // the length of the push opcode (1 or 2 bytes)
-        size_t data_size;         // the length of the actual data embedded in the OP_RETURN output
+        size_t push_opcode_size = 0;  // the length of the push opcode (1 or 2 bytes)
+        size_t data_size = 0;  // the length of the actual data embedded in the OP_RETURN output
         if (2 <= second_byte && second_byte <= 75) {
             push_opcode_size = 1;
             data_size = second_byte;
@@ -1167,22 +1168,22 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         finalize_exchange_sign_transaction(false);
     }
 
-    char output_description_len = strlen(output_description);
+    size_t output_description_len = strlen(output_description);
 
     // Check that the external output's address matches the request from app-exchange
-    int swap_addr_len = strlen(G_swap_state.destination_address);
+    size_t swap_addr_len = strlen(G_swap_state.destination_address);
     if (swap_addr_len != output_description_len ||
         0 !=
             strncmp(G_swap_state.destination_address, output_description, output_description_len)) {
         // address did not match
         PRINTF("Mismatching address for swap\n");
         PRINTF("Expected: ");
-        for (int i = 0; i < swap_addr_len; i++) {
+        for (size_t i = 0; i < swap_addr_len; i++) {
             PRINTF("%c", G_swap_state.destination_address[i]);
         }
         PRINTF("\n");
         PRINTF("Found: ");
-        for (int i = 0; i < output_description_len; i++) {
+        for (size_t i = 0; i < output_description_len; i++) {
             PRINTF("%c", output_description[i]);
         }
         PRINTF("\n");
@@ -1192,6 +1193,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
 
     return true;
 }
+#endif /* HAVE_SWAP */
 
 static bool __attribute__((noinline))
 display_output(dispatcher_context_t *dc,
@@ -2167,6 +2169,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
     // we execute the signing flow only if we're expected to produce any signature
     // (including, possibly, any MuSig2 partial signature from Round 2 of MuSig2)
     if (!only_signing_for_musig || st.has_musig2_pub_nonces) {
+#ifdef HAVE_SWAP
         if (G_called_from_swap) {
             /** SWAP CHECKS
              *
@@ -2175,7 +2178,9 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
 
             // During swaps, the user approval was already obtained in the exchange app
             if (!execute_swap_checks(dc, &st)) return;
-        } else {
+        } else
+#endif /* HAVE_SWAP */
+        {
             /** TRANSACTION CONFIRMATION
              *
              *  Display each non-change output, and transaction fees, and acquire user confirmation,
@@ -2184,7 +2189,7 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
         }
 
         // Signing always takes some time, so we rather not wait before showing the spinner
-        io_show_processing_screen();
+        ioe_show_processing_screen();
 
         /** SIGNING FLOW
          *
@@ -2193,7 +2198,10 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
          */
         int sign_result = sign_transaction(dc, &st, cache, &signing_state, internal_inputs);
 
-        if (!G_called_from_swap) {
+#ifdef HAVE_SWAP
+        if (!G_called_from_swap)
+#endif /* HAVE_SWAP */
+        {
             ui_post_processing_confirm_transaction(dc, sign_result);
         }
 
@@ -2201,10 +2209,12 @@ void handler_sign_psbt(dispatcher_context_t *dc, uint8_t protocol_version) {
             return;
         }
 
+#ifdef HAVE_SWAP
         // Only if called from swap, the app should terminate after sending the response
         if (G_called_from_swap) {
             G_swap_state.should_exit = true;
         }
+#endif /* HAVE_SWAP */
     }
 
     // MuSig2: if there is an active session at the end of round 1, we move it to persistent

@@ -42,7 +42,6 @@
 #include "script.h"
 #include "segwit_addr.h"
 #include "sw.h"
-#include "swap_globals.h"
 #include "wallet.h"
 
 void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_version) {
@@ -155,12 +154,14 @@ void handler_get_wallet_address(dispatcher_context_t *dc, uint8_t protocol_versi
         is_wallet_default = false;
     }
 
+#ifdef HAVE_SWAP
     // Swap feature: check that the wallet policy is a default one
     if (G_called_from_swap && !is_wallet_default) {
         PRINTF("Must be a default wallet policy for swap feature\n");
         SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_WRONG_METHOD_NONDEFAULT_POLICY);
         finalize_exchange_sign_transaction(false);
     }
+#endif /* HAVE_SWAP */
 
     {
         uint8_t computed_wallet_id[32];

@@ -75,7 +75,7 @@ static bool io_ui_process(dispatcher_context_t *context) {
     g_ux_flow_ended = false;
 
     // We are not waiting for the client's input, nor we are doing computations on the device
-    io_clear_processing_timeout();
+    ioe_clear_processing_timeout();
 
 #ifdef REVAMPED_IO
     do {
@@ -91,7 +91,7 @@ static bool io_ui_process(dispatcher_context_t *context) {
 #endif  // !REVAMPED_IO
 
     // We're back at work, we want to show the "Processing..." screen when appropriate
-    io_start_processing_timeout();
+    ioe_start_processing_timeout();
 
     return g_ux_flow_response;
 }

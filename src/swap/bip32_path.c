@@ -1,3 +1,4 @@
+#ifdef HAVE_SWAP
 
 #include "bip32_path.h"
 
@@ -17,3 +18,5 @@ bool parse_serialized_path(bip32_path_t* path,
     }
     return true;
 }
+
+#endif /* HAVE_SWAP */
