@@ -230,7 +230,6 @@ describe("test AppClient", () => {
         expResult: "tb1qmyauyzn08cduzdqweexgna2spwd0rndj55fsrkefry2cpuyt4cpsn2pg28",
         walletHmac: Buffer.from("d7c7a60b4ab4a14c1bf8901ba627d72140b2fb907f2b4e35d2e693bce9fbb371", "hex")
       },
-      // additional descriptor/address vectors from python tests (not previously covered in JS)
       {
         policy: new WalletPolicy(
           "Cold storage",
