@@ -2798,6 +2798,125 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
     }
 }
 
+static int traverse_policy_node_tree(const policy_node_tree_t *tree,
+                                     policy_node_callback_t callback,
+                                     void *callback_state) {
+    if (tree->is_leaf) {
+        return traverse_policy_dfs(r_policy_node(&tree->script), callback, callback_state);
+    } else {
+        int ret = traverse_policy_node_tree(r_policy_node_tree(&tree->left_tree),
+                                            callback,
+                                            callback_state);
+        if (ret < 0) return ret;
+        return traverse_policy_node_tree(r_policy_node_tree(&tree->right_tree),
+                                         callback,
+                                         callback_state);
+    }
+}
+
+int traverse_policy_dfs(const policy_node_t *policy_node,
+                        policy_node_callback_t callback,
+                        void *callback_state) {
+    if (callback == NULL) {
+        return -1;
+    }
+
+    // Visit the current node first (pre-order)
+    int ret = callback(policy_node, callback_state);
+    if (ret < 0) return ret;
+
+    switch (policy_node->type) {
+        // Leaf nodes with no child scripts
+        case TOKEN_0:
+        case TOKEN_1:
+        case TOKEN_PK_K:
+        case TOKEN_PK_H:
+        case TOKEN_PK:
+        case TOKEN_PKH:
+        case TOKEN_WPKH:
+        case TOKEN_OLDER:
+        case TOKEN_AFTER:
+        case TOKEN_SHA256:
+        case TOKEN_HASH256:
+        case TOKEN_RIPEMD160:
+        case TOKEN_HASH160:
+        case TOKEN_MULTI:
+        case TOKEN_MULTI_A:
+        case TOKEN_SORTEDMULTI:
+        case TOKEN_SORTEDMULTI_A:
+            return 0;
+
+        // Nodes with a single child script (including miniscript wrappers)
+        case TOKEN_SH:
+        case TOKEN_WSH:
+        case TOKEN_A:
+        case TOKEN_S:
+        case TOKEN_C:
+        case TOKEN_T:
+        case TOKEN_D:
+        case TOKEN_V:
+        case TOKEN_J:
+        case TOKEN_N:
+        case TOKEN_L:
+        case TOKEN_U: {
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
+            return traverse_policy_dfs(r_policy_node(&node->script), callback, callback_state);
+        }
+
+        // Nodes with exactly two child scripts
+        case TOKEN_AND_V:
+        case TOKEN_AND_B:
+        case TOKEN_AND_N:
+        case TOKEN_OR_B:
+        case TOKEN_OR_C:
+        case TOKEN_OR_D:
+        case TOKEN_OR_I: {
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[0]), callback, callback_state);
+            if (ret < 0) return ret;
+            return traverse_policy_dfs(r_policy_node(&node->scripts[1]), callback, callback_state);
+        }
+
+        // Nodes with exactly three child scripts
+        case TOKEN_ANDOR: {
+            const policy_node_with_script3_t *node =
+                (const policy_node_with_script3_t *) policy_node;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[0]), callback, callback_state);
+            if (ret < 0) return ret;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[1]), callback, callback_state);
+            if (ret < 0) return ret;
+            return traverse_policy_dfs(r_policy_node(&node->scripts[2]), callback, callback_state);
+        }
+
+        // Nodes with a linked list of child scripts
+        case TOKEN_THRESH: {
+            const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy_node;
+            policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&node->scriptlist);
+            while (cur != NULL) {
+                ret = traverse_policy_dfs(r_policy_node(&cur->script), callback, callback_state);
+                if (ret < 0) return ret;
+                cur = r_policy_node_scriptlist(&cur->next);
+            }
+            return 0;
+        }
+
+        case TOKEN_TR: {
+            const policy_node_tr_t *node = (const policy_node_tr_t *) policy_node;
+            if (!isnull_policy_node_tree(&node->tree)) {
+                return traverse_policy_node_tree(r_policy_node_tree(&node->tree),
+                                                 callback,
+                                                 callback_state);
+            }
+            return 0;
+        }
+        case TOKEN_INVALID:
+        default:
+            PRINTF("traverse_policy_dfs: unexpected token %d\n", policy_node->type);
+            return -1;
+    }
+}
+
 #ifndef SKIP_FOR_CMOCKA
 
 void get_policy_wallet_id(policy_map_wallet_header_t *wallet_header, uint8_t out[static 32]) {
