@@ -35,7 +35,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
     }
     uint32_t preimage_len = (uint32_t) preimage_len_u64;
 
-    if (preimage_len < 1) {
+    if (preimage_len < 1 || partial_data_len == 0) {
         // at least the initial 0x00 prefix should be there
         return -3;
     }

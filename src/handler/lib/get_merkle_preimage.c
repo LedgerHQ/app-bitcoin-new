@@ -106,10 +106,12 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
             return -9;
         }
 
+        data_ptr = dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset;
+
         // update hash
         crypto_hash_update(
             &hash_context->header,
-            dispatcher_context->read_buffer.ptr + dispatcher_context->read_buffer.offset,
+            data_ptr,
             n_bytes);
 
         // write bytes to output

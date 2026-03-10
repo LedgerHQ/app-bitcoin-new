@@ -269,26 +269,37 @@ uint32_t crypto_get_master_key_fingerprint() {
 }
 
 bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t key[static 32]) {
-    // TODO: is there a better way?
-    //       The label is a byte string in SLIP-0021, but os_derive_bip32_with_seed_no_throw
-    //       accesses the `path` argument as an array of uint32_t, causing a device freeze if memory
-    //       is not aligned.
+    // The label is a byte string in SLIP-0021, but os_derive_bip32_with_seed_no_throw
+    // accesses the `path` argument as an array of uint32_t, causing a device freeze if memory
+    // is not aligned.
+    // As a workaround, we copy the label into a local buffer aligned to 4 bytes.
+
     uint8_t label_copy[32] __attribute__((aligned(4)));
 
-    memcpy(label_copy, label, label_len);
-
-    if (os_derive_bip32_with_seed_no_throw(HDW_SLIP21,
-                                           CX_CURVE_SECP256K1,
-                                           (uint32_t *) label_copy,
-                                           label_len,
-                                           key,
-                                           NULL,
-                                           NULL,
-                                           0) != CX_OK) {
+    // Fail if the length of the buffer is longer than the local buffer
+    if (label_len > sizeof(label_copy)) {
         return false;
     }
 
-    return true;
+    memcpy(label_copy, label, label_len);
+
+    // The SDK function below requires the output key array to be 64 bytes long
+    uint8_t tmp_key[64] = {0};
+    cx_err_t ret = os_derive_bip32_with_seed_no_throw(HDW_SLIP21,
+                                                      CX_CURVE_SECP256K1,
+                                                      (uint32_t *) label_copy,
+                                                      label_len,
+                                                      tmp_key,
+                                                      NULL,
+                                                      NULL,
+                                                      0);
+    if (ret == CX_OK) {
+        // Only the first 32 bytes are used for SLIP21
+        memcpy(key, tmp_key, 32);
+    }
+    explicit_bzero(tmp_key, sizeof(tmp_key));
+
+    return ret == CX_OK;
 }
 
 int get_extended_pubkey_at_path(const uint32_t bip32_path[],

@@ -80,7 +80,7 @@ def run_test_e2e(navigator: Navigator, client: RaggerClient, wallet_policy: Wall
     rpc_test_wallet.sendtoaddress(T(address_hww), "0.1")
     generate_blocks(1)
 
-    assert multisig_rpc.getwalletinfo()["balance"] == Decimal("0.1")
+    assert multisig_rpc.getbalances()["mine"]["trusted"] == Decimal("0.1")
 
     # ==> prepare a psbt spending from the wallet
 

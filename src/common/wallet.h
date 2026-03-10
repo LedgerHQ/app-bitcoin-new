@@ -488,6 +488,30 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                                        policy_node_ext_info_t *out,
                                        MiniscriptContext ctx);
 
+/**
+ * Callback type for traverse_policy_dfs.
+ * Called for each node in depth-first (pre-order) traversal.
+ *
+ * @param node pointer to the current policy node
+ * @param callback_state opaque pointer passed through from the caller
+ * @return 0 on success; a negative number to abort traversal with an error.
+ */
+typedef int (*policy_node_callback_t)(const policy_node_t *node, void *callback_state);
+
+/**
+ * Recursively traverses a descriptor template tree in depth-first (pre-order) order, calling
+ * the callback for each node.
+ * Traversal stops early if the callback returns a negative value.
+ *
+ * @param policy_node pointer to the root of the subtree to traverse
+ * @param callback function called for each node
+ * @param callback_state opaque pointer forwarded to the callback
+ * @return 0 on success; a negative number on error (from callback or unexpected node type).
+ */
+int traverse_policy_dfs(const policy_node_t *policy_node,
+                        policy_node_callback_t callback,
+                        void *callback_state);
+
 #ifndef SKIP_FOR_CMOCKA
 
 /**

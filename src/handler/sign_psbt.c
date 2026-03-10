@@ -234,7 +234,7 @@ static int hash_output_n(dispatcher_context_t *dc,
                                                        1,
                                                        out_script,
                                                        sizeof(out_script));
-    if (out_script_len == -1) {
+    if (out_script_len < 0) {
         return -1;
     }
 
@@ -380,6 +380,9 @@ static int get_amount_scriptpubkey_from_psbt(
 
 // Convenience function to share common logic when processing all the
 // PSBT_{IN|OUT}_{TAP}?_BIP32_DERIVATION fields.
+// Note: This function must return -1 only on errors (causing signing to abort).
+//       It should return 1 if a derivation that makes sense for this input/output is found.
+//       It should return 0 otherwise (no match found, but continue the signing flow).
 static int read_change_and_index_from_psbt_bip32_derivation(
     dispatcher_context_t *dc,
     placeholder_info_t *placeholder_info,
@@ -421,7 +424,7 @@ static int read_change_and_index_from_psbt_bip32_derivation(
 
     if (der_len < 2 || der_len > MAX_BIP32_PATH_STEPS) {
         PRINTF("BIP32_DERIVATION path too long\n");
-        return -1;
+        return 0;
     }
 
     // if this derivation path matches the internal placeholder,
@@ -1168,8 +1171,8 @@ static bool __attribute__((noinline)) display_output(dispatcher_context_t *dc,
         // Swap feature: do not show the address to the user, but double check it matches
         // the request from app-exchange; it must be the only external output (checked
         // elsewhere).
-        int swap_addr_len = strlen(G_swap_state.destination_address);
-        if (swap_addr_len != address_len ||
+        size_t swap_addr_len = strlen(G_swap_state.destination_address);
+        if (swap_addr_len != (size_t)address_len ||
             0 != strncmp(G_swap_state.destination_address, output_address, address_len)) {
             // address did not match
             PRINTF("Mismatching address for swap\n");
@@ -1254,7 +1257,7 @@ static bool read_outputs(dispatcher_context_t *dc,
                                                        output.in_out.scriptPubKey,
                                                        sizeof(output.in_out.scriptPubKey));
 
-        if (result_len == -1 || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
+        if (result_len < 0  || result_len > (int) sizeof(output.in_out.scriptPubKey)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
