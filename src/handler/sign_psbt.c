@@ -1123,7 +1123,7 @@ execute_swap_checks(dispatcher_context_t *dc, sign_psbt_state_t *st) {
             finalize_exchange_sign_transaction(false);
         }
 
-        // Make sure there is a singla data push
+        // Make sure there is a single data push
         if (opreturn_script_len != 1 + push_opcode_size + data_size) {
             PRINTF("Invalid OP_RETURN Script length in cross-chain swap\n");
             SEND_SW_EC(dc, SW_FAIL_SWAP, EC_SWAP_ERROR_CROSSCHAIN_WRONG_METHOD);
