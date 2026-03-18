@@ -739,7 +739,7 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
         }
 
-        if (input.prevout_amount > 21000000ULL * 100000000ULL) {
+        if (input.prevout_amount > BITCOIN_TOTAL_SUPPLY) {
             // sanity check to avoid overflows in amounts
             PRINTF("Input amount exceed Bitcoin total supply!\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -963,7 +963,7 @@ preprocess_outputs(dispatcher_context_t *dc,
         }
         uint64_t value = read_u64_le(raw_result, 0);
 
-        if (value > 21000000ULL * 100000000ULL) {
+        if (value > BITCOIN_TOTAL_SUPPLY) {
             // sanity check to avoid overflows in amounts
             PRINTF("Output amount exceed Bitcoin total supply!\n");
             SEND_SW(dc, SW_INCORRECT_DATA);
