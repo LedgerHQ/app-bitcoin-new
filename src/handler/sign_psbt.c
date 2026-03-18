@@ -739,6 +739,13 @@ preprocess_inputs(dispatcher_context_t *dc,
             }
         }
 
+        if (input.prevout_amount > 21000000ULL * 100000000ULL) {
+            // sanity check to avoid overflows in amounts
+            PRINTF("Input amount exceed Bitcoin total supply!\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
         // check if the input is internal; if not, continue
 
         int is_internal = is_in_out_internal(dc, st, sign_psbt_cache, &input.in_out, true);
@@ -955,6 +962,13 @@ preprocess_outputs(dispatcher_context_t *dc,
             return false;
         }
         uint64_t value = read_u64_le(raw_result, 0);
+
+        if (value > 21000000ULL * 100000000ULL) {
+            // sanity check to avoid overflows in amounts
+            PRINTF("Output amount exceed Bitcoin total supply!\n");
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
 
         output.value = value;
         st->outputs.total_amount += value;
