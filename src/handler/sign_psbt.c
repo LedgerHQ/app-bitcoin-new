@@ -1957,7 +1957,7 @@ static bool __attribute__((noinline)) produce_musig2_pubnonces(
             continue;
         }
 
-        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info) == true) {
+        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
             continue;
         }
 
@@ -2036,7 +2036,7 @@ sign_transaction(dispatcher_context_t *dc,
             continue;
         }
 
-        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info) == true) {
+        if (!fill_keyexpr_info_if_internal(dc, st, keyexpr_info)) {
             continue;
         }
 
