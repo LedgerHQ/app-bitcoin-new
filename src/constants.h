@@ -126,3 +126,6 @@ _Static_assert(MAX_BIP32_PATH_STEPS == MAX_BIP32_PATH,
 
 #define MAX_BIP44_ACCOUNT_RECOMMENDED       100
 #define MAX_BIP44_ADDRESS_INDEX_RECOMMENDED 50000
+
+// Upper bound of Bitcoin's total supply in satoshis
+#define BITCOIN_TOTAL_SUPPLY (21000000ULL * 100000000UL)
