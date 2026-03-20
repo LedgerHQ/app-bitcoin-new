@@ -4,7 +4,11 @@
 #include "dispatcher.h"
 
 /**
- * TODO: docs
+ * Retrieves the hash of the leaf at `leaf_index` in the Merkle tree identified by `merkle_root`
+ * and `tree_size`, and verifies the proof returned by the host against `merkle_root`.
+ *
+ * On success, writes the 32-byte leaf hash to `out` and returns 0. Returns a negative value on
+ * failure.
  */
 int call_get_merkle_leaf_hash(dispatcher_context_t *dispatcher_context,
                               const uint8_t merkle_root[static 32],
