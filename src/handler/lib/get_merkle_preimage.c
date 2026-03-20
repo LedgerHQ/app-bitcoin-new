@@ -110,11 +110,10 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
         bytes_remaining -= n_bytes;
     }
 
-    // hack: we pass the address of the final accumulator inside cx_sha256_t, so we don't need
-    // an additional variable in the stack to store the final hash.
-    crypto_hash_digest(&hash_context.header, (uint8_t *) &hash_context.acc, 32);
+    uint8_t final_hash[32];
+    crypto_hash_digest(&hash_context.header, final_hash, 32);
 
-    if (memcmp(hash_context.acc, hash, 32) != 0) {
+    if (memcmp(final_hash, hash, 32) != 0) {
         PRINTF("Hash mismatch.\n");
         return -10;
     }
