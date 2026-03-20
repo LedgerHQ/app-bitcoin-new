@@ -17,7 +17,7 @@
 int call_stream_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                      const merkleized_map_commitment_t *map,
                                      const uint8_t *key,
-                                     int key_len,
+                                     size_t key_len,
                                      void (*len_callback)(size_t, void *),
                                      void (*callback)(buffer_t *, void *),
                                      void *callback_state);

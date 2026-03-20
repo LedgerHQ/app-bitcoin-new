@@ -9,7 +9,7 @@
 int call_get_merkleized_map_value_hash(dispatcher_context_t *dispatcher_context,
                                        const merkleized_map_commitment_t *map,
                                        const uint8_t *key,
-                                       int key_len,
+                                       size_t key_len,
                                        uint8_t out[static 32]) {
     // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
