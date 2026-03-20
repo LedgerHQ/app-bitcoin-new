@@ -19,9 +19,9 @@
 int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   const merkleized_map_commitment_t *map,
                                   const uint8_t *key,
-                                  int key_len,
+                                  size_t key_len,
                                   uint8_t *out,
-                                  int out_len);
+                                  size_t out_len);
 
 /**
  * Convenience shortcut to read a little-endian unsigned 32-bit int.
@@ -30,7 +30,7 @@ int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
 static inline int call_get_merkleized_map_value_u32_le(dispatcher_context_t *dispatcher_context,
                                                        const merkleized_map_commitment_t *map,
                                                        const uint8_t *key,
-                                                       int key_len,
+                                                       size_t key_len,
                                                        uint32_t *out) {
     uint8_t result_raw[4];
 
