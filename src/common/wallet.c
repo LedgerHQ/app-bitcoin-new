@@ -131,7 +131,6 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
     if (!buffer_read_varint(buffer, &descriptor_template_len)) {
         return WITH_ERROR(-1, "Invalid wallet policy header");
     }
-    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     if (header->version == WALLET_POLICY_VERSION_V1) {
         if (descriptor_template_len > MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1) {
@@ -139,7 +138,7 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
         }
         if (!buffer_read_bytes(buffer,
                                (uint8_t *) header->descriptor_template,
-                               header->descriptor_template_len)) {
+                               descriptor_template_len)) {
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     } else {  // WALLET_POLICY_VERSION_V2
@@ -151,6 +150,8 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     }
+
+    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     uint64_t n_keys;
     if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
