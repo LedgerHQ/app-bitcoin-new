@@ -29,6 +29,12 @@ typedef struct {
     const char *name;
 } token_descriptor_t;
 
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// At the time of writing, the maximum depth measured across all the tests is 10, so 16 still
+// leaves a margin for much more complex scripts and seems unlikely to be hit in practice.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
+
 static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_SH, .name = "sh"},
     {.type = TOKEN_WSH, .name = "wsh"},
@@ -649,6 +655,10 @@ static int parse_script(buffer_t *in_buf,
                         int version,
                         size_t depth,
                         unsigned int context_flags) {
+    if (depth > MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
+        return WITH_ERROR(-1, "Script is too deeply nested");
+    }
+
     int n_wrappers = 0;
 
     // Keep track of how many key expressions have been created while parsing
