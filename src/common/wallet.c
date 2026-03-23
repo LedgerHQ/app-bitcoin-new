@@ -521,7 +521,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         // allocate musig structures
 
         musig_aggr_key_info_t *musig_info =
-            (musig_aggr_key_info_t *) buffer_alloc(out_buf, sizeof(musig_info), true);
+            (musig_aggr_key_info_t *) buffer_alloc(out_buf, sizeof(musig_aggr_key_info_t), true);
 
         if (musig_info == NULL) {
             return WITH_ERROR(-1, "Out of memory");
