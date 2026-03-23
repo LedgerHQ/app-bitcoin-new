@@ -248,7 +248,7 @@ static PolicyNodeType parse_token(buffer_t *buffer) {
  */
 static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
     uint8_t c;
-    size_t result = 0;
+    uint32_t result = 0;
     int digits_read = 0;
     while (buffer_peek(buffer, &c) && is_digit(c)) {
         ++digits_read;
@@ -259,19 +259,19 @@ static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
             return -1;
         }
 
-        if (10 * result + next_digit < result) {
-            return -1;  // overflow, integer too large
+        if (result > (UINT32_MAX - next_digit) / 10) {
+            return -1;
         }
 
         result = 10 * result + next_digit;
 
         buffer_seek_cur(buffer, 1);
     }
-    *out = result;
-
     if (digits_read == 0) {
         return -1;
     }
+
+    *out = result;
 
     return 0;
 }

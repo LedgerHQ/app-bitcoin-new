@@ -321,6 +321,17 @@ static void test_get_policy_segwit_version(void **state) {
     assert(get_policy_segwit_version(policy) == 1);
 }
 
+// Regression test: parse_unsigned_decimal must reject values that overflow uint32_t.
+// 5368709120 == 10 * 0x20000000 == 0x1_4000_0000 which does not fit in 32 bits;
+// the old overflow check silently truncated it to 0x40000000, failing to detect
+// the overflow.
+static void test_parse_unsigned_decimal_overflow(void **state) {
+    (void) state;
+
+    uint8_t out[MAX_WALLET_POLICY_MEMORY_SIZE];
+    assert_true(0 > parse_policy("wsh(older(5368709120))", out, sizeof(out)));
+}
+
 static void test_failures(void **state) {
     (void) state;
 
@@ -631,6 +642,7 @@ int main() {
         cmocka_unit_test(test_parse_policy_tr),
         cmocka_unit_test(test_parse_policy_tr_multisig),
         cmocka_unit_test(test_get_policy_segwit_version),
+        cmocka_unit_test(test_parse_unsigned_decimal_overflow),
         cmocka_unit_test(test_failures),
         cmocka_unit_test(test_miniscript_types),
     };
