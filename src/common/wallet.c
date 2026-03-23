@@ -359,7 +359,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 
     // consume the rest of the buffer into the pubkey, except possibly the final "/**"
     unsigned int ext_pubkey_len = 0;
-    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH];
+    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
     uint8_t c;
     while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_peek(buffer, &c) &&
            is_alphanumeric(c)) {
