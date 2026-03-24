@@ -5,6 +5,9 @@ from ragger_bitcoin import createRaggerClient, RaggerClient
 from ragger.backend import RaisePolicy
 from ragger.backend.interface import BackendInterface
 from ragger.conftest import configuration
+from ragger.firmware import Firmware
+from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
+from ragger.navigator import Navigator, NavInsID, NavIns
 import ledger_bitcoin._base58 as base58
 from ledger_bitcoin.common import sha256
 from ledger_bitcoin import Chain
@@ -253,3 +256,41 @@ def client(bitcoin_network: str, backend: BackendInterface) -> RaggerClient:
     backend.raise_policy = RaisePolicy.RAISE_CUSTOM
     backend.whitelisted_status = [0x9000, 0xE000]
     return createRaggerClient(backend, chain=chain, debug=True, screenshot_dir=TESTS_ROOT_DIR)
+
+
+def toggle_nonstandard_sighash_setting(navigator: Navigator, firmware: Firmware):
+    """Navigate to app settings and toggle the 'Non-standard sighash' switch.
+
+    Must be called at the start of any test that needs non-standard sighash types
+    to be accepted (the setting is disabled by default and resets per test).
+    """
+    if firmware.device.startswith("nano"):
+        # Nano NBGL: scroll to settings, enter, toggle switch,
+        # scroll through the choice dialog screens, confirm, exit settings
+        navigator.navigate(
+            [NavInsID.RIGHT_CLICK,       # home -> Settings entry
+             NavInsID.BOTH_CLICK,        # enter settings (shows switch)
+             NavInsID.BOTH_CLICK,        # tap switch -> triggers choice dialog
+             NavInsID.RIGHT_CLICK,       # choice: icon/title -> message
+             NavInsID.RIGHT_CLICK,       # choice: message -> "Confirm" button
+             NavInsID.BOTH_CLICK,        # select Confirm -> back to settings
+             NavInsID.RIGHT_CLICK,       # scroll to Back
+             NavInsID.BOTH_CLICK],       # exit settings -> home
+            screen_change_before_first_instruction=False
+        )
+    else:
+        # Touch devices (Stax/Flex/Apex): open settings, tap the switch row,
+        # confirm the "are you sure?" warning dialog, then exit settings
+        if firmware.device == "stax":
+            switch_pos = (STAX_X_CENTER, 140)
+        elif firmware.device == "flex":
+            switch_pos = (FLEX_X_CENTER, 150)
+        else:  # apex_p, apex_m
+            switch_pos = (APEX_P_X_CENTER, 90)
+        navigator.navigate(
+            [NavInsID.USE_CASE_HOME_SETTINGS,
+             NavIns(NavInsID.TOUCH, switch_pos),
+             NavInsID.USE_CASE_CHOICE_CONFIRM,
+             NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT],
+            screen_change_before_first_instruction=False
+        )
