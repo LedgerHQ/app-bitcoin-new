@@ -28,6 +28,7 @@
 #include "write.h"
 
 /* Local headers */
+#include "app_settings.h"
 #include "amount_from_psbt.h"
 #include "bitvector.h"
 #include "check_merkle_tree_sorted.h"
@@ -55,6 +56,7 @@
 #include "psbt.h"
 #include "psbt_parse_rawtx.h"
 #include "script.h"
+#include "sighash.h"
 #include "sign_psbt_cache.h"
 #include "sw.h"
 #include "swap_globals.h"
@@ -811,16 +813,20 @@ preprocess_inputs(dispatcher_context_t *dc,
             return false;
         }
 
-        if (((segwit_version > 0) && (input.sighash_type == SIGHASH_DEFAULT)) ||
-            (input.sighash_type == SIGHASH_ALL)) {
+        sighash_class_t sighash_class = classify_sighash(input.sighash_type, segwit_version);
+        if (sighash_class == SIGHASH_CLASS_SAFE) {
             PRINTF("Sighash type is SIGHASH_DEFAULT or SIGHASH_ALL\n");
 
-        } else if ((segwit_version >= 0) &&
-                   ((input.sighash_type == SIGHASH_NONE) ||
-                    (input.sighash_type == SIGHASH_SINGLE) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_ALL)) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_NONE)) ||
-                    (input.sighash_type == (SIGHASH_ANYONECANPAY | SIGHASH_SINGLE)))) {
+        } else if (sighash_class == SIGHASH_CLASS_NON_SAFE) {
+            // Non-standard sighash: only allowed if the user explicitly enabled
+            // "Allow non-standard sighash" in the application settings.
+            if (!app_settings_get_allow_nondefault_sighash()) {
+                PRINTF("Non-standard sighash rejected: setting not enabled\n");
+                SEND_SW_EC(dc,
+                           SW_SECURITY_STATUS_NOT_SATISFIED,
+                           EC_SIGN_PSBT_NONDEFAULT_SIGHASH_NOT_ALLOWED);
+                return false;
+            }
             PRINTF("Sighash type is non-default, will show a warning.\n");
             st->warnings.non_default_sighash = true;
         } else {
