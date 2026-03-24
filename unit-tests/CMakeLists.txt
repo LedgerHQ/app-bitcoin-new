@@ -53,6 +53,7 @@ add_executable(test_display_utils test_display_utils.c)
 add_executable(test_parser test_parser.c)
 add_executable(test_script test_script.c)
 add_executable(test_wallet test_wallet.c)
+add_executable(test_sighash test_sighash.c ../src/app_settings.c)
 
 # add_executable(test_crypto test_crypto.c)
 
@@ -85,6 +86,7 @@ target_link_libraries(test_display_utils PUBLIC cmocka gcov display_utils)
 target_link_libraries(test_parser PUBLIC cmocka gcov parser buffer buffer_ext varint read write bip32)
 target_link_libraries(test_script PUBLIC cmocka gcov script buffer varint read write bip32)
 target_link_libraries(test_wallet PUBLIC cmocka gcov wallet script buffer buffer_ext varint read write bip32 base58 crypto_mocks)
+target_link_libraries(test_sighash PUBLIC cmocka gcov)
 
 # target_link_libraries(test_crypto PUBLIC cmocka gcov crypto)
 add_test(test_bitvector test_bitvector)
@@ -93,5 +95,6 @@ add_test(test_display_utils test_display_utils)
 add_test(test_parser test_parser)
 add_test(test_script test_script)
 add_test(test_wallet test_wallet)
+add_test(test_sighash test_sighash)
 
 # add_test(test_crypto test_crypto)
