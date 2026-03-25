@@ -56,8 +56,14 @@
 
 /**
  * Maximum number of external outputs handled simultaneously.
+ * On the Nano X, the stack size is limited to 8K at the OS level,
+ * so the stack consumption has to be limited as well.
  */
+#ifdef TARGET_NANOX
+#define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 8
+#else
 #define MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER 16
+#endif
 
 /**
  * Maximum length (characters) of a base58check-encoded serialized extended pubkey.
