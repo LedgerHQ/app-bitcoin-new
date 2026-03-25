@@ -245,7 +245,7 @@ jobs:
       - name: Run tests
         run: |
           cd bitcoin_client_js
-          yarn install
+          yarn install --immutable
           LOG_SPECULOS=1 LOG_APDUS=1 SPECULOS="/speculos/speculos.py" yarn test
 
   deploy_js_client_check_tag:
