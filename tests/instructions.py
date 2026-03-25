@@ -4,7 +4,7 @@ from ragger.navigator import NavInsID, NavIns
 from ragger.firmware import Firmware
 from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
 
-from ragger_bitcoin.ragger_instructions import Instructions, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
+from ragger_bitcoin.ragger_instructions import Instructions, get_max_ext_output_simplified_number
 
 
 def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
@@ -286,7 +286,7 @@ def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
 
 def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, save_screenshot: bool = True, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
-    if (output_count <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER):
+    if (output_count <= get_max_ext_output_simplified_number(model)):
        # Classical case
        return sign_psbt_instruction_approve(model, save_screenshot, has_feewarning = True, go_back = go_back);
 
