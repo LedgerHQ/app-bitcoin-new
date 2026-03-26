@@ -37,11 +37,17 @@ static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
     // on the first call, compute the length the fingerprint + derivation part of the message.
     // - if non-taproot, then it's the entire message;
     // - if taproot, it's the message after the hashes are removed.
+    int max_out_data_length = 4 * (1 + MAX_BIP32_PATH_STEPS);
     if (cs->out_data_length == -1) {
         bool is_tap = cs->psbt_key_type == PSBT_IN_TAP_BIP32_DERIVATION ||
                       cs->psbt_key_type == PSBT_OUT_TAP_BIP32_DERIVATION;
 
         if (!is_tap) {
+            if (cs->total_data_length > max_out_data_length) {
+                PRINTF("BIP32 derivation longer than supported in psbt derivation\n");
+                cs->result = -1;
+                return;
+            }
             cs->out_data_length = cs->total_data_length;
         } else {
             // While BIP-0174 defines the number of hashes as a compact size integer, this
@@ -63,7 +69,7 @@ static void fpt_der_data_callback(buffer_t *data, void *callback_state) {
 
             int out_data_length = cs->total_data_length - 1 - 32 * (int) n_hashes;
 
-            if (out_data_length > 4 * (1 + MAX_BIP32_PATH_STEPS)) {
+            if (out_data_length > max_out_data_length) {
                 PRINTF("BIP32 derivation longer than supported in psbt derivation\n");
                 cs->result = -1;
                 return;
