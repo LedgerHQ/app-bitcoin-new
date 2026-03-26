@@ -412,6 +412,7 @@ end:
 
     if (error) {
         // unexpected error when signing
+        explicit_bzero(out, MAX_DER_SIG_LEN);  // never produce a valid signature on errors
         return -1;
     }
 
