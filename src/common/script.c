@@ -74,6 +74,9 @@ int get_script_type(const uint8_t script[], size_t script_len) {
 int get_script_address(const uint8_t script[], size_t script_len, char *out, size_t out_len) {
     int script_type = get_script_type(script, script_len);
     int addr_len;
+
+    if (out_len == 0) return -1;
+
     switch (script_type) {
         case SCRIPT_TYPE_P2PKH:
         case SCRIPT_TYPE_P2SH: {
