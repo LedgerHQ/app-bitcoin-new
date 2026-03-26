@@ -330,7 +330,10 @@ get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
                                                      raw_witnessUtxo,
                                                      sizeof(raw_witnessUtxo));
 
-    if (wit_utxo_len < 0) {
+    // the witness UTXO field is encoded as 8-bytes for the amount, followed by the length-prefixed
+    // scriptPubkey. We make sure that we can read at least up to the scriptPubkey length, to avoid
+    // reading a possibly-undefined byte at offset 8.
+    if (wit_utxo_len < 8 + 1) {
         return -1;
     }
     int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];
