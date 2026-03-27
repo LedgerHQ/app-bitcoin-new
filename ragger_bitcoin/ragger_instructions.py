@@ -1,6 +1,17 @@
 from ragger.navigator import NavInsID
 
 MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER = 16
+# On Nano X we have reduced the max. number of handled outputs
+# to reduce the stack consumption limited to 8k
+MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER_NANOX = 8
+
+def get_max_ext_output_simplified_number(model):
+    """Returns the device-specific MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER.
+    Nano X has a lower limit (MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER_NANOX)
+    due to memory constraints."""
+    if hasattr(model, 'name') and model.name == "nanox":
+        return MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER_NANOX
+    return MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
 
 class Instructions:
     def __init__(self, model):
@@ -49,7 +60,7 @@ class Instructions:
 
         for output_index in range(0, output_count):
             # the initial N_CACHED_EXTERNAL_OUTPUTS outputs are cached, so it is the same request
-            if output_index < MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER:
+            if output_index < get_max_ext_output_simplified_number(self.model):
                 self.same_request("Amount", NavInsID.USE_CASE_REVIEW_TAP, NavInsID.USE_CASE_REVIEW_TAP,
                             save_screenshot=save_screenshot)
             else:

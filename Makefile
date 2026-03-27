@@ -158,6 +158,16 @@ ENABLE_SWAP = 1
 ########################################
 DEFINES   += HAVE_BOLOS_APP_STACK_CANARY
 
+# Estimated maximum stack usage.
+# It acts as a build-time check to protect global variables.
+# On the Nano X, the stack size is limited to 8K at the OS level.
+ifeq ($(TARGET_NAME),TARGET_NANOX)
+    APP_STACK_MIN_SIZE := 8192
+else
+    APP_STACK_MIN_SIZE := 16384
+endif
+
+
 # If set, the app will automatically approve all requests without user interaction. Useful for performance tests.
 # It is critical that no such app is ever deployed in production.
 AUTOAPPROVE_FOR_PERF_TESTS ?= 0
