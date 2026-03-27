@@ -43,6 +43,11 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
         return -4;
     }
 
+    if (preimage_len > out_len) {
+        PRINTF("Output buffer too short\n");
+        return -10;
+    }
+
     buffer_t buffer_out = buffer_create(out, out_len);
 
     uint8_t *data_ptr =
@@ -54,7 +59,10 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
     crypto_hash_update(&hash_context.header, data_ptr, partial_data_len);
 
     // write to output buffer
-    buffer_write_bytes(&buffer_out, data_ptr, partial_data_len);
+
+    if (!buffer_write_bytes(&buffer_out, data_ptr, partial_data_len)) {
+        return -11;
+    }
 
     size_t bytes_remaining = (size_t) preimage_len - partial_data_len;
 
@@ -91,7 +99,9 @@ int call_get_preimage(dispatcher_context_t *dispatcher_context,
         // update hash
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);
 
-        buffer_write_bytes(&buffer_out, data_ptr, n_bytes);
+        if (!buffer_write_bytes(&buffer_out, data_ptr, n_bytes)) {
+            return -11;
+        }
 
         bytes_remaining -= n_bytes;
     }
