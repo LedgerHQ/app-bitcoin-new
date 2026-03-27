@@ -559,6 +559,11 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
         return -1;
     }
 
+    // If a specific output was requested, verify it was actually found
+    if (output_index >= 0 && (unsigned int) output_index >= flow_state.parser_state.n_outputs) {
+        return -1;
+    }
+
     crypto_hash_digest(&hash_context.header, outputs->txid, 32);
     cx_hash_sha256(outputs->txid, 32, outputs->txid, 32);
     return 0;
