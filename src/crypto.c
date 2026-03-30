@@ -412,6 +412,7 @@ end:
 
     if (error) {
         // unexpected error when signing
+        explicit_bzero(out, MAX_DER_SIG_LEN);  // never produce a valid signature on errors
         return -1;
     }
 
@@ -604,6 +605,11 @@ int crypto_tr_tweak_seckey(const uint8_t seckey[static 32],
 
         ret = 0;
     } while (0);
+
+    if (ret != 0) {
+        // In case of error, make sure that the output buffer doesn't contain data related to seckey
+        explicit_bzero(out, 32);
+    }
 
     explicit_bzero(&P, sizeof(P));
 

@@ -77,7 +77,11 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     buffer_t out_buffer = buffer_create(out_ptr, out_ptr_len);
 
     // write bytes to output
-    buffer_write_bytes(&out_buffer, data_ptr + 1, partial_data_len - 1);  // we skip the first byte
+    if (!buffer_write_bytes(&out_buffer,
+                            data_ptr + 1,  // we skip the first byte
+                            partial_data_len - 1)) {
+        return -11;
+    }
 
     size_t bytes_remaining = (size_t) preimage_len - partial_data_len;
 
@@ -115,7 +119,9 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
             n_bytes);
 
         // write bytes to output
-        buffer_write_bytes(&out_buffer, data_ptr, n_bytes);
+        if (!buffer_write_bytes(&out_buffer, data_ptr, n_bytes)) {
+            return -11;
+        }
 
         bytes_remaining -= n_bytes;
     }

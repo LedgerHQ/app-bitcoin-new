@@ -28,6 +28,12 @@ typedef struct {
     const char *name;
 } token_descriptor_t;
 
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// At the time of writing, the maximum depth measured across all the tests is 10, so 16 still
+// leaves a margin for much more complex scripts and seems unlikely to be hit in practice.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
+
 static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_SH, .name = "sh"},
     {.type = TOKEN_WSH, .name = "wsh"},
@@ -125,7 +131,6 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
     if (!buffer_read_varint(buffer, &descriptor_template_len)) {
         return WITH_ERROR(-1, "Invalid wallet policy header");
     }
-    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     if (header->version == WALLET_POLICY_VERSION_V1) {
         if (descriptor_template_len > MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1) {
@@ -133,7 +138,7 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
         }
         if (!buffer_read_bytes(buffer,
                                (uint8_t *) header->descriptor_template,
-                               header->descriptor_template_len)) {
+                               descriptor_template_len)) {
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     } else {  // WALLET_POLICY_VERSION_V2
@@ -145,6 +150,8 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     }
+
+    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     uint64_t n_keys;
     if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
@@ -242,7 +249,7 @@ static PolicyNodeType parse_token(buffer_t *buffer) {
  */
 static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
     uint8_t c;
-    size_t result = 0;
+    uint32_t result = 0;
     int digits_read = 0;
     while (buffer_peek(buffer, &c) && is_digit(c)) {
         ++digits_read;
@@ -253,19 +260,19 @@ static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
             return -1;
         }
 
-        if (10 * result + next_digit < result) {
-            return -1;  // overflow, integer too large
+        if (result > (UINT32_MAX - next_digit) / 10) {
+            return -1;
         }
 
         result = 10 * result + next_digit;
 
         buffer_seek_cur(buffer, 1);
     }
-    *out = result;
-
     if (digits_read == 0) {
         return -1;
     }
+
+    *out = result;
 
     return 0;
 }
@@ -359,7 +366,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 
     // consume the rest of the buffer into the pubkey, except possibly the final "/**"
     unsigned int ext_pubkey_len = 0;
-    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH];
+    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
     uint8_t c;
     while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_peek(buffer, &c) &&
            is_alphanumeric(c)) {
@@ -544,6 +551,10 @@ static int parse_script(buffer_t *in_buf,
                         int version,
                         size_t depth,
                         unsigned int context_flags) {
+    if (depth > MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
+        return WITH_ERROR(-1, "Script is too deeply nested");
+    }
+
     int n_wrappers = 0;
 
     policy_node_t *outermost_node = (policy_node_t *) buffer_get_cur(out_buf);
