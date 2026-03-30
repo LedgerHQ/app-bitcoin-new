@@ -51,7 +51,7 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     for (int i = 0; i < musig_info->n; i++) {
         // we use ext_pubkey as a temporary variable; will overwrite later
         if (0 > get_extended_pubkey_from_client(dc, &wdi, key_indexes[i], &ext_pubkey)) {
-            return -1;
+            return false;
         }
         memcpy(out->keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
     }
@@ -407,6 +407,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     if (res < 0) {
         PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
 
     // recompute secnonce from psbt_session randomness
