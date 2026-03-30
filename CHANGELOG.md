@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
+## [2.4.6] - 30-03-2026
+
+### Changed
+
+- Small updates for on-screen wording.
+
+### Fixed
+
+- Disable registering miniscript wallet policies containing `older(n)` fragments where `n` has no consensus meaning.
+- Various bug fixes and code modernizations; adopted lib_standard_app from the SDK.
+
 ## [2.4.5] - 10-02-2026
 
 ### Changed
