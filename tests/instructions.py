@@ -4,7 +4,7 @@ from ragger.navigator import NavInsID, NavIns
 from ragger.firmware import Firmware
 from ragger.firmware.touch.positions import STAX_X_CENTER, FLEX_X_CENTER, APEX_P_X_CENTER
 
-from ragger_bitcoin.ragger_instructions import Instructions, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
+from ragger_bitcoin.ragger_instructions import Instructions, get_max_ext_output_simplified_number
 
 
 def message_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
@@ -60,14 +60,14 @@ def message_instruction_reject(model: Firmware) -> Instructions:
     return instructions
 
 
-def pubkey_instruction_approve(model: Firmware) -> Instructions:
+def pubkey_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Approve")
+        instructions.new_request("Approve", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.status_dismiss("approved")
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.status_dismiss("approved", save_screenshot=save_screenshot)
     return instructions
 
 
@@ -109,15 +109,15 @@ def wallet_instruction_approve(model: Firmware) -> Instructions:
     return instructions
 
 
-def register_wallet_instruction_approve(model: Firmware) -> Instructions:
+def register_wallet_instruction_approve(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Register account")
+        instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -133,16 +133,16 @@ def register_wallet_instruction_approve_no_save(model: Firmware) -> Instructions
     return instructions
 
 
-def register_wallet_instruction_approve_long(model: Firmware) -> Instructions:
+def register_wallet_instruction_approve_long(model: Firmware, save_screenshot=True) -> Instructions:
     instructions = Instructions(model)
 
     if model.name.startswith("nano"):
-        instructions.new_request("Register account")
+        instructions.new_request("Register account", save_screenshot=save_screenshot)
     else:
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
-        instructions.choice_confirm()
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
+        instructions.choice_confirm(save_screenshot=save_screenshot)
     return instructions
 
 
@@ -286,7 +286,7 @@ def sign_psbt_instruction_approve_selftransfer(model: Firmware) -> Instructions:
 
 def sign_psbt_instruction_approve_generic(model: Firmware, output_count: int, save_screenshot: bool = True, go_back: bool = False) -> Instructions:
     instructions = Instructions(model)
-    if (output_count <= MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER):
+    if (output_count <= get_max_ext_output_simplified_number(model)):
        # Classical case
        return sign_psbt_instruction_approve(model, save_screenshot, has_feewarning = True, go_back = go_back);
 

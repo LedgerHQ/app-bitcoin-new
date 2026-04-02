@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../crypto.h"
-#include "../common/wallet.h"
+/* Local headers */
+#include "crypto.h"
+#include "wallet.h"
 
 // This allows to keep the cache size small, while only paying a performance hit for any extremely
 // complicated policy with more than 16 key expressions in total (should that occur in practice).

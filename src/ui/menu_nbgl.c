@@ -15,15 +15,16 @@
  *  limitations under the License.
  *****************************************************************************/
 
+/* SDK headers */
 #include "nbgl_use_case.h"
 
-#include "../globals.h"
-#include "./display.h"
+/* Local headers */
+#include "display.h"
 #include "menu.h"
 
 #define SETTING_INFO_NB 3
 static const char* const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer", "Copyright"};
-static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Ledger", "(c) 2025 Ledger"};
+static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Ledger", "(c) 2026 Ledger"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = SETTING_INFO_NB,

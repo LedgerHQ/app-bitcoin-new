@@ -1,10 +1,11 @@
 #include <string.h>
 
-#include "../../boilerplate/sw.h"
 #include "stream_preimage.h"
 
-#include "../../crypto.h"
-#include "../client_commands.h"
+/* Local headers */
+#include "client_commands.h"
+#include "crypto.h"
+#include "sw.h"
 
 int call_stream_preimage(dispatcher_context_t *dispatcher_context,
                          const uint8_t hash[static 32],
@@ -35,7 +36,7 @@ int call_stream_preimage(dispatcher_context_t *dispatcher_context,
     }
     uint32_t preimage_len = (uint32_t) preimage_len_u64;
 
-    if (preimage_len < 1) {
+    if (preimage_len < 1 || partial_data_len == 0) {
         // at least the initial 0x00 prefix should be there
         return -3;
     }

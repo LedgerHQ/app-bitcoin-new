@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../boilerplate/dispatcher.h"
-#include "../sign_psbt.h"
+/* Local headers */
+#include "dispatcher.h"
+#include "sign_psbt.h"
 
 // These functions are used to extract the amount and scriptPubKey of an input from the witness-utxo
 // or the non-witness-utxo of a PSBTv2.

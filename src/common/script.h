@@ -1,8 +1,12 @@
 #pragma once
 
+#include <stdbool.h>
+
+/* SDK headers */
 #include "os.h"
 
-#include "../constants.h"
+/* Local headers */
+#include "constants.h"
 
 /** Script opcodes */
 // from bitcoin-core

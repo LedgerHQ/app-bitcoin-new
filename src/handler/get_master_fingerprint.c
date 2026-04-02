@@ -17,14 +17,13 @@
 
 #include <stdint.h>
 
-#include "os_seed.h"
-
-#include "boilerplate/dispatcher.h"
-#include "boilerplate/sw.h"
-#include "../commands.h"
-#include "../crypto.h"
-
+/* Local headers */
+#include "commands.h"
+#include "crypto.h"
+#include "dispatcher.h"
 #include "handlers.h"
+#include "os_seed.h"
+#include "sw.h"
 
 void handler_get_master_fingerprint(dispatcher_context_t *dc, uint8_t protocol_version) {
     (void) protocol_version;

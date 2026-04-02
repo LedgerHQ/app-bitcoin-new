@@ -2,12 +2,14 @@
 
 #include "get_merkle_preimage.h"
 
-#include "../../boilerplate/sw.h"
-#include "../../common/buffer.h"
-#include "../../crypto.h"
-#include "../client_commands.h"
+/* SDK headers */
+#include "buffer.h"
 
-#include "../../debug-helpers/debug.h"
+/* Local headers */
+#include "client_commands.h"
+#include "crypto.h"
+#include "debug.h"
+#include "sw.h"
 
 // TODO: refactor common code with stream_preimage.c
 
@@ -68,7 +70,11 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
     buffer_t out_buffer = buffer_create(out_ptr, out_ptr_len);
 
     // write bytes to output
-    buffer_write_bytes(&out_buffer, data_ptr + 1, partial_data_len - 1);  // we skip the first byte
+    if (!buffer_write_bytes(&out_buffer,
+                            data_ptr + 1,  // we skip the first byte
+                            partial_data_len - 1)) {
+        return -11;
+    }
 
     size_t bytes_remaining = (size_t) preimage_len - partial_data_len;
 
@@ -103,16 +109,17 @@ int call_get_merkle_preimage(dispatcher_context_t *dispatcher_context,
         crypto_hash_update(&hash_context.header, data_ptr, n_bytes);
 
         // write bytes to output
-        buffer_write_bytes(&out_buffer, data_ptr, n_bytes);
+        if (!buffer_write_bytes(&out_buffer, data_ptr, n_bytes)) {
+            return -11;
+        }
 
         bytes_remaining -= n_bytes;
     }
 
-    // hack: we pass the address of the final accumulator inside cx_sha256_t, so we don't need
-    // an additional variable in the stack to store the final hash.
-    crypto_hash_digest(&hash_context.header, (uint8_t *) &hash_context.acc, 32);
+    uint8_t final_hash[32];
+    crypto_hash_digest(&hash_context.header, final_hash, 32);
 
-    if (memcmp(hash_context.acc, hash, 32) != 0) {
+    if (memcmp(final_hash, hash, 32) != 0) {
         PRINTF("Hash mismatch.\n");
         return -10;
     }

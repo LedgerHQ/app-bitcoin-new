@@ -1,15 +1,16 @@
 #pragma GCC diagnostic ignored "-Wformat-invalid-specifier"  // snprintf
 #pragma GCC diagnostic ignored "-Wformat-extra-args"         // snprintf
 
-#include <stdbool.h>  // bool
-#include <stdio.h>    // snprintf
-#include <string.h>   // memset
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
+#include "display.h"
+
+/* SDK headers */
 #include "os.h"
 #include "ux.h"
-
-#include "./display.h"
 
 // These globals are a workaround for a limitation of the UX library that
 // does not allow to pass proper callbacks and context.
@@ -74,7 +75,7 @@ static bool io_ui_process(dispatcher_context_t *context) {
     g_ux_flow_ended = false;
 
     // We are not waiting for the client's input, nor we are doing computations on the device
-    io_clear_processing_timeout();
+    ioe_clear_processing_timeout();
 
 #ifdef REVAMPED_IO
     do {
@@ -90,7 +91,7 @@ static bool io_ui_process(dispatcher_context_t *context) {
 #endif  // !REVAMPED_IO
 
     // We're back at work, we want to show the "Processing..." screen when appropriate
-    io_start_processing_timeout();
+    ioe_start_processing_timeout();
 
     return g_ux_flow_response;
 }

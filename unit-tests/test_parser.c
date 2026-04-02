@@ -7,7 +7,10 @@
 
 #include <cmocka.h>
 
-#include "common/parser.h"
+#include "common/buffer_ext.h"
+#include "common/parser_ext.h"
+#include "lib_standard_app/buffer.h"
+#include "lib_standard_app/parser.h"
 
 // An example parser that reads an uint32_t, an array of 8 bytes, and an uint8_t.
 typedef struct {

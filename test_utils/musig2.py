@@ -28,12 +28,18 @@ import struct
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
 from abc import ABC, abstractmethod
 
+import sys
+import os
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 import base58
 
 from test_utils.taproot_sighash import SIGHASH_DEFAULT, TaprootSignatureHash
-
-from . import bip0327, bip0340, hash160, sha256
-from . import taproot
+from test_utils import bip0327, bip0340, hash160, sha256
+from test_utils import taproot
 
 from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput

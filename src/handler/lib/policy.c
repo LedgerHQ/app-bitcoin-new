@@ -2,20 +2,21 @@
 
 #include "policy.h"
 
-#include "../lib/get_merkle_leaf_element.h"
-#include "../lib/get_preimage.h"
-#include "../../crypto.h"
-#include "../../musig/musig.h"
-#include "../../common/base58.h"
-#include "../../common/bitvector.h"
-#include "../../common/read.h"
-#include "../../common/script.h"
-#include "../../common/segwit_addr.h"
-#include "../../common/wallet.h"
-
-#include "../../debug-helpers/debug.h"
-
+/* SDK headers */
+#include "base58.h"
 #include "ledger_assert.h"
+#include "read.h"
+
+/* Local headers */
+#include "bitvector.h"
+#include "crypto.h"
+#include "debug.h"
+#include "get_merkle_leaf_element.h"
+#include "get_preimage.h"
+#include "musig.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "wallet.h"
 
 #define MAX_POLICY_DEPTH 10
 
@@ -416,7 +417,7 @@ execute_processor(policy_parser_state_t *state, policy_parser_processor_t proc, 
 
 // p2pkh                     ==> legacy address (start with 1 on mainnet, m or n on testnet)
 // p2sh (also nested segwit) ==> legacy script  (start with 3 on mainnet, 2 on testnet)
-// p2wpkh or p2wsh           ==> bech32         (sart with bc1 on mainnet, tb1 on testnet)
+// p2wpkh or p2wsh           ==> bech32         (start with bc1 on mainnet, tb1 on testnet)
 
 // convenience function, split from get_derived_pubkey only to improve stack usage
 // returns -1 on error, 0 if the returned key info has no wildcard (**), 1 if it has the wildcard
@@ -438,7 +439,7 @@ __attribute__((noinline, warn_unused_result)) int get_extended_pubkey_from_clien
                                                         key_index,
                                                         (uint8_t *) key_info_str,
                                                         sizeof(key_info_str));
-        if (key_info_len == -1) {
+        if (key_info_len < 0) {
             return -1;
         }
 
@@ -1162,7 +1163,7 @@ int get_wallet_script(dispatcher_context_t *dispatcher_context,
         out[1] = 32;  // PUSH 32 bytes
 
         // uint8_t h[32];
-        uint8_t *h = out + 2;  // hack: re-use the output array to save memory
+        uint8_t *h = out + 2;  // hack: reuse the output array to save memory
 
         int h_length = 0;
         if (!isnull_policy_node_tree(&tr_policy->tree)) {
@@ -1729,8 +1730,7 @@ int get_keyexpr_by_index(const policy_node_t *policy,
             int ret = 0;
             policy_node_scriptlist_t *cur_child = r_policy_node_scriptlist(&node->scriptlist);
             for (int script_idx = 0; script_idx < node->n; script_idx++) {
-                LEDGER_ASSERT(cur_child != NULL,
-                              "The script should always have exactly n child scripts");
+                LEDGER_ASSERT(cur_child != NULL, "The script must have exactly n child scripts");
 
                 found = i < (unsigned int) ret;
                 int ret_partial = get_keyexpr_by_index(r_policy_node(&cur_child->script),
@@ -1798,7 +1798,7 @@ static int get_pubkey_from_merkle_tree(dispatcher_context_t *dispatcher_context,
                                                     index,
                                                     (uint8_t *) key_info_str,
                                                     sizeof(key_info_str));
-    if (key_info_len == -1) {
+    if (key_info_len < 0) {
         return WITH_ERROR(-1, "Failed to retrieve key info");
     }
 
@@ -1945,6 +1945,22 @@ static bool are_key_placeholders_identical(const policy_node_keyexpr_t *kp1,
     LEDGER_ASSERT(false, "Unreachable code");
 }
 
+/**
+ * Callback for traverse_policy_dfs that rejects older(n) nodes with an argument that is not
+ * safe, as it sets bits with no consensus meaning (see comment in is_policy_sane() below).
+ */
+static int check_older_node_cb(const policy_node_t *node, void *callback_state) {
+    (void) callback_state;
+    if (node->type == TOKEN_OLDER) {
+        const policy_node_with_uint32_t *older = (const policy_node_with_uint32_t *) node;
+        uint32_t n = older->n & ~SEQUENCE_LOCKTIME_TYPE_FLAG;
+        if (n < 1 || n > 65535) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 int is_policy_sane(dispatcher_context_t *dispatcher_context,
                    const policy_node_t *policy,
                    int wallet_version,
@@ -2069,6 +2085,25 @@ int is_policy_sane(dispatcher_context_t *dispatcher_context,
             }
         }
     }
+
+    // For relative timelocks with `older(n)`, bits 16 to 21 and 23 to 31 have no consensus meaning
+    // per BIP-68/BIP-112. Therefore, for example, `older(65536)` is equivalent to `older(0)`, which
+    // could be dangerous as the user might expect that a timelock is enforced. For relative
+    // timelocks, we reject any value outside the following safe ranges:
+    // - between 1 and 65535 (inclusive), if bit 22 is cleared (block-based timelock)
+    // - between 1 + 2^22 = 4194305 and 65535 + 2^22 = 4259839 (inclusive), if bit 22 is set
+    // (time-based timelock)
+    //
+    // Bit 22 is SEQUENCE_LOCKTIME_TYPE_FLAG in BIP-68.
+    // Note that bit 31 (SEQUENCE_LOCKTIME_DISABLE_FLAG) is implicitly excluded, as the argument n
+    // of older(n) is guaranteed to be strictly less than 2^31 per miniscript rules, which are
+    // enforced in the policy parser.
+    //
+    // See also: https://github.com/bitcoin/bitcoin/pull/33135
+    if (0 > traverse_policy_dfs(policy, check_older_node_cb, NULL)) {
+        return WITH_ERROR(-1, "older() argument out of valid range");
+    }
+
     return 0;
 }
 

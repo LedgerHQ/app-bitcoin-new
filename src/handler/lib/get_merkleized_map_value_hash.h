@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
-#include "../../common/merkle.h"
+/* Local headers */
+#include "dispatcher.h"
+#include "merkle.h"
 
 /**
  * Given a commitment to a merkleized key-value map, this flow finds out the index of the element
@@ -13,10 +14,10 @@
  * success.
  *
  * NOTE: this does _not_ check that the keys are lexicographically sorted; the sanity check needs to
- * be done before.\
+ * be done before.
  */
 int call_get_merkleized_map_value_hash(dispatcher_context_t *dispatcher_context,
                                        const merkleized_map_commitment_t *map,
                                        const uint8_t *key,
-                                       int key_len,
+                                       size_t key_len,
                                        uint8_t out[static 32]);

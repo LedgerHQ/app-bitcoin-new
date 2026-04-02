@@ -5,7 +5,7 @@ a wallet descriptor template and the vector of key placeholder expressions.
 
 A _wallet descriptor template_ follows language very similar to output descriptor, with a few differences; the biggest one is that each `KEY` expression with a key placeholder `KP` expression, that refers to one of the keys in the _keys information vector_, plus the additional derivation steps to use for that key. Contextually, the keys information vector contains all the relevant _xpubs_, and possibly their key origin information.
 
-Each entry in the key information vector contains an _xpub_ (other types of keys supported in output script descriptors are not allowed), possible preceeded by the key origin information. The key origin information is compulsory for internal keys.
+Each entry in the key information vector contains an _xpub_ (other types of keys supported in output script descriptors are not allowed), possible preceded by the key origin information. The key origin information is compulsory for internal keys.
 
 This section formally defines wallet policies, and how they relate to
 output script descriptors.
@@ -127,7 +127,7 @@ The app supports a number of features related to wallet policies. In order to se
 
 - register a wallet, validating all the information (policy and keys involved) with the user on the trusted screen;
 - show the addresses for a registered wallet on the trusted screen;
-- sign spends from the wallet. 
+- sign spends from the wallet.
 
 Since the application is stateless, wallet registration is not persisted on device. In order to make it possible to use a registered wallet in future requests, the device returns a hmac-sha256 (32 bytes long) for the wallet upon a successful registration. The client side is responsible for persisting the wallet policy *and* the returned hmac-sha256, and to provide this information in future requests.
 

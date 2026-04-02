@@ -4,13 +4,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "os.h"
+/* SDK headers */
+#include "bip32.h"
 #include "cx.h"
-#include "constants.h"
+#include "os.h"
+#include "varint.h"
+#include "write.h"
 
-#include "./common/bip32.h"
-#include "./common/varint.h"
-#include "./common/write.h"
+/* Local headers */
+#include "constants.h"
 
 /**
  * A serialized extended pubkey according to BIP32 specifications.
@@ -327,7 +329,7 @@ bool crypto_derive_symmetric_key(const char *label, size_t label_len, uint8_t ke
 int base58_encode_address(const uint8_t in[20], uint32_t version, char *out, size_t out_len);
 
 /**
- * Signs a SHA-256 hash using the ECDSA with deterministic nonce accordin to RFC6979; the signing
+ * Signs a SHA-256 hash using the ECDSA with deterministic nonce according to RFC6979; the signing
  * private key is the one derived at the given BIP-32 path. The signature is returned in the
  * conventional DER encoding.
  *

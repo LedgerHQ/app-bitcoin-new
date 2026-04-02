@@ -1,11 +1,13 @@
+#include <assert.h>
 #include <stdint.h>
 
+/* SDK headers */
 #include "nbgl_use_case.h"
-#include "./display.h"
-#include "./menu.h"
-#include "io.h"
 
-#include <assert.h>
+/* Local headers */
+#include "display.h"
+#include "io_ext.h"
+#include "menu.h"
 
 #define REVIEW_CONFIRM FIRST_USER_TOKEN + 1
 
@@ -14,7 +16,7 @@ static const char *rejected_status;   // text displayed in rejection page (after
 
 /* Graphical resources (GA) used by the application and NBGL */
 #ifdef SCREEN_SIZE_WALLET
-const char GA_SIGN_TRANSACTION[] = "Sign transaction\nto send Bitcoin?";
+const char GA_SIGN_TRANSACTION[] = "Sign transaction\nto send bitcoin?";
 const char GA_SIGN_MESSAGE[] = "Sign message?";
 const char GA_REGISTER_ACCOUNT[] = "Register account?";
 #else
@@ -27,13 +29,12 @@ const char GA_REGISTER_ACCOUNT[] = "Register account";
 const char GA_SECURITY_RISK_TITLE[] = "Security risk detected";
 const char GA_WARN_HIGH_FEES_TITLE[] = "High fees warning";
 const char GA_RISK_EXTERNAL_INPUTS[] =
-    "This transaction has external inputs, and could spend more than you think.";
+    "This transaction has external inputs. You could spend more than expected.";
 const char GA_RISK_NON_STD_SIGHASH[] =
-    "This transaction uses non-standard signing rules (modified sighash), and could spend more "
-    "than you think.";
+    "This transaction uses non-standard signing rules (modified sighash). You could spend more "
+    "than expected.";
 const char GA_WARN_HIGH_FEES[] =
-    "You're about to review a transaction with fees above 10\% of the total amount.";
-
+    "This transaction has fees higher than 10% of the amount you’re sending.";
 #else
 const char GA_SECURITY_RISK_TITLE[] = "Security risk";
 const char GA_WARN_HIGH_FEES_TITLE[] = "High fees warning";
@@ -45,7 +46,7 @@ const char GA_WARN_HIGH_FEES[] = "Fees are above 10%\n of total amount";
 const char GA_BACK_TO_SAFETY[] = "Back to safety";
 const char GA_CONTINUE_ANYWAY[] = "Continue anyway";
 const char GA_RISK_UNVERIFIED_INPUTS[] = "Unverified inputs\nUpdate your wallet software";
-const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send Bitcoin";
+const char GA_REVIEW_TRANSACTION[] = "Review transaction\nto send bitcoin";
 const char GA_REVIEW_MESSAGE[] = "Review message";
 const char GA_LOADING_TRANSACTION[] = "Loading transaction";
 const char GA_SIGNING_TRANSACTION[] = "Signing transaction";
@@ -333,7 +334,7 @@ void ui_display_receive_in_wallet_flow(void) {
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               &pairList,
                               &ICON_APP_ACTION,
-                              "Verify Bitcoin\naddress",
+                              "Verify bitcoin\naddress",
                               NULL,
                               status_address_callback);
 }
@@ -419,7 +420,7 @@ void ui_display_default_wallet_address_flow(void) {
     nbgl_useCaseAddressReview(g_ui_state.wallet.address,
                               NULL,
                               &ICON_APP_ACTION,
-                              "Verify Bitcoin\naddress",
+                              "Verify bitcoin\naddress",
                               NULL,
                               status_address_callback);
 }

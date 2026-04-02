@@ -1,12 +1,17 @@
 #include <stdlib.h>
 
 #include "musig_signing.h"
-#include "lib_standard_app/crypto_helpers.h"
-#include "../boilerplate/sw.h"
-#include "../common/psbt.h"
-#include "../client_commands.h"
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/policy.h"
+
+/* SDK headers */
+#include "crypto_helpers.h"
+
+/* Local headers */
+#include "client_commands.h"
+#include "commands.h"
+#include "get_merkleized_map_value.h"
+#include "policy.h"
+#include "psbt.h"
+#include "sw.h"
 
 bool compute_musig_per_input_info(dispatcher_context_t *dc,
                                   sign_psbt_state_t *st,
@@ -46,7 +51,7 @@ bool compute_musig_per_input_info(dispatcher_context_t *dc,
     for (int i = 0; i < musig_info->n; i++) {
         // we use ext_pubkey as a temporary variable; will overwrite later
         if (0 > get_extended_pubkey_from_client(dc, &wdi, key_indexes[i], &ext_pubkey)) {
-            return -1;
+            return false;
         }
         memcpy(out->keys[i], ext_pubkey.compressed_pubkey, sizeof(ext_pubkey.compressed_pubkey));
     }
@@ -264,20 +269,22 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
         return false;
     }
 
+    bool ret = false;
     uint8_t rand_i_j[32];
     compute_rand_i_j(psbt_session, cur_input_index, keyexpr_info->index, rand_i_j);
 
     musig_secnonce_t secnonce;
     musig_pubnonce_t pubnonce;
-    if (0 > musig_nonce_gen(rand_i_j,
-                            sizeof(rand_i_j),
-                            keyexpr_info->internal_pubkey.compressed_pubkey,
-                            musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
-                            &secnonce,
-                            &pubnonce)) {
+    int res = musig_nonce_gen(rand_i_j,
+                              sizeof(rand_i_j),
+                              keyexpr_info->internal_pubkey.compressed_pubkey,
+                              musig_per_input_info.agg_key_tweaked.compressed_pubkey + 1,
+                              &secnonce,
+                              &pubnonce);
+    explicit_bzero(&secnonce, sizeof(secnonce));
+    if (0 > res) {
         PRINTF("MuSig2 nonce generation failed\n");
-        SEND_SW(dc, SW_BAD_STATE);  // should never happen
-        return false;
+        goto cleanup;
     }
 
     if (!yield_musig_pubnonce(dc,
@@ -288,6 +295,14 @@ bool produce_and_yield_pubnonce(dispatcher_context_t *dc,
                               musig_per_input_info.agg_key_tweaked.compressed_pubkey,
                               keyexpr_info->is_tapscript ? keyexpr_info->tapleaf_hash : NULL)) {
         PRINTF("Failed yielding MuSig2 pubnonce\n");
+        goto cleanup;
+    }
+
+    ret = true;
+
+cleanup:
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+    if (!ret) {
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -392,6 +407,7 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     if (res < 0) {
         PRINTF("Musig aggregation failed; disruptive signer has index %d\n", -res);
         SEND_SW(dc, SW_INCORRECT_DATA);
+        return false;
     }
 
     // recompute secnonce from psbt_session randomness
@@ -408,6 +424,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
                             &secnonce,
                             &pubnonce)) {
         PRINTF("MuSig2 nonce generation failed\n");
+        explicit_bzero(rand_i_j, sizeof(rand_i_j));
+        explicit_bzero(&secnonce, sizeof(secnonce));
         SEND_SW(dc, SW_BAD_STATE);  // should never happen
         return false;
     }
@@ -459,6 +477,8 @@ bool __attribute__((noinline)) sign_sighash_musig_and_yield(dispatcher_context_t
     } while (false);
 
     explicit_bzero(&private_key, sizeof(private_key));
+    explicit_bzero(rand_i_j, sizeof(rand_i_j));
+    explicit_bzero(&secnonce, sizeof(secnonce));
 
     if (err) {
         PRINTF("Partial signature generation failed\n");

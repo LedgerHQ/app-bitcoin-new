@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../../boilerplate/dispatcher.h"
+/* Local headers */
+#include "dispatcher.h"
 
 /**
  * Given the hash of a leaf of a Merkle tree, requests the corresponding pre-image to the host. The

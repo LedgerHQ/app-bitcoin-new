@@ -1,9 +1,10 @@
 #include <string.h>
+#include <limits.h>
 
-#include "../../boilerplate/sw.h"
+/* Local headers */
+#include "client_commands.h"
 #include "get_merkle_leaf_hash.h"
-
-#include "../client_commands.h"
+#include "sw.h"
 
 int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
                                size_t size,
@@ -27,7 +28,8 @@ int call_get_merkle_leaf_index(dispatcher_context_t *dispatcher_context,
     uint64_t index;
 
     if (!buffer_read_u8(&dispatcher_context->read_buffer, &found) ||
-        !buffer_read_varint(&dispatcher_context->read_buffer, &index)) {
+        !buffer_read_varint(&dispatcher_context->read_buffer, &index) || index > INT_MAX ||
+        index >= (uint64_t) size) {
         return -1;
     }
 

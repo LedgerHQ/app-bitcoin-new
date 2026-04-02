@@ -3,16 +3,21 @@
 # possible types of descriptor templates from the BIP.
 # Only to be used for testing purposes.
 
+import sys
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from io import BytesIO
 import re
 from typing import Iterator, List, Optional, Tuple, Type, Union
 
-from ledger_bitcoin.embit.descriptor.miniscript import Miniscript
-from ledger_bitcoin.key import ExtendedKey
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
-from .taproot import ser_script, tagged_hash
+from bitcoin_client.ledger_bitcoin.embit.descriptor.miniscript import Miniscript
+from bitcoin_client.ledger_bitcoin.key import ExtendedKey
+from test_utils.taproot import ser_script, tagged_hash
 
 
 def tapleaf_hash(script: Optional[bytes], leaf_version=b'\xC0') -> Optional[bytes]:

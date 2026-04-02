@@ -9,7 +9,7 @@ Operations on Merkle trees are composed to create commitments to more complex da
 ## Merkle trees
 ### Definition
 
-A Merkle tree allows to create a commitment to an arbitrarily large list of values; short membership proofs can be provided that can be verified solely withthe knowledge of a single hash (the Merkle tree root)
+A Merkle tree allows to create a commitment to an arbitrarily large list of values; short membership proofs can be provided that can be verified solely with the knowledge of a single hash (the Merkle tree root)
 
 Our implementation of Merkle trees loosely follow the structure defined in [RFC 6962](https://www.rfc-editor.org/rfc/pdfrfc/rfc6962.txt.pdf), using SHA-256 as the hash function. We refer to the linked document for a more detailed description. Only one difference (the hash of the empty list) is defined below.
 
@@ -17,7 +17,7 @@ We call a *byte string* an arbitrary array of bytes, where each byte is a value 
 
 Following the notation of RFC 6962, we are given an ordered list of inputs `D[n] = {d(0), d(1), ..., d(n-1)}`, where each element `d(i)` is a byte string. We denote with `||` the concatenation operator, and with `D[a:b]` the list `{d(a), d(a+1), ..., d(b - 1)}`.
 
-We define the Merkle Tree Hash (MTH) (also called the *Merkle root*) as follows. 
+We define the Merkle Tree Hash (MTH) (also called the *Merkle root*) as follows.
 
 The hash of the empty list is `MTH({}) = 0`, a string of 32 bytes identically equal to `0`. *This definition differs from RFC 6962*.
 

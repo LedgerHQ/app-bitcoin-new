@@ -15,16 +15,19 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "dispatcher.h"
-#include "constants.h"
-#include "globals.h"
-#include "io.h"
-#include "sw.h"
 
-#include "common/buffer.h"
+/* SDK headers */
+#include "buffer.h"
+#include "io.h"
+
+/* Local headers */
+#include "constants.h"
+#include "io_ext.h"
+#include "sw.h"
 
 extern dispatcher_context_t G_dispatcher_context;
 
@@ -40,16 +43,16 @@ struct {
 } G_dispatcher_state;
 
 static void add_to_response(const void *rdata, size_t rdata_len) {
-    io_add_to_response(rdata, rdata_len);
+    ioe_add_to_response(rdata, rdata_len);
 }
 
 static void finalize_response(uint16_t sw) {
     G_dispatcher_state.sw = sw;
-    io_finalize_response(sw);
+    ioe_finalize_response(sw);
 }
 
 static void send_response() {
-    io_confirm_response();
+    ioe_send_response();
 }
 
 static void set_ui_dirty() {
@@ -65,14 +68,14 @@ static int process_interruption(dispatcher_context_t *dc) {
     // Reset structured APDU command
     memset(&cmd, 0, sizeof(cmd));
 
-    io_start_interruption_timeout();
+    ioe_start_interruption_timeout();
 
     // Receive command bytes in G_io_apdu_buffer
     if ((input_len = io_exchange(CHANNEL_APDU, G_output_len)) < 0) {
         return -1;
     }
 
-    io_clear_interruption_timeout();
+    ioe_clear_interruption_timeout();
 
     G_output_len = 0;
 
@@ -130,13 +133,13 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     G_dispatcher_context.read_buffer = buffer_create(cmd->data, cmd->lc);
 
     if (cmd->p2 > CURRENT_PROTOCOL_VERSION) {
-        io_send_sw(SW_WRONG_P1P2);
+        ioe_send_sw(SW_WRONG_P1P2);
         return;
     }
 
     if (cmd->cla == CLA_FRAMEWORK && cmd->ins == INS_CONTINUE) {
         PRINTF("Unexpected INS_CONTINUE.\n");
-        io_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
+        ioe_send_sw(SW_BAD_STATE);  // received INS_CONTINUE, but no command was interrupted.
         return;
     } else {
         bool cla_found = false, ins_found = false;
@@ -152,14 +155,14 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         }
 
         if (!cla_found) {
-            io_send_sw(SW_CLA_NOT_SUPPORTED);
+            ioe_send_sw(SW_CLA_NOT_SUPPORTED);
             return;
         } else if (!ins_found) {
-            io_send_sw(SW_INS_NOT_SUPPORTED);
+            ioe_send_sw(SW_INS_NOT_SUPPORTED);
             return;
         }
 
-        io_start_processing_timeout();
+        ioe_start_processing_timeout();
         handler(&G_dispatcher_context, cmd->p2);
     }
 
@@ -167,7 +170,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
     // Failure to do so indicates a bug in the last command processors.
     if (G_dispatcher_state.sw == 0) {
         PRINTF("No response before terminating\n");
-        io_send_sw(SW_BAD_STATE);
+        ioe_send_sw(SW_BAD_STATE);
     }
 
     // We call the termination callback if given, but only if:
@@ -180,7 +183,7 @@ void apdu_dispatcher(command_descriptor_t const cmd_descriptors[],
         G_was_processing_screen_shown = 0;
     }
 
-    io_clear_processing_timeout();
+    ioe_clear_processing_timeout();
 
     /* Resetting loading information screen */
     G_processing_screen_text = NULL;

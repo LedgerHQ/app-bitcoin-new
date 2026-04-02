@@ -1,9 +1,9 @@
 #include "amount_from_psbt.h"
 
-#include "../../common/psbt.h"
-
-#include "../lib/get_merkleized_map_value.h"
-#include "../lib/psbt_parse_rawtx.h"
+/* Local headers */
+#include "get_merkleized_map_value.h"
+#include "psbt.h"
+#include "psbt_parse_rawtx.h"
 
 /*
  Convenience function to get the amount and scriptpubkey from the non-witness-utxo of a certain
@@ -81,7 +81,10 @@ get_amount_scriptpubkey_from_psbt_witness(dispatcher_context_t *dc,
                                                      raw_witnessUtxo,
                                                      sizeof(raw_witnessUtxo));
 
-    if (wit_utxo_len < 0) {
+    // the witness UTXO field is encoded as 8-bytes for the amount, followed by the length-prefixed
+    // scriptPubkey. We make sure that we can read at least up to the scriptPubkey length, to avoid
+    // reading a possibly-undefined byte at offset 8.
+    if (wit_utxo_len < 8 + 1) {
         return -1;
     }
     int wit_utxo_scriptPubkey_len = raw_witnessUtxo[8];

@@ -1,14 +1,16 @@
 #pragma once
 
-#include <stdint.h>
 #include <assert.h>
+#include <stdint.h>
 
+/* SDK headers */
+#include "bip32.h"
+#include "buffer.h"
 #include "ledger_assert.h"
 
-#include "common/bip32.h"
-#include "common/buffer.h"
-#include "../constants.h"
-#include "../crypto.h"
+/* Local headers */
+#include "constants.h"
+#include "crypto.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "os.h"
@@ -86,7 +88,7 @@
 #define MAX_TAPTREE_POLICY_DEPTH 9
 
 typedef struct {
-    uint32_t master_key_derivation[MAX_BIP32_PATH_STEPS];
+    uint32_t master_key_derivation[MAX_BIP388_XPUB_DERIVATION_STEPS];
     uint8_t master_key_fingerprint[4];
     uint8_t master_key_derivation_len;
     uint8_t has_key_origin;
@@ -231,7 +233,7 @@ typedef enum {
         else {                                                                                   \
             int offset = (uint8_t *) obj - (uint8_t *) relative_ptr;                             \
             LEDGER_ASSERT(offset >= 0 && offset < UINT16_MAX,                                    \
-                          "Relative pointer's offset must be between 0 and 65535");              \
+                          "Relative pointer offset must be in 0-65535 range");                   \
             relative_ptr->offset = (uint16_t) offset;                                            \
         }                                                                                        \
     }
@@ -306,9 +308,9 @@ typedef enum {
 // The compiler doesn't like /** inside a block comment, so we disable this warning temporarily.
 
 /** Structure representing a key expression.
- * In V1, it's the index of a key in the key informations array, which includes the final /** step.
- * In V2, it's the index of a key in the key informations array, plus the two numbers a, b in the
- * /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key informations array don't have extra
+ * In V1, it's the index of a key in the key information array, which includes the final /** step.
+ * In V2, it's the index of a key in the key information array, plus the two numbers a, b in the
+ * /<NUM_a;NUM_b>/* derivation steps; here, the xpubs in the key information array don't have extra
  * derivation steps.
  */
 #pragma GCC diagnostic pop
@@ -505,6 +507,30 @@ int get_policy_segwit_version(const policy_node_t *policy);
 int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
                                        policy_node_ext_info_t *out,
                                        MiniscriptContext ctx);
+
+/**
+ * Callback type for traverse_policy_dfs.
+ * Called for each node in depth-first (pre-order) traversal.
+ *
+ * @param node pointer to the current policy node
+ * @param callback_state opaque pointer passed through from the caller
+ * @return 0 on success; a negative number to abort traversal with an error.
+ */
+typedef int (*policy_node_callback_t)(const policy_node_t *node, void *callback_state);
+
+/**
+ * Recursively traverses a descriptor template tree in depth-first (pre-order) order, calling
+ * the callback for each node.
+ * Traversal stops early if the callback returns a negative value.
+ *
+ * @param policy_node pointer to the root of the subtree to traverse
+ * @param callback function called for each node
+ * @param callback_state opaque pointer forwarded to the callback
+ * @return 0 on success; a negative number on error (from callback or unexpected node type).
+ */
+int traverse_policy_dfs(const policy_node_t *policy_node,
+                        policy_node_callback_t callback,
+                        void *callback_state);
 
 #ifndef SKIP_FOR_CMOCKA
 

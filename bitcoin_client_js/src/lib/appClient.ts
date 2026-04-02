@@ -1,6 +1,6 @@
-import * as descriptors from '@bitcoinerlab/descriptors';
+import { DescriptorsFactory } from '@bitcoinerlab/descriptors';
 import * as secp256k1 from '@bitcoinerlab/secp256k1';
-const { Descriptor } = descriptors.DescriptorsFactory(secp256k1);
+const { Output } = DescriptorsFactory(secp256k1);
 import Transport from '@ledgerhq/hw-transport';
 import { networks } from 'bitcoinjs-lib';
 
@@ -451,22 +451,14 @@ export class AppClient {
     let thirdPartyValidationApplicable = true;
     let thirdPartyGeneratedAddress: string;
     try {
-      thirdPartyGeneratedAddress = new Descriptor({
-        expression,
-        network
+      thirdPartyGeneratedAddress = new Output({
+        descriptor: expression,
+        network,
       }).getAddress();
     } catch (err) {
-      // Note: @bitcoinerlab/descriptors@1.0.x does not support Tapscript yet.
-      // These are the supported descriptors:
-      //  - pkh(KEY)
-      //  - wpkh(KEY)
-      //  - sh(wpkh(KEY))
-      //  - sh(SCRIPT)
-      //  - wsh(SCRIPT)
-      //  - sh(wsh(SCRIPT)), where
-      // SCRIPT is any of the (non-tapscript) fragments in: https://bitcoin.sipa.be/miniscript/
-      //
-      // Other expressions are not supported and third party validation would not be applicable:
+      // If this descriptor cannot be interpreted by @bitcoinerlab/descriptors,
+      // third-party validation is not applicable.
+      console.warn(`Third-party address validation unavailable for this descriptor. Address: ${address}`, err);
       thirdPartyValidationApplicable = false;
     }
     if (

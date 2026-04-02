@@ -1,21 +1,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cx.h"
-
 #include "psbt_parse_rawtx.h"
 
+/* SDK headers */
+#include "buffer.h"
+#include "cx.h"
+#include "read.h"
+#include "varint.h"
+
+/* Local headers */
+#include "crypto.h"
+#include "dispatcher.h"
 #include "get_merkleized_map_value_hash.h"
+#include "parser_ext.h"
 #include "stream_preimage.h"
-
-#include "../../boilerplate/dispatcher.h"
-#include "../../boilerplate/sw.h"
-
-#include "../../common/buffer.h"
-#include "../../common/parser.h"
-#include "../../common/read.h"
-#include "../../common/varint.h"
-#include "../../crypto.h"
+#include "sw.h"
 
 struct parse_rawtx_state_s;  // forward declaration
 
@@ -556,6 +556,11 @@ int call_psbt_parse_rawtx(dispatcher_context_t *dispatcher_context,
 
     res = call_stream_preimage(dispatcher_context, value_hash, NULL, cb_process_data, &flow_state);
     if (res < 0 || flow_state.parser_error) {
+        return -1;
+    }
+
+    // If a specific output was requested, verify it was actually found
+    if (output_index >= 0 && (unsigned int) output_index >= flow_state.parser_state.n_outputs) {
         return -1;
     }
 

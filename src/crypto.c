@@ -15,32 +15,33 @@
  *  limitations under the License.
  *****************************************************************************/
 
-#include <stdint.h>   // uint*_t
-#include <string.h>   // memset, explicit_bzero
-#include <stdbool.h>  // bool
-
-#include "os.h"
-#include "cx.h"
-#include "cx_stubs.h"
-#include "cx_ecfp.h"
-#include "ox_ec.h"
-#include "cx_ram.h"
-#include "lcx_ripemd160.h"
-#include "cx_ripemd160.h"
-#include "lib_standard_app/crypto_helpers.h"
-
-#include "common/base58.h"
-#include "common/bip32.h"
-#include "common/format.h"
-#include "common/read.h"
-#include "common/write.h"
-
-#include "../boilerplate/sw.h"
-#include "../debug-helpers/debug.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "crypto.h"
 
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "crypto_helpers.h"
+#include "cx.h"
+#include "cx_ecfp.h"
+#include "cx_ram.h"
+#include "cx_ripemd160.h"
+#include "cx_stubs.h"
+#include "format.h"
+#include "lcx_ripemd160.h"
+#include "os.h"
+#include "ox_ec.h"
+#include "read.h"
+#include "write.h"
+
+/* Local headers */
+#include "constants.h"
+#include "debug.h"
 #include "secp256k1.h"
+#include "sw.h"
 
 /* BIP0341 tags for computing the tagged hashes when tweaking public keys */
 const uint8_t BIP0341_taptweak_tag[] = {'T', 'a', 'p', 'T', 'w', 'e', 'a', 'k'};
@@ -167,7 +168,7 @@ int bip32_CKDpub(const serialized_extended_pubkey_t *parent,
 
 void crypto_ripemd160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
     int res = cx_ripemd160_hash(in, inlen, out);
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in ripemd160 computation. Returned: %d", res);
+    LEDGER_ASSERT(res == CX_OK, "Error in ripemd160 computation. Returned: %d", res);
 }
 
 void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
@@ -175,9 +176,7 @@ void crypto_hash160(const uint8_t *in, uint16_t inlen, uint8_t out[static 20]) {
 
     uint8_t buffer[32];
     int res = cx_hash_sha256(in, inlen, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE,
-                  "Unexpected error in sha256 computation. Returned: %d",
-                  res);
+    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Error in sha256 computation. Returned: %d", res);
     crypto_ripemd160(buffer, 32, out);
 }
 
@@ -232,13 +231,9 @@ void crypto_get_checksum(const uint8_t *in, uint16_t in_len, uint8_t out[static 
     uint8_t buffer[32];
     size_t res;
     res = cx_hash_sha256(in, in_len, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE,
-                  "Unexpected error in sha256 computation. Returned: %d",
-                  res);
+    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Error in sha256 computation. Returned: %d", res);
     res = cx_hash_sha256(buffer, 32, buffer, 32);
-    LEDGER_ASSERT(res == CX_SHA256_SIZE,
-                  "Unexpected error in sha256 computation. Returned: %d",
-                  res);
+    LEDGER_ASSERT(res == CX_SHA256_SIZE, "Error in sha256 computation. Returned: %d", res);
     memmove(out, buffer, 4);
 }
 
@@ -277,10 +272,7 @@ uint32_t crypto_get_master_key_fingerprint() {
     uint8_t master_key_identifier[CX_RIPEMD160_SIZE] = {0};
 
     int res = os_perso_get_master_key_identifier(master_key_identifier, CX_RIPEMD160_SIZE);
-    LEDGER_ASSERT(
-        res == CX_OK,
-        "Unexpected error in os_perso_get_master_key_identifier computation. Returned: %d",
-        res);
+    LEDGER_ASSERT(res == CX_OK, "Error in key_identifier computation. Returned: %d", res);
     return read_u32_be(master_key_identifier, 0);
 }
 
@@ -451,6 +443,7 @@ end:
 
     if (error) {
         // unexpected error when signing
+        explicit_bzero(out, MAX_DER_SIG_LEN);  // never produce a valid signature on errors
         return -1;
     }
 
@@ -468,15 +461,15 @@ void crypto_tr_tagged_hash_init(cx_sha256_t *hash_context, const uint8_t *tag, u
 
     uint8_t hashtag[32];
     res = crypto_hash_update(&hash_context->header, tag, tag_len);
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
+    LEDGER_ASSERT(res == CX_OK, "Error in sha256 computation. Returned: %d", res);
     res = crypto_hash_digest(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
+    LEDGER_ASSERT(res == CX_OK, "Error in sha256 computation. Returned: %d", res);
 
     cx_sha256_init(hash_context);
     res = crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
+    LEDGER_ASSERT(res == CX_OK, "Error in sha256 computation. Returned: %d", res);
     res = crypto_hash_update(&hash_context->header, hashtag, sizeof(hashtag));
-    LEDGER_ASSERT(res == CX_OK, "Unexpected error in sha256 computation. Returned: %d", res);
+    LEDGER_ASSERT(res == CX_OK, "Error in sha256 computation. Returned: %d", res);
 }
 
 void crypto_tr_tapleaf_hash_init(cx_sha256_t *hash_context) {
@@ -594,8 +587,8 @@ int crypto_tr_tweak_pubkey(const uint8_t pubkey[static 32],
         return -1;
     }
 
-    // as the arguments of bip32_CKDpub are public keys, we do not need to use math functions
-    // hardened against side channels attacks, which are slower
+    // as the arguments of crypto_tr_tweak_pubkey are public keys, we do not need to use math
+    // functions hardened against side channels attacks, which are slower
     if (0 > secp256k1_point_unsafe(t, Q)) {
         // point at infinity, or error
         return -1;
@@ -645,6 +638,11 @@ int crypto_tr_tweak_seckey(const uint8_t seckey[static 32],
 
         ret = 0;
     } while (0);
+
+    if (ret != 0) {
+        // In case of error, make sure that the output buffer doesn't contain data related to seckey
+        explicit_bzero(out, 32);
+    }
 
     explicit_bzero(&P, sizeof(P));
 

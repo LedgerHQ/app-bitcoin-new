@@ -1,8 +1,11 @@
 #pragma once
 
-#include <stddef.h>  // size_t
-#include <stdint.h>  // uint*_t
+#include <stddef.h>
+#include <stdint.h>
 
-#include "constants.h"
-#include "common/bip32.h"
+/* SDK headers */
+#include "bip32.h"
+
+/* Local headers */
 #include "commands.h"
+#include "constants.h"

@@ -7,5 +7,6 @@ module.exports = {
   },
   transformIgnorePatterns: [
     "node_modules/(?!(axios)/)"
-  ]
+  ],
+  testPathIgnorePatterns: ['<rootDir>/build/']
 };

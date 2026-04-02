@@ -1,17 +1,20 @@
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
-#include <limits.h>
 
-#include "../common/base58.h"
-#include "../common/bip32.h"
-#include "../common/buffer.h"
-#include "../common/script.h"
-#include "../common/segwit_addr.h"
-#include "../common/wallet.h"
+#include "wallet.h"
 
-#include "../boilerplate/sw.h"
+/* SDK headers */
+#include "base58.h"
+#include "bip32.h"
+#include "buffer.h"
 
-#include "../debug-helpers/debug.h"
+/* Local headers */
+#include "buffer_ext.h"
+#include "debug.h"
+#include "script.h"
+#include "segwit_addr.h"
+#include "sw.h"
 
 #ifndef SKIP_FOR_CMOCKA
 #include "../crypto.h"
@@ -25,6 +28,12 @@ typedef struct {
     PolicyNodeType type;
     const char *name;
 } token_descriptor_t;
+
+// As parse_script is recursive, we set a maximum reasonable recursion depth in order to avoid the
+// risk of stack exhaustion.
+// At the time of writing, the maximum depth measured across all the tests is 10, so 16 still
+// leaves a margin for much more complex scripts and seems unlikely to be hit in practice.
+#define MAX_PARSE_SCRIPT_RECURSION_DEPTH 16
 
 static const token_descriptor_t KNOWN_TOKENS[] = {
     {.type = TOKEN_SH, .name = "sh"},
@@ -123,7 +132,6 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
     if (!buffer_read_varint(buffer, &descriptor_template_len)) {
         return WITH_ERROR(-1, "Invalid wallet policy header");
     }
-    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     if (header->version == WALLET_POLICY_VERSION_V1) {
         if (descriptor_template_len > MAX_DESCRIPTOR_TEMPLATE_LENGTH_V1) {
@@ -131,7 +139,7 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
         }
         if (!buffer_read_bytes(buffer,
                                (uint8_t *) header->descriptor_template,
-                               header->descriptor_template_len)) {
+                               descriptor_template_len)) {
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     } else {  // WALLET_POLICY_VERSION_V2
@@ -143,6 +151,8 @@ int read_wallet_policy_header(buffer_t *buffer, policy_map_wallet_header_t *head
             return WITH_ERROR(-1, "Invalid wallet policy header");
         }
     }
+
+    header->descriptor_template_len = (uint16_t) descriptor_template_len;
 
     uint64_t n_keys;
     if (!buffer_read_varint(buffer, &n_keys) || n_keys > 252) {
@@ -240,7 +250,7 @@ static PolicyNodeType parse_token(buffer_t *buffer) {
  */
 static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
     uint8_t c;
-    size_t result = 0;
+    uint32_t result = 0;
     int digits_read = 0;
     while (buffer_peek(buffer, &c) && is_digit(c)) {
         ++digits_read;
@@ -251,19 +261,19 @@ static int parse_unsigned_decimal(buffer_t *buffer, uint32_t *out) {
             return -1;
         }
 
-        if (10 * result + next_digit < result) {
-            return -1;  // overflow, integer too large
+        if (result > (UINT32_MAX - next_digit) / 10) {
+            return -1;
         }
 
         result = 10 * result + next_digit;
 
         buffer_seek_cur(buffer, 1);
     }
-    *out = result;
-
     if (digits_read == 0) {
         return -1;
     }
+
+    *out = result;
 
     return 0;
 }
@@ -336,7 +346,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
         // read all the given derivation steps
         out->master_key_derivation_len = 0;
         while (consume_character(buffer, '/')) {
-            if (out->master_key_derivation_len > MAX_BIP32_PATH_STEPS) {
+            if (out->master_key_derivation_len >= MAX_BIP388_XPUB_DERIVATION_STEPS) {
                 return WITH_ERROR(-1, "Too many derivation steps");
             }
 
@@ -357,7 +367,7 @@ int parse_policy_map_key_info(buffer_t *buffer, policy_map_key_info_t *out, int 
 
     // consume the rest of the buffer into the pubkey, except possibly the final "/**"
     unsigned int ext_pubkey_len = 0;
-    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH];
+    char ext_pubkey_str[MAX_SERIALIZED_PUBKEY_LENGTH + 1];
     uint8_t c;
     while (ext_pubkey_len < MAX_SERIALIZED_PUBKEY_LENGTH && buffer_peek(buffer, &c) &&
            is_alphanumeric(c)) {
@@ -518,7 +528,7 @@ static int parse_keyexpr(buffer_t *in_buf,
         // allocate musig structures
 
         musig_aggr_key_info_t *musig_info =
-            (musig_aggr_key_info_t *) buffer_alloc(out_buf, sizeof(musig_info), true);
+            (musig_aggr_key_info_t *) buffer_alloc(out_buf, sizeof(musig_aggr_key_info_t), true);
 
         if (musig_info == NULL) {
             return WITH_ERROR(-1, "Out of memory");
@@ -646,6 +656,10 @@ static int parse_script(buffer_t *in_buf,
                         int version,
                         size_t depth,
                         unsigned int context_flags) {
+    if (depth > MAX_PARSE_SCRIPT_RECURSION_DEPTH) {
+        return WITH_ERROR(-1, "Script is too deeply nested");
+    }
+
     int n_wrappers = 0;
 
     // Keep track of how many key expressions have been created while parsing
@@ -2663,7 +2677,7 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
             out->s = count_not_s <= node->k - 1 ? 1 : 0;
             out->e = count_s == node->n ? 1 : 0;
 
-            out->m = (count_e == node->n && count_not_s <= node->k) ? 1 : 0;
+            out->m = (count_e == node->n && count_m == node->n && count_not_s <= node->k) ? 1 : 0;
 
             out->x = 0;
 
@@ -2899,6 +2913,126 @@ int compute_miniscript_policy_ext_info(const policy_node_t *policy_node,
         default:
             PRINTF("%s, %d\n", __FILE__, __LINE__);
             PRINTF("Unknown token: %d\n", policy_node->type);
+            return -1;
+    }
+}
+
+static int traverse_policy_node_tree(const policy_node_tree_t *tree,
+                                     policy_node_callback_t callback,
+                                     void *callback_state) {
+    if (tree->is_leaf) {
+        return traverse_policy_dfs(r_policy_node(&tree->script), callback, callback_state);
+    } else {
+        int ret = traverse_policy_node_tree(r_policy_node_tree(&tree->left_tree),
+                                            callback,
+                                            callback_state);
+        if (ret < 0) return ret;
+        return traverse_policy_node_tree(r_policy_node_tree(&tree->right_tree),
+                                         callback,
+                                         callback_state);
+    }
+}
+
+int traverse_policy_dfs(const policy_node_t *policy_node,
+                        policy_node_callback_t callback,
+                        void *callback_state) {
+    if (callback == NULL) {
+        return -1;
+    }
+
+    // Visit the current node first (pre-order)
+    int ret = callback(policy_node, callback_state);
+    if (ret < 0) return ret;
+
+    switch (policy_node->type) {
+        // Leaf nodes with no child scripts
+        case TOKEN_0:
+        case TOKEN_1:
+        case TOKEN_PK_K:
+        case TOKEN_PK_H:
+        case TOKEN_PK:
+        case TOKEN_PKH:
+        case TOKEN_WPKH:
+        case TOKEN_OLDER:
+        case TOKEN_AFTER:
+        case TOKEN_SHA256:
+        case TOKEN_HASH256:
+        case TOKEN_RIPEMD160:
+        case TOKEN_HASH160:
+        case TOKEN_MULTI:
+        case TOKEN_MULTI_A:
+        case TOKEN_SORTEDMULTI:
+        case TOKEN_SORTEDMULTI_A:
+            return 0;
+
+        // Nodes with a single child script (including miniscript wrappers)
+        case TOKEN_SH:
+        case TOKEN_WSH:
+        case TOKEN_A:
+        case TOKEN_S:
+        case TOKEN_C:
+        case TOKEN_T:
+        case TOKEN_D:
+        case TOKEN_V:
+        case TOKEN_J:
+        case TOKEN_N:
+        case TOKEN_L:
+        case TOKEN_U: {
+            const policy_node_with_script_t *node = (const policy_node_with_script_t *) policy_node;
+            return traverse_policy_dfs(r_policy_node(&node->script), callback, callback_state);
+        }
+
+        // Nodes with exactly two child scripts
+        case TOKEN_AND_V:
+        case TOKEN_AND_B:
+        case TOKEN_AND_N:
+        case TOKEN_OR_B:
+        case TOKEN_OR_C:
+        case TOKEN_OR_D:
+        case TOKEN_OR_I: {
+            const policy_node_with_script2_t *node =
+                (const policy_node_with_script2_t *) policy_node;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[0]), callback, callback_state);
+            if (ret < 0) return ret;
+            return traverse_policy_dfs(r_policy_node(&node->scripts[1]), callback, callback_state);
+        }
+
+        // Nodes with exactly three child scripts
+        case TOKEN_ANDOR: {
+            const policy_node_with_script3_t *node =
+                (const policy_node_with_script3_t *) policy_node;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[0]), callback, callback_state);
+            if (ret < 0) return ret;
+            ret = traverse_policy_dfs(r_policy_node(&node->scripts[1]), callback, callback_state);
+            if (ret < 0) return ret;
+            return traverse_policy_dfs(r_policy_node(&node->scripts[2]), callback, callback_state);
+        }
+
+        // Nodes with a linked list of child scripts
+        case TOKEN_THRESH: {
+            const policy_node_thresh_t *node = (const policy_node_thresh_t *) policy_node;
+            policy_node_scriptlist_t *cur = r_policy_node_scriptlist(&node->scriptlist);
+            while (cur != NULL) {
+                ret = traverse_policy_dfs(r_policy_node(&cur->script), callback, callback_state);
+                if (ret < 0) return ret;
+                cur = r_policy_node_scriptlist(&cur->next);
+            }
+            return 0;
+        }
+
+        // tr nodes with a keypath and (possibly) a taptree
+        case TOKEN_TR: {
+            const policy_node_tr_t *node = (const policy_node_tr_t *) policy_node;
+            if (!isnull_policy_node_tree(&node->tree)) {
+                return traverse_policy_node_tree(r_policy_node_tree(&node->tree),
+                                                 callback,
+                                                 callback_state);
+            }
+            return 0;
+        }
+        case TOKEN_INVALID:
+        default:
+            PRINTF("traverse_policy_dfs: unexpected token %d\n", policy_node->type);
             return -1;
     }
 }

@@ -2,15 +2,16 @@
 
 #include "get_merkleized_map_value.h"
 
-#include "get_merkle_leaf_index.h"
+/* Local headers */
 #include "get_merkle_leaf_element.h"
+#include "get_merkle_leaf_index.h"
 
 int call_get_merkleized_map_value(dispatcher_context_t *dispatcher_context,
                                   const merkleized_map_commitment_t *map,
                                   const uint8_t *key,
-                                  int key_len,
+                                  size_t key_len,
                                   uint8_t *out,
-                                  int out_len) {
+                                  size_t out_len) {
     // LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     uint8_t key_merkle_hash[32];

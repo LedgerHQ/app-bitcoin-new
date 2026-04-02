@@ -1,20 +1,24 @@
-#include <assert.h>
+#ifdef HAVE_SWAP
 
-#include "ux.h"
-#include "usbd_core.h"
-#include "os_io_seproxyhal.h"
-#include "os.h"
+#include <assert.h>
 
 #include "handle_swap_sign_transaction.h"
 
-#include "../globals.h"
-#include "../swap/swap_globals.h"
-#include "../common/read.h"
+/* SDK headers */
+#include "os.h"
+#include "read.h"
+#include "swap_lib_calls.h"
+#include "ux.h"
+
+/* Local headers */
+#include "os_io_seproxyhal.h"
+#include "swap_globals.h"
+#include "usbd_core.h"
 
 // Save the BSS address where we will write the return value when finished
 static uint8_t* G_swap_sign_return_value_address;
 
-bool copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
+bool swap_copy_transaction_parameters(create_transaction_parameters_t* sign_transaction_params) {
     char destination_address[65];
     uint8_t destination_address_extra_data[33];
     uint8_t amount[8];
@@ -92,3 +96,5 @@ void __attribute__((noreturn)) finalize_exchange_sign_transaction(bool is_succes
     *G_swap_sign_return_value_address = is_success;
     os_lib_end();
 }
+
+#endif /* HAVE_SWAP */

@@ -426,14 +426,14 @@ export class PsbtV2 {
     this.setGlobalOutputCount(tx.outs.length);
 
     for (let i = 0; i < tx.ins.length; i++) {
-      this.setInputPreviousTxId(i, tx.ins[i].hash);
+      this.setInputPreviousTxId(i, asBuffer(tx.ins[i].hash));
       this.setInputOutputIndex(i, tx.ins[i].index);
       this.setInputSequence(i, tx.ins[i].sequence);
     }
 
     for (let i = 0; i < tx.outs.length; i++) {
-      this.setOutputAmount(i, tx.outs[i].value);
-      this.setOutputScript(i, tx.outs[i].script);
+      this.setOutputAmount(i, asSatoshiNumber(tx.outs[i].value));
+      this.setOutputScript(i, asBuffer(tx.outs[i].script));
     }
 
     // PSBT_GLOBAL_UNSIGNED_TX must be removed in a valid PSBTv2
@@ -444,7 +444,7 @@ export class PsbtV2 {
    * https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/ts_src/psbt.ts
    *
    * Prepares the fields required for signing a Psbt on a Ledger
-   * device. It should be used exclusively before calling 
+   * device. It should be used exclusively before calling
    * `appClient.signPsbt()` and not as a general Psbt conversion method.
    *
    * Note: This method supports all the policies that the Ledger is able to
@@ -479,25 +479,25 @@ export class PsbtV2 {
     psbtBJS.data.inputs.forEach((input, index) => {
       if (isTaprootInput(input))
         throw new Error(`Taproot inputs not supported`);
-      this.setInputPreviousTxId(index, psbtBJS.txInputs[index].hash);
+      this.setInputPreviousTxId(index, asBuffer(psbtBJS.txInputs[index].hash));
       if (psbtBJS.txInputs[index].sequence !== undefined)
         this.setInputSequence(index, psbtBJS.txInputs[index].sequence);
       this.setInputOutputIndex(index, psbtBJS.txInputs[index].index);
       if (input.sighashType !== undefined)
         this.setInputSighashType(index, input.sighashType);
       if (input.nonWitnessUtxo)
-        this.setInputNonWitnessUtxo(index, input.nonWitnessUtxo);
+        this.setInputNonWitnessUtxo(index, asBuffer(input.nonWitnessUtxo));
       if (input.witnessUtxo) {
         this.setInputWitnessUtxo(
           index,
-          input.witnessUtxo.value,
-          input.witnessUtxo.script
+          asSatoshiNumber(input.witnessUtxo.value),
+          asBuffer(input.witnessUtxo.script)
         );
       }
       if (input.witnessScript)
-        this.setInputWitnessScript(index, input.witnessScript);
+        this.setInputWitnessScript(index, asBuffer(input.witnessScript));
       if (input.redeemScript)
-        this.setInputRedeemScript(index, input.redeemScript);
+        this.setInputRedeemScript(index, asBuffer(input.redeemScript));
       psbtBJS.data.inputs[index].bip32Derivation.forEach(derivation => {
         if (!/^m\//i.test(derivation.path))
           throw new Error(`Invalid input bip32 derivation`);
@@ -509,15 +509,15 @@ export class PsbtV2 {
           );
         this.setInputBip32Derivation(
           index,
-          derivation.pubkey,
-          derivation.masterFingerprint,
+          asBuffer(derivation.pubkey),
+          asBuffer(derivation.masterFingerprint),
           pathArray
         );
       });
     });
     psbtBJS.txOutputs.forEach((output, index) => {
-      this.setOutputAmount(index, output.value);
-      this.setOutputScript(index, output.script);
+      this.setOutputAmount(index, asSatoshiNumber(output.value));
+      this.setOutputScript(index, asBuffer(output.script));
     });
     return this;
   }
@@ -737,6 +737,12 @@ function set(
 ) {
   const key = new Key(keyType, keyData);
   map.set(key.toString(), value);
+}
+function asBuffer(buf: Buffer | Uint8Array): Buffer {
+  return Buffer.from(buf);
+}
+function asSatoshiNumber(value: number | bigint): number {
+  return sanitizeBigintToNumber(value);
 }
 function uint32LE(n: number): Buffer {
   const buf = Buffer.alloc(4);

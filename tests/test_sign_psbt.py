@@ -1,5 +1,7 @@
 import base64
 import pytest
+import hmac
+from hashlib import sha256
 
 from pathlib import Path
 
@@ -13,10 +15,10 @@ from ragger.navigator import Navigator
 from ragger.error import ExceptionRAPDU
 from ragger.firmware import Firmware
 
-from test_utils import bip0340, txmaker
+from test_utils import bip0340, txmaker, SpeculosGlobals
 
 from ragger_bitcoin import RaggerClient
-from ragger_bitcoin.ragger_instructions import MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER
+from ragger_bitcoin.ragger_instructions import get_max_ext_output_simplified_number
 from .instructions import *
 
 tests_root: Path = Path(__file__).parent
@@ -598,17 +600,17 @@ def singlesig_wpkh_4toN(navigator: Navigator, firmware: Firmware, client: Ragger
 
     assert len(result) == n_ins
 
-def test_sign_psbt_singlesig_wpkh_4to17(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4toMax(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 1)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, get_max_ext_output_simplified_number(firmware) + 1)
 
-def test_sign_psbt_singlesig_wpkh_4to17_go_back(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4toMax_go_back(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 1, True)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, get_max_ext_output_simplified_number(firmware) + 1, True)
 
-def test_sign_psbt_singlesig_wpkh_4to18(navigator: Navigator, firmware: Firmware, client:
+def test_sign_psbt_singlesig_wpkh_4toMaxPlus1(navigator: Navigator, firmware: Firmware, client:
                                        RaggerClient, test_name: str):
-    singlesig_wpkh_4toN(navigator, firmware, client, test_name, MAX_EXT_OUTPUT_SIMPLIFIED_NUMBER + 2)
+    singlesig_wpkh_4toN(navigator, firmware, client, test_name, get_max_ext_output_simplified_number(firmware) + 2)
 
 
 def test_sign_psbt_singlesig_large_amount(navigator: Navigator, firmware: Firmware, client:
@@ -747,6 +749,34 @@ def test_sign_psbt_fail_wrong_non_witness_utxo(navigator: Navigator, firmware: F
     assert error_code == EC_SIGN_PSBT_NONWITNESSUTXO_CHECK_FAILED
 
 
+def test_sign_psbt_with_max_derivation_path(navigator: Navigator, firmware: Firmware, client:
+                                            RaggerClient, test_name: str, speculos_globals: SpeculosGlobals):
+    # Test that we can sign a PSBT with MAX_BIP32_PATH_STEPS (10) derivation steps
+    # The key origin has 8 steps, plus the /** gives us 2 more for a total of 10
+    wallet = WalletPolicy(
+        "",
+        "wpkh(@0/**)",
+        [
+            "[f5acc2fd/48'/1'/0'/2'/0'/1'/2'/3']tpubDNTK3WZ6g6eZBbCYCdFMpkCNvEqMxYexWRyqrGDkC5WDsNJdUk95z9wHWm6rBZeeMRxKafnuJzT8TqUs94A11KKkW9wT1pcFQShC9p3Vcxi"
+        ],
+    )
+
+    psbt = txmaker.createPsbt(
+        wallet,
+        [100_000_000],
+        [99_000_000],
+        [True]
+    )
+
+    wallet_hmac = hmac.new(
+        speculos_globals.wallet_registration_key, wallet.id, sha256).digest()
+
+    # This should succeed as we're at the limit
+    result = client.sign_psbt(psbt, wallet, wallet_hmac, navigator,
+                              instructions=sign_psbt_instruction_approve(firmware, save_screenshot=False),
+                              testname=test_name)
+
+    assert len(result) == 1
 
 
 def test_sign_psbt_with_opreturn(navigator: Navigator, firmware: Firmware, client: RaggerClient, test_name: str):
