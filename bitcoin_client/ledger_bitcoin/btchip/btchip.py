@@ -56,6 +56,7 @@ class btchip:
 	BTCHIP_INS_GET_FIRMWARE_VERSION = 0xc4
 	BTCHIP_INS_COMPOSE_MOFN_ADDRESS = 0xc6
 	BTCHIP_INS_GET_POS_SEED = 0xca
+	BTCHIP_INS_GET_MASTER_FINGERPRINT = 0xd0
 
 	BTCHIP_INS_EXT_GET_HALF_PUBLIC_KEY = 0x20
 	BTCHIP_INS_EXT_CACHE_PUT_PUBLIC_KEY = 0x22
@@ -444,3 +445,15 @@ class btchip:
 		result['patch_version'] = response[4]
 		result['specialVersion'] = response[1]
 		return result
+
+	def getMasterFingerprint(self):
+		"""Returns the 4-byte master key fingerprint.
+
+		Uses the INS_GET_MASTER_FINGERPRINT (0x05) APDU which internally
+		calls os_perso_get_master_key_identifier() to compute
+		RIPEMD160(SHA256(compressed_master_pubkey)) and returns the first
+		4 bytes, without requiring DERIVE_MASTER permission.
+		"""
+		apdu = [ self.BTCHIP_CLA, self.BTCHIP_INS_GET_MASTER_FINGERPRINT, 0x00, 0x00, 0x00 ]
+		response = self.dongle.exchange(bytearray(apdu))
+		return bytes(response[0:4])
