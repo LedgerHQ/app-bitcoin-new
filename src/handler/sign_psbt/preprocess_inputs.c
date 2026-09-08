@@ -154,6 +154,33 @@ bool __attribute__((noinline)) preprocess_inputs(
             return false;
         }
 
+        // BIP-322 proof of funds: "the Non-Witness UTXO field may be omitted for any input that
+        // spends an output from the same transaction as an input earlier in the list". Such an
+        // input is authenticated with the non-witness utxo carried by that earlier input, exactly
+        // as if it were its own (see get_amount_scriptpubkey_from_psbt_nonwitness_shared).
+        bool nonwitness_shared = false;
+        if (!input.has_nonWitnessUtxo && st->bip322.is_message_signing && cur_input_index > 0) {
+            if (0 ==
+                get_amount_scriptpubkey_from_psbt_nonwitness_shared(dc,
+                                                                    st,
+                                                                    cur_input_index,
+                                                                    &input.in_out.map,
+                                                                    &input.prevout_amount,
+                                                                    input.in_out.scriptPubKey,
+                                                                    &input.in_out.scriptPubKey_len,
+                                                                    NULL)) {
+                // sanity check before accumulating, to avoid overflowing the total
+                if (input.prevout_amount > BITCOIN_TOTAL_SUPPLY) {
+                    PRINTF("Input amount exceeds Bitcoin total supply!\n");
+                    SEND_SW(dc, SW_INCORRECT_DATA);
+                    return false;
+                }
+                st->inputs_total_amount += input.prevout_amount;
+                input.has_nonWitnessUtxo = true;
+                nonwitness_shared = true;
+            }
+        }
+
         // either witness utxo or non-witness utxo (or both) must be present.
         if (!input.has_nonWitnessUtxo && !input.has_witnessUtxo) {
             PRINTF("No witness utxo nor non-witness utxo present in input.\n");
@@ -163,7 +190,7 @@ bool __attribute__((noinline)) preprocess_inputs(
 
         // validate non-witness utxo (if present) and witness utxo (if present)
 
-        if (input.has_nonWitnessUtxo) {
+        if (input.has_nonWitnessUtxo && !nonwitness_shared) {
             uint8_t prevout_hash[32];
 
             // check if the prevout_hash of the transaction matches the computed one from the

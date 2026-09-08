@@ -262,12 +262,14 @@ static bool __attribute__((noinline)) sign_transaction_input(dispatcher_context_
         // sign_non_witness(non_witness_utxo.vout[psbt.tx.input_[i].prevout.n].scriptPubKey, i)
 
         uint64_t tmp;  // unused
-        if (0 > get_amount_scriptpubkey_from_psbt_nonwitness(dc,
-                                                             &input->in_out.map,
-                                                             &tmp,
-                                                             input->in_out.scriptPubKey,
-                                                             &input->in_out.scriptPubKey_len,
-                                                             NULL)) {
+        if (0 > get_amount_scriptpubkey_from_psbt_nonwitness_shared(dc,
+                                                                    st,
+                                                                    cur_input_index,
+                                                                    &input->in_out.map,
+                                                                    &tmp,
+                                                                    input->in_out.scriptPubKey,
+                                                                    &input->in_out.scriptPubKey_len,
+                                                                    NULL)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }

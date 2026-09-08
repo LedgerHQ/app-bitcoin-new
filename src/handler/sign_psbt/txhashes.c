@@ -249,11 +249,13 @@ bool __attribute__((noinline)) compute_tx_hashes(dispatcher_context_t *dc,
             uint8_t in_scriptPubKey[MAX_PREVOUT_SCRIPTPUBKEY_LEN];
             size_t in_scriptPubKey_len;
 
-            if (0 > get_amount_scriptpubkey_from_psbt(dc,
-                                                      &ith_map,
-                                                      &in_amount,
-                                                      in_scriptPubKey,
-                                                      &in_scriptPubKey_len)) {
+            if (0 > get_amount_scriptpubkey_from_psbt_shared(dc,
+                                                             st,
+                                                             i,
+                                                             &ith_map,
+                                                             &in_amount,
+                                                             in_scriptPubKey,
+                                                             &in_scriptPubKey_len)) {
                 SEND_SW(dc, SW_INCORRECT_DATA);
                 return false;
             }

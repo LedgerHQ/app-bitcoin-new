@@ -18,6 +18,7 @@
 #include "amount_from_psbt.h"
 
 /* Local headers */
+#include "get_merkleized_map.h"
 #include "get_merkleized_map_value.h"
 #include "psbt.h"
 #include "psbt_fields.h"
@@ -33,23 +34,14 @@
  non-witness-utxo does not match the one pointed by expected_prevout_hash. Returns -1 on failure, 0
  on success.
 */
-int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness_output(
     dispatcher_context_t *dc,
     const merkleized_map_commitment_t *input_map,
+    uint32_t prevout_n,
     uint64_t *amount,
     uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
     size_t *scriptPubKey_len,
     const uint8_t *expected_prevout_hash) {
-    // If there is no witness-utxo, it must be the case that this is a legacy input.
-    // In this case, we can only retrieve the prevout amount and scriptPubKey by parsing
-    // the non-witness-utxo
-
-    // Read the prevout index
-    uint32_t prevout_n;
-    if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
-        return -1;
-    }
-
     // SIZE_MAX is reserved by call_psbt_parse_rawtx to mean "no output is queried"
     if (prevout_n >= SIZE_MAX) {
         return -1;
@@ -86,6 +78,32 @@ int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
     memcpy(scriptPubKey, parser_outputs.vout_scriptpubkey, parser_outputs.vout_scriptpubkey_len);
 
     return 0;
+}
+
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness(
+    dispatcher_context_t *dc,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len,
+    const uint8_t *expected_prevout_hash) {
+    // If there is no witness-utxo, it must be the case that this is a legacy input.
+    // In this case, we can only retrieve the prevout amount and scriptPubKey by parsing
+    // the non-witness-utxo
+
+    // Read the prevout index
+    uint32_t prevout_n;
+    if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
+        return -1;
+    }
+
+    return get_amount_scriptpubkey_from_psbt_nonwitness_output(dc,
+                                                               input_map,
+                                                               prevout_n,
+                                                               amount,
+                                                               scriptPubKey,
+                                                               scriptPubKey_len,
+                                                               expected_prevout_hash);
 }
 
 /*
@@ -160,4 +178,97 @@ int get_amount_scriptpubkey_from_psbt(dispatcher_context_t *dc,
                                                         scriptPubKey,
                                                         scriptPubKey_len,
                                                         NULL);
+}
+
+int __attribute__((noinline)) get_amount_scriptpubkey_from_psbt_nonwitness_shared(
+    dispatcher_context_t *dc,
+    const sign_psbt_state_t *st,
+    unsigned int input_index,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len,
+    const uint8_t *expected_prevout_hash) {
+    if (0 == get_amount_scriptpubkey_from_psbt_nonwitness(dc,
+                                                          input_map,
+                                                          amount,
+                                                          scriptPubKey,
+                                                          scriptPubKey_len,
+                                                          expected_prevout_hash)) {
+        return 0;
+    }
+
+    if (!st->bip322.is_message_signing) {
+        return -1;
+    }
+
+    // The input has no (valid) non-witness-utxo of its own: look for one in the preceding inputs
+    // that spend the same transaction.
+    uint8_t prevout_hash[32];
+    uint32_t prevout_n;
+    if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, input_map, prevout_hash) ||
+        PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, input_map, &prevout_n)) {
+        return -1;
+    }
+
+    for (unsigned int j = input_index; j > 0;) {
+        j--;
+
+        merkleized_map_commitment_t jth_map;
+        if (0 > call_get_merkleized_map(dc, st->inputs_root, st->n_inputs, j, &jth_map)) {
+            return -1;
+        }
+
+        uint8_t jth_prevout_hash[32];
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, &jth_map, jth_prevout_hash)) {
+            return -1;
+        }
+
+        if (memcmp(jth_prevout_hash, prevout_hash, sizeof(prevout_hash)) != 0) {
+            // the inputs spending the same transaction are consecutive: none of them has it
+            PRINTF("No earlier input carries the non-witness utxo of input %u\n", input_index);
+            return -1;
+        }
+
+        // the transaction found in input j must hash to this input's prevout txid
+        if (0 == get_amount_scriptpubkey_from_psbt_nonwitness_output(dc,
+                                                                     &jth_map,
+                                                                     prevout_n,
+                                                                     amount,
+                                                                     scriptPubKey,
+                                                                     scriptPubKey_len,
+                                                                     prevout_hash)) {
+            return 0;
+        }
+        // input j has no (valid) non-witness-utxo either: keep looking
+    }
+
+    return -1;
+}
+
+int get_amount_scriptpubkey_from_psbt_shared(
+    dispatcher_context_t *dc,
+    const sign_psbt_state_t *st,
+    unsigned int input_index,
+    const merkleized_map_commitment_t *input_map,
+    uint64_t *amount,
+    uint8_t scriptPubKey[static MAX_PREVOUT_SCRIPTPUBKEY_LEN],
+    size_t *scriptPubKey_len) {
+    int ret = get_amount_scriptpubkey_from_psbt_witness(dc,
+                                                        input_map,
+                                                        amount,
+                                                        scriptPubKey,
+                                                        scriptPubKey_len);
+    if (ret >= 0) {
+        return ret;
+    }
+
+    return get_amount_scriptpubkey_from_psbt_nonwitness_shared(dc,
+                                                               st,
+                                                               input_index,
+                                                               input_map,
+                                                               amount,
+                                                               scriptPubKey,
+                                                               scriptPubKey_len,
+                                                               NULL);
 }
