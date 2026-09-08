@@ -41,6 +41,9 @@
 
 extern const char GA_SIGNING_MESSAGE[];
 
+// BIP-68: a sequence with this flag set has no relative timelock semantics.
+#define BIP68_SEQUENCE_LOCKTIME_DISABLE_FLAG (1u << 31)
+
 // The BIP-340 tag used for the message hash, as defined by BIP-322.
 static const uint8_t BIP0322_MSG_TAG[] = {'B', 'I', 'P', '0', '3', '2', '2', '-', 's', 'i', 'g',
                                           'n', 'e', 'd', '-', 'm', 'e', 's', 's', 'a', 'g', 'e'};
@@ -274,25 +277,45 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
             return false;
         }
 
-        // Every input must have sequence 0. A missing PSBT_IN_SEQUENCE defaults to the final
-        // sequence number (0xFFFFFFFF) per BIP-370, so it must be present. (Non-zero sequences
-        // only appear in the timelocked variants, which are not supported yet.)
+        // Sequence rules. BIP-322 gives a timelock meaning only to the sequence of the first
+        // input (the "age" of the signature, together with nLockTime); the proof-of-funds
+        // inputs are ordinary spends of real coins.
+        // A missing PSBT_IN_SEQUENCE means the final sequence number (0xFFFFFFFF) per BIP-370.
         uint32_t sequence;
-        if (4 != call_get_merkleized_map_value_u32_le(dc,
+        bool has_sequence =
+            4 == call_get_merkleized_map_value_u32_le(dc,
                                                       &input_map,
-                                                      (uint8_t[]){PSBT_IN_SEQUENCE},
+                                                      (uint8_t[]) {PSBT_IN_SEQUENCE},
                                                       1,
-                                                      &sequence) ||
-            sequence != 0) {
-            PRINTF("BIP-322: non-zero (or missing) sequence is not supported\n");
-            SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
-            return false;
+                                                      &sequence);
+        if (cur_input_index == 0) {
+            // The first input must have an explicit sequence of 0: any other value makes this
+            // a timelocked variant, which is not supported yet.
+            if (!has_sequence || sequence != 0) {
+                PRINTF("BIP-322: timelocked variants are not supported (first input's sequence)\n");
+                SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
+                return false;
+            }
+        } else {
+            // A proof-of-funds input may have sequence 0 (the value BIP-322 expects) or any
+            // sequence with the BIP-68 relative-timelock disable flag set, which includes the
+            // final sequence number (explicit, or implied by a missing PSBT_IN_SEQUENCE). Any
+            // other value would impose a relative timelock on to_sign (with version 2), which
+            // is again a timelocked variant.
+            if (!has_sequence) {
+                sequence = 0xFFFFFFFF;
+            }
+            if (sequence != 0 && (sequence & BIP68_SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0) {
+                PRINTF("BIP-322: relative timelocks on proof-of-funds inputs are not supported\n");
+                SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
+                return false;
+            }
         }
 
         uint32_t prevout_index;
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input_map,
-                                                      (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
+                                                      (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
                                                       1,
                                                       &prevout_index)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
@@ -302,7 +325,7 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
         uint8_t prevout_txid[32];
         if (32 != call_get_merkleized_map_value(dc,
                                                 &input_map,
-                                                (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
+                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 prevout_txid,
                                                 sizeof(prevout_txid))) {
@@ -397,8 +420,8 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
     return true;
 }
 
-bool __attribute__((noinline))
-bip322_display_message(dispatcher_context_t *dc, sign_psbt_state_t *st) {
+bool __attribute__((noinline)) bip322_display_message(dispatcher_context_t *dc,
+                                                      sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Show any input verification warnings, exactly as the transaction review does. All the
@@ -444,7 +467,7 @@ bip322_display_message(dispatcher_context_t *dc, sign_psbt_state_t *st) {
         int message_length =
             call_stream_merkleized_map_value(dc,
                                              &st->global_map,
-                                             (uint8_t[]){PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE},
+                                             (uint8_t[]) {PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE},
                                              1,
                                              NULL,
                                              message_copy_callback,
