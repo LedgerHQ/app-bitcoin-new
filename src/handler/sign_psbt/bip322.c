@@ -272,7 +272,9 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
             continue;
         }
 
-        // The first input must spend output 0 of to_spend.
+        // The first input must spend output 0 of to_spend. This holds for a proof-of-funds
+        // too: per BIP-322 v2.0.0, the message_challenge is not optional, so a request made
+        // only of real UTXOs (no virtual input) fails below, on the txid binding.
         uint32_t prevout_index;
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input_map,

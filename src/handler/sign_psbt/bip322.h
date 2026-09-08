@@ -25,11 +25,12 @@
 #include "sign_psbt.h"
 
 // Support for BIP-322 generic signed messages (message signing via SIGN_PSBT).
+// This implements BIP-322 v2.0.0 (2026-06-04).
 //
 // A PSBT with the PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE global field is a request to sign the
 // BIP-322 "to_sign" virtual transaction for the contained message. Such a transaction can never
-// be broadcast (its input spends the "to_spend" virtual transaction, whose own input references
-// the null outpoint), so it is reviewed as a message signature, not as a transaction.
+// be broadcast (its first input spends the "to_spend" virtual transaction, whose own input
+// references the null outpoint), so it is reviewed as a message signature, not as a transaction.
 //
 // The security anchor is bip322_validate(): the to_spend txid is recomputed on-device from the
 // message (tagged hash) and the input's own scriptPubKey, and must match the input's prevout.
@@ -84,7 +85,9 @@ bool bip322_detect(dispatcher_context_t *dc, sign_psbt_state_t *st);
  *
  * Additional inputs beyond the first make the request a proof-of-funds: they spend real UTXOs
  * that must all belong to the wallet policy, and their total amount is later shown to the
- * user. The first input must always spend the recomputed to_spend transaction.
+ * user. The first input must always spend the recomputed to_spend transaction: BIP-322 v2.0.0
+ * clarifies that the message_challenge is not optional in a proof of funds, so a request
+ * whose first input spends a real UTXO is rejected.
  *
  * On success, st->bip322.challenge_script contains the scriptPubKey being proven; for a plain
  * (single-input) message signing, the missing_nonwitnessutxo warning is cleared, as the
