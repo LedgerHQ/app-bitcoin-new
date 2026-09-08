@@ -122,13 +122,19 @@ def build_bip322_pof_psbt(wallet_policy: WalletPolicy,
                           is_change: bool = False,
                           address_index: int = 0) -> PSBT:
     """Builds a BIP-322 proof-of-funds PSBT: the to_sign transaction additionally spends one
-    real (fake, wallet-owned) UTXO per entry of utxo_amounts."""
+    real (fake, wallet-owned) UTXO per entry of utxo_amounts. The proof-of-funds inputs are
+    sorted in BIP-69 order (by txid as displayed, then by output index), as the app requires
+    in order to guarantee that no outpoint is spent twice."""
 
     psbt = build_bip322_psbt(wallet_policy, message,
                              is_change=is_change, address_index=address_index)
 
-    for amount in utxo_amounts:
-        txin, psbt_input = build_wallet_utxo_input(wallet_policy, amount)
+    proof_inputs = [build_wallet_utxo_input(wallet_policy, amount) for amount in utxo_amounts]
+    # COutPoint.hash is the txid as an integer, whose numeric order is the order of the txid
+    # as displayed (big-endian)
+    proof_inputs.sort(key=lambda pair: (pair[0].prevout.hash, pair[0].prevout.n))
+
+    for txin, psbt_input in proof_inputs:
         psbt.tx.vin.append(txin)
         psbt.inputs.append(psbt_input)
 

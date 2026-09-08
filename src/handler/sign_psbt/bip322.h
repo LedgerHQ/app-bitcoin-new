@@ -87,7 +87,9 @@ bool bip322_detect(dispatcher_context_t *dc, sign_psbt_state_t *st);
  * that must all belong to the wallet policy, and their total amount is later shown to the
  * user. The first input must always spend the recomputed to_spend transaction: BIP-322 v2.0.0
  * clarifies that the message_challenge is not optional in a proof of funds, so a request
- * whose first input spends a real UTXO is rejected.
+ * whose first input spends a real UTXO is rejected. The proof-of-funds inputs must be in
+ * strictly increasing BIP-69 order and distinct from the to_spend outpoint, so that no coin
+ * can be counted twice in the proven amount.
  *
  * On success, st->bip322.challenge_script contains the scriptPubKey being proven; for a plain
  * (single-input) message signing, the missing_nonwitnessutxo warning is cleared, as the

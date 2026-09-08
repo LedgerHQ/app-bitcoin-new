@@ -93,6 +93,12 @@
 // proven amount shown to the user must be trustworthy, and external inputs cannot be signed.
 #define EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS 0x0013
 
+// The inputs of a BIP-322 proof-of-funds (all the inputs after the first) must be distinct
+// from the to_spend outpoint and from each other, and sorted in strictly increasing BIP-69
+// order (by txid as displayed, then by output index). Spending an outpoint twice would
+// inflate the proven amount shown to the user; the ordering makes duplicates impossible.
+#define EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED 0x0014
+
 /**
  * Swap
  */

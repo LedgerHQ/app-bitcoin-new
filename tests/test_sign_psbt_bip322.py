@@ -1,3 +1,4 @@
+import copy
 import hmac
 from hashlib import sha256
 
@@ -38,6 +39,7 @@ EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE = 0x000E
 EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH = 0x000F
 EC_SIGN_PSBT_BIP322_UNSUPPORTED = 0x0011
 EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS = 0x0013
+EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED = 0x0014
 
 
 wallet_wpkh = WalletPolicy(
@@ -366,3 +368,39 @@ def test_sign_bip322_pof_missing_challenge(navigator: Navigator, firmware: Firmw
 
     expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
                            IncorrectDataError, EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH)
+
+
+def test_sign_bip322_pof_duplicate_input(navigator: Navigator, firmware: Firmware,
+                                         client: RaggerClient, test_name: str):
+    # spending the same UTXO twice would count its amount twice in the proven total shown to
+    # the user (and makes to_sign consensus-invalid): the device must refuse
+    psbt = build_bip322_pof_psbt(wallet_wpkh, b"I control these coins", [100_000])
+    psbt.tx.vin.append(copy.deepcopy(psbt.tx.vin[1]))
+    psbt.inputs.append(copy.deepcopy(psbt.inputs[1]))
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           IncorrectDataError, EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED)
+
+
+def test_sign_bip322_pof_duplicate_challenge_input(navigator: Navigator, firmware: Firmware,
+                                                   client: RaggerClient, test_name: str):
+    # the to_spend outpoint itself, repeated as a proof-of-funds input, must be refused too
+    psbt = build_bip322_pof_psbt(wallet_wpkh, b"I control these coins", [100_000])
+    psbt.tx.vin.insert(1, copy.deepcopy(psbt.tx.vin[0]))
+    psbt.inputs.insert(1, copy.deepcopy(psbt.inputs[0]))
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           IncorrectDataError, EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED)
+
+
+def test_sign_bip322_pof_unsorted_inputs(navigator: Navigator, firmware: Firmware,
+                                         client: RaggerClient, test_name: str):
+    # the proof-of-funds inputs must be in strictly increasing BIP-69 order
+    psbt = build_bip322_pof_psbt(wallet_wpkh, b"I control these coins", [100_000, 200_000])
+    assert (psbt.tx.vin[1].prevout.hash, psbt.tx.vin[1].prevout.n) < \
+        (psbt.tx.vin[2].prevout.hash, psbt.tx.vin[2].prevout.n)
+    psbt.tx.vin[1], psbt.tx.vin[2] = psbt.tx.vin[2], psbt.tx.vin[1]
+    psbt.inputs[1], psbt.inputs[2] = psbt.inputs[2], psbt.inputs[1]
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
+                           IncorrectDataError, EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED)

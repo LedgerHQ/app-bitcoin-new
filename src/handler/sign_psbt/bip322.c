@@ -191,6 +191,23 @@ bool bip322_detect(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     return true;
 }
 
+// Compares two outpoints in BIP-69 order: by txid as displayed (that is, comparing the bytes of
+// the txid from the last to the first), then by output index. Returns <0, 0 or >0.
+static int outpoint_compare_bip69(const uint8_t a_txid[static 32],
+                                  uint32_t a_vout,
+                                  const uint8_t b_txid[static 32],
+                                  uint32_t b_vout) {
+    for (int i = 31; i >= 0; i--) {
+        if (a_txid[i] != b_txid[i]) {
+            return a_txid[i] < b_txid[i] ? -1 : 1;
+        }
+    }
+    if (a_vout != b_vout) {
+        return a_vout < b_vout ? -1 : 1;
+    }
+    return 0;
+}
+
 bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
@@ -240,6 +257,12 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
         return false;
     }
 
+    // The to_spend outpoint (spent by the first input) and the outpoint of the previous input,
+    // used to enforce the uniqueness and ordering of the proof-of-funds inputs.
+    uint8_t to_spend_txid[32];
+    uint8_t prev_txid[32];
+    uint32_t prev_vout = 0;
+
     for (unsigned int cur_input_index = 0; cur_input_index < st->n_inputs; cur_input_index++) {
         merkleized_map_commitment_t input_map;
         if (0 > call_get_merkleized_map(dc,
@@ -257,7 +280,7 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
         uint32_t sequence;
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input_map,
-                                                      (uint8_t[]) {PSBT_IN_SEQUENCE},
+                                                      (uint8_t[]){PSBT_IN_SEQUENCE},
                                                       1,
                                                       &sequence) ||
             sequence != 0) {
@@ -266,35 +289,56 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
             return false;
         }
 
-        if (cur_input_index != 0) {
-            // Additional (proof-of-funds) inputs spend real UTXOs of the wallet policy; their
-            // amounts and scripts were already verified and aggregated by preprocess_inputs().
-            continue;
-        }
-
-        // The first input must spend output 0 of to_spend. This holds for a proof-of-funds
-        // too: per BIP-322 v2.0.0, the message_challenge is not optional, so a request made
-        // only of real UTXOs (no virtual input) fails below, on the txid binding.
         uint32_t prevout_index;
         if (4 != call_get_merkleized_map_value_u32_le(dc,
                                                       &input_map,
-                                                      (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
+                                                      (uint8_t[]){PSBT_IN_OUTPUT_INDEX},
                                                       1,
-                                                      &prevout_index) ||
-            prevout_index != 0) {
-            PRINTF("BIP-322: the input does not spend the first output of to_spend\n");
-            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE);
+                                                      &prevout_index)) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
         uint8_t prevout_txid[32];
         if (32 != call_get_merkleized_map_value(dc,
                                                 &input_map,
-                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
+                                                (uint8_t[]){PSBT_IN_PREVIOUS_TXID},
                                                 1,
                                                 prevout_txid,
                                                 sizeof(prevout_txid))) {
             SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
+
+        if (cur_input_index != 0) {
+            // Additional (proof-of-funds) inputs spend real UTXOs of the wallet policy; their
+            // amounts and scripts were already verified and aggregated by preprocess_inputs().
+            // Since their total is shown to the user, no outpoint may be spent twice (the sum
+            // would otherwise count the same coins several times), and BIP-322 requires to_sign
+            // to be consensus-valid anyway. Rather than buffering every outpoint, the app
+            // requires the proof-of-funds inputs to be in strictly increasing BIP-69 order,
+            // which makes a duplicate impossible, and different from the to_spend outpoint.
+            bool ok = outpoint_compare_bip69(prevout_txid, prevout_index, to_spend_txid, 0) != 0;
+            if (cur_input_index >= 2) {
+                ok = ok &&
+                     outpoint_compare_bip69(prevout_txid, prevout_index, prev_txid, prev_vout) > 0;
+            }
+            if (!ok) {
+                PRINTF("BIP-322: proof-of-funds inputs must be unique and in BIP-69 order\n");
+                SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED);
+                return false;
+            }
+            memcpy(prev_txid, prevout_txid, sizeof(prev_txid));
+            prev_vout = prevout_index;
+            continue;
+        }
+
+        // The first input must spend output 0 of to_spend. This holds for a proof-of-funds
+        // too: per BIP-322 v2.0.0, the message_challenge is not optional, so a request made
+        // only of real UTXOs (no virtual input) fails below, on the txid binding.
+        if (prevout_index != 0) {
+            PRINTF("BIP-322: the input does not spend the first output of to_spend\n");
+            SEND_SW_EC(dc, SW_INCORRECT_DATA, EC_SIGN_PSBT_BIP322_INVALID_STRUCTURE);
             return false;
         }
 
@@ -337,6 +381,7 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
             return false;
         }
 
+        memcpy(to_spend_txid, prevout_txid, sizeof(to_spend_txid));
         memcpy(st->bip322.challenge_script, challenge_script, challenge_script_len);
         st->bip322.challenge_script_len = challenge_script_len;
     }
@@ -352,8 +397,8 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
     return true;
 }
 
-bool __attribute__((noinline)) bip322_display_message(dispatcher_context_t *dc,
-                                                      sign_psbt_state_t *st) {
+bool __attribute__((noinline))
+bip322_display_message(dispatcher_context_t *dc, sign_psbt_state_t *st) {
     LOG_PROCESSOR(__FILE__, __LINE__, __func__);
 
     // Show any input verification warnings, exactly as the transaction review does. All the
@@ -399,7 +444,7 @@ bool __attribute__((noinline)) bip322_display_message(dispatcher_context_t *dc,
         int message_length =
             call_stream_merkleized_map_value(dc,
                                              &st->global_map,
-                                             (uint8_t[]) {PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE},
+                                             (uint8_t[]){PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE},
                                              1,
                                              NULL,
                                              message_copy_callback,
