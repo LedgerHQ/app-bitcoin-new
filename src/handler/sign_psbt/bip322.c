@@ -34,6 +34,7 @@
 #include "get_merkleized_map_value.h"
 #include "merkle.h"
 #include "psbt.h"
+#include "psbt_fields.h"
 #include "script.h"
 #include "stream_merkleized_map_value.h"
 #include "sw.h"
@@ -282,16 +283,15 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
         // inputs are ordinary spends of real coins.
         // A missing PSBT_IN_SEQUENCE means the final sequence number (0xFFFFFFFF) per BIP-370.
         uint32_t sequence;
-        bool has_sequence =
-            4 == call_get_merkleized_map_value_u32_le(dc,
-                                                      &input_map,
-                                                      (uint8_t[]) {PSBT_IN_SEQUENCE},
-                                                      1,
-                                                      &sequence);
+        psbt_field_status_t sequence_status = psbt_get_input_sequence(dc, &input_map, &sequence);
+        if (sequence_status == PSBT_FIELD_ERROR) {
+            SEND_SW(dc, SW_INCORRECT_DATA);
+            return false;
+        }
         if (cur_input_index == 0) {
             // The first input must have an explicit sequence of 0: any other value makes this
             // a timelocked variant, which is not supported yet.
-            if (!has_sequence || sequence != 0) {
+            if (sequence_status != PSBT_FIELD_PRESENT || sequence != 0) {
                 PRINTF("BIP-322: timelocked variants are not supported (first input's sequence)\n");
                 SEND_SW_EC(dc, SW_NOT_SUPPORTED, EC_SIGN_PSBT_BIP322_UNSUPPORTED);
                 return false;
@@ -302,7 +302,7 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
             // final sequence number (explicit, or implied by a missing PSBT_IN_SEQUENCE). Any
             // other value would impose a relative timelock on to_sign (with version 2), which
             // is again a timelocked variant.
-            if (!has_sequence) {
+            if (sequence_status == PSBT_FIELD_ABSENT) {
                 sequence = 0xFFFFFFFF;
             }
             if (sequence != 0 && (sequence & BIP68_SEQUENCE_LOCKTIME_DISABLE_FLAG) == 0) {
@@ -313,22 +313,13 @@ bool __attribute__((noinline)) bip322_validate(dispatcher_context_t *dc, sign_ps
         }
 
         uint32_t prevout_index;
-        if (4 != call_get_merkleized_map_value_u32_le(dc,
-                                                      &input_map,
-                                                      (uint8_t[]) {PSBT_IN_OUTPUT_INDEX},
-                                                      1,
-                                                      &prevout_index)) {
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_index(dc, &input_map, &prevout_index)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }
 
         uint8_t prevout_txid[32];
-        if (32 != call_get_merkleized_map_value(dc,
-                                                &input_map,
-                                                (uint8_t[]) {PSBT_IN_PREVIOUS_TXID},
-                                                1,
-                                                prevout_txid,
-                                                sizeof(prevout_txid))) {
+        if (PSBT_FIELD_PRESENT != psbt_get_input_prevout_txid(dc, &input_map, prevout_txid)) {
             SEND_SW(dc, SW_INCORRECT_DATA);
             return false;
         }

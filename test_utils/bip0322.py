@@ -18,12 +18,13 @@ from typing import List, Tuple
 from bitcoin_client.ledger_bitcoin import WalletPolicy
 from bitcoin_client.ledger_bitcoin.key import ExtendedKey, KeyOriginInfo
 from bitcoin_client.ledger_bitcoin.psbt import PSBT, PartiallySignedInput, PartiallySignedOutput
-from bitcoin_client.ledger_bitcoin.tx import (CTransaction, CTxIn, CTxOut, COutPoint, CTxWitness)
+from bitcoin_client.ledger_bitcoin.tx import (CScriptWitness, CTransaction, CTxIn, CTxInWitness,
+                                              CTxOut, COutPoint, CTxWitness, uint256_from_str)
 from bitcoin_client.ledger_bitcoin._serialize import ser_compact_size, ser_string, ser_uint256
 
 from test_utils import hash160, hash256
 from test_utils.txmaker import (getScriptPubkeyFromWallet, fill_inout,
-                                createFakeWalletTransaction)
+                                createFakeWalletTransaction, random_bytes, random_txid)
 from test_utils.wallet_policy import DescriptorTemplate
 
 PSBT_GLOBAL_GENERIC_SIGNED_MESSAGE = 0x09
@@ -169,6 +170,75 @@ def build_wallet_utxo_input(wallet_policy: WalletPolicy,
                address_index=prevout_addr_idx)
 
     return txin, psbt_input
+
+
+def build_wallet_utxo_inputs_same_tx(wallet_policy: WalletPolicy,
+                                     amounts: List[int]) -> List[Tuple[CTxIn, PartiallySignedInput]]:
+    """Builds one fake transaction with len(amounts) wallet-owned outputs, and returns the
+    inputs spending each of them (with sequence 0), in BIP-69 order (that is, by output index),
+    together with their PSBT input maps (all carrying the non-witness utxo, when relevant for the
+    policy)."""
+
+    desc_tmpl = DescriptorTemplate.from_string(wallet_policy.descriptor_template)
+
+    prevout = CTransaction()
+    prevout.nVersion = 2
+    prevout.nLockTime = 0
+    txin = CTxIn()
+    txin.prevout = COutPoint(uint256_from_str(random_txid()), 0)
+    txin.scriptSig = random_bytes(80)  # dummy
+    txin.nSequence = 0
+    prevout.vin = [txin]
+    prevout.wit = CTxWitness()
+    if desc_tmpl.is_segwit():
+        in_wit = CTxInWitness()
+        in_wit.scriptWitness = CScriptWitness()
+        in_wit.scriptWitness.stack = [random_bytes(64)]  # dummy
+        prevout.wit.vtxinwit = [in_wit]
+
+    address_indexes = list(range(100, 100 + len(amounts)))
+    prevout.vout = [
+        CTxOut(amount, getScriptPubkeyFromWallet(wallet_policy, False, address_index).data)
+        for amount, address_index in zip(amounts, address_indexes)
+    ]
+    prevout.rehash()
+
+    result = []
+    for prevout_n, address_index in enumerate(address_indexes):
+        txin = CTxIn()
+        txin.prevout = COutPoint(prevout.sha256, prevout_n)
+        txin.scriptSig = b""
+        txin.nSequence = 0
+
+        psbt_input = PartiallySignedInput(0)
+        if desc_tmpl.is_segwit():
+            psbt_input.witness_utxo = prevout.vout[prevout_n]
+        if desc_tmpl.is_legacy() or (desc_tmpl.is_segwit() and not desc_tmpl.is_taproot()):
+            psbt_input.non_witness_utxo = prevout
+
+        fill_inout(wallet_policy, psbt_input, is_change=False, address_index=address_index)
+        result.append((txin, psbt_input))
+
+    return result
+
+
+def bip322_pof_legacy_sighash_all(to_sign_tx: CTransaction,
+                                  input_index: int,
+                                  script_code: bytes) -> bytes:
+    """Legacy SIGHASH_ALL sighash of one input of a (possibly multi-input, proof-of-funds)
+    to_sign transaction."""
+    ser = struct.pack("<i", to_sign_tx.nVersion)
+    ser += ser_compact_size(len(to_sign_tx.vin))
+    for i, txin in enumerate(to_sign_tx.vin):
+        ser += txin.prevout.serialize()
+        ser += ser_string(script_code if i == input_index else b"")
+        ser += struct.pack("<I", txin.nSequence)
+    ser += ser_compact_size(len(to_sign_tx.vout))
+    for txout in to_sign_tx.vout:
+        ser += struct.pack("<q", txout.nValue) + ser_string(txout.scriptPubKey)
+    ser += struct.pack("<I", to_sign_tx.nLockTime)
+    ser += struct.pack("<I", 1)  # SIGHASH_ALL
+    return hash256(ser)
 
 
 def bip322_pof_segwitv0_sighash_all(to_sign_tx: CTransaction,

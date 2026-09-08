@@ -21,6 +21,8 @@ from test_utils.bip0322 import (
     build_bip322_psbt,
     build_bip322_pof_psbt,
     build_wallet_utxo_input,
+    build_wallet_utxo_inputs_same_tx,
+    bip322_pof_legacy_sighash_all,
     build_to_spend_tx,
     bip322_segwitv0_sighash_all,
     bip322_pof_segwitv0_sighash_all,
@@ -40,6 +42,7 @@ EC_SIGN_PSBT_BIP322_TOSPEND_MISMATCH = 0x000F
 EC_SIGN_PSBT_BIP322_UNSUPPORTED = 0x0011
 EC_SIGN_PSBT_BIP322_EXTERNAL_INPUTS = 0x0013
 EC_SIGN_PSBT_BIP322_INPUTS_NOT_SORTED = 0x0014
+EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_AND_WITNESSUTXO = 0x0003
 
 
 wallet_wpkh = WalletPolicy(
@@ -462,3 +465,55 @@ def test_sign_bip322_challenge_sequence_unsupported(navigator: Navigator, firmwa
     psbt.inputs[0].sequence = None  # PSBT_IN_SEQUENCE omitted
     expect_sign_psbt_error(client, navigator, firmware, test_name, psbt,
                            NotSupportedError, EC_SIGN_PSBT_BIP322_UNSUPPORTED)
+
+
+def test_sign_bip322_pof_shared_nonwitness_utxo(navigator: Navigator, firmware: Firmware,
+                                                client: RaggerClient, test_name: str):
+    # BIP-322 allows omitting the non-witness utxo of an input that spends an output of the same
+    # transaction as an earlier input. A legacy wallet is used because for legacy inputs the
+    # non-witness utxo is otherwise mandatory, so the omission is only accepted if the earlier
+    # input's transaction is actually used.
+    # The review is identical to test_sign_bip322_proof_of_funds, so no screenshots are taken.
+    message = b"I control these coins"
+    psbt = build_bip322_psbt(wallet_pkh, message)
+    shared_inputs = build_wallet_utxo_inputs_same_tx(wallet_pkh, [30_000, 40_000, 50_000])
+    for i, (txin, psbt_input) in enumerate(shared_inputs):
+        if i > 0:
+            psbt_input.non_witness_utxo = None  # carried by the first input only
+        psbt.tx.vin.append(txin)
+        psbt.inputs.append(psbt_input)
+
+    result = client.sign_psbt(psbt, wallet_pkh, None, navigator,
+                              instructions=bip322_instruction_approve(firmware,
+                                                                      save_screenshot=False),
+                              testname=test_name)
+
+    assert len(result) == 4
+    assert sorted(idx for idx, _ in result) == [0, 1, 2, 3]
+
+    prevout = shared_inputs[0][1].non_witness_utxo
+    for input_index, partial_sig in result:
+        if input_index == 0:
+            script_code = bytes(psbt.inputs[0].non_witness_utxo.vout[0].scriptPubKey)
+        else:
+            script_code = bytes(prevout.vout[psbt.tx.vin[input_index].prevout.n].scriptPubKey)
+        sighash = bip322_pof_legacy_sighash_all(psbt.tx, input_index, script_code)
+        assert partial_sig.signature[-1] == 1  # SIGHASH_ALL
+        assert ecdsa_verify(partial_sig.pubkey, sighash, partial_sig.signature[:-1])
+
+
+def test_sign_bip322_pof_shared_nonwitness_utxo_later_input(navigator: Navigator,
+                                                            firmware: Firmware,
+                                                            client: RaggerClient,
+                                                            test_name: str):
+    # the non-witness utxo can only be taken from an *earlier* input: if only a later input
+    # carries it, the (legacy) input without it has no utxo at all and is refused as usual
+    psbt = build_bip322_psbt(wallet_pkh, b"I control these coins")
+    shared_inputs = build_wallet_utxo_inputs_same_tx(wallet_pkh, [30_000, 40_000])
+    shared_inputs[0][1].non_witness_utxo = None  # carried by the second input only
+    for txin, psbt_input in shared_inputs:
+        psbt.tx.vin.append(txin)
+        psbt.inputs.append(psbt_input)
+
+    expect_sign_psbt_error(client, navigator, firmware, test_name, psbt, IncorrectDataError,
+                           EC_SIGN_PSBT_MISSING_NONWITNESSUTXO_AND_WITNESSUTXO, wallet=wallet_pkh)
