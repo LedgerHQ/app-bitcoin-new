@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dates are in `dd-mm-yyyy` format.
 
-## [2.X.X] - XX-XX-2026
+## [2.5.1] - 09-09-2026
 
-### Added
+## Fixed
 
-- Stateful, SDK-native fuzzing framework (Absolution-based) with semantic continuation host for `SIGN_PSBT` (developer tooling).
+- Support for musig() key expressions inside multi_a fragments.
+- Various bug fixes and code modernizations.
 
 ## [2.5.0] - 24-07-2026
 
